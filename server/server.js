@@ -33,6 +33,8 @@ CREATE INDEX IF NOT EXISTS msg_ch ON messages(channel,id);
 `);
 for (const col of ['avatar TEXT', 'color TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
+try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
+try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
 const stmts = new Map();
 const sql = (s) => { let p = stmts.get(s); if (!p) { p = db.prepare(s); stmts.set(s, p); } return p; };
 const get = (s, ...a) => sql(s).get(...a);
@@ -42,6 +44,9 @@ const run = (s, ...a) => sql(s).run(...a);
 // ---------- utilidades ----------
 const conns = new Map();            // userId -> Set<ws>
 const rooms = new Map();            // roomKey -> Map<userId, {ws,name,state}>
+const activities = new Map();       // userId -> {name, kind, since}
+const parties = new Map();          // roomKey -> {current, queue:[], playing:boolean, pos:number, updatedAt:number, loop:boolean}
+const ROLE_RANK = { owner: 4, admin: 3, mod: 2, dj: 1, member: 0 };
 const fail = (m) => { const e = new Error(m); e.user = true; throw e; };
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const toUser = (id, o) => { const s = conns.get(id); if (s) for (const w of s) send(w, o); };
@@ -54,22 +59,30 @@ const memberIds = (sid) => all('SELECT user_id u FROM members WHERE server_id=?'
 const friendIds = (uid) => all(`SELECT CASE WHEN a=? THEN b ELSE a END f FROM friends WHERE status='accepted' AND (a=? OR b=?)`, uid, uid, uid).map((r) => r.f);
 const areFriends = (a, b) => !!get(`SELECT 1 x FROM friends WHERE status='accepted' AND ((a=? AND b=?) OR (a=? AND b=?))`, a, b, b, a);
 const dmKey = (a, b) => `d${Math.min(a, b)}_${Math.max(a, b)}`;
+const roleOf = (sid, uid) => {
+  const s = get('SELECT owner FROM servers WHERE id=?', sid);
+  if (!s) return null;
+  if (s.owner === uid) return 'owner';
+  const m = get('SELECT role FROM members WHERE server_id=? AND user_id=?', sid, uid);
+  return m ? (m.role || 'member') : null;
+};
+const roleRank = (r) => ROLE_RANK[r] ?? 0;
 
 /** Devuelve { audience:[userId], voice:boolean } o lanza error si uid no tiene acceso. */
 function authorize(key, uid) {
   key = String(key || '');
   if (key[0] === 'c') {
-    const ch = get('SELECT c.id,c.server_id s,c.type t FROM channels c WHERE c.id=?', Number(key.slice(1)));
+    const ch = get('SELECT c.id,c.server_id s,c.type t,c.user_limit lim FROM channels c WHERE c.id=?', Number(key.slice(1)));
     if (!ch) fail('Canal inexistente');
     if (!get('SELECT 1 x FROM members WHERE server_id=? AND user_id=?', ch.s, uid)) fail('No eres miembro');
-    return { audience: memberIds(ch.s), type: ch.t, serverId: ch.s };
+    return { audience: memberIds(ch.s), type: ch.t, serverId: ch.s, userLimit: ch.lim || 0 };
   }
   const m = /^d(\d+)_(\d+)$/.exec(key);
   if (m) {
     const a = Number(m[1]), b = Number(m[2]);
     if (uid !== a && uid !== b) fail('Sin acceso');
     if (!areFriends(a, b)) fail('Solo entre amigos');
-    return { audience: [a, b], type: 'dm' };
+    return { audience: [a, b], type: 'dm', userLimit: 2 };
   }
   return fail('Canal inválido');
 }
@@ -79,11 +92,94 @@ function presenceAudience(uid) {
   return [...s, ...friendIds(uid)];
 }
 
-const selfView = (id) => get('SELECT id,name,color,bio,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id);
-const profileOf = (id) => get('SELECT color,av FROM users WHERE id=?', id) || {};
+const selfView = (id) => ({ ...get('SELECT id,name,color,bio,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
+const profileOf = (id) => ({ ...(get('SELECT color,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
 function roomUsers(key) {
   const r = rooms.get(key);
   return r ? [...r.entries()].map(([id, v]) => ({ id, name: v.name, state: v.state, ...profileOf(id) })) : [];
+}
+
+// ---- EpicBot DJ: Watch & Listen Together sincronizado por sala ----
+function partyPos(p) {
+  if (!p || !p.current) return 0;
+  return p.playing ? Math.max(0, p.pos + (Date.now() - p.updatedAt) / 1000) : Math.max(0, p.pos);
+}
+function partyView(key) {
+  const p = parties.get(key);
+  if (!p) return { current: null, queue: [], playing: false, pos: 0, serverTs: Date.now(), loop: false };
+  return { current: p.current, queue: p.queue, playing: p.playing, pos: partyPos(p), serverTs: Date.now(), loop: !!p.loop };
+}
+function broadcastParty(key) {
+  const r = rooms.get(key);
+  const view = partyView(key);
+  if (r) for (const [, v] of r) send(v.ws, { t: 'party.sync', key, party: view });
+  broadcastRoom(key);
+}
+async function searchYouTube(raw) {
+  const q = clean(raw, 300);
+  if (!q) return [];
+  const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
+  // 1) Si es URL de Playlist de YouTube (list=PL... o youtube.com/playlist?list=...)
+  const listMatch = /[?&]list=([A-Za-z0-9_-]{10,})/.exec(q);
+  if (listMatch && (/youtube\.com\/playlist/i.test(q) || !/(?:v=|youtu\.be\/)/.test(q) || /list=PL/i.test(q))) {
+    try {
+      const r = await fetch(`https://www.youtube.com/playlist?list=${encodeURIComponent(listMatch[1])}&hl=es`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8' } });
+      const html = await r.text();
+      const m = /var ytInitialData = (\{.*?\});<\/script>/s.exec(html);
+      if (m) {
+        const items = [];
+        const re = /"playlistVideoRenderer":\{"videoId":"([A-Za-z0-9_-]{11})".*?"title":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"\}.*?"shortBylineText":\{"runs":\[\{"text":"((?:[^"\\]|\\.)*)"\}/g;
+        let x;
+        while ((x = re.exec(m[1])) && items.length < 35) {
+          const ytId = x[1];
+          const title = JSON.parse(`"${x[2]}"`);
+          const author = JSON.parse(`"${x[3]}"`);
+          items.push({ ytId, kind: 'yt', title, author, duration: 'Playlist', thumb: `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${ytId}` });
+        }
+        if (items.length) return items;
+      }
+    } catch {}
+  }
+  // 2) Si es link directo de video de YouTube (watch?v=, youtu.be/, shorts/, embed/)
+  const ytMatch = /(?:youtube\.com\/(?:watch\?.*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i.exec(q) || (/^[A-Za-z0-9_-]{11}$/.test(q) ? [q, q] : null);
+  if (ytMatch) {
+    const ytId = ytMatch[1];
+    let title = `YouTube (${ytId})`, author = 'YouTube';
+    try {
+      const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`, { headers: { 'User-Agent': ua } });
+      if (r.ok) { const j = await r.json(); title = j.title || title; author = j.author_name || author; }
+    } catch {}
+    return [{ ytId, kind: 'yt', title, author, duration: 'Video', thumb: `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${ytId}` }];
+  }
+  // 3) Si es archivo directo de audio/video (.mp3, .mp4, .webm, .ogg, .wav o /files/...)
+  if (/^https?:\/\/.+\.(mp3|wav|ogg|webm|mp4|m4a)(\?.*)?$/i.test(q) || /^\/files\/\d+/.test(q)) {
+    const cleanName = decodeURIComponent(q.split('/').pop().split('?')[0]) || ' Multimedia directo';
+    return [{ ytId: null, kind: 'direct', title: cleanName, author: 'Archivo directo', duration: 'Directo', thumb: '', url: q }];
+  }
+  // 4) Búsqueda por texto en YouTube (sin API key)
+  try {
+    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=es`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8' } });
+    const html = await r.text();
+    const m = /var ytInitialData = (\{.*?\});<\/script>/s.exec(html);
+    if (!m) return [];
+    const data = JSON.parse(m[1]);
+    const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+    const out = [];
+    for (const sec of contents) {
+      const list = sec?.itemSectionRenderer?.contents || [];
+      for (const it of list) {
+        const v = it.videoRenderer;
+        if (!v || !v.videoId) continue;
+        const title = v.title?.runs?.map((x) => x.text).join('') || 'Sin título';
+        const author = v.ownerText?.runs?.[0]?.text || v.longBylineText?.runs?.[0]?.text || 'YouTube';
+        const duration = v.lengthText?.simpleText || 'EN VIVO';
+        out.push({ ytId: v.videoId, kind: 'yt', title, author, duration, thumb: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`, url: `https://www.youtube.com/watch?v=${v.videoId}` });
+        if (out.length >= 10) break;
+      }
+      if (out.length >= 10) break;
+    }
+    return out;
+  } catch { return []; }
 }
 
 // ---- llamadas entrantes (solo DMs): timbre de 45 s hasta contestar / rechazar / cancelar ----
@@ -97,7 +193,8 @@ function stopRing(key, reason) {
 function broadcastRoom(key) {
   let aud;
   try { aud = authorize(key, [...(rooms.get(key)?.keys() || [])][0] ?? -1).audience; } catch { aud = [...(rooms.get(key)?.keys() || [])]; }
-  toUsers(aud, { t: 'voice.room', key, users: roomUsers(key) });
+  const partyTrack = parties.get(key)?.current?.title || null;
+  toUsers(aud, { t: 'voice.room', key, users: roomUsers(key), partyTrack });
 }
 function leaveRoom(ws) {
   const key = ws.room; if (!key) return;
@@ -109,8 +206,9 @@ function leaveRoom(ws) {
     for (const [, v] of r) send(v.ws, { t: 'voice.left', key, userId: ws.user.id });
     let aud = [ws.user.id, ...r.keys()];
     try { aud = authorize(key, ws.user.id).audience; } catch {}
-    if (!r.size) rooms.delete(key);
-    toUsers(aud, { t: 'voice.room', key, users: roomUsers(key) });
+    if (!r.size) { rooms.delete(key); parties.delete(key); }
+    const partyTrack = parties.get(key)?.current?.title || null;
+    toUsers(aud, { t: 'voice.room', key, users: roomUsers(key), partyTrack });
   }
 }
 
@@ -123,16 +221,30 @@ const iceServers = () => {
 const serverView = (sid, uid) => {
   const s = get('SELECT id,name,owner,invite FROM servers WHERE id=?', sid);
   if (!s) fail('Servidor inexistente');
-  if (!get('SELECT 1 x FROM members WHERE server_id=? AND user_id=?', sid, uid)) fail('No eres miembro');
-  const channels = all('SELECT id,name,type FROM channels WHERE server_id=? ORDER BY id', sid).map((c) => ({ ...c, key: 'c' + c.id, room: c.type === 'voice' ? roomUsers('c' + c.id) : undefined }));
-  const members = all('SELECT u.id,u.name,u.color,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({ ...m, online: isOnline(m.id) }));
-  return { id: s.id, name: s.name, owner: s.owner, invite: s.owner === uid ? s.invite : undefined, channels, members };
+  const myRole = roleOf(sid, uid);
+  if (!myRole) fail('No eres miembro');
+  const channels = all(`SELECT id,name,type,user_limit FROM channels WHERE server_id=? ORDER BY CASE WHEN type='text' THEN 0 ELSE 1 END, id`, sid).map((c) => {
+    const key = 'c' + c.id;
+    return {
+      id: c.id, name: c.name, type: c.type, key,
+      userLimit: c.user_limit || 0,
+      room: c.type === 'voice' ? roomUsers(key) : undefined,
+      partyTrack: c.type === 'voice' ? (parties.get(key)?.current?.title || null) : undefined,
+    };
+  });
+  const members = all('SELECT u.id,u.name,u.color,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
+    id: m.id, name: m.name, color: m.color, bio: m.bio, av: m.av,
+    role: m.id === s.owner ? 'owner' : (m.role || 'member'),
+    online: isOnline(m.id),
+    activity: activities.get(m.id) || null,
+  }));
+  return { id: s.id, name: s.name, owner: s.owner, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
-  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
+  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
   const out = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
-    const u = { id: r.uid, name: r.name, color: r.color, av: r.av, online: isOnline(r.uid), dm: dmKey(uid, r.uid) };
+    const u = { id: r.uid, name: r.name, color: r.color, bio: r.bio, av: r.av, online: isOnline(r.uid), activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
     if (r.status === 'accepted') out.friends.push(u); else if (r.b === uid) out.incoming.push(u); else out.outgoing.push(u);
   }
   return out;
@@ -167,9 +279,12 @@ const H = {
   'server.create': (ws, d) => {
     const name = clean(d.name, 40); if (name.length < 2) fail('Nombre muy corto');
     const id = Number(run('INSERT INTO servers(name,owner,invite,created) VALUES(?,?,?,?)', name, ws.user.id, newInvite(), Date.now()).lastInsertRowid);
-    run('INSERT INTO members VALUES(?,?)', id, ws.user.id);
-    run(`INSERT INTO channels(server_id,name,type) VALUES(?, 'general','text')`, id);
-    run(`INSERT INTO channels(server_id,name,type) VALUES(?, 'Sala de voz','voice')`, id);
+    run(`INSERT INTO members(server_id,user_id,role) VALUES(?,?,'owner')`, id, ws.user.id);
+    run(`INSERT INTO channels(server_id,name,type,user_limit) VALUES(?, 'general','text',0)`, id);
+    run(`INSERT INTO channels(server_id,name,type,user_limit) VALUES(?, 'multimedia-y-links','text',0)`, id);
+    run(`INSERT INTO channels(server_id,name,type,user_limit) VALUES(?, '🔊 Sala General','voice',0)`, id);
+    run(`INSERT INTO channels(server_id,name,type,user_limit) VALUES(?, '🎮 Gaming Squad','voice',5)`, id);
+    run(`INSERT INTO channels(server_id,name,type,user_limit) VALUES(?, '🎵 Música & YouTube','voice',0)`, id);
     toUser(ws.user.id, { t: 'servers.changed' });
     return { id };
   },
@@ -177,7 +292,7 @@ const H = {
   'server.join': (ws, d) => {
     const s = get('SELECT id FROM servers WHERE invite=?', clean(d.code, 32).toLowerCase());
     if (!s) fail('Invitación inválida');
-    run('INSERT OR IGNORE INTO members VALUES(?,?)', s.id, ws.user.id);
+    run(`INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,'member')`, s.id, ws.user.id);
     toUser(ws.user.id, { t: 'servers.changed' }); notifyServer(s.id);
     return { id: s.id };
   },
@@ -192,37 +307,162 @@ const H = {
     const s = get('SELECT owner FROM servers WHERE id=?', id);
     if (!s || s.owner !== ws.user.id) fail('Solo el dueño puede eliminarlo');
     const m = memberIds(id);
-    for (const c of all('SELECT id FROM channels WHERE server_id=?', id)) run('DELETE FROM messages WHERE channel=?', 'c' + c.id);
+    for (const c of all('SELECT id FROM channels WHERE server_id=?', id)) { run('DELETE FROM messages WHERE channel=?', 'c' + c.id); parties.delete('c' + c.id); }
     run('DELETE FROM servers WHERE id=?', id);
     toUsers(m, { t: 'servers.changed' });
   },
   'server.kick': (ws, d) => {
-    const id = Number(d.id);
-    const s = get('SELECT owner FROM servers WHERE id=?', id);
-    if (!s || s.owner !== ws.user.id) fail('Solo el dueño puede expulsar');
-    if (Number(d.userId) === ws.user.id) fail('No puedes expulsarte');
-    run('DELETE FROM members WHERE server_id=? AND user_id=?', id, Number(d.userId));
-    toUser(Number(d.userId), { t: 'servers.changed' }); notifyServer(id);
+    const id = Number(d.id), target = Number(d.userId);
+    const myR = roleOf(id, ws.user.id), tarR = roleOf(id, target);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para expulsar');
+    if (target === ws.user.id) fail('No puedes expulsarte');
+    if (!tarR || roleRank(myR) <= roleRank(tarR)) fail('No puedes expulsar a alguien de igual o mayor rango');
+    run('DELETE FROM members WHERE server_id=? AND user_id=?', id, target);
+    toUser(target, { t: 'servers.changed' }); notifyServer(id);
+  },
+  'server.setRole': (ws, d) => {
+    const id = Number(d.id), target = Number(d.userId), newRole = String(d.role || 'member');
+    if (!['admin', 'mod', 'dj', 'member'].includes(newRole)) fail('Rango inválido');
+    const myR = roleOf(id, ws.user.id), tarR = roleOf(id, target);
+    if (!myR || roleRank(myR) < 3) fail('Solo el Dueño o Administradores pueden asignar rangos');
+    if (!tarR || tarR === 'owner') fail('No puedes cambiar el rango del dueño');
+    if (myR !== 'owner' && (roleRank(newRole) >= roleRank(myR) || roleRank(tarR) >= roleRank(myR))) fail('Solo el dueño puede gestionar administradores');
+    run('UPDATE members SET role=? WHERE server_id=? AND user_id=?', newRole, id, target);
+    notifyServer(id);
+    return { userId: target, role: newRole };
   },
   'server.newinvite': (ws, d) => {
-    const s = get('SELECT owner FROM servers WHERE id=?', Number(d.id));
-    if (!s || s.owner !== ws.user.id) fail('Solo el dueño');
-    run('UPDATE servers SET invite=? WHERE id=?', newInvite(), Number(d.id)); notifyServer(Number(d.id));
+    const id = Number(d.id);
+    if (roleRank(roleOf(id, ws.user.id)) < 3) fail('Solo Dueño o Admin');
+    run('UPDATE servers SET invite=? WHERE id=?', newInvite(), id); notifyServer(id);
   },
   'channel.create': (ws, d) => {
-    const s = get('SELECT owner FROM servers WHERE id=?', Number(d.serverId));
-    if (!s || s.owner !== ws.user.id) fail('Solo el dueño puede crear canales');
+    const sid = Number(d.serverId);
+    if (roleRank(roleOf(sid, ws.user.id)) < 3) fail('Solo Dueño o Admin pueden crear canales');
     const type = d.type === 'voice' ? 'voice' : 'text';
-    const name = clean(d.name, 32).replace(/\s+/g, type === 'text' ? '-' : ' ').toLowerCase(); if (!name) fail('Nombre vacío');
-    if (all('SELECT 1 FROM channels WHERE server_id=?', Number(d.serverId)).length >= 50) fail('Límite de canales');
-    run('INSERT INTO channels(server_id,name,type) VALUES(?,?,?)', Number(d.serverId), name, type);
-    notifyServer(Number(d.serverId));
+    const rawName = clean(d.name, 34);
+    const name = type === 'text' ? rawName.replace(/\s+/g, '-').toLowerCase() : rawName.replace(/\s+/g, ' ');
+    if (!name) fail('Nombre vacío');
+    const userLimit = type === 'voice' ? Math.max(0, Math.min(MAX_ROOM, Number(d.userLimit) || 0)) : 0;
+    if (all('SELECT 1 FROM channels WHERE server_id=?', sid).length >= 50) fail('Límite de canales');
+    const cid = Number(run('INSERT INTO channels(server_id,name,type,user_limit) VALUES(?,?,?,?)', sid, name, type, userLimit).lastInsertRowid);
+    notifyServer(sid);
+    return { id: cid };
   },
   'channel.delete': (ws, d) => {
-    const c = get('SELECT c.server_id s, s.owner o FROM channels c JOIN servers s ON s.id=c.server_id WHERE c.id=?', Number(d.id));
-    if (!c || c.o !== ws.user.id) fail('Solo el dueño');
-    run('DELETE FROM messages WHERE channel=?', 'c' + Number(d.id)); run('DELETE FROM channels WHERE id=?', Number(d.id));
+    const c = get('SELECT c.id, c.server_id s FROM channels c WHERE c.id=?', Number(d.id));
+    if (!c || roleRank(roleOf(c.s, ws.user.id)) < 3) fail('Solo Dueño o Admin');
+    run('DELETE FROM messages WHERE channel=?', 'c' + c.id);
+    run('DELETE FROM channels WHERE id=?', c.id);
+    parties.delete('c' + c.id);
     notifyServer(c.s);
+  },
+  'activity.set': (ws, d) => {
+    const name = clean(d?.name, 60);
+    if (name) {
+      const prev = activities.get(ws.user.id);
+      activities.set(ws.user.id, { name, kind: clean(d?.kind || 'game', 16), since: prev?.name === name ? prev.since : Date.now() });
+    } else {
+      activities.delete(ws.user.id);
+    }
+    const act = activities.get(ws.user.id) || null;
+    toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'presence', id: ws.user.id, online: true, activity: act });
+    if (ws.room) broadcastRoom(ws.room);
+    return { activity: act };
+  },
+  'party.get': (ws, d) => {
+    const key = d?.key || ws.room;
+    if (!key) fail('No estás en una sala de voz');
+    authorize(key, ws.user.id);
+    return partyView(key);
+  },
+  'party.search': async (ws, d) => {
+    return { items: await searchYouTube(d?.q) };
+  },
+  'party.add': async (ws, d) => {
+    const key = d?.key || ws.room;
+    if (!key) fail('Únete primero a un canal de voz o llamada para usar el Bot DJ');
+    authorize(key, ws.user.id);
+    let tracks = [];
+    if (d?.track && (d.track.ytId || d.track.url)) {
+      tracks = [{
+        id: crypto.randomBytes(6).toString('hex'),
+        ytId: d.track.ytId ? clean(d.track.ytId, 16) : null,
+        kind: d.track.ytId ? 'yt' : 'direct',
+        title: clean(d.track.title || ' Pista', 140),
+        author: clean(d.track.author || 'YouTube', 80),
+        duration: clean(d.track.duration || '', 24),
+        thumb: clean(d.track.thumb || '', 240),
+        url: clean(d.track.url || '', 400),
+        addedBy: ws.user.name,
+      }];
+    } else if (d?.q) {
+      const found = await searchYouTube(d.q);
+      if (!found.length) fail('No se encontraron resultados para agregar');
+      // Si fue una playlist se agregan todos; si fue búsqueda normal se agrega el primero
+      const isPlaylist = /[?&]list=([A-Za-z0-9_-]{10,})/.test(String(d.q));
+      const picked = isPlaylist ? found : [found[0]];
+      tracks = picked.map((t) => ({ ...t, id: crypto.randomBytes(6).toString('hex'), addedBy: ws.user.name }));
+    } else fail('Pista inválida');
+
+    let p = parties.get(key);
+    if (!p) parties.set(key, (p = { current: null, queue: [], playing: false, pos: 0, updatedAt: Date.now(), loop: false }));
+    for (const tr of tracks) {
+      if (!p.current) {
+        p.current = tr;
+        p.playing = true;
+        p.pos = 0;
+        p.updatedAt = Date.now();
+      } else {
+        p.queue.push(tr);
+      }
+    }
+    broadcastParty(key);
+    return { added: tracks.length, party: partyView(key) };
+  },
+  'party.control': (ws, d) => {
+    const key = d?.key || ws.room;
+    if (!key) fail('No estás en una sala de voz');
+    const a = authorize(key, ws.user.id);
+    let p = parties.get(key);
+    if (!p) return partyView(key);
+    const act = String(d?.action || '');
+    if (act === 'play') {
+      if (p.current && !p.playing) { p.pos = typeof d.pos === 'number' ? Math.max(0, d.pos) : partyPos(p); p.playing = true; p.updatedAt = Date.now(); }
+    } else if (act === 'pause') {
+      if (p.current) { p.pos = typeof d.pos === 'number' ? Math.max(0, d.pos) : partyPos(p); p.playing = false; p.updatedAt = Date.now(); }
+    } else if (act === 'seek') {
+      if (p.current) { p.pos = Math.max(0, Number(d.pos) || 0); p.updatedAt = Date.now(); }
+    } else if (act === 'next' || act === 'ended') {
+      // Si es 'ended', verificar trackId para que si 4 clientes mandan 'ended' al terminar el video solo avance una vez
+      if (act === 'ended' && d.trackId && p.current?.id !== d.trackId) return partyView(key);
+      if (p.loop && p.current) p.queue.push({ ...p.current, id: crypto.randomBytes(6).toString('hex') });
+      p.current = p.queue.shift() || null;
+      p.pos = 0;
+      p.playing = !!p.current;
+      p.updatedAt = Date.now();
+    } else if (act === 'jump') {
+      const idx = Number(d.index);
+      if (idx >= 0 && idx < p.queue.length) {
+        if (p.loop && p.current) p.queue.push({ ...p.current, id: crypto.randomBytes(6).toString('hex') });
+        p.current = p.queue.splice(idx, 1)[0];
+        p.pos = 0;
+        p.playing = true;
+        p.updatedAt = Date.now();
+      }
+    } else if (act === 'remove') {
+      const idx = Number(d.index);
+      if (idx >= 0 && idx < p.queue.length) p.queue.splice(idx, 1);
+    } else if (act === 'loop') {
+      p.loop = !p.loop;
+    } else if (act === 'clear') {
+      if (a.serverId && roleRank(roleOf(a.serverId, ws.user.id)) < 1 && p.queue.length > 3) {
+        // Cualquiera con rol DJ/Mod/Admin/Owner o en llamadas pequeñas puede limpiar
+      }
+      p.current = null; p.queue = []; p.playing = false; p.pos = 0; p.updatedAt = Date.now();
+    }
+    broadcastParty(key);
+    return partyView(key);
   },
   'dm.open': (ws, d) => { const o = Number(d.userId); if (!areFriends(ws.user.id, o)) fail('Solo amigos'); return { key: dmKey(ws.user.id, o) }; },
   'msg.send': (ws, d) => {
@@ -279,13 +519,15 @@ const H = {
     if (a.type === 'text') fail('No es canal de voz');
     leaveRoom(ws);
     let r = rooms.get(d.key); if (!r) rooms.set(d.key, (r = new Map()));
-    if (!r.has(ws.user.id) && r.size >= MAX_ROOM) fail(`Sala llena (máx. ${MAX_ROOM})`);
+    const limit = a.userLimit > 0 ? Math.min(MAX_ROOM, a.userLimit) : MAX_ROOM;
+    if (!r.has(ws.user.id) && r.size >= limit) fail(`Sala llena (máx. ${limit} usuarios)`);
     const old = r.get(ws.user.id); if (old && old.ws !== ws) send(old.ws, { t: 'voice.kicked', key: d.key });
     const peers = roomUsers(d.key).filter((p) => p.id !== ws.user.id);
     r.set(ws.user.id, { ws, name: ws.user.name, state: {} });
     ws.room = d.key;
     for (const p of peers) send(r.get(p.id).ws, { t: 'voice.joined', key: d.key, user: { id: ws.user.id, name: ws.user.name, state: {}, ...profileOf(ws.user.id) } });
-    toUsers(a.audience, { t: 'voice.room', key: d.key, users: roomUsers(d.key) });
+    const partyTrack = parties.get(d.key)?.current?.title || null;
+    toUsers(a.audience, { t: 'voice.room', key: d.key, users: roomUsers(d.key), partyTrack });
     let ringing = false, offline = false;
     if (a.type === 'dm') {
       if (peers.length) stopRing(d.key, 'answered');                 // el otro contestó
@@ -299,7 +541,7 @@ const H = {
         } else offline = true;
       }
     }
-    return { peers, ice: iceServers(), ringing, offline };
+    return { peers, ice: iceServers(), ringing, offline, party: partyView(d.key) };
   },
   'call.decline': (ws, d) => { const r = rings.get(d.key); if (r && r.to === ws.user.id) stopRing(d.key, 'declined'); },
   'profile.set': (ws, d) => {
@@ -352,6 +594,70 @@ function releaseInfo() {
 }
 
 // ---------- transporte ----------
+function ytPlayerHtml(vid) {
+  const safeVid = /^[A-Za-z0-9_-]{11}$/.test(vid || '') ? vid : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="referrer" content="origin-when-cross-origin">
+<style>html,body{margin:0;padding:0;width:100%;height:100%;background:#090a0f;overflow:hidden;font-family:system-ui,sans-serif}
+#player{width:100%;height:100%;border:0}
+</style></head><body><div id="player"></div>
+<script>
+let p = null, ready = false, curVid = ${JSON.stringify(safeVid)}, pending = [];
+const post = (o) => { try { parent.postMessage({ src: 'epickast-yt', ...o }, '*'); } catch {} };
+const tag = document.createElement('script');
+tag.src = 'https://www.youtube.com/iframe_api';
+document.head.appendChild(tag);
+window.onYouTubeIframeAPIReady = function() {
+  p = new YT.Player('player', {
+    width: '100%', height: '100%',
+    videoId: curVid || undefined,
+    playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, origin: location.origin },
+    events: {
+      onReady: () => {
+        ready = true;
+        while (pending.length) runCmd(pending.shift());
+        post({ ev: 'ready', videoId: curVid, duration: p.getDuration ? p.getDuration() : 0 });
+      },
+      onStateChange: (e) => {
+        post({ ev: 'state', state: e.data, pos: p.getCurrentTime ? p.getCurrentTime() : 0, duration: p.getDuration ? p.getDuration() : 0 });
+        if (e.data === 0) post({ ev: 'ended', videoId: curVid });
+      },
+      onError: (e) => post({ ev: 'error', code: e.data, videoId: curVid })
+    }
+  });
+};
+function runCmd(m) {
+  if (!ready || !p) { pending.push(m); return; }
+  try {
+    if (m.cmd === 'load') {
+      curVid = m.videoId;
+      p.loadVideoById({ videoId: m.videoId, startSeconds: Number(m.pos) || 0 });
+      if (m.playing === false) setTimeout(() => { try { p.pauseVideo(); } catch {} }, 350);
+    } else if (m.cmd === 'sync') {
+      if (m.videoId && m.videoId !== curVid) {
+        curVid = m.videoId;
+        p.loadVideoById({ videoId: m.videoId, startSeconds: Number(m.pos) || 0 });
+      } else if (typeof m.pos === 'number' && p.getCurrentTime) {
+        const cur = p.getCurrentTime() || 0;
+        if (Math.abs(cur - m.pos) > 2.2) p.seekTo(m.pos, true);
+      }
+      const st = p.getPlayerState ? p.getPlayerState() : -1;
+      if (m.playing && st !== 1 && st !== 3) p.playVideo();
+      else if (!m.playing && st === 1) p.pauseVideo();
+    } else if (m.cmd === 'play') p.playVideo();
+    else if (m.cmd === 'pause') p.pauseVideo();
+    else if (m.cmd === 'seek') p.seekTo(Number(m.pos) || 0, true);
+    else if (m.cmd === 'vol') { p.setVolume(Math.max(0, Math.min(100, Number(m.vol) ?? 80))); if (m.vol > 0 && p.isMuted && p.isMuted()) p.unMute(); }
+  } catch {}
+}
+window.addEventListener('message', (e) => { if (e.data && e.data.cmd) runCmd(e.data); });
+setInterval(() => {
+  if (ready && p && p.getCurrentTime && p.getPlayerState && p.getPlayerState() === 1) {
+    post({ ev: 'time', pos: p.getCurrentTime() || 0, duration: p.getDuration ? p.getDuration() : 0 });
+  }
+}, 1000);
+</script></body></html>`;
+}
+
 const SAFE_MIMES = /^(image\/(png|jpeg|webp|gif|bmp)|application\/pdf|text\/plain|audio\/(mpeg|wav|ogg|webm)|video\/(mp4|webm))$/i;
 const httpServer = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -361,6 +667,10 @@ const httpServer = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"ok":true,"app":"EpicKast"}'); }
   if (u.pathname === '/version') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(releaseInfo())); }
+  if (u.pathname === '/yt-player') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'origin-when-cross-origin' });
+    return res.end(ytPlayerHtml(u.searchParams.get('v') || ''));
+  }
   if (u.pathname === '/download/latest') {
     const info = releaseInfo();
     const fp = info.file ? path.join(__dirname, '..', 'dist', info.file) : null;
@@ -438,7 +748,7 @@ function login(ws, userId, name) {
   ws.user = { id: userId, name };
   let s = conns.get(userId); if (!s) conns.set(userId, (s = new Set()));
   s.add(ws);
-  if (s.size === 1) toUsers(presenceAudience(userId), { t: 'presence', id: userId, online: true });
+  if (s.size === 1) toUsers(presenceAudience(userId), { t: 'presence', id: userId, online: true, activity: activities.get(userId) || null });
 }
 
 wss.on('connection', (ws, req) => {
@@ -478,7 +788,15 @@ wss.on('connection', (ws, req) => {
         fail('No autenticado');
       }
       const h = H[m.t]; if (!h) fail('Operación desconocida');
-      reply(true, h(ws, m));
+      const res = h(ws, m);
+      if (res && typeof res.then === 'function') {
+        res.then((v) => reply(true, v)).catch((e) => {
+          if (!e.user) console.error('[error]', m.t, e);
+          reply(false, e.user ? e.message : 'Error interno');
+        });
+      } else {
+        reply(true, res);
+      }
     } catch (e) {
       if (!e.user) console.error('[error]', m.t, e);
       reply(false, e.user ? e.message : 'Error interno');
@@ -490,7 +808,11 @@ wss.on('connection', (ws, req) => {
     if (!ws.user) return;
     leaveRoom(ws);
     const s = conns.get(ws.user.id); s?.delete(ws);
-    if (s && !s.size) { conns.delete(ws.user.id); toUsers(presenceAudience(ws.user.id), { t: 'presence', id: ws.user.id, online: false }); }
+    if (s && !s.size) {
+      conns.delete(ws.user.id);
+      activities.delete(ws.user.id);
+      toUsers(presenceAudience(ws.user.id), { t: 'presence', id: ws.user.id, online: false, activity: null });
+    }
   });
   ws.on('error', () => {});
 });

@@ -21,6 +21,9 @@ const SVG_PATHS = {
   userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
   settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
+  tiles: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+  panelLeft: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
 };
 function icoSvg(name, size = 15) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -42,6 +45,15 @@ const DEFAULTS = {
   hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.024, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
   keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 54, hideNoVideo: true,
+  partyVol: 0.75, partyAudioOnly: false, autoGameDetect: true, customActivity: '',
+  hideSide: false, hideMembers: false,
+};
+const ROLES = {
+  owner:  { label: 'Dueño',       group: '👑 Dueño',            badge: '👑', color: '#fbbf24', rank: 4 },
+  admin:  { label: 'Admin',       group: '🛡️ Administradores',  badge: '🛡️', color: '#ff6b81', rank: 3 },
+  mod:    { label: 'Moderador',   group: '⚔️ Moderadores',      badge: '⚔️', color: '#2ed573', rank: 2 },
+  dj:     { label: 'DJ',          group: '🎵 DJs',              badge: '🎵', color: '#a29bfe', rank: 1 },
+  member: { label: 'Miembro',     group: '🟢 Miembros en línea', badge: '',   color: '',        rank: 0 },
 };
 const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('epickast.settings') || '{}') };
 const saveSettings = () => localStorage.setItem('epickast.settings', JSON.stringify(settings));
@@ -59,10 +71,12 @@ const S = {
   ws: null, seq: 0, pend: new Map(), me: null, token: localStorage.getItem('epickast.token') || '', ice: [],
   friends: { friends: [], incoming: [], outgoing: [] }, servers: [], sdata: new Map(),
   view: { kind: 'home', sid: null }, chan: null, chanType: null, chanName: '',
-  rooms: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
-  oldest: null, loadingOld: false, statTimer: null, pingTimer: null, incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.2.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
+  oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
+  incoming: null, outgoing: null, cleanup: [],
+  mini: false, appVer: '1.4.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
+  party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
 };
 
 window.epic.version?.().then((v) => { if (v) S.appVer = v; }).catch(() => {});
@@ -178,8 +192,9 @@ function onMsg(ev) {
   if (m.r) { const p = S.pend.get(m.r); if (p) { S.pend.delete(m.r); m.ok ? p.res(m.data) : p.rej(new Error(m.error)); } return; }
   switch (m.t) {
     case 'presence': {
-      for (const f of S.friends.friends) if (f.id === m.id) f.online = m.online;
-      for (const sd of S.sdata.values()) for (const mem of sd.members) if (mem.id === m.id) mem.online = m.online;
+      if (S.me && m.id === S.me.id) { S.me.activity = m.activity || null; renderMe(); }
+      for (const f of S.friends.friends) if (f.id === m.id) { f.online = m.online; if (m.activity !== undefined) f.activity = m.activity; }
+      for (const sd of S.sdata.values()) for (const mem of sd.members) if (mem.id === m.id) { mem.online = m.online; if (m.activity !== undefined) mem.activity = m.activity; }
       renderSide(); renderMembers(); renderHome(); break;
     }
     case 'friends.changed': loadFriends(); break;
@@ -188,7 +203,26 @@ function onMsg(ev) {
     case 'msg': onChatMsg(m); break;
     case 'msg.pinned': onMsgPinned(m); break;
     case 'typing': onTyping(m); break;
-    case 'voice.room': S.rooms.set(m.key, m.users); if (!m.users.length) S.rooms.delete(m.key); renderSide(); break;
+    case 'voice.room':
+      S.rooms.set(m.key, m.users);
+      if (!m.users.length) { S.rooms.delete(m.key); S.partyTracks.delete(m.key); }
+      else if (m.partyTrack !== undefined) {
+        if (m.partyTrack) S.partyTracks.set(m.key, m.partyTrack);
+        else S.partyTracks.delete(m.key);
+      }
+      renderSide();
+      break;
+    case 'party.sync':
+      if (m.party?.current?.title) S.partyTracks.set(m.key, m.party.current.title);
+      else S.partyTracks.delete(m.key);
+      if (m.key === S.callKey) {
+        S.party = m.party;
+        renderStage();
+        syncPartyTile();
+        S.partyModalUpdater?.();
+      }
+      renderSide();
+      break;
     case 'voice.joined': S.call?.addPeer(m.user); ringer.beep([520, 680]); break;
     case 'voice.left': S.call?.removePeer(m.userId); ringer.beep([600, 420]); break;
     case 'voice.peerstate': { const p = S.call?.peers.get(m.userId); if (p) { p.state = m.state; renderStage(); } break; }
@@ -292,9 +326,30 @@ async function autoLogin() {
 }
 async function bootstrap() {
   $('login').classList.add('hidden'); $('main').classList.remove('hidden');
+  S.lastSentActivity = '';
   await Promise.all([loadFriends(), loadServers(), checkServerUpdate()]);
   if (S.view.kind === 'server') await refreshServer(S.view.sid);
   render();
+  startGameDetection();
+}
+async function syncActivity() {
+  if (!S.ws || S.ws.readyState !== 1 || !S.me) return;
+  let actName = (settings.customActivity || '').trim();
+  if (!actName && settings.autoGameDetect) {
+    const det = await window.epic.detectGame?.().catch(() => null);
+    S.detectedGame = det?.name || null;
+    actName = S.detectedGame || '';
+  } else if (!settings.autoGameDetect) {
+    S.detectedGame = null;
+  }
+  if (actName === S.lastSentActivity) return;
+  S.lastSentActivity = actName;
+  rpc('activity.set', { name: actName, kind: 'game' }).catch(() => {});
+}
+function startGameDetection() {
+  clearInterval(S.gameTimer);
+  setTimeout(syncActivity, 800);
+  S.gameTimer = setInterval(syncActivity, 18000);
 }
 async function checkServerUpdate() {
   try {
@@ -323,7 +378,10 @@ async function loadServers() {
 }
 async function refreshServer(id) {
   try { S.sdata.set(id, await rpc('server.get', { id })); } catch { S.sdata.delete(id); if (S.view.sid === id) goHome(); return; }
-  for (const c of S.sdata.get(id).channels) if (c.room) { if (c.room.length) S.rooms.set(c.key, c.room); else S.rooms.delete(c.key); }
+  for (const c of S.sdata.get(id).channels) {
+    if (c.room) { if (c.room.length) S.rooms.set(c.key, c.room); else S.rooms.delete(c.key); }
+    if (c.partyTrack) S.partyTracks.set(c.key, c.partyTrack); else S.partyTracks.delete(c.key);
+  }
   if (S.view.sid === id) { renderSide(); renderMembers(); }
 }
 
@@ -570,17 +628,33 @@ $('msgInput').addEventListener('paste', (e) => {
   const files = e.clipboardData?.files;
   if (files && files.length > 0) { e.preventDefault(); uploadFiles(files); }
 });
+let dragOverTimer = null;
+function clearDragOver() {
+  clearTimeout(dragOverTimer);
+  $('center')?.classList.remove('dragover');
+}
 $('center').addEventListener('dragover', (e) => {
   if (!S.chan || S.chanType === 'voice') return;
-  e.preventDefault(); $('center').classList.add('dragover');
+  const hasFiles = e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  if (!hasFiles) return;
+  e.preventDefault();
+  $('center').classList.add('dragover');
+  clearTimeout(dragOverTimer);
+  dragOverTimer = setTimeout(clearDragOver, 1400);
 });
 $('center').addEventListener('dragleave', (e) => {
-  if (e.target === $('center')) $('center').classList.remove('dragover');
+  if (!e.relatedTarget || !$('center').contains(e.relatedTarget)) clearDragOver();
 });
 $('center').addEventListener('drop', (e) => {
-  e.preventDefault(); $('center').classList.remove('dragover');
+  e.preventDefault();
+  clearDragOver();
   if (e.dataTransfer?.files?.length) uploadFiles(e.dataTransfer.files);
 });
+window.addEventListener('drop', clearDragOver);
+window.addEventListener('dragend', clearDragOver);
+window.addEventListener('blur', clearDragOver);
+window.addEventListener('mousedown', clearDragOver);
+window.addEventListener('keydown', (e) => { if (e.key === 'Escape') clearDragOver(); });
 $('composer').addEventListener('submit', (e) => {
   e.preventDefault(); const t = $('msgInput').value.trim();
   if (!t || !S.chan || S.chanType === 'voice') return;
@@ -674,8 +748,16 @@ async function modalGallery() {
 // ---------- render ----------
 function render() { renderRail(); renderSide(); renderMembers(); renderCenter(); renderHome(); renderStage(); renderMe(); }
 function renderMe() {
-  const bar = $('meBar'); if (!S.me) return; bar.replaceChildren(
-    h('div', { class: 'who', title: 'Editar perfil', onclick: modalProfile }, avatar(S.me, 34, true), h('div', { style: 'min-width:0' }, h('b', null, S.me.name), h('small', null, S.me.bio || 'Editar perfil'))),
+  const bar = $('meBar'); if (!S.me) return;
+  const actTxt = S.me.activity?.name ? `🎮 ${S.me.activity.name}` : (S.me.bio || 'Editar perfil y actividad');
+  bar.replaceChildren(
+    h('div', { class: 'who', title: 'Editar perfil y estado de juego', onclick: modalProfile },
+      avatar(S.me, 34, true),
+      h('div', { style: 'min-width:0' },
+        h('b', null, S.me.name),
+        h('small', { class: S.me.activity?.name ? 'act-live' : '' }, actTxt)
+      )
+    ),
     h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16)));
 }
 function renderRail() {
@@ -686,7 +768,16 @@ function renderRail() {
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
 }
 function userItem(u, onclick, extra) {
-  return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : ''), onclick }, h('span', { class: 'l' }, avatar(u, 28, u.online), h('span', { class: 'nm' }, u.name, S.unread.has(u.dm) ? ' ●' : '')), extra);
+  return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : ''), onclick },
+    h('span', { class: 'l' },
+      avatar(u, 28, u.online),
+      h('div', { class: 'u-stack' },
+        h('span', { class: 'nm' }, u.name, S.unread.has(u.dm) ? ' ●' : ''),
+        u.online && u.activity?.name ? h('small', { class: 'u-act' }, `🎮 ${u.activity.name}`) : null
+      )
+    ),
+    extra
+  );
 }
 function renderSide() {
   const L = $('sideList'); L.replaceChildren();
@@ -695,20 +786,42 @@ function renderSide() {
     for (const f of S.friends.friends) {
       L.append(userItem(f, () => openChannel(f.dm, 'dm', f.name), h('button', { class: 'side-call', title: `Llamar a ${f.name}`, onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name); } }, icoSvg('phone', 14))));
       const room = S.rooms.get(f.dm); if (room?.length) L.append(h('div', { class: 'sub' }, `🔊 en llamada (${room.length})`));
+      const pt = S.partyTracks.get(f.dm); if (pt) L.append(h('div', { class: 'sub party-sub' }, `🎵 ${pt}`));
     }
     if (!S.friends.friends.length) L.append(h('div', { class: 'item' }, 'Aún no tienes amigos'));
     return;
   }
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
-  $('sideTitle').replaceChildren(h('span', null, sd.name), h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar' }, '⋯'));
+  const myRank = ROLES[sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member')]?.rank ?? 0;
+  $('sideTitle').replaceChildren(
+    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, sd.name),
+    h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, canales y rangos' }, '⋯')
+  );
   for (const type of ['text', 'voice']) {
     L.append(h('div', { class: 'sect' }, type === 'text' ? 'Canales de texto' : 'Canales de voz',
-      sd.owner === S.me.id ? h('button', { title: 'Crear canal', onclick: () => modalChannel(sd.id, type) }, '+') : null));
+      myRank >= 3 ? h('button', { title: type === 'text' ? 'Crear canal de texto' : 'Crear canal de voz', onclick: () => modalChannel(sd.id, type) }, '+') : null));
     for (const c of sd.channels.filter((x) => x.type === type)) {
-      const sel = S.chan === c.key;
+      const sel = S.chan === c.key || (type === 'voice' && S.callKey === c.key);
+      const rUsers = type === 'voice' ? (S.rooms.get(c.key) || []) : [];
+      const countBadge = type === 'voice' && (rUsers.length > 0 || c.userLimit > 0)
+        ? h('span', { class: 'ch-cnt' + (c.userLimit > 0 && rUsers.length >= c.userLimit ? ' full' : '') }, c.userLimit > 0 ? `${rUsers.length}/${c.userLimit}` : `${rUsers.length}`)
+        : null;
+      const prefix = type === 'text' ? '# ' : (/^[\p{Emoji}\u200d]+/u.test(c.name) ? '' : '🔊 ');
       L.append(h('div', { class: 'item' + (sel ? ' sel' : ''), onclick: () => (type === 'voice' ? joinCall(c.key, c.name) : openChannel(c.key, 'text', c.name)) },
-        h('span', null, (type === 'text' ? '# ' : '🔊 ') + c.name, S.unread.has(c.key) ? ' ●' : '')));
-      if (type === 'voice') for (const u of S.rooms.get(c.key) || []) L.append(h('div', { class: 'sub' }, avatar(u, 18), (u.state?.screen ? '🖥️ ' : u.state?.cam ? '📷 ' : '') + u.name + (u.state?.muted ? ' 🔇' : '')));
+        h('span', { class: 'nm' }, prefix + c.name, S.unread.has(c.key) ? ' ●' : ''),
+        countBadge
+      ));
+      if (type === 'voice') {
+        const pt = S.partyTracks.get(c.key);
+        if (pt) L.append(h('div', { class: 'sub party-sub', title: `Sonando en ${c.name}: ${pt}` }, `🎵 ${pt}`));
+        for (const u of rUsers) {
+          L.append(h('div', { class: 'sub' },
+            avatar(u, 18),
+            h('span', { class: 'sub-nm' }, (u.state?.screen ? '🖥️ ' : u.state?.cam ? '📷 ' : '') + u.name + (u.state?.muted ? ' 🔇' : '')),
+            u.activity?.name ? h('span', { class: 'sub-game', title: `Jugando a ${u.activity.name}` }, `🎮 ${u.activity.name}`) : null
+          ));
+        }
+      }
     }
   }
 }
@@ -716,19 +829,109 @@ function renderMembers() {
   const M = $('members'); M.replaceChildren();
   if (S.view.kind !== 'server') return;
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
-  M.append(h('div', { class: 'sect' }, `Miembros — ${sd.members.length}`));
-  for (const m of [...sd.members].sort((a, b) => b.online - a.online)) M.append(h('div', { class: 'item' }, h('span', { class: 'l' }, avatar(m, 28, m.online), h('span', { class: 'nm' }, m.name, m.id === sd.owner ? ' 👑' : ''))));
+  const online = sd.members.filter((m) => m.online);
+  const offline = sd.members.filter((m) => !m.online);
+
+  const renderRow = (m) => {
+    const rKey = m.role || (m.id === sd.owner ? 'owner' : 'member');
+    const rInfo = ROLES[rKey] || ROLES.member;
+    const subTxt = m.online && m.activity?.name ? `🎮 ${m.activity.name}` : (m.bio || '');
+    return h('div', { class: 'item mem-row' + (m.online ? '' : ' off'), onclick: () => modalMemberCard(sd, m), title: 'Clic para ver perfil o asignar rango' },
+      h('span', { class: 'l' },
+        avatar(m, 30, m.online),
+        h('div', { class: 'u-stack' },
+          h('span', { class: 'nm', style: rInfo.color ? `color:${rInfo.color};font-weight:600` : '' },
+            m.name,
+            rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null
+          ),
+          subTxt ? h('small', { class: m.online && m.activity?.name ? 'u-act' : 'u-bio' }, subTxt) : null
+        )
+      )
+    );
+  };
+
+  for (const rKey of ['owner', 'admin', 'mod', 'dj', 'member']) {
+    const grp = online.filter((m) => (m.role || (m.id === sd.owner ? 'owner' : 'member')) === rKey);
+    if (!grp.length) continue;
+    M.append(h('div', { class: 'sect' }, `${ROLES[rKey].group} — ${grp.length}`));
+    grp.forEach((m) => M.append(renderRow(m)));
+  }
+  if (offline.length) {
+    M.append(h('div', { class: 'sect' }, `⚫ Desconectados — ${offline.length}`));
+    offline.forEach((m) => M.append(renderRow(m)));
+  }
+}
+function modalMemberCard(sd, m) {
+  const myRole = sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member');
+  const myRank = ROLES[myRole]?.rank ?? 0;
+  const mRole = m.role || (m.id === sd.owner ? 'owner' : 'member');
+  const mRank = ROLES[mRole]?.rank ?? 0;
+  const rInfo = ROLES[mRole] || ROLES.member;
+  const isFriend = S.friends.friends.some((f) => f.id === m.id);
+  const canSetRole = myRank >= 3 && m.id !== sd.owner && (myRole === 'owner' || myRank > mRank);
+  const canKick = myRank >= 2 && m.id !== S.me.id && myRank > mRank;
+
+  const roleSel = canSetRole ? h('select', {
+    onchange: async (e) => {
+      await safe(rpc('server.setRole', { id: sd.id, userId: m.id, role: e.target.value }));
+      toast(`Rango de ${m.name} actualizado a ${ROLES[e.target.value]?.label}`);
+      closeModal();
+    }
+  }, ['admin', 'mod', 'dj', 'member'].filter((rk) => myRole === 'owner' || ROLES[rk].rank < myRank).map((rk) =>
+    h('option', { value: rk, selected: mRole === rk }, `${ROLES[rk].badge || '👤'} ${ROLES[rk].label}`)
+  )) : null;
+
+  modal(`Perfil de ${m.name}`,
+    h('div', { class: 'prof' },
+      avatar(m, 72, m.online),
+      h('div', { style: 'display:flex;flex-direction:column;gap:4px;min-width:0' },
+        h('div', { style: 'font-size:17px;font-weight:700;color:' + (rInfo.color || 'var(--tx)') }, `${m.name} ${rInfo.badge || ''}`),
+        h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${m.online ? '🟢 En línea' : '⚫ Desconectado'}`),
+        m.activity?.name ? h('div', { class: 'act-pill' }, `🎮 Jugando a ${m.activity.name}`) : null,
+        m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:2px' }, `“${m.bio}”`) : null
+      )
+    ),
+    canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
+    h('div', { class: 'row' },
+      m.id !== S.me.id && !isFriend ? h('button', { class: 'primary', onclick: () => safe(rpc('friends.add', { name: m.name })).then(() => { toast('Solicitud enviada'); closeModal(); }) }, icoSvg('userPlus', 14), ' Agregar amigo') : null,
+      canKick ? h('button', { class: 'danger', onclick: () => confirm(`¿Expulsar a ${m.name} del servidor?`) && safe(rpc('server.kick', { id: sd.id, userId: m.id })).then(closeModal) }, 'Expulsar del servidor') : null
+    )
+  );
+}
+function applyPanelsLayout() {
+  const mainEl = $('main');
+  if (!mainEl) return;
+  mainEl.classList.toggle('hide-side', !!settings.hideSide);
+  const hideRight = S.view.kind !== 'server' || !!settings.hideMembers;
+  mainEl.classList.toggle('hide-members', hideRight);
 }
 function renderCenter() {
+  applyPanelsLayout();
   const dm = S.chan && S.chan[0] === 'd';
   const showChat = !!S.chan && S.chanType !== 'voice';
+  const isServer = S.view.kind === 'server';
+  const toggleSideBtn = h('button', {
+    class: 'btn-ico' + (settings.hideSide ? ' on-pane' : ''),
+    title: settings.hideSide ? 'Mostrar lista de contactos y canales' : 'Ocultar lista de contactos y canales (mantiene los servidores visibles)',
+    onclick: () => { settings.hideSide = !settings.hideSide; saveSettings(); renderCenter(); }
+  }, icoSvg('panelLeft', 16));
+
   const rightBtns = h('div', { style: 'display:flex;gap:8px;align-items:center' },
+    S.call ? h('button', { class: 'btn-act hdr' + (S.party?.current ? ' call' : ''), title: 'Abrir EpicBot DJ (YouTube & Playlists en conjunto)', onclick: modalParty }, '🎵 ', S.party?.current ? 'Bot DJ (Sonando)' : 'Bot DJ') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver mensajes fijados en este canal', onclick: modalPins }, icoSvg('pin', 14), 'Fijados') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, icoSvg('gallery', 14), 'Galería') : null,
-    dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null
+    dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null,
+    isServer ? h('button', {
+      class: 'btn-act hdr' + (!settings.hideMembers ? ' on-pane' : ''),
+      title: settings.hideMembers ? 'Mostrar columna de miembros a la derecha' : 'Ocultar columna de miembros para ampliar la pantalla',
+      onclick: () => { settings.hideMembers = !settings.hideMembers; saveSettings(); renderCenter(); }
+    }, icoSvg('users', 14), 'Miembros') : null
   );
   $('chTitle').replaceChildren(
-    h('span', null, S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : ''),
+    h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
+      toggleSideBtn,
+      h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '')
+    ),
     rightBtns
   );
   $('msgs').classList.toggle('hidden', !showChat); $('composer').classList.toggle('hidden', !showChat);
@@ -768,12 +971,15 @@ function renderHome() {
     H.append(h('div', { class: 'hint', style: 'padding:12px 2px' }, 'Aún no has agregado amigos. Envía una solicitud arriba para empezar a chatear y llamar.'));
   }
   for (const u of S.friends.friends) {
+    const statusLine = u.online
+      ? (u.activity?.name ? `🎮 Jugando a ${u.activity.name}` : (u.bio ? `En línea · ${u.bio}` : 'En línea'))
+      : 'Desconectado';
     H.append(h('div', { class: 'friend-card' },
       h('span', { class: 'l', style: 'cursor:pointer', onclick: () => openChannel(u.dm, 'dm', u.name) },
         avatar(u, 38, u.online),
         h('span', { class: 'nm' },
           h('div', { style: 'font-weight:600;color:var(--tx)' }, u.name),
-          h('div', { class: 'hint', style: u.online ? 'color:var(--ok)' : '' }, u.online ? 'En línea' : 'Desconectado')
+          h('div', { class: 'hint', style: u.online ? (u.activity?.name ? 'color:#a29bfe;font-weight:600' : 'color:var(--ok)') : '' }, statusLine)
         )
       ),
       h('div', { class: 'f-actions' },
@@ -790,31 +996,95 @@ function modal(title, ...body) {
   const m = $('modal'); m.replaceChildren(h('div', { class: 'panel' }, h('h3', null, title), ...body, h('button', { onclick: closeModal }, 'Cerrar')));
   m.classList.remove('hidden'); m.onclick = (e) => { if (e.target === m) closeModal(); };
 }
-function closeModal() { S.cleanup.splice(0).forEach((f) => { try { f(); } catch {} }); $('modal').classList.add('hidden'); $('modal').replaceChildren(); }
+function closeModal() { S.partyModalUpdater = null; S.cleanup.splice(0).forEach((f) => { try { f(); } catch {} }); $('modal').classList.add('hidden'); $('modal').replaceChildren(); }
 function modalServer() {
-  const name = h('input', { placeholder: 'Nombre del servidor' }); const code = h('input', { placeholder: 'Código de invitación' });
-  modal('Servidores', h('label', null, 'Crear un servidor', name), h('button', { class: 'primary', onclick: async () => { const r = await safe(rpc('server.create', { name: name.value })); closeModal(); await loadServers(); openServer(r.id); } }, 'Crear'),
+  const name = h('input', { placeholder: 'Nombre del servidor (ej. Squad Epick3D)' }); const code = h('input', { placeholder: 'Código de invitación' });
+  modal('Servidores', h('label', null, 'Crear un servidor (incluye salas de voz, gaming y música)', name), h('button', { class: 'primary', onclick: async () => { const r = await safe(rpc('server.create', { name: name.value })); closeModal(); await loadServers(); openServer(r.id); } }, 'Crear servidor'),
     h('label', null, 'Unirse con invitación', code), h('button', { class: 'primary', onclick: async () => { const r = await safe(rpc('server.join', { code: code.value })); closeModal(); await loadServers(); openServer(r.id); } }, 'Unirse'));
 }
 function modalChannel(sid, type) {
-  const name = h('input', { placeholder: 'nombre-del-canal' });
-  modal(type === 'text' ? 'Nuevo canal de texto' : 'Nuevo canal de voz', name, h('button', { class: 'primary', onclick: async () => { await safe(rpc('channel.create', { serverId: sid, name: name.value, type })); closeModal(); } }, 'Crear'));
+  const name = h('input', { placeholder: type === 'text' ? 'ej. clips-y-memes' : 'ej. 🎮 Squad Ranked' });
+  const limSel = h('select', null,
+    [[0, 'Sin límite (hasta 8 en malla P2P)'], [2, '2 usuarios (Sala Dúo)'], [3, '3 usuarios (Trío)'], [4, '4 usuarios (Squad)'], [5, '5 usuarios (5v5)'], [6, '6 usuarios']].map(([v, t]) => h('option', { value: v }, t))
+  );
+  const presets = type === 'voice' ? h('div', { class: 'preset-chips' },
+    [
+      ['🔊 Sala General', 0],
+      ['🎮 Gaming Squad', 5],
+      ['🎵 Sala de Música / DJ', 0],
+      ['🎬 Cine & YouTube', 0],
+      ['🔒 Sala Dúo VIP', 2],
+      ['💤 AFK / Descanso', 0],
+    ].map(([n, l]) => h('button', { type: 'button', class: 'chip', onclick: () => { name.value = n; limSel.value = String(l); } }, n))
+  ) : null;
+
+  modal(type === 'text' ? 'Nuevo canal de texto' : 'Nuevo canal de voz',
+    type === 'voice' ? h('label', null, 'Plantillas rápidas (clic para rellenar)', presets) : null,
+    h('label', null, 'Nombre del canal', name),
+    type === 'voice' ? h('label', null, 'Límite de usuarios en el canal', limSel) : null,
+    h('button', { class: 'primary', onclick: async () => {
+      await safe(rpc('channel.create', { serverId: sid, name: name.value, type, userLimit: type === 'voice' ? Number(limSel.value) : 0 }));
+      closeModal();
+    } }, 'Crear canal')
+  );
 }
 function modalServerManage() {
-  const sd = S.sdata.get(S.view.sid); if (!sd) return; const own = sd.owner === S.me.id; const parts = [];
-  if (own) {
-    parts.push(h('label', null, 'Código de invitación (compártelo con tus amigos)', h('input', { value: sd.invite || '', readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(e.target.value); toast('Copiado'); } })));
-    parts.push(h('button', { onclick: () => rpc('server.newinvite', { id: sd.id }).then(closeModal) }, 'Generar nueva invitación'));
-    parts.push(h('div', { class: 'sect' }, 'Canales'));
-    for (const c of sd.channels) parts.push(h('div', { class: 'item' }, (c.type === 'text' ? '# ' : '🔊 ') + c.name, h('button', { onclick: () => confirm(`¿Eliminar ${c.name}?`) && rpc('channel.delete', { id: c.id }).then(closeModal) }, '✕')));
-    parts.push(h('div', { class: 'sect' }, 'Miembros'));
-    for (const m of sd.members) if (m.id !== S.me.id) parts.push(h('div', { class: 'item' }, h('span', { class: 'l' }, avatar(m, 24), m.name), h('button', { onclick: () => confirm(`¿Expulsar a ${m.name}?`) && rpc('server.kick', { id: sd.id, userId: m.id }).then(closeModal) }, 'Expulsar')));
-    parts.push(h('button', { class: 'danger', onclick: () => confirm('¿Eliminar el servidor y sus mensajes?') && rpc('server.delete', { id: sd.id }).then(closeModal) }, 'Eliminar servidor'));
-  } else parts.push(h('button', { class: 'danger', onclick: () => rpc('server.leave', { id: sd.id }).then(closeModal) }, 'Salir del servidor'));
-  modal(sd.name, ...parts);
+  const sd = S.sdata.get(S.view.sid); if (!sd) return;
+  const myRole = sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member');
+  const myRank = ROLES[myRole]?.rank ?? 0;
+  const parts = [];
+  if (sd.invite) {
+    parts.push(h('label', null, '🔗 Código de invitación (clic para copiar y compartir con tus amigos)',
+      h('input', { value: sd.invite, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(e.target.value); toast('Código copiado'); } })));
+    if (myRank >= 3) parts.push(h('button', { onclick: () => rpc('server.newinvite', { id: sd.id }).then(closeModal) }, '🔄 Generar nuevo código de invitación'));
+  }
+  if (myRank >= 3) {
+    parts.push(
+      h('div', { class: 'sect', style: 'display:flex;justify-content:space-between;align-items:center' },
+        h('span', null, `Canales (${sd.channels.length})`),
+        h('div', { style: 'display:flex;gap:6px' },
+          h('button', { style: 'padding:3px 8px;font-size:11px', onclick: () => { closeModal(); modalChannel(sd.id, 'text'); } }, '+ Texto'),
+          h('button', { style: 'padding:3px 8px;font-size:11px', onclick: () => { closeModal(); modalChannel(sd.id, 'voice'); } }, '+ Voz')
+        )
+      )
+    );
+    for (const c of sd.channels) {
+      parts.push(h('div', { class: 'item', style: 'background:var(--bg3)' },
+        h('span', null, (c.type === 'text' ? '# ' : '🔊 ') + c.name + (c.userLimit ? ` (máx. ${c.userLimit})` : '')),
+        h('button', { class: 'btn-ico del', title: 'Eliminar canal', onclick: () => confirm(`¿Eliminar ${c.name}?`) && rpc('channel.delete', { id: c.id }).then(closeModal) }, '✕')
+      ));
+    }
+  }
+  parts.push(h('div', { class: 'sect' }, `Miembros y Rangos (${sd.members.length})`));
+  const memList = h('div', { class: 'gal-list', style: 'max-height:220px' });
+  for (const m of sd.members) {
+    const mRole = m.role || (m.id === sd.owner ? 'owner' : 'member');
+    const mRank = ROLES[mRole]?.rank ?? 0;
+    const canEditRole = myRank >= 3 && m.id !== sd.owner && (myRole === 'owner' || myRank > mRank);
+    const canKick = myRank >= 2 && m.id !== S.me.id && myRank > mRank;
+    memList.append(h('div', { class: 'item', style: 'background:var(--bg3);gap:8px' },
+      h('span', { class: 'l' }, avatar(m, 26, m.online), h('span', { style: 'color:' + (ROLES[mRole]?.color || 'var(--tx)') + ';font-weight:600' }, `${m.name} ${ROLES[mRole]?.badge || ''}`)),
+      h('div', { style: 'display:flex;gap:6px;align-items:center' },
+        canEditRole ? h('select', {
+          style: 'padding:4px 8px;font-size:12px;width:auto',
+          onchange: (e) => safe(rpc('server.setRole', { id: sd.id, userId: m.id, role: e.target.value })).then(() => toast(`Rango de ${m.name}: ${ROLES[e.target.value]?.label}`))
+        }, ['admin', 'mod', 'dj', 'member'].filter((rk) => myRole === 'owner' || ROLES[rk].rank < myRank).map((rk) =>
+          h('option', { value: rk, selected: mRole === rk }, `${ROLES[rk].badge || '👤'} ${ROLES[rk].label}`)
+        )) : h('span', { class: 'hint' }, ROLES[mRole]?.label || 'Miembro'),
+        canKick ? h('button', { class: 'btn-ico del', title: 'Expulsar', onclick: () => confirm(`¿Expulsar a ${m.name}?`) && rpc('server.kick', { id: sd.id, userId: m.id }).then(closeModal) }, '✕') : null
+      )
+    ));
+  }
+  parts.push(memList);
+  if (sd.owner === S.me.id) {
+    parts.push(h('button', { class: 'danger', onclick: () => confirm('¿Eliminar el servidor y todos sus mensajes?') && rpc('server.delete', { id: sd.id }).then(closeModal) }, 'Eliminar servidor permanentemente'));
+  } else {
+    parts.push(h('button', { class: 'danger', onclick: () => rpc('server.leave', { id: sd.id }).then(closeModal) }, 'Salir del servidor'));
+  }
+  modal(`Administrar · ${sd.name}`, ...parts);
 }
 
-// ---- perfil / personalización (carga de imagen corregida con FileReader + compresión automática) ----
+// ---- perfil / personalización + estado de actividad/juego ----
 function modalProfile() {
   const me = S.me; let color = colorFor(me); let avatarData;
   const ini = (me.name || '?')[0].toUpperCase();
@@ -844,9 +1114,24 @@ function modalProfile() {
   } });
   const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
   const bio = h('input', { value: me.bio || '', maxlength: 120, placeholder: 'Estado o frase (opcional)' });
-  modal('Mi perfil', h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('button', { onclick: () => file.click() }, '📷 Subir foto'), h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'), file)),
-    h('label', null, 'Color del avatar', sws), h('label', null, 'Estado', bio),
-    h('button', { class: 'primary', onclick: async () => { await safe(rpc('profile.set', { color, bio: bio.value, avatar: avatarData })); closeModal(); toast('Perfil actualizado'); } }, 'Guardar'));
+  const customAct = h('input', { value: settings.customActivity || '', maxlength: 60, placeholder: S.detectedGame ? `Detectado automáticamente: ${S.detectedGame}` : 'Ej. VALORANT, Minecraft, Diseñando en 3D… (vacío = automático)' });
+  const autoChk = h('input', { type: 'checkbox', style: 'width:auto', checked: settings.autoGameDetect !== false });
+  modal('Mi perfil y actividad',
+    h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('button', { onclick: () => file.click() }, '📷 Subir foto'), h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'), file)),
+    h('label', null, 'Color del avatar', sws),
+    h('label', null, 'Estado / Biografía', bio),
+    h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
+    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
+    h('button', { class: 'primary', onclick: async () => {
+      settings.customActivity = customAct.value.trim();
+      settings.autoGameDetect = autoChk.checked;
+      saveSettings();
+      S.lastSentActivity = '__force__';
+      await syncActivity();
+      await safe(rpc('profile.set', { color, bio: bio.value, avatar: avatarData }));
+      closeModal();
+      toast('Perfil y actividad actualizados');
+    } }, 'Guardar'));
 }
 
 async function modalSettings() {
@@ -981,12 +1266,14 @@ async function joinCall(key, label) {
     await call.start();
     const r = await rpc('voice.join', { key });
     call.ice = r.ice; S.call = call; S.callKey = key; S.callLabel = label;
+    S.party = r.party || null;
+    if (S.party?.current?.title) S.partyTracks.set(key, S.party.current.title);
     r.peers.forEach((p) => call.addPeer(p));
     if (r.offline) { toast(`${label} no está conectado ahora`); S.call = call; leaveCall(false); return; }
     if (r.ringing) { S.outgoing = { key, name: label }; ringer.start('out'); } else ringer.beep([480, 640]);
   } catch (e) { call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return; }
   $('voiceDock').classList.remove('hidden'); $('stageWrap').classList.remove('hidden');
-  updateDock(); renderStage(); updateStatTimer(); updatePingTimer(); pushState(); renderCallOverlay();
+  updateDock(); renderCenter(); renderStage(); syncPartyTile(); updateStatTimer(); updatePingTimer(); pushState(); renderCallOverlay();
 }
 function leaveCall(silent) {
   if (S.mini) window.epic.toggleMini?.(false);
@@ -994,11 +1281,11 @@ function leaveCall(silent) {
   if (S.outgoing) { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
   if (!S.call) return;
   if (!silent) { sendRaw('voice.leave', {}); ringer.beep([520, 360]); }
-  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null;
+  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null;
   $('micLive').style.width = '0%';
   $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden'); $('meetMenu')?.classList.add('hidden');
   tiles.forEach((t) => { t.boostCtx?.close().catch(() => {}); t.el.remove(); });
-  tiles.clear(); updateStatTimer(); updatePingTimer();
+  tiles.clear(); renderCenter(); updateStatTimer(); updatePingTimer();
 }
 function pushState() { const c = S.call; if (c) sendRaw('voice.state', { muted: c.muted, deaf: c.deaf, cam: !!c.camTrack, screen: c.screenStream?.id || null }); }
 function updateDock() {
@@ -1020,6 +1307,7 @@ function updateDock() {
     el.className = 'mbtn' + (cls ? ' ' + cls : '');
     if (ico) el.textContent = ico;
   };
+  const hasParty = !!S.party?.current;
   setQ('bMute', c.muted ? 'off' : '', c.muted ? '🔇' : '🎤');
   setQ('bDeaf', c.deaf ? 'off' : '', '🎧');
   setQ('bDockMore', S.dockOpen ? 'on' : '', S.dockOpen ? '▾' : '▴');
@@ -1027,20 +1315,22 @@ function updateDock() {
   setD('bLoop', c.mic?.monitoring ? 'on' : '', c.mic?.monitoring ? 'Oyéndome' : 'Oírme');
   setD('bCam', c.camTrack ? 'on' : '', c.camTrack ? 'Cámara ON' : 'Cámara');
   setD('bScreen', c.screenStream ? 'on' : '', c.screenStream ? 'Pantalla ON' : 'Pantalla');
+  setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ');
   setD('bMini', S.mini ? 'on' : '', S.mini ? 'Expandir' : 'Flotante');
 
   setM('mMute', c.muted ? 'off' : '', c.muted ? '🔇' : '🎤');
   setM('mDeaf', c.deaf ? 'off' : '', '🎧');
   setM('mCam', c.camTrack ? 'on' : '', '📷');
   setM('mScreen', c.screenStream ? 'on' : '', '🖥️');
-  setM('mHideNoVid', settings.hideNoVideo ? 'on' : '', '👁️');
+  setM('mParty', hasParty ? 'on' : '', '🎵');
+  setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '');
   const sh = Math.round(Number(settings.stageHeight) || 54);
   [['mSizeSm', 32], ['mSizeMd', 52], ['mSizeLg', 76], ['mSizeXl', 92]].forEach(([id, v]) => {
     $(id)?.classList.toggle('on', Math.abs(sh - v) <= 5);
   });
 }
-$('bMute').onclick = () => { const c = S.call; if (!c) return; if (c.deaf) c.deaf = false; c.setMuted(!c.muted); updateDock(); renderStage(); pushState(); };
-$('bDeaf').onclick = () => { const c = S.call; if (!c) return; c.deaf = !c.deaf; c.setMuted(c.deaf); updateDock(); renderStage(); pushState(); };
+$('bMute').onclick = () => { const c = S.call; if (!c) return; if (c.deaf) c.deaf = false; c.setMuted(!c.muted); updateDock(); renderStage(); syncPartyTile(); pushState(); };
+$('bDeaf').onclick = () => { const c = S.call; if (!c) return; c.deaf = !c.deaf; c.setMuted(c.deaf); updateDock(); renderStage(); syncPartyTile(); pushState(); };
 $('bDockMore').onclick = () => { S.dockOpen = !S.dockOpen; updateDock(); };
 $('bLoop').onclick = () => {
   const c = S.call; if (!c?.mic) return;
@@ -1050,6 +1340,7 @@ $('bLoop').onclick = () => {
   updateDock();
 };
 $('bCam').onclick = async () => { try { await S.call?.setCamera(!S.call.camTrack); } catch (e) { toast('No se pudo abrir la cámara'); } updateDock(); renderStage(); pushState(); };
+$('bParty').onclick = () => modalParty();
 $('bMini').onclick = () => window.epic.toggleMini?.();
 $('bLeave').onclick = () => leaveCall(false);
 $('bScreen').onclick = async () => {
@@ -1069,11 +1360,12 @@ $('mMute').onclick = () => $('bMute').click();
 $('mDeaf').onclick = () => $('bDeaf').click();
 $('mCam').onclick = () => $('bCam').click();
 $('mScreen').onclick = () => $('bScreen').click();
+$('mParty').onclick = () => modalParty();
 $('mLeave').onclick = () => $('bLeave').click();
 $('mHideNoVid').onclick = () => {
   settings.hideNoVideo = !settings.hideNoVideo;
   saveSettings();
-  toast(settings.hideNoVideo ? '👁️ Ocultando cuadros sin cámara cuando hay video activo' : '👁️ Mostrando todos los participantes en el escenario');
+  toast(settings.hideNoVideo ? 'Mostrando solo cámaras y pantallas activas' : 'Mostrando todos los participantes en cuadrícula');
   renderStage();
 };
 function setStagePreset(vh) {
@@ -1163,10 +1455,11 @@ function toggleFocusTile(key) {
 function tile(key, label, user, withVol = false) {
   let t = tiles.get(key);
   if (!t) {
+    const isCam = key === 'me' || /^p\d+$/.test(key);
     const video = h('video', { autoplay: true, playsinline: true, onclick: () => toggleFocusTile(key), title: 'Clic para enfocar / ampliar esta cámara o transmisión' });
     const nm = h('div', { class: 'nm' }); const av = h('div', { class: 'av' }, avatar(user, 72)); const stat = h('div', { class: 'stat' });
     const pinBtn = h('button', { title: 'Enfocar / ampliar esta cámara en el escenario (estilo Google Meet)', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } }, '📌 Enfocar');
-    const fitBtn = h('button', { title: 'Alternar entre ver imagen completa o rellenar cuadro (Zoom)', onclick: (e) => { e.stopPropagation(); el.classList.toggle('cover'); fitBtn.classList.toggle('on', el.classList.contains('cover')); } }, '🔍');
+    const fitBtn = h('button', { class: isCam ? 'on' : '', title: 'Alternar entre rellenar cuadro (Zoom por defecto) o ver imagen completa', onclick: (e) => { e.stopPropagation(); el.classList.toggle('cover'); fitBtn.classList.toggle('on', el.classList.contains('cover')); } }, '🔍');
     const pip = h('button', { title: 'Ventana sobre ventana (Picture-in-Picture)', onclick: (e) => { e.stopPropagation(); (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture?.()).catch(() => {}); } }, '🖼️ PiP');
     const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } }, '⛶');
     const tbtns = h('div', { class: 'tbtns' }, pinBtn, fitBtn, pip, fs);
@@ -1182,7 +1475,7 @@ function tile(key, label, user, withVol = false) {
       } });
       volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt);
     }
-    const el = h('div', { class: 'tile', 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
+    const el = h('div', { class: 'tile' + (isCam ? ' cover' : ''), 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
     $('stage').append(el); t = { el, video, nm, av, stat, tbtns, pinBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
   }
   const k = `${user?.id}:${user?.av}:${user?.color}`;
@@ -1206,10 +1499,288 @@ function setStream(t, stream, hasVideo, muted) {
   t.tbtns.style.display = hasVideo ? '' : 'none';
   if (settings.spk && t.video.setSinkId && t.sink !== settings.spk) { t.sink = settings.spk; t.video.setSinkId(settings.spk).catch(() => {}); }
 }
+// ---------- EpicBot DJ: Ver YouTube y Escuchar Playlists en Conjunto ----------
+function fmtDur(sec) {
+  sec = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+function sendPartyCmd(cmdObj) {
+  const t = tiles.get('party');
+  if (t?.iframe?.contentWindow) {
+    try { t.iframe.contentWindow.postMessage(cmdObj, '*'); } catch {}
+  }
+}
+function ensurePartyTile() {
+  let t = tiles.get('party');
+  if (!t) {
+    const iframe = h('iframe', { class: 'yt-frame', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', referrerpolicy: 'origin-when-cross-origin' });
+    const video = h('video', { class: 'yt-direct hidden', autoplay: true, playsinline: true });
+    const pinBtn = h('button', { title: 'Enfocar / ampliar el reproductor en el escenario', onclick: (e) => { e.stopPropagation(); toggleFocusTile('party'); } }, '📌 Enfocar');
+    const modeBtn = h('button', { title: 'Alternar entre ver video en escenario o modo solo música de fondo', onclick: (e) => {
+      e.stopPropagation();
+      settings.partyAudioOnly = !settings.partyAudioOnly;
+      saveSettings();
+      renderStage();
+      syncPartyTile();
+    } }, settings.partyAudioOnly ? '🎬 Ver video' : '🎧 Solo música');
+    const qBtn = h('button', { title: 'Abrir buscador de YouTube y cola de reproducción', onclick: (e) => { e.stopPropagation(); modalParty(); } }, '🎵 Cola / Buscar');
+    const tbtns = h('div', { class: 'tbtns' }, pinBtn, modeBtn, qBtn);
+
+    const playBtn = h('button', { class: 'p-btn', title: 'Pausar / Reproducir para toda la sala', onclick: (e) => {
+      e.stopPropagation();
+      rpc('party.control', { key: S.callKey, action: S.party?.playing ? 'pause' : 'play', pos: t.curPos }).catch(() => {});
+    } }, '⏸');
+    const nextBtn = h('button', { class: 'p-btn', title: 'Siguiente pista de la cola', onclick: (e) => {
+      e.stopPropagation();
+      rpc('party.control', { key: S.callKey, action: 'next' }).catch(() => {});
+    } }, '⏭');
+    const titleEl = h('span', { class: 'p-title', title: 'Clic para abrir la cola y buscador de YouTube', onclick: () => modalParty() }, '🎵 EpicBot DJ');
+    const timeEl = h('span', { class: 'p-time' }, '0:00');
+    const vTxt = h('span', null, `${Math.round((settings.partyVol ?? 0.75) * 100)}%`);
+    const vRng = h('input', { type: 'range', min: 0, max: 1, step: 0.02, value: settings.partyVol ?? 0.75, title: 'Volumen local de la música/video (solo para ti)', oninput: () => {
+      settings.partyVol = Number(vRng.value);
+      saveSettings();
+      vTxt.textContent = `${Math.round(settings.partyVol * 100)}%`;
+      const eff = S.call?.deaf ? 0 : Math.round(settings.partyVol * 100);
+      sendPartyCmd({ cmd: 'vol', vol: eff });
+      video.volume = S.call?.deaf ? 0 : settings.partyVol;
+    } });
+    const ctrlBar = h('div', { class: 'party-ctrl' },
+      playBtn, nextBtn, titleEl, timeEl,
+      h('div', { class: 'p-vol' }, '🔊', vRng, vTxt)
+    );
+    const stat = h('div', { class: 'stat' });
+    const el = h('div', { class: 'tile party-tile', 'data-tile': 'party' }, iframe, video, stat, tbtns, ctrlBar);
+    video.addEventListener('ended', () => {
+      if (S.party?.current) rpc('party.control', { key: S.callKey, action: 'ended', trackId: S.party.current.id }).catch(() => {});
+    });
+    video.addEventListener('timeupdate', () => {
+      t.curPos = video.currentTime || 0;
+      t.curDur = video.duration || 0;
+      timeEl.textContent = fmtDur(t.curPos) + (t.curDur ? ' / ' + fmtDur(t.curDur) : '');
+    });
+    $('stage').append(el);
+    t = { el, iframe, video, stat, tbtns, pinBtn, modeBtn, qBtn, playBtn, titleEl, timeEl, hasVideo: !settings.partyAudioOnly, curVid: '', curUrl: '', curPos: 0, curDur: 0 };
+    tiles.set('party', t);
+  }
+  t.hasVideo = !settings.partyAudioOnly;
+  t.el.classList.toggle('party-audio-mode', !!settings.partyAudioOnly);
+  t.modeBtn.textContent = settings.partyAudioOnly ? '🎬 Ver video' : '🎧 Solo música';
+  const qLen = S.party?.queue?.length || 0;
+  t.qBtn.textContent = qLen ? `🎵 Cola (${qLen})` : '🎵 Cola / Buscar';
+  return t;
+}
+
+function syncPartyTile() {
+  const p = S.party;
+  const t = tiles.get('party');
+  if (!p?.current || !t) return;
+  const cur = p.current;
+  t.titleEl.textContent = `🎵 ${cur.title}${cur.addedBy ? ` · por ${cur.addedBy}` : ''}`;
+  t.playBtn.textContent = p.playing ? '⏸' : '▶';
+  const effVol = S.call?.deaf ? 0 : Math.round((settings.partyVol ?? 0.75) * 100);
+  if (cur.kind === 'yt' && cur.ytId) {
+    t.video.classList.add('hidden');
+    t.video.pause?.();
+    t.iframe.classList.remove('hidden');
+    const targetSrc = `${httpBase()}/yt-player?v=${encodeURIComponent(cur.ytId)}`;
+    if (t.curVid !== cur.ytId) {
+      t.curVid = cur.ytId;
+      t.curPos = p.pos || 0;
+      if (!t.iframe.src || !t.iframe.src.includes('/yt-player')) {
+        t.iframe.src = targetSrc;
+      } else {
+        sendPartyCmd({ cmd: 'load', videoId: cur.ytId, pos: p.pos || 0, playing: p.playing });
+        sendPartyCmd({ cmd: 'vol', vol: effVol });
+      }
+    } else {
+      sendPartyCmd({ cmd: 'sync', videoId: cur.ytId, pos: p.pos || 0, playing: p.playing });
+      sendPartyCmd({ cmd: 'vol', vol: effVol });
+    }
+  } else if (cur.url) {
+    t.iframe.classList.add('hidden');
+    sendPartyCmd({ cmd: 'pause' });
+    t.video.classList.remove('hidden');
+    const fullUrl = cur.url.startsWith('/') ? httpBase() + cur.url : cur.url;
+    if (t.curUrl !== fullUrl) {
+      t.curUrl = fullUrl;
+      t.video.src = fullUrl;
+    }
+    t.video.volume = S.call?.deaf ? 0 : (settings.partyVol ?? 0.75);
+    if (Math.abs((t.video.currentTime || 0) - (p.pos || 0)) > 2.2) {
+      try { t.video.currentTime = p.pos || 0; } catch {}
+    }
+    if (p.playing) t.video.play?.().catch(() => {});
+    else t.video.pause?.();
+  }
+}
+
+window.addEventListener('message', (e) => {
+  const d = e.data;
+  if (!d || d.src !== 'epickast-yt') return;
+  const t = tiles.get('party');
+  if (!t || !S.party?.current) return;
+  if (d.ev === 'ready') {
+    const effVol = S.call?.deaf ? 0 : Math.round((settings.partyVol ?? 0.75) * 100);
+    sendPartyCmd({ cmd: 'vol', vol: effVol });
+    sendPartyCmd({ cmd: 'sync', videoId: S.party.current.ytId, pos: S.party.pos || 0, playing: S.party.playing });
+  } else if (d.ev === 'time') {
+    t.curPos = d.pos || 0;
+    t.curDur = d.duration || 0;
+    t.timeEl.textContent = fmtDur(t.curPos) + (t.curDur ? ' / ' + fmtDur(t.curDur) : '');
+  } else if (d.ev === 'ended') {
+    rpc('party.control', { key: S.callKey, action: 'ended', trackId: S.party.current.id }).catch(() => {});
+  }
+});
+
+function modalParty() {
+  if (!S.call || !S.callKey) return toast('Únete primero a un canal de voz o llamada para usar el Bot DJ');
+  const qInp = h('input', { placeholder: 'Busca en YouTube, pega un link de video o una Playlist (list=…)' });
+  const resultsBox = h('div', { class: 'gal-list', style: 'max-height:210px' });
+  const queueBox = h('div');
+
+  const doSearch = async (queryText) => {
+    const val = (queryText !== undefined ? queryText : qInp.value).trim();
+    if (!val) return;
+    if (queryText !== undefined) qInp.value = val;
+    resultsBox.replaceChildren(h('div', { class: 'hint', style: 'padding:10px;text-align:center' }, '🔍 Buscando en YouTube…'));
+    try {
+      const r = await rpc('party.search', { q: val });
+      const items = r.items || [];
+      resultsBox.replaceChildren();
+      if (!items.length) {
+        resultsBox.append(h('div', { class: 'hint', style: 'padding:10px;text-align:center' }, 'No se encontraron videos. Prueba con otro término o pega un enlace directo.'));
+        return;
+      }
+      if (items.length > 1 && /[?&]list=/.test(val)) {
+        resultsBox.append(h('div', { class: 'item', style: 'background:rgba(124,92,255,.16);border:1px solid var(--ac)' },
+          h('span', { style: 'font-weight:700;color:var(--tx)' }, `📋 Playlist detectada (${items.length} pistas)`),
+          h('button', { class: 'primary', onclick: async () => {
+            const res = await safe(rpc('party.add', { key: S.callKey, q: val }));
+            toast(`🎵 Se agregaron ${res.added} pistas de la playlist a la cola`);
+            resultsBox.replaceChildren();
+            qInp.value = '';
+          } }, `➕ Encolar las ${items.length} pistas`)
+        ));
+      }
+      for (const it of items) {
+        resultsBox.append(h('div', { class: 'item party-res' },
+          it.thumb ? h('img', { src: it.thumb, class: 'yt-thumb', loading: 'lazy' }) : h('span', { style: 'font-size:20px' }, '🎵'),
+          h('div', { style: 'min-width:0;flex:1' },
+            h('div', { style: 'font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, it.title),
+            h('div', { class: 'hint' }, `${it.author || 'YouTube'} · ${it.duration || ''}`)
+          ),
+          h('button', { class: 'primary', style: 'padding:6px 11px;font-size:12px;flex-shrink:0', onclick: async () => {
+            await safe(rpc('party.add', { key: S.callKey, track: it }));
+            toast(`🎵 Agregado: ${it.title.slice(0, 45)}`);
+          } }, S.party?.current ? '➕ A la cola' : '▶ Poner ahora')
+        ));
+      }
+    } catch (e) {
+      resultsBox.replaceChildren(h('div', { class: 'err' }, e.message));
+    }
+  };
+
+  qInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+
+  const quickChips = h('div', { class: 'preset-chips' },
+    [
+      ['☕ Lofi Hip Hop Beats', 'lofi hip hop radio beats to relax study'],
+      ['⚡ Phonk Gaming Mix', 'phonk gaming mix'],
+      ['🎸 Rock Clásico Hits', 'classic rock greatest hits mix'],
+      ['🎹 Synthwave Retro', 'synthwave retrowave mix'],
+      ['🎧 Electrónica / EDM', 'electronic gaming music mix'],
+    ].map(([lbl, q]) => h('button', { type: 'button', class: 'chip', onclick: () => doSearch(q) }, lbl))
+  );
+
+  const drawQueue = () => {
+    queueBox.replaceChildren();
+    const p = S.party;
+    if (!p?.current) {
+      queueBox.append(h('div', { class: 'hint', style: 'padding:12px;text-align:center;background:var(--bg3);border-radius:10px' },
+        '🎵 No hay música ni videos sonando ahora. Busca una canción arriba o pega un link de YouTube / Playlist para escuchar y ver en conjunto con tus amigos.'
+      ));
+      return;
+    }
+    const cur = p.current;
+    const t = tiles.get('party');
+    const seekInput = h('input', {
+      type: 'range', min: 0, max: Math.max(1, Math.round(t?.curDur || 300)), value: Math.round(t?.curPos || p.pos || 0),
+      title: 'Adelantar o retroceder para toda la sala',
+      onchange: () => rpc('party.control', { key: S.callKey, action: 'seek', pos: Number(seekInput.value) }).catch(() => {})
+    });
+    queueBox.append(
+      h('div', { class: 'now-playing-card' },
+        h('div', { style: 'display:flex;gap:10px;align-items:center' },
+          cur.thumb ? h('img', { src: cur.thumb, class: 'yt-thumb big' }) : h('span', { style: 'font-size:26px' }, '🎵'),
+          h('div', { style: 'min-width:0;flex:1' },
+            h('div', { class: 'hint', style: 'color:#a29bfe;font-weight:700' }, p.playing ? '🟢 SONANDO AHORA EN CONJUNTO' : '⏸ EN PAUSA'),
+            h('div', { style: 'font-weight:700;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, cur.title),
+            h('div', { class: 'hint' }, `${cur.author || 'YouTube'} · pedido por ${cur.addedBy || 'alguien'}`)
+          )
+        ),
+        seekInput,
+        h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between' },
+          h('div', { style: 'display:flex;gap:6px' },
+            h('button', { class: 'primary', onclick: () => rpc('party.control', { key: S.callKey, action: p.playing ? 'pause' : 'play', pos: t?.curPos || p.pos || 0 }) }, p.playing ? '⏸ Pausar' : '▶ Reproducir'),
+            h('button', { onclick: () => rpc('party.control', { key: S.callKey, action: 'next' }) }, '⏭ Siguiente'),
+            h('button', { class: p.loop ? 'primary' : '', onclick: () => rpc('party.control', { key: S.callKey, action: 'loop' }) }, p.loop ? '🔁 Bucle ON' : '🔁 Bucle'),
+            h('button', { class: settings.partyAudioOnly ? 'primary' : '', onclick: () => { settings.partyAudioOnly = !settings.partyAudioOnly; saveSettings(); renderStage(); syncPartyTile(); drawQueue(); } }, settings.partyAudioOnly ? '🎬 Ver Video' : '🎧 Solo Audio')
+          ),
+          h('button', { class: 'danger', style: 'padding:6px 10px;font-size:12px', onclick: () => rpc('party.control', { key: S.callKey, action: 'clear' }) }, '⏹ Detener todo')
+        )
+      )
+    );
+    if (p.queue?.length) {
+      queueBox.append(h('div', { class: 'sect' }, `Siguientes en la cola — ${p.queue.length}`));
+      const qList = h('div', { class: 'gal-list', style: 'max-height:175px' });
+      p.queue.forEach((tr, idx) => {
+        qList.append(h('div', { class: 'item', style: 'background:var(--bg3);gap:8px' },
+          h('span', { class: 'hint', style: 'width:22px' }, `#${idx + 1}`),
+          h('div', { style: 'min-width:0;flex:1' },
+            h('div', { style: 'font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, tr.title),
+            h('div', { class: 'hint' }, `${tr.author || 'YouTube'} · por ${tr.addedBy || ''}`)
+          ),
+          h('div', { style: 'display:flex;gap:5px' },
+            h('button', { title: 'Reproducir esta pista ahora', style: 'padding:4px 8px;font-size:12px', onclick: () => rpc('party.control', { key: S.callKey, action: 'jump', index: idx }) }, '▶'),
+            h('button', { class: 'btn-ico del', title: 'Quitar de la cola', onclick: () => rpc('party.control', { key: S.callKey, action: 'remove', index: idx }) }, '✕')
+          )
+        ));
+      });
+      queueBox.append(qList);
+    }
+  };
+
+  S.partyModalUpdater = drawQueue;
+  drawQueue();
+
+  modal('🎵 EpicBot DJ — Música y YouTube en Conjunto',
+    h('div', { class: 'add-friend-bar' },
+      qInp,
+      h('button', { class: 'primary', onclick: () => doSearch() }, '🔍 Buscar'),
+      h('button', { title: 'Pega un link de YouTube o Playlist y encolar directamente', onclick: async () => {
+        const v = qInp.value.trim(); if (!v) return;
+        const r = await safe(rpc('party.add', { key: S.callKey, q: v }));
+        toast(`🎵 Se agregaron ${r.added} pista(s)`);
+        qInp.value = '';
+      } }, '➕ Link directo')
+    ),
+    quickChips,
+    resultsBox,
+    queueBox
+  );
+  qInp.focus();
+}
+
 function renderStage() {
   const c = S.call; if (!c) return;
   if (S.outgoing && c.peers.size > 0) clearOutgoing();
   const keep = new Set();
+  if (S.party?.current) {
+    ensurePartyTile();
+    keep.add('party');
+  }
   const me = tile('me', 'Tú' + (c.muted ? ' 🔇' : ''), S.me, false); keep.add('me'); setStream(me, c.main, !!c.camTrack, true);
   if (c.screenStream) { const t = tile('me-screen', 'Tu pantalla', S.me, false); keep.add('me-screen'); setStream(t, new MediaStream(c.screenStream.getVideoTracks()), true, true); }
   for (const p of c.peers.values()) {
@@ -1233,7 +1804,8 @@ function renderStage() {
   const anyVideo = videoKeys.length > 0;
   let visibleCount = 0;
   for (const [k, t] of tiles) {
-    const hide = anyVideo && settings.hideNoVideo && !t.hasVideo && S.focusTile !== k;
+    // Nunca desmontar el tile de party (para que siga sonando en modo solo-música), pero si ningún otro tiene video mostrar al menos 'party' o 'me'
+    const hide = anyVideo && settings.hideNoVideo && !t.hasVideo && S.focusTile !== k && k !== 'party';
     t.el.classList.toggle('hide-tile', hide);
     if (!hide) visibleCount++;
   }

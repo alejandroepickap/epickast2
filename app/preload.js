@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('epic', {
   onShortcut: (cb) => ipcRenderer.on('shortcut:trigger', (_e, act) => cb(act)),
   loadAuth: () => ipcRenderer.invoke('auth:load'),
   saveAuth: (data) => ipcRenderer.invoke('auth:save', data),
+  detectGame: () => ipcRenderer.invoke('game:detect'),
 });

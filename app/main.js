@@ -1,7 +1,62 @@
 'use strict';
 const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage } = require('electron');
+const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+
+// Catálogo ligero de procesos (inspirado en DESKTOP_PROCESS_POLLING_PERF de discord_utils.node hallado con REA)
+const KNOWN_GAMES = {
+  'valorant-win64-shipping.exe': 'VALORANT', 'valorant.exe': 'VALORANT',
+  'cs2.exe': 'Counter-Strike 2', 'csgo.exe': 'CS:GO',
+  'league of legends.exe': 'League of Legends', 'leagueclientux.exe': 'League of Legends (Lobby)',
+  'fortniteclient-win64-shipping.exe': 'Fortnite',
+  'minecraft.windows.exe': 'Minecraft', 'javaw.exe': 'Minecraft (Java)', 'minecraft.exe': 'Minecraft',
+  'robloxplayerbeta.exe': 'Roblox',
+  'gta5.exe': 'Grand Theft Auto V', 'fivem.exe': 'FiveM (GTA RP)',
+  'r5apex.exe': 'Apex Legends',
+  'overwatch.exe': 'Overwatch 2',
+  'rocketleague.exe': 'Rocket League',
+  'dota2.exe': 'Dota 2',
+  'eldenring.exe': 'Elden Ring',
+  'helldivers2.exe': 'HELLDIVERS 2',
+  'palworld-win64-shipping.exe': 'Palworld',
+  'baldursgate3.exe': "Baldur's Gate 3", 'bg3.exe': "Baldur's Gate 3", 'bg3_dx11.exe': "Baldur's Gate 3",
+  'cyberpunk2077.exe': 'Cyberpunk 2077',
+  'tslgame.exe': 'PUBG: Battlegrounds',
+  'cod.exe': 'Call of Duty', 'modernwarfare.exe': 'Call of Duty',
+  'rainbowsix.exe': 'Rainbow Six Siege',
+  'deadbydaylight-win64-shipping.exe': 'Dead by Daylight',
+  'genshinimpact.exe': 'Genshin Impact', 'starrail.exe': 'Honkai: Star Rail', 'zenlesszonezero.exe': 'Zenless Zone Zero',
+  'osu!.exe': 'osu!',
+  'terraria.exe': 'Terraria',
+  'stardew valley.exe': 'Stardew Valley',
+  'among us.exe': 'Among Us',
+  'lethal company.exe': 'Lethal Company',
+  'phasmophobia.exe': 'Phasmophobia',
+  'rustclient.exe': 'Rust',
+  'arkascended.exe': 'ARK: Survival Ascended', 'shootergame.exe': 'ARK: Survival Evolved',
+  'destiny2.exe': 'Destiny 2',
+  'warframe.x64.exe': 'Warframe',
+  'pathofexile_x64.exe': 'Path of Exile', 'pathofexilesteam.exe': 'Path of Exile',
+  'diablo iv.exe': 'Diablo IV',
+  'wow.exe': 'World of Warcraft',
+  'fc24.exe': 'EA SPORTS FC 24', 'fc25.exe': 'EA SPORTS FC 25',
+  'forzahorizon5.exe': 'Forza Horizon 5',
+  'left4dead2.exe': 'Left 4 Dead 2',
+  'GarrysMod.exe': "Garry's Mod", 'hl2.exe': 'Source Engine Game',
+  'hollow_knight.exe': 'Hollow Knight',
+  'hades.exe': 'Hades', 'hades2.exe': 'Hades II',
+  'factorio.exe': 'Factorio',
+  'satisfactory.exe': 'Satisfactory', 'factorygame-win64-shipping.exe': 'Satisfactory',
+  'valheim.exe': 'Valheim',
+  'projectzomboid64.exe': 'Project Zomboid',
+  'vrchat.exe': 'VRChat',
+  'brawlhalla.exe': 'Brawlhalla',
+  'balatro.exe': 'Balatro',
+  'blender.exe': 'Blender 3D',
+  'orca-slicer.exe': 'OrcaSlicer 3D', 'prusa-slicer.exe': 'PrusaSlicer 3D', 'ultimaker-cura.exe': 'UltiMaker Cura 3D',
+  'bambu-studio.exe': 'Bambu Studio 3D', 'solidworks.exe': 'SolidWorks CAD', 'fusion360.exe': 'Autodesk Fusion 360',
+};
 
 app.setAppUserModelId('com.epickap.epickast');
 
@@ -89,6 +144,19 @@ app.whenReady().then(() => {
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
+  ipcMain.handle('game:detect', () => new Promise((resolve) => {
+    execFile('tasklist.exe', ['/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 4000, maxBuffer: 1024 * 1024 }, (err, stdout) => {
+      if (err || !stdout) return resolve(null);
+      const lines = stdout.split(/\r?\n/);
+      for (const line of lines) {
+        const m = /^"([^"]+)"/.exec(line);
+        if (!m) continue;
+        const exe = m[1].toLowerCase();
+        if (KNOWN_GAMES[exe]) return resolve({ name: KNOWN_GAMES[exe], exe: m[1] });
+      }
+      resolve(null);
+    });
+  }));
   const authFile = path.join(app.getPath('userData'), 'epickast-auth.json');
   ipcMain.handle('auth:load', () => {
     try {

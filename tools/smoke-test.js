@@ -76,19 +76,46 @@ function client(port) {
   assert.equal(pinsList.length, 1);
   assert.equal(pinsList[0].id, repRes.id);
   a.events.length = 0; b.events.length = 0;
-  // servidor
+  // servidor, rangos, canales de voz con límite, actividad de juego y EpicBot DJ
   const { id } = await a.rpc('server.create', { name: 'Mi Server' });
-  let sv = await a.rpc('server.get', { id }); assert.equal(sv.channels.length, 2);
+  let sv = await a.rpc('server.get', { id }); assert.equal(sv.channels.length, 5);
   await assert.rejects(b.rpc('server.get', { id }), /miembro/);
   await b.rpc('server.join', { code: sv.invite });
   const txt = sv.channels.find((c) => c.type === 'text'), voice = sv.channels.find((c) => c.type === 'voice');
   await b.rpc('msg.send', { channel: txt.key, text: 'hola server' });
   assert.equal((await a.rpc('msg.history', { channel: txt.key }))[0].text, 'hola server');
-  await assert.rejects(b.rpc('channel.create', { serverId: id, name: 'x', type: 'text' }), /dueño/);
-  // voz + señalización
+  await assert.rejects(b.rpc('channel.create', { serverId: id, name: 'x', type: 'text' }), /Dueño o Admin/);
+  // Asignar rango Admin a beto y probar crear canal de voz con límite
+  await a.rpc('server.setRole', { id, userId: rb.user.id, role: 'admin' });
+  sv = await b.rpc('server.get', { id });
+  assert.equal(sv.myRole, 'admin');
+  await b.rpc('channel.create', { serverId: id, name: '🔒 Sala Duo', type: 'voice', userLimit: 2 });
+  sv = await a.rpc('server.get', { id });
+  assert.equal(sv.channels.some((c) => c.name === '🔒 Sala Duo' && c.userLimit === 2), true);
+  // Actividad de juego en vivo
+  a.events.length = 0; b.events.length = 0;
+  await a.rpc('activity.set', { name: 'VALORANT', kind: 'game' });
+  const presEvt = await b.wait('presence');
+  assert.equal(presEvt.activity.name, 'VALORANT');
+  // voz + señalización + EpicBot DJ (Watch & Listen Together)
   const ja = await a.rpc('voice.join', { key: voice.key }); assert.equal(ja.peers.length, 0);
   const jb = await b.rpc('voice.join', { key: voice.key }); assert.equal(jb.peers[0].name, 'ana');
   assert.equal((await a.wait('voice.joined')).user.name, 'beto');
+  a.events.length = 0; b.events.length = 0;
+  const pAdd = await a.rpc('party.add', { key: voice.key, track: { ytId: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio', author: 'Lofi Girl', duration: 'EN VIVO' } });
+  assert.equal(pAdd.added, 1);
+  assert.equal(pAdd.party.current.ytId, 'jfKfPfyJRdk');
+  const pSync = await b.wait('party.sync');
+  assert.equal(pSync.party.current.title, 'Lofi Hip Hop Radio');
+  assert.equal(pSync.party.playing, true);
+  a.events.length = 0;
+  await b.rpc('party.control', { key: voice.key, action: 'pause', pos: 42 });
+  const pSync2 = await a.wait('party.sync');
+  assert.equal(pSync2.party.playing, false);
+  assert.equal(Math.round(pSync2.party.pos), 42);
+  const ytHtmlRes = await fetch(`http://127.0.0.1:${port}/yt-player?v=jfKfPfyJRdk`);
+  assert.equal(ytHtmlRes.status, 200);
+  assert.ok((await ytHtmlRes.text()).includes('YT.Player'));
   await b.rpc('rtc.signal', { to: ra.user.id, data: { description: { type: 'offer', sdp: 'x' } } });
   assert.equal((await a.wait('rtc.signal')).from, rb.user.id);
   await a.rpc('voice.state', { muted: true, cam: true });

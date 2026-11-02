@@ -48,7 +48,9 @@
 ### Operaciones WebSocket (`rpc(t, data)`)
 - **Autenticación y perfil**: `register`, `login`, `resume`, `profile.set`, `profile.get`, `profile.avatar`.
 - **Amigos y DMs**: `friends.list`, `friends.add`, `friends.accept`, `friends.remove`, `dm.open`.
-- **Servidores y canales**: `servers.list`, `server.create`, `server.get`, `server.join`, `server.leave`, `server.delete`, `server.kick`, `server.newinvite`, `channel.create`, `channel.delete`.
+- **Servidores, rangos y múltiples canales de voz**: `servers.list`, `server.create` (crea 5 canales por defecto incluyendo `🔊 Sala General`, `🎮 Gaming Squad` y `🎵 Música & YouTube`), `server.get`, `server.join`, `server.leave`, `server.delete`, `server.kick`, `server.setRole` (`owner`, `admin`, `mod`, `dj`, `member`), `server.newinvite`, `channel.create` (con plantillas y `userLimit`), `channel.delete`.
+- **Detección de Juegos y Actividad en Vivo (`DESKTOP_PROCESS_POLLING_PERF`)**: `activity.set` (sincronizado con el escáner ligero `game:detect` de `app/main.js` que consulta `tasklist.exe` sin inyectar DLLs ni consumir CPU).
+- **EpicBot DJ — Música y YouTube en Conjunto (`Watch & Listen Together`)**: `party.get`, `party.search` (buscador directo de YouTube, links `watch?v=`/`youtu.be` y playlists `list=PL...` sin API Key), `party.add`, `party.control` (`play`, `pause`, `seek`, `next`, `ended`, `jump`, `remove`, `loop`, `clear`) + endpoint `GET /yt-player?v=ID` que sirve el reproductor IFrame API con origen HTTP válido para evitar el bloqueo de embeds en `file://`.
 - **Chat, notas de voz, fijados y galería**: `msg.send` (soporta `replyTo`), `msg.history`, `msg.pin`, `msg.pins`, `msg.typing`, `files.list`.
 - **Voz, llamadas y WebRTC**: `voice.join`, `voice.leave`, `voice.state`, `call.decline`, `rtc.signal`.
 
