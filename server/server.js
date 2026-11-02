@@ -825,6 +825,11 @@ wss.on('connection', (ws, req) => {
 
 // latido: elimina conexiones muertas
 setInterval(() => { for (const ws of wss.clients) { if (!ws.alive) { ws.terminate(); continue; } ws.alive = false; ws.ping(); } }, 25000).unref();
+// keep-alive automático para hosts gratuitos en la nube (Render / Koyeb)
+if (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL) {
+  const selfUrl = String(process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL).replace(/\/+$/, '') + '/health';
+  setInterval(() => fetch(selfUrl).catch(() => {}), 10 * 60 * 1000).unref();
+}
 // limpieza de sesiones viejas (90 días)
 run('DELETE FROM sessions WHERE created<?', Date.now() - 90 * 864e5);
 

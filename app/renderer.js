@@ -251,7 +251,19 @@ function onProfile(p) {
 }
 
 // ---------- login, sesión persistente ("Permanecer conectado") y actualizaciones ----------
-function normUrl(u) { u = (u || '').trim(); if (!u) return DEFAULTS.server; if (!/^wss?:\/\//i.test(u)) u = 'ws://' + u; if (!/:\d+/.test(u.replace(/^wss?:\/\//i, '')) && u.startsWith('ws://')) u += ':7777'; return u; }
+function normUrl(u) {
+  u = (u || '').trim().replace(/\/+$/, '');
+  if (!u) return DEFAULTS.server;
+  if (/^https:\/\//i.test(u)) u = 'wss://' + u.slice(8);
+  else if (/^http:\/\//i.test(u)) u = 'ws://' + u.slice(7);
+  else if (!/^wss?:\/\//i.test(u)) {
+    const isLocal = /^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(u);
+    u = (isLocal ? 'ws://' : 'wss://') + u;
+  }
+  const hostPart = u.replace(/^wss?:\/\//i, '');
+  if (u.startsWith('ws://') && !/:\d+$/.test(hostPart) && /^(localhost|127\.|192\.168\.|10\.|172\.)/i.test(hostPart)) u += ':7777';
+  return u;
+}
 function httpBase() { return settings.server.replace(/^ws/i, 'http').replace(/\/+$/, ''); }
 $('lgServer').value = settings.server;
 $('lgUser').value = localStorage.getItem('epickast.user') || '';
