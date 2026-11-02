@@ -587,7 +587,13 @@ function releaseInfo() {
   let file = null;
   if (fs.existsSync(dist)) {
     const files = fs.readdirSync(dist).filter((f) => /\.(exe|zip)$/i.test(f) && !/uninstaller/i.test(f));
-    files.sort((a, b) => (a.endsWith('.exe') ? -1 : 1) - (b.endsWith('.exe') ? -1 : 1));
+    files.sort((a, b) => {
+      const aMatch = a.includes(version) ? 1 : 0, bMatch = b.includes(version) ? 1 : 0;
+      if (aMatch !== bMatch) return bMatch - aMatch;
+      const aExe = a.endsWith('.exe') ? 1 : 0, bExe = b.endsWith('.exe') ? 1 : 0;
+      if (aExe !== bExe) return bExe - aExe;
+      return b.localeCompare(a, undefined, { numeric: true });
+    });
     if (files.length) file = files[0];
   }
   return { version, file, downloadPath: file ? '/download/latest' : null };
