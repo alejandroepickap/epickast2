@@ -1,0 +1,10 @@
+node_modules/
+dist/
+server/data/
+*.log
+.DS_Store
+Thumbs.db
+docs/rea-evidence/*_graph*.json
+
+docs/rea-evidence/*.evidence.json
+docs/rea-evidence/epickast_app_analysis.json

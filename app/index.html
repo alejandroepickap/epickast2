@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws: wss: http: https:; img-src 'self' data: blob: http: https:; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream: http: https:; script-src 'self' 'wasm-unsafe-eval'; worklet-src 'self'">
+<title>EpicKast</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="screen">
+  <form id="loginForm" class="card">
+    <div class="brand">
+      <img src="logo.svg" alt="EK" class="brand-logo">
+      <h1>Epic<span>Kast</span></h1>
+      <p class="subbrand">Comunicación ultraligera de baja latencia</p>
+    </div>
+    <label>Servidor<input id="lgServer" placeholder="ws://127.0.0.1:7777" autocomplete="off"></label>
+    <label>Usuario<input id="lgUser" autocomplete="username"></label>
+    <label>Contraseña<input id="lgPass" type="password" autocomplete="current-password"></label>
+    <div class="row"><button type="submit" data-mode="login" class="primary">Entrar</button><button type="submit" data-mode="register">Crear cuenta</button></div>
+    <p id="lgError" class="err"></p>
+  </form>
+</div>
+
+<div id="main" class="hidden">
+  <nav id="rail"></nav>
+  <aside id="side">
+    <header id="sideTitle"></header>
+    <div id="sideList"></div>
+    <div id="voiceDock" class="hidden">
+      <div class="vtop">
+        <div class="vstatus">
+          <div id="voiceInfo"></div>
+          <div class="vmeta">
+            <span id="pingBadge" class="ping" title="Latencia y calidad de señal P2P"></span>
+            <div class="micbar" title="Nivel de tu micrófono en vivo (la puerta anti-respiración filtra sonidos bajos)"><div id="micLive"></div></div>
+          </div>
+        </div>
+        <div class="vquick">
+          <button id="bMute" class="qbtn" title="Silenciar / activar micrófono (Alt+M)"><i>🎤</i><span>Micro</span></button>
+          <button id="bDeaf" class="qbtn" title="Silenciar audio de la llamada (Alt+D)"><i>🎧</i><span>Audio</span></button>
+          <button id="bDockMore" class="qbtn" title="Desplegar más controles de llamada"><i>▴</i></button>
+          <button id="bLeave" class="qbtn hang" title="Colgar llamada"><i>📵</i><span>Colgar</span></button>
+        </div>
+      </div>
+      <div id="dockDrawer" class="dock hidden">
+        <button id="bCam" class="dockbtn" title="Encender / apagar cámara"><i>📷</i><span>Cámara</span></button>
+        <button id="bScreen" class="dockbtn" title="Compartir pantalla"><i>🖥️</i><span>Pantalla</span></button>
+        <button id="bLoop" class="dockbtn" title="Escuchar mi propio micrófono (para probar cómo sueno)"><i>👂</i><span>Oírme</span></button>
+        <button id="bMini" class="dockbtn" title="Modo ventana sobre ventana (siempre visible encima)"><i>📌</i><span>Flotante</span></button>
+      </div>
+    </div>
+    <footer id="meBar"></footer>
+  </aside>
+  <section id="center">
+    <div id="updateBar" class="hidden"></div>
+    <header id="chTitle"></header>
+    <div id="stageWrap" class="hidden">
+      <div id="stage"></div>
+      <div id="meetBar">
+        <button id="mMute" class="mbtn" title="Silenciar / activar micrófono (Alt+M)">🎤</button>
+        <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)">🎧</button>
+        <button id="mCam" class="mbtn" title="Encender / apagar cámara">📷</button>
+        <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana">🖥️</button>
+        <button id="mHideNoVid" class="mbtn" title="Ocultar cuadros sin cámara para ampliar el video activo">👁️</button>
+        <div class="msep"></div>
+        <button id="mSizeSm" class="mbtn sz" title="Tamaño compacto (32%)">S</button>
+        <button id="mSizeMd" class="mbtn sz" title="Tamaño medio (50%)">M</button>
+        <button id="mSizeLg" class="mbtn sz" title="Tamaño cine (76%)">L</button>
+        <button id="mSizeXl" class="mbtn sz" title="Tamaño máximo (92%)">XL</button>
+        <div class="msep"></div>
+        <div class="mmore-wrap">
+          <button id="mMore" class="mbtn" title="Opciones de audio, anti-respiración y vista">⋮</button>
+          <div id="meetMenu" class="meet-menu hidden"></div>
+        </div>
+        <button id="mLeave" class="mbtn hang" title="Colgar llamada">📵 Colgar</button>
+      </div>
+      <div id="stageResizer" title="Arrastra hacia arriba o abajo para cambiar el tamaño del área de cámaras y transmisiones"><span></span></div>
+    </div>
+    <div id="msgs"></div>
+    <div id="typingBar" class="hidden"></div>
+    <div id="replyBar" class="hidden"></div>
+    <form id="composer">
+      <button type="button" id="bAttach" title="Enviar imagen o documento (también puedes arrastrar o pegar con Ctrl+V)">📎</button>
+      <button type="button" id="bVoiceNote" title="Grabar nota de voz rápida (clic para grabar, clic de nuevo para enviar)">🎙️</button>
+      <input id="fileInput" type="file" multiple class="hidden">
+      <input id="msgInput" placeholder="Escribe un mensaje, pega una captura (Ctrl+V) o arrastra archivos…" autocomplete="off" maxlength="2000">
+    </form>
+    <div id="home" class="hidden"></div>
+  </section>
+  <aside id="members"></aside>
+</div>
+
+<div id="callOverlay" class="hidden"></div>
+<div id="modal" class="hidden"></div>
+<div id="toast"></div>
+<script src="call.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

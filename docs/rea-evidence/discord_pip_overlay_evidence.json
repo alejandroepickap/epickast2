@@ -1,0 +1,26 @@
+{
+  "inspected_at": "2026-11-02T21:17:05.713Z",
+  "source_artifacts": [
+    "C:/Users/puma1/AppData/Local/Discord/app-1.0.9266/resources/app.asar",
+    "C:/Users/puma1/AppData/Local/Discord/app-1.0.9266/modules/discord_desktop_core-1/discord_desktop_core/core.asar"
+  ],
+  "always_on_top_patterns": [
+    "WINDOW_SET_ALWAYS_ON_TOP",
+    "setAlwaysOnTop(enabled)",
+    "ALWAYS_ON_TOP",
+    "isAlwaysOnTop()",
+    "setAlwaysOnTop(!0)",
+    "setAlwaysOnTop(!1)"
+  ],
+  "popout_window_patterns": [
+    "popout",
+    "setMinimumSize(width,height)",
+    "Popout",
+    "POPOUT"
+  ],
+  "popout_code_snippets": [
+    "!1)),Promise.resolve()}),DiscordIPC_1.DiscordIPC.main.handle(DiscordIPC_1.IPCEvents.WINDOW_SET_ALWAYS_ON_TOP,(_,key,enabled)=>{let win=injectedGetWindow(key);return null!=win&&win.setAlwaysOnTop(enabled),Promise.resolve()}),DiscordIPC_1.DiscordIPC.main.handle(DiscordIPC_1.IPCEvents.WINDOW_OPEN_DOCUMENT_PIP,event=>event.sender.executeJavaScript(\"document.getElementById('__",
+    "&(windowOptions.y=parsedFeatures.top);let existingWindow=popoutWindows[key];if(null!=existingWindow)return windowOptions.outOfProcessOverlay||null!=existingWindow&&(existingWindow.setAlwaysOnTop(!0),existingWindow.focus(),existingWindow.setAlwaysOnTop(!1)),{action:\"deny\"};if(windowOptions.outOfProcessOverlay){let rect={x:0,y:0,width:1280,height:720};for(let{bounds}of elec",
+    "oke(DiscordIPC_1.IPCEvents.WINDOW_MAXIMIZE,key)},exports.focus=function(_hack,key){return DiscordIPC_1.DiscordIPC.renderer.invoke(DiscordIPC_1.IPCEvents.WINDOW_FOCUS,key)},exports.setAlwaysOnTop=function(key,enabled){return DiscordIPC_1.DiscordIPC.renderer.invoke(DiscordIPC_1.IPCEvents.WINDOW_SET_ALWAYS_ON_TOP,key,enabled)},exports.openDocumentPip=function(){return Discor"
+  ]
+}

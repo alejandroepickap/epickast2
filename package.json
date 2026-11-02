@@ -1,0 +1,60 @@
+{
+  "name": "epickast",
+  "productName": "EpicKast",
+  "version": "1.2.0",
+  "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
+  "author": "EpicKap",
+  "main": "app/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "test": "node tools/smoke-test.js",
+    "pack:friends": "electron-builder --win nsis zip --x64"
+  },
+  "build": {
+    "appId": "com.epickap.epickast",
+    "productName": "EpicKast",
+    "asar": true,
+    "files": [
+      "app/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "afterPack": "tools/harden-fuses.js",
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EpicKast",
+      "artifactName": "EpicKast-Instalador-${version}.exe"
+    }
+  },
+  "dependencies": {
+    "@timephy/rnnoise-wasm": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2"
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}

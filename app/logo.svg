@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#191b26"/>
+      <stop offset="100%" stop-color="#0d0e14"/>
+    </linearGradient>
+    <linearGradient id="ac" x1="20" y1="24" x2="108" y2="104" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9b82ff"/>
+      <stop offset="100%" stop-color="#6441f0"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)" stroke="url(#ac)" stroke-width="3.5"/>
+  <!-- Minimalist geometric E -->
+  <path d="M26 34H58V44H37V59H54V69H37V84H58V94H26V34Z" fill="#F4F5F8"/>
+  <!-- Minimalist geometric K with accent chevron -->
+  <path d="M66 34H77V94H66V34Z" fill="#F4F5F8"/>
+  <path d="M103 34L80 63L104 94H90L70 64L90 34H103Z" fill="url(#ac)"/>
+</svg>
