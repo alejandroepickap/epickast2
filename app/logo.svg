@@ -1,18 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#191b26"/>
-      <stop offset="100%" stop-color="#0d0e14"/>
+      <stop offset="0%" stop-color="#171926"/>
+      <stop offset="55%" stop-color="#0e1018"/>
+      <stop offset="100%" stop-color="#090a10"/>
     </linearGradient>
-    <linearGradient id="ac" x1="20" y1="24" x2="108" y2="104" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#9b82ff"/>
-      <stop offset="100%" stop-color="#6441f0"/>
+    <linearGradient id="ac" x1="20" y1="18" x2="112" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a88bff"/>
+      <stop offset="50%" stop-color="#7c5cff"/>
+      <stop offset="100%" stop-color="#4e2eea"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="64" y1="8" x2="64" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9b82ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#7c5cff" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)" stroke="url(#ac)" stroke-width="3.5"/>
-  <!-- Minimalist geometric E -->
-  <path d="M26 34H58V44H37V59H54V69H37V84H58V94H26V34Z" fill="#F4F5F8"/>
-  <!-- Minimalist geometric K with accent chevron -->
-  <path d="M66 34H77V94H66V34Z" fill="#F4F5F8"/>
-  <path d="M103 34L80 63L104 94H90L70 64L90 34H103Z" fill="url(#ac)"/>
+  <!-- Squircle base -->
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#bg)" stroke="url(#ac)" stroke-width="3.5"/>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#glow)"/>
+  <!-- Sleek geometric E (with angled middle bar) -->
+  <path d="M24 33H58L54 44H35V58.5H53L49.5 68.5H35V84H58L54 95H24V33Z" fill="#F6F7FB"/>
+  <!-- Sleek geometric K stem + electric violet-indigo wing -->
+  <path d="M64 33H75.5V95H64V33Z" fill="#F6F7FB"/>
+  <path d="M105 33L80.5 63.2L106 95H91.2L69.5 64L90.8 33H105Z" fill="url(#ac)"/>
+  <!-- Subtle signal spark dot -->
+  <circle cx="101" cy="64" r="4.2" fill="#2ed573"/>
 </svg>

@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": "EpicKap",
   "main": "app/main.js",
@@ -42,6 +42,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "EpicKast",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "artifactName": "EpicKast-Instalador-${version}.exe"
     }
   },

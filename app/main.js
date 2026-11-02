@@ -1,6 +1,9 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
+
+app.setAppUserModelId('com.epickap.epickast');
 
 // ---- Rendimiento (derivado de los hallazgos de REA sobre el cliente de Discord) ----
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
@@ -86,6 +89,30 @@ app.whenReady().then(() => {
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
+  const authFile = path.join(app.getPath('userData'), 'epickast-auth.json');
+  ipcMain.handle('auth:load', () => {
+    try {
+      if (!fs.existsSync(authFile)) return null;
+      const raw = JSON.parse(fs.readFileSync(authFile, 'utf8'));
+      if (raw?.enc && safeStorage.isEncryptionAvailable()) {
+        raw.pass = safeStorage.decryptString(Buffer.from(raw.enc, 'base64'));
+        delete raw.enc;
+      }
+      return raw;
+    } catch { return null; }
+  });
+  ipcMain.handle('auth:save', (e, data) => {
+    try {
+      if (!data) { if (fs.existsSync(authFile)) fs.unlinkSync(authFile); return true; }
+      const out = { ...data };
+      if (out.pass && safeStorage.isEncryptionAvailable()) {
+        out.enc = safeStorage.encryptString(String(out.pass)).toString('base64');
+        delete out.pass;
+      }
+      fs.writeFileSync(authFile, JSON.stringify(out), 'utf8');
+      return true;
+    } catch { return false; }
+  });
   ipcMain.handle('shortcuts:set', (e, cfg) => {
     try {
       globalShortcut.unregisterAll();

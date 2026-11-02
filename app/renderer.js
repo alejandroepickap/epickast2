@@ -12,6 +12,30 @@ function h(tag, props, ...kids) {
   return e;
 }
 
+const SVG_PATHS = {
+  chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"/>',
+  gallery: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+};
+function icoSvg(name, size = 15) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('width', size);
+  s.setAttribute('height', size);
+  s.setAttribute('viewBox', '0 0 24 24');
+  s.setAttribute('fill', 'none');
+  s.setAttribute('stroke', 'currentColor');
+  s.setAttribute('stroke-width', '2');
+  s.setAttribute('stroke-linecap', 'round');
+  s.setAttribute('stroke-linejoin', 'round');
+  s.innerHTML = SVG_PATHS[name] || '';
+  return s;
+}
+
 const DEFAULTS = {
   server: 'ws://127.0.0.1:7777', mic: '', cam: '', spk: '',
   camPreset: '720p30', screenPreset: '1080p30', screenAudio: false,
@@ -192,27 +216,79 @@ function onProfile(p) {
   render(); renderCallOverlay();
 }
 
-// ---------- login y actualizaciones ----------
+// ---------- login, sesión persistente ("Permanecer conectado") y actualizaciones ----------
 function normUrl(u) { u = (u || '').trim(); if (!u) return DEFAULTS.server; if (!/^wss?:\/\//i.test(u)) u = 'ws://' + u; if (!/:\d+/.test(u.replace(/^wss?:\/\//i, '')) && u.startsWith('ws://')) u += ':7777'; return u; }
 function httpBase() { return settings.server.replace(/^ws/i, 'http').replace(/\/+$/, ''); }
-$('lgServer').value = settings.server; $('lgUser').value = localStorage.getItem('epickast.user') || '';
+$('lgServer').value = settings.server;
+$('lgUser').value = localStorage.getItem('epickast.user') || '';
+if ($('lgRemember')) $('lgRemember').checked = localStorage.getItem('epickast.remember') !== '0';
+
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault(); $('lgError').textContent = '';
   const mode = e.submitter?.dataset.mode || 'login';
+  const remember = $('lgRemember') ? $('lgRemember').checked : true;
+  const userVal = $('lgUser').value.trim();
+  const passVal = $('lgPass').value;
   settings.server = normUrl($('lgServer').value); saveSettings();
   try {
     if (S.ws) { S.ws.onclose = null; S.ws.close(); S.ws = null; }
     await connect(settings.server);
-    const r = await rpc(mode, { name: $('lgUser').value, password: $('lgPass').value });
+    const r = await rpc(mode, { name: userVal, password: passVal });
     S.me = r.user; S.token = r.token; S.ice = r.ice;
-    localStorage.setItem('epickast.token', r.token); localStorage.setItem('epickast.user', r.user.name);
+    localStorage.setItem('epickast.user', r.user.name);
+    localStorage.setItem('epickast.remember', remember ? '1' : '0');
+    if (remember) {
+      localStorage.setItem('epickast.token', r.token);
+      window.epic.saveAuth?.({ server: settings.server, user: r.user.name, pass: passVal, token: r.token, remember: true });
+    } else {
+      localStorage.removeItem('epickast.token');
+      window.epic.saveAuth?.(null);
+    }
     $('lgPass').value = ''; await bootstrap();
   } catch (err) { $('lgError').textContent = err.message; }
 });
+
 async function autoLogin() {
-  if (!S.token) return;
-  try { await connect(settings.server); const r = await rpc('resume', { token: S.token }); S.me = r.user; S.ice = r.ice; await bootstrap(); }
-  catch { if (S.ws) { S.ws.onclose = null; S.ws.close(); S.ws = null; } }
+  const saved = await window.epic.loadAuth?.().catch(() => null);
+  const remember = localStorage.getItem('epickast.remember') !== '0' && (saved?.remember !== false);
+  if (saved?.server && !localStorage.getItem('epickast.settings')) {
+    settings.server = normUrl(saved.server);
+    $('lgServer').value = settings.server;
+  }
+  if (saved?.user && !$('lgUser').value) $('lgUser').value = saved.user;
+  if (remember && saved?.pass) $('lgPass').value = saved.pass;
+  const tok = S.token || (remember ? saved?.token : '') || '';
+  if (!remember || (!tok && !saved?.pass)) return;
+
+  const statusEl = $('lgError');
+  if (statusEl) { statusEl.style.color = 'var(--ok)'; statusEl.textContent = `Reconectando sesión de ${$('lgUser').value || 'tu cuenta'}…`; }
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await connect(settings.server);
+      let r;
+      if (tok) {
+        try { r = await rpc('resume', { token: tok }); }
+        catch (e) {
+          if (saved?.user && saved?.pass) r = await rpc('login', { name: saved.user, password: saved.pass });
+          else throw e;
+        }
+      } else {
+        r = await rpc('login', { name: saved.user, password: saved.pass });
+      }
+      S.me = r.user; S.token = r.token || tok; S.ice = r.ice;
+      localStorage.setItem('epickast.token', S.token);
+      localStorage.setItem('epickast.user', r.user.name);
+      if (saved?.pass) window.epic.saveAuth?.({ server: settings.server, user: r.user.name, pass: saved.pass, token: S.token, remember: true });
+      if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
+      await bootstrap();
+      return;
+    } catch {
+      if (S.ws) { S.ws.onclose = null; S.ws.close(); S.ws = null; }
+      await new Promise((res) => setTimeout(res, 750));
+    }
+  }
+  if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
 }
 async function bootstrap() {
   $('login').classList.add('hidden'); $('main').classList.remove('hidden');
@@ -600,7 +676,7 @@ function render() { renderRail(); renderSide(); renderMembers(); renderCenter();
 function renderMe() {
   const bar = $('meBar'); if (!S.me) return; bar.replaceChildren(
     h('div', { class: 'who', title: 'Editar perfil', onclick: modalProfile }, avatar(S.me, 34, true), h('div', { style: 'min-width:0' }, h('b', null, S.me.name), h('small', null, S.me.bio || 'Editar perfil'))),
-    h('button', { title: 'Ajustes', onclick: modalSettings }, '⚙️'));
+    h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16)));
 }
 function renderRail() {
   const r = $('rail'); r.replaceChildren();
@@ -617,14 +693,14 @@ function renderSide() {
   if (S.view.kind === 'home') {
     $('sideTitle').replaceChildren(h('span', null, 'Mensajes directos'));
     for (const f of S.friends.friends) {
-      L.append(userItem(f, () => openChannel(f.dm, 'dm', f.name), h('button', { class: 'btn-call', title: `Llamar a ${f.name}`, style: 'padding:3px 8px', onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name); } }, '📞')));
+      L.append(userItem(f, () => openChannel(f.dm, 'dm', f.name), h('button', { class: 'side-call', title: `Llamar a ${f.name}`, onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name); } }, icoSvg('phone', 14))));
       const room = S.rooms.get(f.dm); if (room?.length) L.append(h('div', { class: 'sub' }, `🔊 en llamada (${room.length})`));
     }
     if (!S.friends.friends.length) L.append(h('div', { class: 'item' }, 'Aún no tienes amigos'));
     return;
   }
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
-  $('sideTitle').replaceChildren(h('span', null, sd.name), h('button', { onclick: modalServerManage, title: 'Administrar' }, '⋯'));
+  $('sideTitle').replaceChildren(h('span', null, sd.name), h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar' }, '⋯'));
   for (const type of ['text', 'voice']) {
     L.append(h('div', { class: 'sect' }, type === 'text' ? 'Canales de texto' : 'Canales de voz',
       sd.owner === S.me.id ? h('button', { title: 'Crear canal', onclick: () => modalChannel(sd.id, type) }, '+') : null));
@@ -647,9 +723,9 @@ function renderCenter() {
   const dm = S.chan && S.chan[0] === 'd';
   const showChat = !!S.chan && S.chanType !== 'voice';
   const rightBtns = h('div', { style: 'display:flex;gap:8px;align-items:center' },
-    showChat ? h('button', { title: 'Ver mensajes fijados en este canal', onclick: modalPins }, '📌 Fijados') : null,
-    showChat ? h('button', { title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, '🖼️ Galería') : null,
-    dm ? h('button', { class: 'btn-call', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, '📞 Llamar') : null
+    showChat ? h('button', { class: 'btn-act hdr', title: 'Ver mensajes fijados en este canal', onclick: modalPins }, icoSvg('pin', 14), 'Fijados') : null,
+    showChat ? h('button', { class: 'btn-act hdr', title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, icoSvg('gallery', 14), 'Galería') : null,
+    dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null
   );
   $('chTitle').replaceChildren(
     h('span', null, S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : ''),
@@ -661,15 +737,52 @@ function renderCenter() {
 function renderHome() {
   const H = $('home'); if (H.classList.contains('hidden') && S.view.kind !== 'home') return;
   H.replaceChildren();
-  const inp = h('input', { placeholder: 'Nombre de usuario del amigo' });
-  H.append(h('h3', null, 'Agregar amigo'), h('div', { class: 'row' }, inp, h('button', { class: 'primary', onclick: () => { if (inp.value.trim()) safe(rpc('friends.add', { name: inp.value })).then(() => { inp.value = ''; toast('Solicitud enviada'); }); } }, 'Enviar')));
-  if (S.friends.incoming.length) H.append(h('h3', null, 'Solicitudes recibidas'));
-  for (const u of S.friends.incoming) H.append(h('div', { class: 'item' }, h('span', { class: 'l' }, avatar(u, 32), u.name), h('span', null, h('button', { class: 'primary', onclick: () => rpc('friends.accept', { id: u.id }) }, 'Aceptar'), ' ', h('button', { onclick: () => rpc('friends.remove', { id: u.id }) }, 'Rechazar'))));
-  if (S.friends.outgoing.length) H.append(h('h3', null, 'Pendientes'));
-  for (const u of S.friends.outgoing) H.append(h('div', { class: 'item' }, h('span', { class: 'l' }, avatar(u, 32), u.name), h('button', { onclick: () => rpc('friends.remove', { id: u.id }) }, 'Cancelar')));
+  const sendFriend = () => {
+    const v = inp.value.trim();
+    if (v) safe(rpc('friends.add', { name: v })).then(() => { inp.value = ''; toast('Solicitud enviada'); });
+  };
+  const inp = h('input', { placeholder: 'Escribe el nombre de usuario de tu amigo…', onkeydown: (e) => { if (e.key === 'Enter') sendFriend(); } });
+  H.append(
+    h('h3', null, 'Agregar amigo'),
+    h('div', { class: 'add-friend-bar' }, inp, h('button', { class: 'primary', onclick: sendFriend }, icoSvg('userPlus', 15), 'Enviar solicitud'))
+  );
+  if (S.friends.incoming.length) H.append(h('h3', null, `Solicitudes recibidas — ${S.friends.incoming.length}`));
+  for (const u of S.friends.incoming) {
+    H.append(h('div', { class: 'friend-card' },
+      h('span', { class: 'l' }, avatar(u, 36), h('span', { class: 'nm' }, h('b', { style: 'color:var(--tx)' }, u.name), h('div', { class: 'hint' }, 'Quiere agregarte'))),
+      h('div', { class: 'f-actions' },
+        h('button', { class: 'btn-act call', onclick: () => rpc('friends.accept', { id: u.id }) }, icoSvg('check', 15), 'Aceptar'),
+        h('button', { class: 'btn-ico del', title: 'Rechazar', onclick: () => rpc('friends.remove', { id: u.id }) }, icoSvg('close', 15))
+      )
+    ));
+  }
+  if (S.friends.outgoing.length) H.append(h('h3', null, `Solicitudes enviadas — ${S.friends.outgoing.length}`));
+  for (const u of S.friends.outgoing) {
+    H.append(h('div', { class: 'friend-card' },
+      h('span', { class: 'l' }, avatar(u, 34), h('span', { class: 'nm' }, u.name, h('div', { class: 'hint' }, 'Pendiente de aceptar'))),
+      h('div', { class: 'f-actions' }, h('button', { class: 'btn-act', onclick: () => rpc('friends.remove', { id: u.id }) }, 'Cancelar'))
+    ));
+  }
   H.append(h('h3', null, `Amigos — ${S.friends.friends.length}`));
-  for (const u of S.friends.friends) H.append(h('div', { class: 'item' }, h('span', { class: 'l' }, avatar(u, 36, u.online), h('span', { class: 'nm' }, u.name, h('div', { class: 'hint' }, u.online ? 'En línea' : 'Desconectado'))),
-    h('span', { class: 'row' }, h('button', { class: 'btn-msg', onclick: () => openChannel(u.dm, 'dm', u.name) }, '💬 Mensaje'), h('button', { class: 'btn-call', onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name); } }, '📞 Llamar'), h('button', { title: 'Eliminar amigo', onclick: () => confirm(`¿Eliminar a ${u.name}?`) && rpc('friends.remove', { id: u.id }) }, '✕'))));
+  if (!S.friends.friends.length) {
+    H.append(h('div', { class: 'hint', style: 'padding:12px 2px' }, 'Aún no has agregado amigos. Envía una solicitud arriba para empezar a chatear y llamar.'));
+  }
+  for (const u of S.friends.friends) {
+    H.append(h('div', { class: 'friend-card' },
+      h('span', { class: 'l', style: 'cursor:pointer', onclick: () => openChannel(u.dm, 'dm', u.name) },
+        avatar(u, 38, u.online),
+        h('span', { class: 'nm' },
+          h('div', { style: 'font-weight:600;color:var(--tx)' }, u.name),
+          h('div', { class: 'hint', style: u.online ? 'color:var(--ok)' : '' }, u.online ? 'En línea' : 'Desconectado')
+        )
+      ),
+      h('div', { class: 'f-actions' },
+        h('button', { class: 'btn-act', title: `Abrir chat con ${u.name}`, onclick: () => openChannel(u.dm, 'dm', u.name) }, icoSvg('chat', 15), 'Mensaje'),
+        h('button', { class: 'btn-act call', title: `Llamar a ${u.name}`, onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name); } }, icoSvg('phone', 15), 'Llamar'),
+        h('button', { class: 'btn-ico del', title: 'Eliminar amigo', onclick: () => confirm(`¿Eliminar a ${u.name}?`) && rpc('friends.remove', { id: u.id }) }, icoSvg('close', 16))
+      )
+    ));
+  }
 }
 
 // ---------- modales ----------
@@ -801,7 +914,7 @@ async function modalSettings() {
     h('label', null, '📦 Enlace de descarga/actualización para tus amigos (clic para copiar)',
       h('input', { value: dlLink, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(dlLink); toast('Enlace de descarga copiado'); } })),
     h('label', null, 'Servidor', h('input', { value: settings.server, onchange: (e) => { settings.server = normUrl(e.target.value); saveSettings(); toast('Se aplicará al volver a iniciar sesión'); } })),
-    h('button', { class: 'danger', onclick: () => { localStorage.removeItem('epickast.token'); location.reload(); } }, 'Cerrar sesión'));
+    h('button', { class: 'danger', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, 'Cerrar sesión'));
 }
 
 // ---------- llamadas entrantes / salientes ----------
