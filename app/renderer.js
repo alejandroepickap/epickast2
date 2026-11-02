@@ -42,7 +42,7 @@ function icoSvg(name, size = 15) {
 const DEFAULTS = {
   server: 'wss://epickast.onrender.com', mic: '', cam: '', spk: '',
   camPreset: '720p30', screenPreset: '1080p30', screenAudio: false,
-  hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.024, audioKbps: 96,
+  hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.006, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
   keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 54, hideNoVideo: true,
   partyVol: 0.75, partyAudioOnly: false, autoGameDetect: true, customActivity: '',
@@ -56,6 +56,7 @@ const ROLES = {
   member: { label: 'Miembro',     group: '🟢 Miembros en línea', badge: '',   color: '',        rank: 0 },
 };
 const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('epickast.settings') || '{}') };
+if (settings.voiceGate === 0.024 || settings.voiceGate === undefined) settings.voiceGate = 0.006;
 if (!settings.server || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(settings.server)) {
   settings.server = DEFAULTS.server;
   localStorage.setItem('epickast.settings', JSON.stringify(settings));
@@ -1152,10 +1153,26 @@ function modalProfile() {
 
 async function modalSettings() {
   let devs = []; try { devs = await navigator.mediaDevices.enumerateDevices(); } catch {}
-  const sel = (kind, key) => { const s = h('select', { onchange: () => { settings[key] = s.value; saveSettings(); } }, h('option', { value: '' }, 'Predeterminado'), devs.filter((d) => d.kind === kind).map((d, i) => h('option', { value: d.deviceId, selected: settings[key] === d.deviceId }, d.label || `Dispositivo ${i + 1}`))); return s; };
+  const sel = (kind, key) => {
+    const s = h('select', { onchange: () => {
+      settings[key] = s.value;
+      saveSettings();
+      if (key === 'spk') {
+        mic?.setSinkId?.(settings.spk);
+        S.call?.setSinkId?.(settings.spk);
+        tiles.forEach((t) => {
+          if (t.video && t.video.setSinkId && t.sink !== settings.spk) {
+            t.sink = settings.spk;
+            t.video.setSinkId(settings.spk).catch(() => {});
+          }
+        });
+      }
+    } }, h('option', { value: '' }, 'Predeterminado'), devs.filter((d) => d.kind === kind).map((d, i) => h('option', { value: d.deviceId, selected: settings[key] === d.deviceId }, d.label || `Dispositivo ${i + 1}`)));
+    return s;
+  };
   const preset = (key, obj) => { const s = h('select', { onchange: () => { settings[key] = s.value; saveSettings(); S.call?.retune(); } }, Object.keys(obj).map((k) => h('option', { value: k, selected: settings[key] === k }, k))); return s; };
   const chk = (key, text, after) => h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: !!settings[key], onchange: (e) => { settings[key] = e.target.checked; saveSettings(); after?.(); } }), text);
-  const noiseSel = h('select', { onchange: () => { settings.noise = noiseSel.value; saveSettings(); if (mic) startTest(); else hint.textContent = 'Se aplicará en la próxima llamada.'; } },
+  const noiseSel = h('select', { onchange: () => { settings.noise = noiseSel.value; saveSettings(); if (mic && ownMic) startTest(); else hint.textContent = 'Se aplicará en la próxima llamada.'; } },
     [['high', 'Alta — RNNoise + Filtro 115 Hz + Anti-Respiración (recomendada)'], ['std', 'Estándar — Chromium'], ['off', 'Desactivada']].map(([v, t]) => h('option', { value: v, selected: settings.noise === v }, t)));
   const audioQSel = h('select', { onchange: () => { settings.audioKbps = Number(audioQSel.value); saveSettings(); S.call?.peers.forEach((p) => p.senders.mic && S.call.tuneAudio(p.senders.mic)); } },
     [[64, 'Voz Clara (64 kbps)'], [96, 'Voz HD (96 kbps — recomendada)'], [128, 'Estudio / Música (128 kbps)']].map(([v, t]) => h('option', { value: v, selected: Number(settings.audioKbps) === v }, t)));
@@ -1167,24 +1184,67 @@ async function modalSettings() {
     mic?.setGain?.(settings.micGain);
   } });
   const gatePct = (v) => (v <= 0.002 ? 'Desactivada (0%)' : `${Math.round((v / 0.06) * 100)}%`);
-  const gateLbl = h('span', null, gatePct(settings.voiceGate ?? 0.024));
-  const gateInput = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.024, oninput: () => {
+  const gateLbl = h('span', null, gatePct(settings.voiceGate ?? 0.006));
+  const gateInput = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.006, oninput: () => {
     settings.voiceGate = Number(gateInput.value); saveSettings();
     gateLbl.textContent = gatePct(settings.voiceGate);
     S.call?.mic?.setGate?.(settings.voiceGate);
     mic?.setGate?.(settings.voiceGate);
   } });
   const hint = h('div', { class: 'hint' }, 'Incluye filtro paso-alto (115 Hz), recorte nasal (180 Hz), RNNoise y puerta de voz anti-respiración para silenciar suspiros y aire entre palabras.');
-  let mic = null, raf = 0; const bar = h('div'); const meter = h('div', { class: 'meter' }, bar);
-  const mon = h('input', { type: 'checkbox', style: 'width:auto', onchange: () => mic?.monitor(mon.checked) });
+  let mic = null, raf = 0, ownMic = false;
+  const bar = h('div');
+  const meterStatus = h('span', { style: 'font-size:11px;color:var(--mu);margin-left:8px' }, '⚪ Micrófono inactivo');
+  const meter = h('div', { style: 'display:flex;align-items:center;gap:8px;width:100%' }, h('div', { class: 'meter', style: 'flex:1' }, bar), meterStatus);
+  const mon = h('input', { type: 'checkbox', style: 'width:auto', checked: true, onchange: () => mic?.monitor(mon.checked) });
   const testBtn = h('button', { onclick: () => (mic ? stopTest() : startTest()) }, '🎙 Probar micrófono');
-  const stopTest = () => { cancelAnimationFrame(raf); mic?.dispose(); mic = null; bar.style.width = '0'; testBtn.textContent = '🎙 Probar micrófono'; mon.checked = false; };
+  const stopTest = () => {
+    cancelAnimationFrame(raf);
+    if (mic) {
+      mic.monitor(false);
+      if (ownMic) mic.dispose();
+      mic = null;
+    }
+    bar.style.width = '0%';
+    meterStatus.textContent = '⚪ Micrófono inactivo';
+    meterStatus.style.color = 'var(--mu)';
+    testBtn.textContent = '🎙 Probar micrófono';
+  };
   const startTest = async () => {
     stopTest();
-    try { mic = await createMic(settings); } catch { return toast('No se pudo abrir el micrófono'); }
-    mic.monitor(true); mon.checked = true;
-    testBtn.textContent = '⏹ Detener prueba'; hint.textContent = `Supresión activa: ${{ high: 'RNNoise + Puerta Anti-Respiración', std: 'estándar', off: 'ninguna' }[mic.mode]}. Respira suave para comprobar que la puerta de voz lo silencia.`;
-    const loop = () => { bar.style.width = Math.min(100, Math.round(mic.level() * 180)) + '%'; raf = requestAnimationFrame(loop); }; loop();
+    meterStatus.textContent = '⌛ Conectando micrófono...';
+    if (S.call?.mic) {
+      mic = S.call.mic;
+      ownMic = false;
+    } else {
+      try {
+        mic = await createMic(settings);
+        ownMic = true;
+      } catch (e) {
+        meterStatus.textContent = '❌ Error al abrir micrófono';
+        meterStatus.style.color = 'var(--re)';
+        return toast('No se pudo abrir el micrófono: ' + (e.message || e.name || 'Permiso denegado'));
+      }
+    }
+    mic.monitor(mon.checked);
+    testBtn.textContent = '⏹ Detener prueba';
+    hint.textContent = `Supresión activa: ${{ high: 'RNNoise + Puerta Anti-Respiración', std: 'estándar', off: 'ninguna' }[mic.mode] || 'estándar'}. Habla al micrófono para verificar la barra verde y escucharte.`;
+    const loop = () => {
+      if (!mic) return;
+      const raw = mic.rawLevel ? mic.rawLevel() : 0;
+      const proc = mic.level ? mic.level() : 0;
+      const lv = Math.max(raw, proc);
+      bar.style.width = Math.min(100, Math.round(lv * 220)) + '%';
+      if (lv > 0.02) {
+        meterStatus.textContent = `🟢 Hablando (${Math.round(lv * 100)}%)`;
+        meterStatus.style.color = 'var(--gr)';
+      } else {
+        meterStatus.textContent = '⚪ En silencio';
+        meterStatus.style.color = 'var(--mu)';
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    loop();
   };
   S.cleanup.push(stopTest);
   const swA = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === settings.accent ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { settings.accent = c; saveSettings(); applyAccent(); swA.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
@@ -1400,8 +1460,8 @@ $('mMore').onclick = (e) => {
   const menu = $('meetMenu');
   if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
   const c = S.call;
-  const gLbl = h('b', null, `${Math.round(((settings.voiceGate ?? 0.024) / 0.06) * 100)}%`);
-  const gRng = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.024, oninput: () => {
+  const gLbl = h('b', null, `${Math.round(((settings.voiceGate ?? 0.006) / 0.06) * 100)}%`);
+  const gRng = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.006, oninput: () => {
     settings.voiceGate = Number(gRng.value);
     saveSettings();
     gLbl.textContent = `${Math.round((settings.voiceGate / 0.06) * 100)}%`;

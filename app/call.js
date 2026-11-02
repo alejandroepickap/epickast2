@@ -46,16 +46,39 @@ function preferredCodecs() {
  */
 async function createMic(settings) {
   const mode = ['off', 'std', 'high'].includes(settings.noise) ? settings.noise : 'high';
-  const raw = await navigator.mediaDevices.getUserMedia({
-    audio: {
-      deviceId: settings.mic ? { exact: settings.mic } : undefined,
-      echoCancellation: true,
-      noiseSuppression: mode !== 'off',
-      autoGainControl: true,
-      channelCount: 1,
-      sampleRate: 48000,
-    },
-  });
+  const preferredDevice = settings.mic && typeof settings.mic === 'string' && settings.mic.trim() !== '' ? settings.mic.trim() : null;
+
+  let raw = null;
+  // 1) Intentar con el dispositivo configurado (con { ideal }, nunca { exact } para no fallar por id re-enumerado o desconectado)
+  if (preferredDevice) {
+    try {
+      raw = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: { ideal: preferredDevice },
+          echoCancellation: true,
+          noiseSuppression: mode !== 'off',
+          autoGainControl: true,
+          channelCount: 1,
+          sampleRate: 48000,
+        },
+      });
+    } catch (e) {
+      console.warn('getUserMedia con preferredDevice falló, intentando audio predeterminado:', e);
+    }
+  }
+
+  // 2) Fallback al dispositivo de audio predeterminado del sistema
+  if (!raw) {
+    raw = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: mode !== 'off',
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: 48000,
+      },
+    });
+  }
 
   // Mantener vivo el pull de captura de Chromium en Windows
   const pullEl = new Audio();
@@ -100,12 +123,14 @@ async function createMic(settings) {
     }
   }
 
-  // 3) Puerta de Voz Anti-Respiración (Noise Gate con ataque rápido de 6 ms y sostén de 220 ms)
+  // 3) Puerta de Voz Anti-Respiración (Noise Gate)
   const gateAn = ctx.createAnalyser();
   gateAn.fftSize = 256;
   const gateGain = ctx.createGain();
-  let gateThresh = Math.max(0, Math.min(0.12, Number(settings.voiceGate ?? 0.024)));
-  gateGain.gain.value = gateThresh > 0.002 ? 0 : 1;
+  let gateThresh = Math.max(0, Math.min(0.12, Number(settings.voiceGate ?? 0.006)));
+  // Siempre iniciar en 1 (abierto) para que la primera sílaba o palabra nunca se corte
+  gateGain.gain.value = 1;
+  let gateOpen = true;
 
   cleanNode.connect(gateAn);
   cleanNode.connect(gateGain);
@@ -125,8 +150,6 @@ async function createMic(settings) {
   an.fftSize = 256;
   const zeroGain = ctx.createGain();
   zeroGain.gain.value = 0;
-  const monGain = ctx.createGain();
-  monGain.gain.value = 0;
   const dest = ctx.createMediaStreamDestination();
   dest.channelCount = 1;
 
@@ -136,14 +159,22 @@ async function createMic(settings) {
   inGain.connect(an);
   an.connect(zeroGain);
   zeroGain.connect(ctx.destination);
-  inGain.connect(monGain);
-  monGain.connect(ctx.destination);
+
+  // Elemento Audio dedicado para monitoreo propio (Oírme / Probador de micrófono)
+  // Utiliza dest.stream para oír tu propia voz procesada con sinkId correcto al altavoz o audífono seleccionado
+  const monEl = new Audio();
+  monEl.srcObject = dest.stream;
+  if (settings.spk && typeof monEl.setSinkId === 'function') {
+    monEl.setSinkId(settings.spk).catch(() => {});
+  }
+  if (settings.spk && typeof ctx.setSinkId === 'function') {
+    ctx.setSinkId(settings.spk).catch(() => {});
+  }
   await ctx.resume().catch(() => {});
 
   const gateBuf = new Uint8Array(gateAn.fftSize);
   const buf = new Uint8Array(an.fftSize);
-  let holdUntil = 0;
-  let gateOpen = gateThresh <= 0.002;
+  let holdUntil = performance.now() + 400; // Mantener abierto inicialmente
   const gateTimer = setInterval(() => {
     if (gateThresh <= 0.002) {
       if (!gateOpen) { gateOpen = true; gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.01); }
@@ -158,17 +189,17 @@ async function createMic(settings) {
       sum += d * d;
     }
     const rms = Math.sqrt(sum / gateBuf.length);
-    const lv = Math.max(rms * 1.35, peak * 0.65);
+    const lv = Math.max(rms * 1.5, peak * 0.7);
     const now = performance.now();
     if (lv >= gateThresh) {
-      holdUntil = now + 220;
+      holdUntil = now + 260; // 260ms sostén para no cortar finales de palabras
       if (!gateOpen) {
         gateOpen = true;
-        gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.006);
+        gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.008);
       }
     } else if (gateOpen && now > holdUntil) {
       gateOpen = false;
-      gateGain.gain.setTargetAtTime(0, ctx.currentTime, 0.032);
+      gateGain.gain.setTargetAtTime(0, ctx.currentTime, 0.040);
     }
   }, 22);
 
@@ -180,7 +211,7 @@ async function createMic(settings) {
     ctx,
     analyser: an,
     monitoring: false,
-    _nodes: { src, hp, breathEq, cleanNode, gateAn, gateGain, comp, inGain, dest, an, zeroGain, monGain, pullEl },
+    _nodes: { src, hp, breathEq, cleanNode, gateAn, gateGain, comp, inGain, dest, an, zeroGain, monEl, pullEl },
     setGain(val) {
       inGain.gain.setTargetAtTime(Math.max(0.2, Math.min(2.5, Number(val) || 1)), ctx.currentTime, 0.015);
     },
@@ -190,6 +221,10 @@ async function createMic(settings) {
         gateOpen = true;
         gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.01);
       }
+    },
+    setSinkId(sinkId) {
+      if (typeof monEl.setSinkId === 'function') monEl.setSinkId(sinkId).catch(() => {});
+      if (typeof ctx.setSinkId === 'function') ctx.setSinkId(sinkId).catch(() => {});
     },
     rawLevel() {
       gateAn.getByteTimeDomainData(gateBuf);
@@ -211,12 +246,21 @@ async function createMic(settings) {
     },
     monitor(on) {
       this.monitoring = !!on;
-      monGain.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.015);
-      if (on && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (on) {
+        if (monEl.srcObject !== dest.stream) monEl.srcObject = dest.stream;
+        if (settings.spk && typeof monEl.setSinkId === 'function') {
+          monEl.setSinkId(settings.spk).catch(() => {});
+        }
+        monEl.play().catch(() => {});
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      } else {
+        monEl.pause();
+      }
     },
     dispose() {
       clearInterval(gateTimer);
       this.monitor(false);
+      try { monEl.srcObject = null; } catch {}
       try { pullEl.srcObject = null; } catch {}
       raw.getTracks().forEach((t) => t.stop());
       outStream.getTracks().forEach((t) => t.stop());
@@ -247,6 +291,10 @@ class Call {
   setSelfMonitor(on) {
     this.mic?.monitor(on);
     this.onChange();
+  }
+
+  setSinkId(sinkId) {
+    this.mic?.setSinkId?.(sinkId);
   }
 
   // ---- pares ----
