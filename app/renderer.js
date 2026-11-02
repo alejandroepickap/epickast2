@@ -40,7 +40,7 @@ function icoSvg(name, size = 15) {
 }
 
 const DEFAULTS = {
-  server: 'ws://127.0.0.1:7777', mic: '', cam: '', spk: '',
+  server: 'wss://epickast.onrender.com', mic: '', cam: '', spk: '',
   camPreset: '720p30', screenPreset: '1080p30', screenAudio: false,
   hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.024, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
@@ -56,6 +56,10 @@ const ROLES = {
   member: { label: 'Miembro',     group: '🟢 Miembros en línea', badge: '',   color: '',        rank: 0 },
 };
 const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('epickast.settings') || '{}') };
+if (!settings.server || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(settings.server)) {
+  settings.server = DEFAULTS.server;
+  localStorage.setItem('epickast.settings', JSON.stringify(settings));
+}
 const saveSettings = () => localStorage.setItem('epickast.settings', JSON.stringify(settings));
 const userVols = JSON.parse(localStorage.getItem('epickast.volumes') || '{}'); // userId -> 0..2 (1 = 100%)
 const getUserVol = (uid) => (userVols[uid] !== undefined ? Number(userVols[uid]) : 1);
@@ -297,7 +301,7 @@ $('loginForm').addEventListener('submit', async (e) => {
 async function autoLogin() {
   const saved = await window.epic.loadAuth?.().catch(() => null);
   const remember = localStorage.getItem('epickast.remember') !== '0' && (saved?.remember !== false);
-  if (saved?.server && !localStorage.getItem('epickast.settings')) {
+  if (saved?.server && !/^ws:\/\/(127\.0\.0\.1|localhost)/i.test(saved.server) && !localStorage.getItem('epickast.settings')) {
     settings.server = normUrl(saved.server);
     $('lgServer').value = settings.server;
   }

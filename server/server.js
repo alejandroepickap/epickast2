@@ -581,7 +581,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.0.0';
+  let version = '1.5.0';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
@@ -590,13 +590,15 @@ function releaseInfo() {
     files.sort((a, b) => {
       const aMatch = a.includes(version) ? 1 : 0, bMatch = b.includes(version) ? 1 : 0;
       if (aMatch !== bMatch) return bMatch - aMatch;
-      const aExe = a.endsWith('.exe') ? 1 : 0, bExe = b.endsWith('.exe') ? 1 : 0;
-      if (aExe !== bExe) return bExe - aExe;
+      const aZip = a.startsWith('EpicKast-Instalador-') && a.endsWith('.zip') ? 1 : 0;
+      const bZip = b.startsWith('EpicKast-Instalador-') && b.endsWith('.zip') ? 1 : 0;
+      if (aZip !== bZip) return bZip - aZip;
       return b.localeCompare(a, undefined, { numeric: true });
     });
     if (files.length) file = files[0];
   }
-  return { version, file, downloadPath: file ? '/download/latest' : null };
+  const ghUrl = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.zip`;
+  return { version, file: file || `EpicKast-Instalador-${version}.zip`, downloadPath: '/download/latest', ghUrl };
 }
 
 // ---------- transporte ----------
@@ -677,10 +679,32 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'origin-when-cross-origin' });
     return res.end(ytPlayerHtml(u.searchParams.get('v') || ''));
   }
+  if (u.pathname === '/' || u.pathname === '/index.html') {
+    const info = releaseInfo();
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    return res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>EpicKast — Descarga Oficial</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,#1d1b38 0%,#0e1015 70%);color:#eef0f6;font-family:system-ui,sans-serif;text-align:center;padding:20px}
+.box{background:#151821;border:1px solid rgba(255,255,255,.08);padding:34px;border-radius:20px;max-width:480px;box-shadow:0 20px 50px #000a}
+h1{margin:0 0 6px;font-size:28px}h1 span{color:#7c5cff}p{color:#8c93a8;font-size:14px;line-height:1.5}
+a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:12px;font-size:15px}
+.steps{text-align:left;background:#1e2230;padding:14px 18px;border-radius:12px;margin-top:18px;font-size:13px;color:#d0d5e6}
+.steps li{margin:6px 0}</style></head><body><div class="box">
+<h1>Epic<span>Kast</span> v${info.version}</h1>
+<p>Comunicación ultraligera de baja latencia · Servidor en línea 🟢</p>
+<a class="btn" href="/download/latest">⬇ Descargar para Windows (ZIP sin bloqueo)</a>
+<ol class="steps">
+<li>Descarga el archivo <b>.zip</b> de arriba y extráelo.</li>
+<li>Abre <b>Instalar-Sin-Bloqueo.bat</b> (elimina el aviso de SmartScreen automáticamente e instala EpicKast).</li>
+<li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast.onrender.com</b>.</li>
+</ol></div></body></html>`);
+  }
   if (u.pathname === '/download/latest') {
     const info = releaseInfo();
     const fp = info.file ? path.join(__dirname, '..', 'dist', info.file) : null;
-    if (!fp || !fs.existsSync(fp)) { res.writeHead(404); return res.end('No hay instalador generado en dist/'); }
+    if (!fp || !fs.existsSync(fp)) {
+      res.writeHead(302, { Location: info.ghUrl });
+      return res.end();
+    }
     const stat = fs.statSync(fp);
     res.writeHead(200, {
       'content-type': 'application/octet-stream',
