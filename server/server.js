@@ -978,32 +978,42 @@ a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-de
   if (u.pathname === '/download/latest') {
     const info = releaseInfo();
     const fp = info.file ? path.join(__dirname, '..', 'dist', info.file) : null;
-    if (!fp || !fs.existsSync(fp)) {
-      res.writeHead(302, { Location: info.ghUrl });
-      return res.end();
+    if (fp && fs.existsSync(fp)) {
+      const stat = fs.statSync(fp);
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'content-length': stat.size,
+        'content-disposition': `attachment; filename="${info.file}"`,
+      });
+      return fs.createReadStream(fp).pipe(res);
     }
-    const stat = fs.statSync(fp);
-    res.writeHead(200, {
-      'content-type': 'application/octet-stream',
-      'content-length': stat.size,
-      'content-disposition': `attachment; filename="${info.file}"`,
-    });
-    return fs.createReadStream(fp).pipe(res);
+    const manualZip = path.join(__dirname, '..', 'release', `EpicKast-v${info.version}-Manual.zip`);
+    if (fs.existsSync(manualZip)) {
+      const stat = fs.statSync(manualZip);
+      res.writeHead(200, {
+        'content-type': 'application/zip',
+        'content-length': stat.size,
+        'content-disposition': `attachment; filename="EpicKast-v${info.version}-Manual.zip"`,
+      });
+      return fs.createReadStream(manualZip).pipe(res);
+    }
+    res.writeHead(302, { Location: '/download/asar' });
+    return res.end();
   }
   if (u.pathname === '/download/exe') {
     const info = releaseInfo();
     const fp = info.exeFile ? path.join(__dirname, '..', 'dist', info.exeFile) : null;
-    if (!fp || !fs.existsSync(fp)) {
-      res.writeHead(302, { Location: info.ghExe });
-      return res.end();
+    if (fp && fs.existsSync(fp)) {
+      const stat = fs.statSync(fp);
+      res.writeHead(200, {
+        'content-type': 'application/vnd.microsoft.portable-executable',
+        'content-length': stat.size,
+        'content-disposition': `attachment; filename="${info.exeFile}"`,
+      });
+      return fs.createReadStream(fp).pipe(res);
     }
-    const stat = fs.statSync(fp);
-    res.writeHead(200, {
-      'content-type': 'application/vnd.microsoft.portable-executable',
-      'content-length': stat.size,
-      'content-disposition': `attachment; filename="${info.exeFile}"`,
-    });
-    return fs.createReadStream(fp).pipe(res);
+    res.writeHead(302, { Location: '/download/asar' });
+    return res.end();
   }
   if (req.method === 'POST' && u.pathname === '/upload') {
     const tok = String(req.headers['x-token'] || '');

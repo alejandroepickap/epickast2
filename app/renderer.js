@@ -632,6 +632,7 @@ async function checkServerUpdate() {
         actionArea.replaceChildren(restartBtn);
         toast(`Actualización v${info.version} descargada con éxito. Haz clic en Reiniciar ahora.`);
       } else {
+        if (res?.error) toast('Aviso de descarga: ' + res.error);
         label.textContent = `✨ Actualización v${info.version} disponible`;
         const retryBtn = h('button', {
           class: 'primary',

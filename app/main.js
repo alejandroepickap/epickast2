@@ -426,17 +426,25 @@ app.whenReady().then(() => {
       });
 
       const stat = fs.statSync(tempAsar);
-      if (stat.size < 500000) throw new Error('El paquete ASAR descargado está incompleto');
+      if (stat.size < 500000) throw new Error('El paquete ASAR descargado está incompleto (' + stat.size + ' B)');
 
       const appDir = path.dirname(app.getAppPath());
       const pendingAsar = path.join(appDir, 'app.asar.pending');
       fs.copyFileSync(tempAsar, pendingAsar);
       try { fs.unlinkSync(tempAsar); } catch {}
       console.log('ASAR pendiente copiado a:', pendingAsar);
+
+      const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+      const logFile = path.join(localAppDir, 'epickast-update.log');
+      try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] ASAR descargado con éxito (${stat.size} B) guardado en ${pendingAsar}\n`); } catch {}
+
       return { ok: true, size: stat.size };
     } catch (err) {
       if (tempAsar) { try { fs.unlinkSync(tempAsar); } catch {} }
       console.error('Error al descargar ASAR update:', err);
+      const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+      const logFile = path.join(localAppDir, 'epickast-update.log');
+      try { fs.appendFileSync(logFile, `[${new Date().toISOString()}] Error al descargar ASAR: ${err.message}\n`); } catch {}
       return { ok: false, error: err.message };
     }
   });
