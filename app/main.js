@@ -23,7 +23,7 @@ function downloadFile(url, destPath, onProgress, maxRedirects = 5) {
       }
       if (res.statusCode !== 200) {
         res.resume();
-        return reject(new Error(`Error de descarga HTTP ${res.statusCode}`));
+        return reject(new Error('Error de descarga HTTP ' + res.statusCode));
       }
       const total = parseInt(res.headers['content-length'] || '0', 10);
       let downloaded = 0;
@@ -39,11 +39,15 @@ function downloadFile(url, destPath, onProgress, maxRedirects = 5) {
         fileStream.close(() => resolve(destPath));
       });
       fileStream.on('error', (err) => {
-        fs.unlink(destPath, () => {});
+        try { fileStream.destroy(); } catch {}
+        try { fs.unlinkSync(destPath); } catch {}
         reject(err);
       });
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      try { fs.unlinkSync(destPath); } catch {}
+      reject(err);
+    });
   });
 }
 
@@ -404,13 +408,13 @@ app.whenReady().then(() => {
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
   
-  ipcMain.handle('app:download-asar-update', async (e, url) => {
+    ipcMain.handle('app:download-asar-update', async (e, url) => {
+    let tempAsar = null;
     try {
       if (!url || typeof url !== 'string') throw new Error('URL de ASAR inválida');
-      const tempAsar = path.join(app.getPath('temp'), 'epickast-update.asar');
-      if (fs.existsSync(tempAsar)) {
-        try { fs.unlinkSync(tempAsar); } catch {}
-      }
+      const uniqueName = 'epickast-update-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.asar';
+      tempAsar = path.join(app.getPath('temp'), uniqueName);
+
       await downloadFile(url, tempAsar, (pct, cur, tot) => {
         try {
           if (e?.sender && !e.sender.isDestroyed()) {
@@ -420,16 +424,18 @@ app.whenReady().then(() => {
           }
         } catch {}
       });
-      // Verificar tamaño
+
       const stat = fs.statSync(tempAsar);
       if (stat.size < 500000) throw new Error('El paquete ASAR descargado está incompleto');
 
       const appDir = path.dirname(app.getAppPath());
       const pendingAsar = path.join(appDir, 'app.asar.pending');
       fs.copyFileSync(tempAsar, pendingAsar);
+      try { fs.unlinkSync(tempAsar); } catch {}
       console.log('ASAR pendiente copiado a:', pendingAsar);
       return { ok: true, size: stat.size };
     } catch (err) {
+      if (tempAsar) { try { fs.unlinkSync(tempAsar); } catch {} }
       console.error('Error al descargar ASAR update:', err);
       return { ok: false, error: err.message };
     }
