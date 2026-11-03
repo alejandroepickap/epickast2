@@ -3,6 +3,49 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, scre
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const https = require('node:https');
+const http = require('node:http');
+
+function downloadFile(url, destPath, onProgress, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) return reject(new Error('Demasiadas redirecciones'));
+    const isHttps = /^https:/i.test(url);
+    const client = isHttps ? https : http;
+    const req = client.get(url, { headers: { 'User-Agent': 'EpicKast-Updater' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        let redirectUrl = res.headers.location;
+        if (!/^https?:\/\//i.test(redirectUrl)) {
+          const parsed = new URL(url);
+          redirectUrl = new URL(redirectUrl, parsed.origin).href;
+        }
+        res.resume();
+        return downloadFile(redirectUrl, destPath, onProgress, maxRedirects - 1).then(resolve, reject);
+      }
+      if (res.statusCode !== 200) {
+        res.resume();
+        return reject(new Error(`Error de descarga HTTP ${res.statusCode}`));
+      }
+      const total = parseInt(res.headers['content-length'] || '0', 10);
+      let downloaded = 0;
+      const fileStream = fs.createWriteStream(destPath);
+      res.on('data', (chunk) => {
+        downloaded += chunk.length;
+        if (total > 0 && onProgress) {
+          onProgress(Math.round((downloaded / total) * 100), downloaded, total);
+        }
+      });
+      res.pipe(fileStream);
+      fileStream.on('finish', () => {
+        fileStream.close(() => resolve(destPath));
+      });
+      fileStream.on('error', (err) => {
+        fs.unlink(destPath, () => {});
+        reject(err);
+      });
+    });
+    req.on('error', reject);
+  });
+}
 
 // Catálogo ligero de procesos (inspirado en DESKTOP_PROCESS_POLLING_PERF de discord_utils.node hallado con REA)
 const KNOWN_GAMES = {
@@ -144,6 +187,33 @@ app.whenReady().then(() => {
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
+  ipcMain.handle('app:download-and-install', async (e, url) => {
+    try {
+      if (!url || typeof url !== 'string') throw new Error('URL inválida');
+      const tempExe = path.join(app.getPath('temp'), 'EpicKast-Update.exe');
+      if (fs.existsSync(tempExe)) {
+        try { fs.unlinkSync(tempExe); } catch {}
+      }
+      await downloadFile(url, tempExe, (pct, cur, tot) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app:update-progress', { percent: pct, current: cur, total: tot });
+        }
+      });
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('app:update-progress', { percent: 100, installing: true });
+      }
+      // Ejecutar instalador NSIS silencioso /S con retardo de 1s para que Electron cierre limpiamente
+      const cmd = `timeout /t 1 /nobreak >nul & start "" "${tempExe}" /S`;
+      execFile('cmd.exe', ['/c', cmd], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => {
+        app.quit();
+      }, 500);
+      return { ok: true };
+    } catch (err) {
+      console.error('Error al descargar e instalar actualización:', err);
+      return { ok: false, error: err.message };
+    }
+  });
   ipcMain.handle('game:detect', () => new Promise((resolve) => {
     execFile('tasklist.exe', ['/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 4000, maxBuffer: 1024 * 1024 }, (err, stdout) => {
       if (err || !stdout) return resolve(null);

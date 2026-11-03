@@ -115,6 +115,13 @@ async function createMic(settings) {
         channelCount: 1,
         channelCountMode: 'explicit',
       });
+      rn.onprocessorerror = (err) => {
+        console.warn('RNNoise processor error, bypassing cleanly to breathEq:', err);
+        try {
+          breathEq.disconnect(rn);
+          breathEq.connect(gateGain);
+        } catch {}
+      };
       breathEq.connect(rn);
       cleanNode = rn;
       actualMode = 'high';
@@ -127,12 +134,16 @@ async function createMic(settings) {
   const gateAn = ctx.createAnalyser();
   gateAn.fftSize = 256;
   const gateGain = ctx.createGain();
-  let gateThresh = Math.max(0, Math.min(0.12, Number(settings.voiceGate ?? 0.006)));
-  // Siempre iniciar en 1 (abierto) para que la primera sílaba o palabra nunca se corte
+  // En modo 'high' (RNNoise), RNNoise elimina por IA el ruido ambiente y la respiración de forma continua.
+  // La compuerta de volumen por umbral solo se impone si el usuario la configura a un umbral alto (> 0.010).
+  const userGate = Number(settings.voiceGate ?? 0.006);
+  let gateThresh = (actualMode === 'high' && userGate <= 0.010) ? 0 : Math.max(0, Math.min(0.12, userGate));
+  // Siempre iniciar en 1 (abierto) para que la voz fluya de inmediato
   gateGain.gain.value = 1;
   let gateOpen = true;
 
-  cleanNode.connect(gateAn);
+  // Medir la voz directamente de la fuente física ('src') para que filtros o IA no impidan detectar la voz
+  src.connect(gateAn);
   cleanNode.connect(gateGain);
 
   // 4) Limitador/compresor suave de picos (umbral alto -18 dB para no levantar sonidos bajos) + ganancia de usuario
@@ -216,7 +227,8 @@ async function createMic(settings) {
       inGain.gain.setTargetAtTime(Math.max(0.2, Math.min(2.5, Number(val) || 1)), ctx.currentTime, 0.015);
     },
     setGate(val) {
-      gateThresh = Math.max(0, Math.min(0.12, Number(val) || 0));
+      const v = Number(val) || 0;
+      gateThresh = (actualMode === 'high' && v <= 0.010) ? 0 : Math.max(0, Math.min(0.12, v));
       if (gateThresh <= 0.002) {
         gateOpen = true;
         gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.01);

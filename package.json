@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": "EpicKap",
   "main": "app/main.js",

@@ -396,6 +396,47 @@ const H = {
     if (roleRank(roleOf(id, ws.user.id)) < 3) fail('Solo Dueño o Admin');
     run('UPDATE servers SET invite=? WHERE id=?', newInvite(), id); notifyServer(id);
   },
+  'server.inviteFriend': (ws, d) => {
+    const sid = Number(d.serverId);
+    const friendId = Number(d.friendId);
+    if (!sid || !friendId) fail('Datos incompletos');
+    const myRole = roleOf(sid, ws.user.id);
+    if (!myRole) fail('No eres miembro del servidor');
+
+    const isFriend = get('SELECT 1 FROM friends WHERE ((a=? AND b=?) OR (a=? AND b=?)) AND status=\'accepted\'', ws.user.id, friendId, friendId, ws.user.id);
+    if (!isFriend) fail('El usuario no es tu amigo');
+
+    const alreadyMember = get('SELECT 1 FROM members WHERE server_id=? AND user_id=?', sid, friendId);
+    if (alreadyMember) fail('Ya es miembro del servidor');
+
+    const s = get('SELECT id, name, invite FROM servers WHERE id=?', sid);
+    if (!s) fail('Servidor inexistente');
+
+    const dm = dmKey(ws.user.id, friendId);
+    const msgText = `¡Te he invitado a unirte al servidor **${s.name}**!\nepickast://join/${s.invite}`;
+    const now = Date.now();
+    const r = run('INSERT INTO messages(channel, user_id, text, ts) VALUES(?,?,?,?)', dm, ws.user.id, msgText, now);
+    const mid = Number(r.lastInsertRowid);
+
+    const fullMsg = {
+      id: mid,
+      channel: dm,
+      userId: ws.user.id,
+      name: ws.user.name,
+      color: ws.user.color,
+      av: ws.user.avatar ? (ws.user.av || 1) : 0,
+      text: msgText,
+      ts: now,
+      fileId: null,
+      fileName: null,
+      fileMime: null,
+      fileSize: null
+    };
+
+    toUser(friendId, { t: 'msg', channel: dm, msg: fullMsg });
+    toUser(ws.user.id, { t: 'msg', channel: dm, msg: fullMsg });
+    return { ok: true, mid };
+  },
   'channel.create': (ws, d) => {
     const sid = Number(d.serverId);
     if (roleRank(roleOf(sid, ws.user.id)) < 3) fail('Solo Dueño o Admin pueden crear canales');
@@ -641,12 +682,15 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.1';
+  let version = '1.5.2';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
+  let exeFile = null;
   if (fs.existsSync(dist)) {
     const files = fs.readdirSync(dist).filter((f) => /\.(exe|zip)$/i.test(f) && !/uninstaller/i.test(f));
+    const exes = files.filter(f => f.endsWith('.exe'));
+    if (exes.length) exeFile = exes[0];
     files.sort((a, b) => {
       const aMatch = a.includes(version) ? 1 : 0, bMatch = b.includes(version) ? 1 : 0;
       if (aMatch !== bMatch) return bMatch - aMatch;
@@ -658,7 +702,16 @@ function releaseInfo() {
     if (files.length) file = files[0];
   }
   const ghUrl = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
-  return { version, file: file || `EpicKast-v${version}-Amigos.zip`, downloadPath: '/download/latest', ghUrl };
+  const ghExe = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.exe`;
+  return {
+    version,
+    file: file || `EpicKast-v${version}-Amigos.zip`,
+    exeFile: exeFile || `EpicKast-Instalador-${version}.exe`,
+    downloadPath: '/download/latest',
+    exeDownloadPath: '/download/exe',
+    ghUrl,
+    ghExe
+  };
 }
 
 // ---------- transporte ----------
@@ -779,6 +832,21 @@ a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-de
       'content-type': 'application/octet-stream',
       'content-length': stat.size,
       'content-disposition': `attachment; filename="${info.file}"`,
+    });
+    return fs.createReadStream(fp).pipe(res);
+  }
+  if (u.pathname === '/download/exe') {
+    const info = releaseInfo();
+    const fp = info.exeFile ? path.join(__dirname, '..', 'dist', info.exeFile) : null;
+    if (!fp || !fs.existsSync(fp)) {
+      res.writeHead(302, { Location: info.ghExe });
+      return res.end();
+    }
+    const stat = fs.statSync(fp);
+    res.writeHead(200, {
+      'content-type': 'application/vnd.microsoft.portable-executable',
+      'content-length': stat.size,
+      'content-disposition': `attachment; filename="${info.exeFile}"`,
     });
     return fs.createReadStream(fp).pipe(res);
   }

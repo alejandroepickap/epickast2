@@ -373,11 +373,45 @@ async function checkServerUpdate() {
     const info = await rpc('app.version');
     S.srvRelease = info;
     const bar = $('updateBar');
-    if (info?.version && info.version !== S.appVer && info.downloadPath) {
-      const url = httpBase() + info.downloadPath;
+    if (info?.version && info.version !== S.appVer && (info.exeDownloadPath || info.downloadPath)) {
+      const exeUrl = info.ghExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
+      const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
+
+      const updateBtn = h('button', {
+        class: 'primary',
+        style: 'padding:5px 12px;font-size:12px;font-weight:600',
+        onclick: async (e) => {
+          const btn = e.currentTarget;
+          if (window.epic?.installUpdate) {
+            btn.disabled = true;
+            btn.textContent = '⏳ Conectando...';
+            window.epic.onUpdateProgress?.((prog) => {
+              if (prog?.installing) {
+                btn.textContent = '🚀 Reiniciando para aplicar actualización...';
+              } else if (prog?.percent !== undefined) {
+                btn.textContent = `⚡ Descargando... ${prog.percent}%`;
+              }
+            });
+            const res = await window.epic.installUpdate(exeUrl);
+            if (!res?.ok) {
+              toast('No se pudo instalar automáticamente: ' + (res?.error || ''));
+              btn.disabled = false;
+              btn.textContent = '⚡ Reintentar actualización';
+            }
+          } else {
+            window.epic?.openExternal?.(zipUrl);
+          }
+        }
+      }, '⚡ Actualizar ahora');
+
+      const manualLink = h('button', {
+        style: 'padding:5px 10px;font-size:11px;opacity:0.85',
+        onclick: () => window.epic?.openExternal?.(zipUrl)
+      }, '⬇ ZIP manual');
+
       bar.replaceChildren(
-        h('span', null, `✨ Nueva versión de EpicKast disponible (${info.version})`),
-        h('button', { onclick: () => window.epic.openExternal?.(url) }, '⬇ Descargar actualización')
+        h('span', null, `✨ Nueva versión disponible (${info.version})`),
+        h('div', { style: 'display:inline-flex;gap:6px;align-items:center' }, updateBtn, manualLink)
       );
       bar.classList.remove('hidden');
     } else {
@@ -504,6 +538,55 @@ function attachmentEl(m) {
   );
 }
 
+function renderMsgText(text) {
+  if (!text) return null;
+  const match = /epickast:\/\/join\/([a-fA-F0-9]+)/i.exec(text);
+  if (!match) return h('div', { class: 'tx' }, text);
+
+  const code = match[1].toLowerCase();
+  const cleanMsg = text.replace(/epickast:\/\/join\/[a-fA-F0-9]+/i, '').trim();
+
+  const joinBtn = h('button', {
+    class: 'primary',
+    style: 'padding:7px 14px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;border-radius:6px;margin-top:6px',
+    onclick: async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      b.textContent = 'Uniéndose...';
+      try {
+        const res = await rpc('server.join', { code });
+        toast('¡Te has unido al servidor correctamente!');
+        b.textContent = '✓ Ya te uniste';
+        b.style.background = '#2ea043';
+        if (res?.id) {
+          await loadServers();
+          selectServer(res.id);
+        }
+      } catch (err) {
+        toast(err.message || 'Error al unirse');
+        b.disabled = false;
+        b.textContent = '🚀 Unirme al servidor';
+      }
+    }
+  }, '🚀 Unirme al servidor');
+
+  return h('div', { class: 'tx' },
+    cleanMsg ? h('div', { style: 'margin-bottom:6px' }, cleanMsg) : null,
+    h('div', {
+      style: 'background:rgba(20,24,35,0.7);border:1px solid rgba(130,160,255,0.3);border-radius:10px;padding:12px 14px;max-width:340px;margin-top:4px'
+    },
+      h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px' },
+        h('span', { style: 'font-size:24px' }, '🏰'),
+        h('div', null,
+          h('div', { style: 'font-size:11px;text-transform:uppercase;color:#8ba3c7;font-weight:700' }, 'Invitación a Servidor'),
+          h('div', { style: 'font-size:13px;font-weight:600;color:#fff' }, `Código: ${code}`)
+        )
+      ),
+      joinBtn
+    )
+  );
+}
+
 const msgEl = (m) => h('div', { class: 'm', 'data-mid': m.id },
   avatar({ id: m.userId, name: m.name, color: m.color, av: m.av }, 36),
   h('div', { class: 'mb' },
@@ -516,7 +599,7 @@ const msgEl = (m) => h('div', { class: 'm', 'data-mid': m.id },
       h('i', null, fmtTime(m.ts)),
       m.pinned ? h('span', { class: 'pin-tag' }, '📌 Fijado') : null
     ),
-    m.text ? h('div', { class: 'tx' }, m.text) : null,
+    m.text ? renderMsgText(m.text) : null,
     attachmentEl(m)
   ),
   h('div', { class: 'macts' },
@@ -811,7 +894,8 @@ function renderSide() {
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
   const myRank = ROLES[sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member')]?.rank ?? 0;
   $('sideTitle').replaceChildren(
-    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, sd.name),
+    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1' }, sd.name),
+    h('button', { class: 'btn-ico', onclick: () => modalInviteFriends(sd.id), title: 'Invitar amigos directamente a este servidor' }, '👥'),
     h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, canales y rangos' }, '⋯')
   );
   for (const type of ['text', 'voice']) {
@@ -1002,6 +1086,7 @@ function renderHome() {
       h('div', { class: 'f-actions' },
         h('button', { class: 'btn-act', title: `Abrir chat con ${u.name}`, onclick: () => openChannel(u.dm, 'dm', u.name) }, icoSvg('chat', 15), 'Mensaje'),
         h('button', { class: 'btn-act call', title: `Llamar a ${u.name}`, onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name); } }, icoSvg('phone', 15), 'Llamar'),
+        S.servers.length ? h('button', { class: 'btn-act', title: `Invitar a ${u.name} a un servidor`, onclick: () => modalInviteFriendToAnyServer(u) }, '🏰 Invitar') : null,
         h('button', { class: 'btn-ico del', title: 'Eliminar amigo', onclick: () => confirm(`¿Eliminar a ${u.name}?`) && rpc('friends.remove', { id: u.id }) }, icoSvg('close', 16))
       )
     ));
@@ -1014,6 +1099,35 @@ function modal(title, ...body) {
   m.classList.remove('hidden'); m.onclick = (e) => { if (e.target === m) closeModal(); };
 }
 function closeModal() { S.partyModalUpdater = null; S.cleanup.splice(0).forEach((f) => { try { f(); } catch {} }); $('modal').classList.add('hidden'); $('modal').replaceChildren(); }
+function modalInviteFriendToAnyServer(friend) {
+  if (!S.servers.length) return toast('No estás en ningún servidor todavía');
+  if (S.servers.length === 1) {
+    const s = S.servers[0];
+    safe(rpc('server.inviteFriend', { serverId: s.id, friendId: friend.id }))
+      .then(() => toast(`¡Invitación a "${s.name}" enviada a ${friend.name}!`))
+      .catch((e) => toast(e.message || 'Error al enviar invitación'));
+    return;
+  }
+  const items = S.servers.map((s) => h('button', {
+    class: 'primary',
+    style: 'width:100%;text-align:left;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-radius:8px;margin-bottom:6px',
+    onclick: async () => {
+      closeModal();
+      try {
+        await rpc('server.inviteFriend', { serverId: s.id, friendId: friend.id });
+        toast(`¡Invitación a "${s.name}" enviada a ${friend.name}!`);
+      } catch (e) {
+        toast(e.message || 'Error al enviar invitación');
+      }
+    }
+  }, h('span', { style: 'font-weight:600' }, s.name), h('span', { style: 'font-size:12px;opacity:0.85' }, 'Enviar invitación 📨')));
+
+  modal(`Invitar a ${friend.name}`,
+    h('p', { class: 'muted', style: 'font-size:13px;margin-bottom:10px' }, 'Elige el servidor al que deseas invitar a tu amigo:'),
+    h('div', { style: 'display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;margin-bottom:12px' }, ...items)
+  );
+}
+
 function modalServer() {
   const name = h('input', { placeholder: 'Nombre del servidor (ej. Squad Epick3D)' }); const code = h('input', { placeholder: 'Código de invitación' });
   modal('Servidores', h('label', null, 'Crear un servidor (incluye salas de voz, gaming y música)', name), h('button', { class: 'primary', onclick: async () => { const r = await safe(rpc('server.create', { name: name.value })); closeModal(); await loadServers(); openServer(r.id); } }, 'Crear servidor'),
@@ -1045,11 +1159,95 @@ function modalChannel(sid, type) {
     } }, 'Crear canal')
   );
 }
+function modalInviteFriends(serverId) {
+  const sd = S.sdata.get(serverId);
+  if (!sd) return toast('Servidor no disponible');
+  const friends = S.friends?.friends || [];
+  if (friends.length === 0) {
+    modal(`Invitar a ${sd.name}`,
+      h('p', { class: 'muted', style: 'padding:14px 0' }, 'No tienes amigos agregados aún. Agrega amigos en la sección de Contactos para poder invitarlos directamente con un solo clic.'),
+      h('div', { class: 'row' }, h('button', { onclick: closeModal }, 'Cerrar'))
+    );
+    return;
+  }
+
+  const existingMemberIds = new Set((sd.members || []).map((m) => m.id));
+  const list = h('div', { style: 'max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin:12px 0;padding-right:4px' });
+
+  function renderFriendRows(filter = '') {
+    list.replaceChildren();
+    const q = filter.trim().toLowerCase();
+    const filtered = friends.filter((f) => !q || f.name.toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      list.append(h('p', { class: 'muted', style: 'text-align:center;padding:12px' }, 'No se encontraron amigos'));
+      return;
+    }
+    filtered.forEach((f) => {
+      const isMember = existingMemberIds.has(f.id);
+      const btn = h('button', {
+        class: isMember ? '' : 'primary',
+        disabled: isMember,
+        style: 'font-size:12px;padding:6px 14px;min-width:105px;font-weight:600;border-radius:6px',
+        onclick: async () => {
+          btn.disabled = true;
+          btn.textContent = 'Enviando...';
+          try {
+            await rpc('server.inviteFriend', { serverId: sd.id, friendId: f.id });
+            btn.textContent = '✓ Enviada';
+            btn.style.background = '#2ea043';
+            btn.style.borderColor = '#2ea043';
+            toast(`Invitación enviada a ${f.name}`);
+          } catch (err) {
+            btn.disabled = false;
+            btn.textContent = '📨 Invitar';
+            toast(err.message || 'Error al enviar invitación');
+          }
+        }
+      }, isMember ? 'Ya es miembro' : '📨 Invitar');
+
+      list.append(h('div', {
+        style: 'display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px'
+      },
+        h('div', { style: 'display:flex;align-items:center;gap:10px' },
+          avatar(f, 32),
+          h('div', null,
+            h('b', { style: 'font-size:13px;display:block' }, f.name),
+            h('span', { class: 'muted', style: 'font-size:11px' }, f.online ? '🟢 En línea' : '⚪ Desconectado')
+          )
+        ),
+        btn
+      ));
+    });
+  }
+
+  const searchInput = h('input', {
+    placeholder: '🔍 Buscar amigo...',
+    style: 'margin-bottom:8px',
+    oninput: (e) => renderFriendRows(e.target.value)
+  });
+
+  renderFriendRows();
+
+  modal(`👥 Invitar amigos a "${sd.name}"`,
+    h('p', { class: 'muted', style: 'font-size:12px;margin-bottom:8px' }, 'Envía la invitación directamente al chat privado de tus amigos con un solo clic:'),
+    searchInput,
+    list,
+    h('div', { class: 'row' }, h('button', { onclick: closeModal }, 'Listo'))
+  );
+}
+
 function modalServerManage() {
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
   const myRole = sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member');
   const myRank = ROLES[myRole]?.rank ?? 0;
   const parts = [];
+  parts.push(
+    h('button', {
+      class: 'primary',
+      style: 'width:100%;padding:10px;margin-bottom:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px',
+      onclick: () => { closeModal(); modalInviteFriends(sd.id); }
+    }, '👥 Invitar amigos directamente a este servidor')
+  );
   if (sd.invite) {
     parts.push(h('label', null, '🔗 Código de invitación (clic para copiar y compartir con tus amigos)',
       h('input', { value: sd.invite, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(e.target.value); toast('Código copiado'); } })));

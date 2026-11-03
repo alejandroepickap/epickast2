@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('epic', {
   onMiniChanged: (cb) => ipcRenderer.on('window:mini-changed', (_e, val) => cb(val)),
   version: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+  installUpdate: (url) => ipcRenderer.invoke('app:download-and-install', url),
+  onUpdateProgress: (cb) => ipcRenderer.on('app:update-progress', (_e, data) => cb(data)),
   setShortcuts: (cfg) => ipcRenderer.invoke('shortcuts:set', cfg),
   onShortcut: (cb) => ipcRenderer.on('shortcut:trigger', (_e, act) => cb(act)),
   loadAuth: () => ipcRenderer.invoke('auth:load'),

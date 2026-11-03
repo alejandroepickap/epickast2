@@ -18,21 +18,22 @@ function client(port) {
   await new Promise((r) => httpServer.listen(0, '127.0.0.1', r));
   const port = httpServer.address().port;
   const a = await client(port), b = await client(port);
-  const ra = await a.rpc('register', { name: 'ana', password: 'secreto1' });
-  const rb = await b.rpc('register', { name: 'beto', password: 'secreto2' });
-  await assert.rejects(client(port).then((c) => c.rpc('login', { name: 'ana', password: 'mal' })), /incorrectos/);
+  const uAna = 'ana_' + Date.now(), uBeto = 'beto_' + Date.now();
+  const ra = await a.rpc('register', { name: uAna, password: 'secreto1' });
+  const rb = await b.rpc('register', { name: uBeto, password: 'secreto2' });
+  await assert.rejects(client(port).then((c) => c.rpc('login', { name: uAna, password: 'mal' })), /incorrectos/);
   // amigos
-  await a.rpc('friends.add', { name: 'beto' }); await b.wait('friends.changed');
+  await a.rpc('friends.add', { name: uBeto }); await b.wait('friends.changed');
   assert.equal((await b.rpc('friends.list')).incoming.length, 1);
   await b.rpc('friends.accept', { id: ra.user.id });
-  const fl = await a.rpc('friends.list'); assert.equal(fl.friends[0].name, 'beto'); assert.equal(fl.friends[0].online, true);
+  const fl = await a.rpc('friends.list'); assert.equal(fl.friends[0].name, uBeto); assert.equal(fl.friends[0].online, true);
   // DM
   const { key } = await a.rpc('dm.open', { userId: rb.user.id });
   await a.rpc('msg.send', { channel: key, text: 'hola beto' });
   assert.equal((await b.wait('msg')).msg.text, 'hola beto');
   // llamada entrante: rechazar
   assert.equal((await a.rpc('voice.join', { key })).ringing, true);
-  const inc = await b.wait('call.incoming'); assert.equal(inc.from.name, 'ana'); assert.equal(inc.key, key);
+  const inc = await b.wait('call.incoming'); assert.equal(inc.from.name, uAna); assert.equal(inc.key, key);
   await b.rpc('call.decline', { key }); assert.equal((await a.wait('call.stop')).reason, 'declined'); await a.rpc('voice.leave');
   // llamada entrante: contestar
   a.events.length = 0; b.events.length = 0;
@@ -66,7 +67,7 @@ function client(port) {
   const repRes = await b.rpc('msg.send', { channel: key, text: 'recibido el plano!', replyTo: upJson.msg.id });
   const repEvt = await a.wait('msg');
   assert.equal(repEvt.msg.replyId, upJson.msg.id);
-  assert.equal(repEvt.msg.replyName, 'ana');
+  assert.equal(repEvt.msg.replyName, uAna);
   const pinRes = await a.rpc('msg.pin', { id: repRes.id });
   assert.equal(pinRes.pinned, true);
   const pinEvt = await b.wait('msg.pinned');
@@ -80,6 +81,12 @@ function client(port) {
   const { id } = await a.rpc('server.create', { name: 'Mi Server' });
   let sv = await a.rpc('server.get', { id }); assert.equal(sv.channels.length, 5);
   await assert.rejects(b.rpc('server.get', { id }), /miembro/);
+  // Invitar amigo directamente a este servidor (server.inviteFriend)
+  a.events.length = 0; b.events.length = 0;
+  const invRes = await a.rpc('server.inviteFriend', { serverId: id, friendId: rb.user.id });
+  assert.equal(invRes.ok, true);
+  const invMsg = await b.wait('msg');
+  assert.ok(invMsg.msg.text.includes('epickast://join/' + sv.invite));
   await b.rpc('server.join', { code: sv.invite });
   const txt = sv.channels.find((c) => c.type === 'text'), voice = sv.channels.find((c) => c.type === 'voice');
   await b.rpc('msg.send', { channel: txt.key, text: 'hola server' });
@@ -99,8 +106,8 @@ function client(port) {
   assert.equal(presEvt.activity.name, 'VALORANT');
   // voz + señalización + EpicBot DJ (Watch & Listen Together)
   const ja = await a.rpc('voice.join', { key: voice.key }); assert.equal(ja.peers.length, 0);
-  const jb = await b.rpc('voice.join', { key: voice.key }); assert.equal(jb.peers[0].name, 'ana');
-  assert.equal((await a.wait('voice.joined')).user.name, 'beto');
+  const jb = await b.rpc('voice.join', { key: voice.key }); assert.equal(jb.peers[0].name, uAna);
+  assert.equal((await a.wait('voice.joined')).user.name, uBeto);
   a.events.length = 0; b.events.length = 0;
   const pAdd = await a.rpc('party.add', { key: voice.key, track: { ytId: 'jfKfPfyJRdk', title: 'Lofi Hip Hop Radio', author: 'Lofi Girl', duration: 'EN VIVO' } });
   assert.equal(pAdd.added, 1);
