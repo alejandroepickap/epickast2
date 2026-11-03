@@ -80,7 +80,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.4.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.5.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -384,12 +384,30 @@ function startGameDetection() {
   setTimeout(syncActivity, 800);
   S.gameTimer = setInterval(syncActivity, 18000);
 }
+function isNewerVersion(latest, current) {
+  if (!latest || !current) return false;
+  const pLatest = String(latest).replace(/^[^\d]*/, '').split('.').map((x) => parseInt(x, 10) || 0);
+  const pCurrent = String(current).replace(/^[^\d]*/, '').split('.').map((x) => parseInt(x, 10) || 0);
+  const len = Math.max(pLatest.length, pCurrent.length);
+  for (let i = 0; i < len; i++) {
+    const l = pLatest[i] || 0;
+    const c = pCurrent[i] || 0;
+    if (l > c) return true;
+    if (l < c) return false;
+  }
+  return false;
+}
+
 async function checkServerUpdate() {
   try {
+    if (window.epic?.version) {
+      const v = await window.epic.version().catch(() => null);
+      if (v) S.appVer = v;
+    }
     const info = await rpc('app.version');
     S.srvRelease = info;
     const bar = $('updateBar');
-    if (info?.version && info.version !== S.appVer && (info.exeDownloadPath || info.downloadPath)) {
+    if (info?.version && isNewerVersion(info.version, S.appVer) && (info.exeDownloadPath || info.downloadPath)) {
       const exeUrl = info.ghExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
       const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
 
@@ -425,13 +443,19 @@ async function checkServerUpdate() {
         onclick: () => window.epic?.openExternal?.(zipUrl)
       }, '⬇ ZIP manual');
 
+      const closeBtn = h('button', {
+        style: 'background:transparent;border:0;color:#fff;opacity:0.75;font-size:14px;padding:2px 6px;cursor:pointer',
+        title: 'Cerrar aviso',
+        onclick: () => bar.classList.add('hidden')
+      }, '✕');
+
       bar.replaceChildren(
         h('span', null, `✨ Nueva versión disponible (${info.version})`),
-        h('div', { style: 'display:inline-flex;gap:6px;align-items:center' }, updateBtn, manualLink)
+        h('div', { style: 'display:inline-flex;gap:6px;align-items:center' }, updateBtn, manualLink, closeBtn)
       );
       bar.classList.remove('hidden');
     } else {
-      bar.classList.add('hidden');
+      bar?.classList.add('hidden');
     }
   } catch {}
 }
