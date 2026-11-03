@@ -64,9 +64,13 @@ function saveBackup() {
 
 function restoreBackup() {
   try {
-    const count = get('SELECT count(*) c FROM users')?.c || 0;
+    // sync always
     const target = fs.existsSync(BACKUP_FILE) ? BACKUP_FILE : (fs.existsSync(SEED_FILE) ? SEED_FILE : null);
-    if (count === 0 && target) {
+    if (target) {
+      try {
+        db.exec("DELETE FROM users WHERE name LIKE 'ana_%' OR name LIKE 'beto_%'");
+        db.exec("DELETE FROM servers WHERE name = 'Mi Server'");
+      } catch {}
       const data = JSON.parse(fs.readFileSync(target, 'utf8'));
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
@@ -819,7 +823,11 @@ const httpServer = http.createServer((req, res) => {
       return fs.createReadStream(BACKUP_FILE).pipe(res);
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    return res.end('{}');
+    return res.end('{}'); }
+  if (u.pathname === '/restore-seed') {
+    restoreBackup();
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ ok: true, msg: 'Restaurado con exito' }));
   }
   if (u.pathname === '/yt-player') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'origin-when-cross-origin' });
