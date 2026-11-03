@@ -643,6 +643,18 @@ const H = {
       LEFT JOIN messages rm ON rm.id=m.reply_to LEFT JOIN users ru ON ru.id=rm.user_id LEFT JOIN files rf ON rf.id=rm.file_id
       WHERE m.channel=? AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse();
   },
+  'msg.edit': (ws, d) => {
+    const id = Number(d.id);
+    const m = get('SELECT id, channel, user_id, file_id FROM messages WHERE id=?', id);
+    if (!m) fail('Mensaje inexistente');
+    if (m.user_id !== ws.user.id) fail('Solo puedes editar tus propios mensajes');
+    const text = clean(d.text, 2000);
+    if (!text) fail('El mensaje no puede estar vacío');
+    run('UPDATE messages SET text=? WHERE id=?', text, id);
+    const auth = authorize(m.channel, ws.user.id);
+    toUsers(auth.audience, { t: 'msg.edited', channel: m.channel, id, text });
+    return { ok: true, id, text };
+  },
   'msg.delete': (ws, d) => {
     const id = Number(d.id);
     const m = get('SELECT id, channel, user_id, file_id FROM messages WHERE id=?', id);

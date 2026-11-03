@@ -680,8 +680,22 @@ app.whenReady().then(() => {
   ipcMain.handle('shortcuts:set', (e, cfg) => {
     try {
       globalShortcut.unregisterAll();
-      if (cfg?.mute) globalShortcut.register(String(cfg.mute), () => win && !win.isDestroyed() && win.webContents.send('shortcut:trigger', 'mute'));
-      if (cfg?.deaf) globalShortcut.register(String(cfg.deaf), () => win && !win.isDestroyed() && win.webContents.send('shortcut:trigger', 'deaf'));
+      const bind = (key, act) => {
+        if (!key) return;
+        try {
+          globalShortcut.register(String(key), () => {
+            if (win && !win.isDestroyed()) win.webContents.send('shortcut:trigger', act);
+          });
+        } catch (err) {
+          console.warn('[Shortcut] Error registering', act, key, err?.message);
+        }
+      };
+      bind(cfg?.mute || 'Alt+M', 'mute');
+      bind(cfg?.deaf || 'Alt+D', 'deaf');
+      bind(cfg?.overlay || 'Alt+O', 'overlay');
+      bind(cfg?.pip || 'Alt+P', 'pip');
+      bind(cfg?.screen || 'Alt+S', 'screen');
+      bind(cfg?.hang || 'Alt+Q', 'hang');
       return true;
     } catch { return false; }
   });

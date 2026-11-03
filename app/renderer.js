@@ -79,7 +79,16 @@ const getUserVol = (uid) => (userVols[uid] !== undefined ? Number(userVols[uid])
 const setUserVol = (uid, v) => { userVols[uid] = Math.round(v * 100) / 100; localStorage.setItem('epickast.volumes', JSON.stringify(userVols)); };
 function applyAccent() { document.documentElement.style.setProperty('--ac', settings.accent); }
 function applyStageHeight() { document.documentElement.style.setProperty('--stage-h', `${Math.max(24, Math.min(94, Number(settings.stageHeight) || 60))}vh`); }
-function applyShortcuts() { window.epic.setShortcuts?.({ mute: settings.keyMute || '', deaf: settings.keyDeaf || '' }).catch(() => {}); }
+function applyShortcuts() {
+  window.epic.setShortcuts?.({
+    mute: settings.keyMute || 'Alt+M',
+    deaf: settings.keyDeaf || 'Alt+D',
+    overlay: settings.keyOverlay || 'Alt+O',
+    pip: settings.keyPip || 'Alt+P',
+    screen: settings.keyScreen || 'Alt+S',
+    hang: settings.keyHang || 'Alt+Q'
+  }).catch(() => {});
+}
 applyAccent();
 applyStageHeight();
 applyShortcuts();
@@ -92,7 +101,7 @@ const S = {
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
   mini: false, appVer: '1.6.1', srvRelease: null, typingTimer: null, lastTypingSent: 0,
-  replyTo: null, vrec: null, focusTile: null, dockOpen: false,
+  replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
   stageCollapsed: false,
@@ -109,6 +118,14 @@ window.epic.onOverlayStatus?.((val) => {
   updateDock();
 });
 window.epic.onShortcut?.((act) => {
+  if (act === 'overlay') {
+    toggleOverlay();
+    return;
+  }
+  if (act === 'pip') {
+    window.epic.toggleMini?.();
+    return;
+  }
   if (!S.call) return;
   if (act === 'mute') {
     $('bMute')?.click();
@@ -116,6 +133,10 @@ window.epic.onShortcut?.((act) => {
   } else if (act === 'deaf') {
     $('bDeaf')?.click();
     ringer.beep(S.call.deaf ? [360, 260] : [540, 720], 0.06, 0.09);
+  } else if (act === 'screen') {
+    $('bScreen')?.click();
+  } else if (act === 'hang') {
+    $('bLeave')?.click();
   }
 });
 
@@ -266,7 +287,26 @@ function onMsg(ev) {
     case 'server.changed': if (S.sdata.has(m.id) || S.view.sid === m.id) refreshServer(m.id); break;
     case 'msg': onChatMsg(m); break;
     case 'msg.pinned': onMsgPinned(m); break;
+    case 'msg.edited': {
+      if (m.channel === S.chan) {
+        const el = document.querySelector(`[data-mid="${m.id}"]`);
+        if (el) {
+          if (el._msg) el._msg.text = m.text;
+          const tx = el.querySelector('.tx');
+          if (tx) {
+            tx.replaceWith(renderMsgText(m.text));
+          }
+          const mb = el.querySelector('.mb');
+          if (mb && !mb.querySelector('.edit-tag')) {
+            const head = mb.querySelector('.mhead');
+            if (head) head.append(h('span', { class: 'pin-tag edit-tag', style: 'color:#8ba3c7;font-size:10px;font-style:italic' }, '(editado)'));
+          }
+        }
+      }
+      break;
+    }
     case 'msg.deleted': {
+      if (S.editingMsg && S.editingMsg.id === m.id) cancelEditMsg();
       if (m.channel === S.chan) {
         const el = document.querySelector(`[data-mid="${m.id}"]`);
         if (el) el.remove();
@@ -641,6 +681,7 @@ async function openServer(id) {
 async function openChannel(key, type, name) {
   S.chan = key; S.chanType = type; S.chanName = name; S.unread.delete(key); S.oldest = null;
   clearReply();
+  cancelEditMsg();
   $('typingBar').classList.add('hidden');
   render(); $('msgs').replaceChildren();
   if (type === 'voice') return;
@@ -678,7 +719,31 @@ function setReply(m) {
 function clearReply() {
   S.replyTo = null;
   const bar = $('replyBar');
-  if (bar) { bar.classList.add('hidden'); bar.replaceChildren(); }
+  if (bar && !S.editingMsg) { bar.classList.add('hidden'); bar.replaceChildren(); }
+}
+
+function startEditMsg(m) {
+  clearReply();
+  S.editingMsg = m;
+  const bar = $('replyBar');
+  bar.replaceChildren(
+    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' },
+      '✏️ ', h('b', null, 'Editando mensaje: '), m.text.slice(0, 60), ' ',
+      h('i', { style: 'font-size:11px;opacity:0.7;' }, '(Esc para cancelar, Enter para guardar)')
+    ),
+    h('button', { type: 'button', onclick: () => { cancelEditMsg(); $('msgInput').value = ''; }, title: 'Cancelar edición' }, '✕')
+  );
+  bar.classList.remove('hidden');
+  $('msgInput').value = m.text;
+  $('msgInput').focus();
+  const len = $('msgInput').value.length;
+  $('msgInput').setSelectionRange(len, len);
+}
+
+function cancelEditMsg() {
+  S.editingMsg = null;
+  const bar = $('replyBar');
+  if (bar && !S.replyTo) { bar.classList.add('hidden'); bar.replaceChildren(); }
 }
 
 function jumpToMsg(id) {
@@ -781,36 +846,42 @@ function renderMsgText(text) {
   );
 }
 
-const msgEl = (m) => h('div', { class: 'm', 'data-mid': m.id },
-  avatar({ id: m.userId, name: m.name, color: m.color, av: m.av }, 36),
-  h('div', { class: 'mb' },
-    m.replyId ? h('div', { class: 'quote', onclick: () => jumpToMsg(m.replyId), title: 'Ir al mensaje original' },
-      h('b', null, `↩ ${m.replyName || 'Mensaje'}:`),
-      h('span', null, m.replyText || '📎 Archivo adjunto')
-    ) : null,
-    h('div', { class: 'mhead' },
-      h('b', null, m.name),
-      h('i', null, fmtTime(m.ts)),
-      m.pinned ? h('span', { class: 'pin-tag' }, '📌 Fijado') : null
+const msgEl = (m) => {
+  const el = h('div', { class: 'm', 'data-mid': m.id },
+    avatar({ id: m.userId, name: m.name, color: m.color, av: m.av }, 36),
+    h('div', { class: 'mb' },
+      m.replyId ? h('div', { class: 'quote', onclick: () => jumpToMsg(m.replyId), title: 'Ir al mensaje original' },
+        h('b', null, `↩ ${m.replyName || 'Mensaje'}:`),
+        h('span', null, m.replyText || '📎 Archivo adjunto')
+      ) : null,
+      h('div', { class: 'mhead' },
+        h('b', null, m.name),
+        h('i', null, fmtTime(m.ts)),
+        m.pinned ? h('span', { class: 'pin-tag' }, '📌 Fijado') : null
+      ),
+      m.text ? renderMsgText(m.text) : null,
+      attachmentEl(m)
     ),
-    m.text ? renderMsgText(m.text) : null,
-    attachmentEl(m)
-  ),
-  h('div', { class: 'macts' },
-    h('button', { title: 'Responder a este mensaje', onclick: () => setReply(m) }, '↩'),
-    h('button', { title: 'Fijar / Desfijar mensaje', onclick: () => rpc('msg.pin', { id: m.id }).catch((e) => toast(e.message)) }, '📌'),
-    (m.userId === S.me?.id || (S.server && (ROLES[S.server.myRole]?.rank ?? 0) >= 2)) ?
-      h('button', {
-        class: 'del-msg-btn',
-        title: 'Eliminar mensaje (borrar texto o spam)',
-        onclick: () => {
-          if (confirm('¿Eliminar este mensaje permanentemente?')) {
-            rpc('msg.delete', { id: m.id }).catch((e) => toast(e.message));
+    h('div', { class: 'macts' },
+      h('button', { title: 'Responder a este mensaje', onclick: () => setReply(m) }, '↩'),
+      h('button', { title: 'Fijar / Desfijar mensaje', onclick: () => rpc('msg.pin', { id: m.id }).catch((e) => toast(e.message)) }, '📌'),
+      (m.userId === S.me?.id && m.text) ?
+        h('button', { class: 'edit-msg-btn', title: 'Editar mensaje', onclick: () => startEditMsg(m) }, '✏️') : null,
+      (m.userId === S.me?.id || (S.server && (ROLES[S.server.myRole]?.rank ?? 0) >= 2)) ?
+        h('button', {
+          class: 'del-msg-btn',
+          title: 'Eliminar mensaje (borrar texto o spam)',
+          onclick: () => {
+            if (confirm('¿Eliminar este mensaje permanentemente?')) {
+              rpc('msg.delete', { id: m.id }).catch((e) => toast(e.message));
+            }
           }
-        }
-      }, '🗑️') : null
-  )
-);
+        }, '🗑️') : null
+    )
+  );
+  el._msg = m;
+  return el;
+};
 
 function onMsgPinned(m) {
   if (m.channel !== S.chan) return;
@@ -981,7 +1052,21 @@ $('msgInput').addEventListener('input', () => {
   if (now - S.lastTypingSent > 2200) { S.lastTypingSent = now; sendRaw('msg.typing', { channel: S.chan }); }
 });
 $('msgInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && S.replyTo) clearReply();
+  if (e.key === 'Escape') {
+    if (S.editingMsg) {
+      cancelEditMsg();
+      $('msgInput').value = '';
+    } else if (S.replyTo) {
+      clearReply();
+    }
+  } else if (e.key === 'ArrowUp' && !$('msgInput').value) {
+    e.preventDefault();
+    const myMsgEls = Array.from($('msgs').querySelectorAll('.m')).reverse();
+    const lastEl = myMsgEls.find(el => el._msg && el._msg.userId === S.me?.id && el._msg.text);
+    if (lastEl && lastEl._msg) {
+      startEditMsg(lastEl._msg);
+    }
+  }
 });
 $('msgInput').addEventListener('paste', (e) => {
   const files = e.clipboardData?.files;
@@ -1017,6 +1102,13 @@ window.addEventListener('keydown', (e) => { if (e.key === 'Escape') clearDragOve
 $('composer').addEventListener('submit', (e) => {
   e.preventDefault(); const t = $('msgInput').value.trim();
   if (!t || !S.chan || S.chanType === 'voice') return;
+  if (S.editingMsg) {
+    const editId = S.editingMsg.id;
+    cancelEditMsg();
+    $('msgInput').value = '';
+    rpc('msg.edit', { id: editId, text: t }).catch((er) => toast(er.message));
+    return;
+  }
   const replyTo = S.replyTo?.id || undefined;
   $('msgInput').value = '';
   clearReply();
@@ -1135,7 +1227,7 @@ function renderRail() {
     }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.6.7';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.6.8';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -2358,11 +2450,27 @@ async function modalSettings() {
   );
 
   // Acordeón 3: Atajos
-  const accShortcuts = acc('⌨️', 'Atajos de Teclado Globales', 'Combinaciones de teclas activas dentro de juegos',
-    h('label', null, 'Silenciar / Activar micrófono',
+  const accShortcuts = acc('⌨️', 'Atajos de Teclado Globales y Navegación', 'Combinaciones de teclas activas dentro y fuera de juegos',
+    h('div', { style: 'font-size:12px;color:var(--mu);margin-bottom:6px;font-weight:600' }, '🎮 Atajos Globales (in-game / pantalla completa):'),
+    h('label', null, 'Silenciar / Activar micrófono (Alt + M)',
       h('input', { value: settings.keyMute || 'Alt+M', placeholder: 'Ej. Alt+M', onchange: (e) => { settings.keyMute = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de micrófono actualizado'); } })),
-    h('label', null, 'Silenciar / Activar audio (Deafen)',
-      h('input', { value: settings.keyDeaf || 'Alt+D', placeholder: 'Ej. Alt+D', onchange: (e) => { settings.keyDeaf = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de audio actualizado'); } }))
+    h('label', null, 'Silenciar / Activar audio / Deafen (Alt + D)',
+      h('input', { value: settings.keyDeaf || 'Alt+D', placeholder: 'Ej. Alt+D', onchange: (e) => { settings.keyDeaf = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de audio actualizado'); } })),
+    h('label', null, 'Alternar Overlay Gamer sobre juego (Alt + O)',
+      h('input', { value: settings.keyOverlay || 'Alt+O', placeholder: 'Ej. Alt+O', onchange: (e) => { settings.keyOverlay = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de overlay actualizado'); } })),
+    h('label', null, 'Alternar Modo Flotante / PiP (Alt + P)',
+      h('input', { value: settings.keyPip || 'Alt+P', placeholder: 'Ej. Alt+P', onchange: (e) => { settings.keyPip = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de modo flotante actualizado'); } })),
+    h('label', null, 'Compartir / Detener pantalla (Alt + S)',
+      h('input', { value: settings.keyScreen || 'Alt+S', placeholder: 'Ej. Alt+S', onchange: (e) => { settings.keyScreen = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de pantalla compartido actualizado'); } })),
+    h('label', null, 'Colgar llamada de voz (Alt + Q)',
+      h('input', { value: settings.keyHang || 'Alt+Q', placeholder: 'Ej. Alt+Q', onchange: (e) => { settings.keyHang = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de colgar actualizado'); } })),
+    h('div', { style: 'margin-top:12px;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;font-size:11.5px;color:var(--mu);line-height:1.6' },
+      h('b', { style: 'color:var(--tx);display:block;margin-bottom:4px' }, '⚡ Atajos de Navegación Rápida en la app:'),
+      '• ', h('code', { style: 'background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;color:#fff' }, 'Ctrl + ,'), ' — Abrir / Cerrar Ajustes', h('br'),
+      '• ', h('code', { style: 'background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;color:#fff' }, 'Ctrl + 0'), ' — Volver a Inicio / Amigos', h('br'),
+      '• ', h('code', { style: 'background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;color:#fff' }, 'Ctrl + 1..9'), ' — Cambiar directamente a servidor', h('br'),
+      '• ', h('code', { style: 'background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:4px;color:#fff' }, '↑ Flecha Arriba'), ' en el chat vacío — Editar tu último mensaje'
+    )
   );
 
   const THEMES = [
@@ -3829,7 +3937,7 @@ $('winMax')?.addEventListener('click', () => window.epic?.maximize?.());
 $('winClose')?.addEventListener('click', () => window.epic?.close?.());
 
 
-// Global Escape key to exit fullscreen, mini mode or stage theater
+// Global keydown: Escape + Atajos de Navegación Rápida (Ctrl+, / Ctrl+0 / Ctrl+1..9)
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (document.fullscreenElement) {
@@ -3843,6 +3951,30 @@ window.addEventListener('keydown', (e) => {
     } else if ((Number(settings.stageHeight) || 60) > 60) {
       setStagePreset(60);
       toast('Escenario restaurado a tamaño equilibrado (60%)');
+    }
+    return;
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === ',' || e.code === 'Comma') {
+      e.preventDefault();
+      const modal = $('modal');
+      if (modal && !modal.classList.contains('hidden')) closeModal();
+      else modalSettings();
+      return;
+    }
+    if (e.key === '0' || e.code === 'Digit0') {
+      e.preventDefault();
+      goHome();
+      return;
+    }
+    if (e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      const idx = parseInt(e.key, 10) - 1;
+      if (S.servers && S.servers[idx]) {
+        openServer(S.servers[idx].id);
+      }
+      return;
     }
   }
 });
