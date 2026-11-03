@@ -375,6 +375,32 @@ app.whenReady().then(() => {
       overlayWin.webContents.send('overlay:data', data);
     }
   });
+  
+  ipcMain.handle('app:uninstall', async () => {
+    try {
+      const { spawn } = require('child_process');
+      const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+      const uninstallerPath = path.join(localAppDir, 'Programs', 'epickast', 'Uninstall EpicKast.exe');
+      
+      if (fs.existsSync(uninstallerPath)) {
+        isQuitting = true;
+        const child = spawn('cmd.exe', ['/c', 'start', '""', uninstallerPath], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: false
+        });
+        child.unref();
+        setTimeout(() => app.quit(), 200);
+        return { ok: true };
+      } else {
+        throw new Error('No se encontró el desinstalador oficial en ' + uninstallerPath);
+      }
+    } catch (err) {
+      console.error('Error al lanzar desinstalador:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
   
