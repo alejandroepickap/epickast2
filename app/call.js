@@ -320,14 +320,22 @@ class Call {
       try { p.making = true; await pc.setLocalDescription(); this.send('rtc.signal', { to: p.id, data: { description: pc.localDescription } }); }
       catch (e) { console.warn('negotiation', e); } finally { p.making = false; }
     };
+    const purgeDeadStreams = () => {
+      for (const [sid, s] of p.streams) {
+        if (sid === p.mainId) continue;
+        const live = s.getTracks().filter((tr) => tr.readyState !== 'ended');
+        if (live.length === 0) p.streams.delete(sid);
+      }
+      this.onChange();
+    };
     pc.ontrack = (e) => {
       const st = e.streams[0] || new MediaStream([e.track]);
       if (!p.streams.has(st.id)) {
         p.streams.set(st.id, st); if (!p.mainId) p.mainId = st.id;
-        st.onaddtrack = st.onremovetrack = () => this.onChange();
+        st.onaddtrack = st.onremovetrack = purgeDeadStreams;
       }
-      e.track.onmute = e.track.onunmute = e.track.onended = () => this.onChange();
-      this.onChange();
+      e.track.onmute = e.track.onunmute = e.track.onended = purgeDeadStreams;
+      purgeDeadStreams();
     };
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed') pc.restartIce();

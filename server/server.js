@@ -35,6 +35,7 @@ for (const col of ['avatar TEXT', 'color TEXT', 'bio TEXT', 'av INTEGER DEFAULT 
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE servers ADD COLUMN icon TEXT'); } catch {}
 const stmts = new Map();
 const sql = (s) => { let p = stmts.get(s); if (!p) { p = db.prepare(s); stmts.set(s, p); } return p; };
 const get = (s, ...a) => sql(s).get(...a);
@@ -279,7 +280,7 @@ const iceServers = () => {
   return l;
 };
 const serverView = (sid, uid) => {
-  const s = get('SELECT id,name,owner,invite FROM servers WHERE id=?', sid);
+  const s = get('SELECT id,name,owner,invite,icon FROM servers WHERE id=?', sid);
   if (!s) fail('Servidor inexistente');
   const myRole = roleOf(sid, uid);
   if (!myRole) fail('No eres miembro');
@@ -298,7 +299,7 @@ const serverView = (sid, uid) => {
     online: isOnline(m.id),
     activity: activities.get(m.id) || null,
   }));
-  return { id: s.id, name: s.name, owner: s.owner, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
+  return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
   const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
@@ -314,7 +315,7 @@ const notifyFriends = (...ids) => ids.forEach((i) => toUser(i, { t: 'friends.cha
 const newInvite = () => crypto.randomBytes(5).toString('hex');
 
 const H = {
-  'servers.list': (ws) => all('SELECT s.id,s.name FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id', ws.user.id),
+  'servers.list': (ws) => all('SELECT s.id,s.name,s.icon FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id', ws.user.id),
   'friends.list': (ws) => friendsView(ws.user.id),
   'friends.add': (ws, d) => {
     const u = get('SELECT id FROM users WHERE name=?', clean(d.name, 24));
@@ -395,6 +396,17 @@ const H = {
     const id = Number(d.id);
     if (roleRank(roleOf(id, ws.user.id)) < 3) fail('Solo Dueño o Admin');
     run('UPDATE servers SET invite=? WHERE id=?', newInvite(), id); notifyServer(id);
+  },
+  'server.setIcon': (ws, d) => {
+    const id = Number(d.id);
+    const s = get('SELECT owner FROM servers WHERE id=?', id);
+    const r = roleOf(id, ws.user.id);
+    if (!s || (s.owner !== ws.user.id && roleRank(r) < 3)) fail('Solo el dueño o administradores pueden cambiar el icono');
+    const icon = d.icon ? String(d.icon).slice(0, 85000) : null;
+    run('UPDATE servers SET icon=? WHERE id=?', icon, id);
+    notifyServer(id);
+    for (const m of memberIds(id)) toUser(m, { t: 'servers.changed' });
+    return { ok: true, icon };
   },
   'server.inviteFriend': (ws, d) => {
     const sid = Number(d.serverId);
@@ -690,7 +702,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.4';
+  let version = '1.5.5';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
@@ -709,14 +721,18 @@ function releaseInfo() {
     });
     if (files.length) file = files[0];
   }
-  const ghUrl = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
-  const ghExe = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.exe`;
+  const directExe = process.env.DIRECT_EXE_URL || null;
+  const directZip = process.env.DIRECT_ZIP_URL || null;
+  const ghUrl = directZip || `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
+  const ghExe = directExe || `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.exe`;
   return {
     version,
     file: file || `EpicKast-v${version}-Amigos.zip`,
     exeFile: exeFile || `EpicKast-Instalador-${version}.exe`,
     downloadPath: '/download/latest',
     exeDownloadPath: '/download/exe',
+    directExe,
+    directZip,
     ghUrl,
     ghExe
   };

@@ -48,6 +48,7 @@ const DEFAULTS = {
   partyVol: 0.75, partyAudioOnly: false, autoGameDetect: true, customActivity: '',
   hideSide: false, hideMembers: false, disableGpu: false,
   voiceMode: 'vad', pttKey: 'Control', pttCue: true, gameMode: false,
+  mutedServers: [], chatSound: true,
 };
 const ROLES = {
   owner:  { label: 'Dueño',       group: '👑 Dueño',            badge: '👑', color: '#fbbf24', rank: 4 },
@@ -84,6 +85,7 @@ const S = {
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
+  stageCollapsed: false,
 };
 
 window.epic.version?.().then((v) => { if (v) S.appVer = v; }).catch(() => {});
@@ -104,6 +106,24 @@ window.epic.onShortcut?.((act) => {
   } else if (act === 'deaf') {
     $('bDeaf')?.click();
     ringer.beep(S.call.deaf ? [360, 260] : [540, 720], 0.06, 0.09);
+  }
+});
+
+if (typeof window !== 'undefined' && window.Notification && Notification.permission === 'default') {
+  Notification.requestPermission?.().catch(() => {});
+}
+
+$('bTogglePass')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  const input = $('lgPass');
+  if (!input) return;
+  const isPass = input.type === 'password';
+  input.type = isPass ? 'text' : 'password';
+  const eye = $('eyeIco');
+  if (eye) {
+    eye.innerHTML = isPass
+      ? '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>'
+      : '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>';
   }
 });
 
@@ -146,6 +166,22 @@ const ringer = {
         o.connect(g).connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.01);
       });
     } catch {}
+  },
+  playJoin() {
+    // Acorde ascendente suave de bienvenida al unirse a la sala
+    this.beep([440, 554, 659, 880], 0.05, 0.14);
+  },
+  playLeave() {
+    // Tono descendente sutil al salir alguien de la sala
+    this.beep([784, 587, 392], 0.065, 0.11);
+  },
+  playStreamStart() {
+    // Campana brillante moderna al iniciar transmisión de pantalla
+    this.beep([587, 880, 1175], 0.07, 0.13);
+  },
+  playStreamStop() {
+    // Tono suave al finalizar transmisión de pantalla
+    this.beep([880, 587], 0.07, 0.09);
   },
   start(kind) {
     this.stop(); if (kind === 'in' && settings.dnd) return;
@@ -234,9 +270,39 @@ function onMsg(ev) {
       }
       renderSide();
       break;
-    case 'voice.joined': S.call?.addPeer(m.user); ringer.beep([520, 680]); break;
-    case 'voice.left': S.call?.removePeer(m.userId); ringer.beep([600, 420]); break;
-    case 'voice.peerstate': { const p = S.call?.peers.get(m.userId); if (p) { p.state = m.state; renderStage(); } break; }
+    case 'voice.joined':
+      S.call?.addPeer(m.user);
+      ringer.playJoin();
+      toast(`👋 ${m.user?.name || 'Alguien'} se unió a la llamada`);
+      break;
+    case 'voice.left': {
+      const peer = S.call?.peers.get(m.userId);
+      const pName = peer?.name || 'Alguien';
+      S.call?.removePeer(m.userId);
+      ringer.playLeave();
+      toast(`🚪 ${pName} salió de la llamada`);
+      break;
+    }
+    case 'voice.peerstate': {
+      const p = S.call?.peers.get(m.userId);
+      if (p) {
+        const oldScreen = !!p.state?.screen;
+        const oldCam = !!p.state?.cam;
+        p.state = m.state;
+        const newScreen = !!m.state?.screen;
+        const newCam = !!m.state?.cam;
+        if (!oldScreen && newScreen) {
+          ringer.playStreamStart();
+          toast(`🖥️ ${p.name} comenzó a transmitir pantalla`);
+        } else if (oldScreen && !newScreen) {
+          ringer.playStreamStop();
+        } else if (!oldCam && newCam) {
+          ringer.beep([523, 784], 0.06, 0.1);
+        }
+        renderStage();
+      }
+      break;
+    }
     case 'voice.sound':
       if (m.from !== S.me?.id) {
         playSoundEffect(m.sound);
@@ -408,7 +474,7 @@ async function checkServerUpdate() {
     S.srvRelease = info;
     const bar = $('updateBar');
     if (info?.version && isNewerVersion(info.version, S.appVer) && (info.exeDownloadPath || info.downloadPath)) {
-      const exeUrl = info.ghExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
+      const exeUrl = info.directExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
       const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
 
       const updateBtn = h('button', {
@@ -664,13 +730,68 @@ function addMsg(m, stick = true) {
   if (stick && near) box.scrollTop = 1e9;
 }
 function onChatMsg(m) {
-  if (m.channel === S.chan) {
+  const isCurrentChannel = m.channel === S.chan;
+  if (isCurrentChannel) {
     $('typingBar').classList.add('hidden');
     addMsg(m.msg);
-  } else if (m.msg.userId !== S.me.id) {
-    S.unread.add(m.channel); renderSide(); renderRail();
+  } else if (m.msg.userId !== S.me?.id) {
+    S.unread.add(m.channel);
+    renderSide();
+    renderRail();
+  }
+
+  // Notificaciones de chat (solo para mensajes entrantes de otros usuarios)
+  if (m.msg.userId !== S.me?.id) {
+    const isDm = m.channel[0] === 'd';
+    let srv = null;
+    let chName = '';
+    if (!isDm) {
+      srv = [...S.sdata.values()].find((sd) => sd.channels?.some((c) => c.key === m.channel));
+      const ch = srv?.channels?.find((c) => c.key === m.channel);
+      chName = ch ? `# ${ch.name}` : 'Canal';
+    }
+
+    const isServerMuted = srv && (settings.mutedServers || []).includes(srv.id);
     const preview = m.msg.text || (m.msg.fileName ? `📎 ${m.msg.fileName}` : 'Nuevo mensaje');
-    if (m.channel[0] === 'd' && !settings.dnd) { toast(`${m.msg.name}: ${preview.slice(0, 60)}`); window.epic.flash(); }
+
+    // Notificar si no está silenciado el servidor ni está en No Molestar
+    if (!isServerMuted && !settings.dnd) {
+      const windowUnfocused = !document.hasFocus();
+
+      if (!isCurrentChannel || windowUnfocused) {
+        if (settings.chatSound !== false) {
+          ringer.beep([880, 1174], 0.04, 0.07);
+        }
+
+        window.epic?.flash?.();
+
+        if (window.Notification && (Notification.permission === 'granted' || Notification.permission === 'default')) {
+          try {
+            const notifTitle = isDm ? `💬 ${m.msg.name}` : `💬 ${m.msg.name} en ${srv?.name || 'Servidor'} (${chName})`;
+            const notif = new Notification(notifTitle, {
+              body: preview.slice(0, 120),
+              silent: true,
+            });
+            notif.onclick = () => {
+              window.focus();
+              if (isDm) {
+                openChannel(m.channel, 'dm', m.msg.name);
+              } else if (srv) {
+                openServer(srv.id).then(() => {
+                  const ch = srv.channels?.find((c) => c.key === m.channel);
+                  if (ch) openChannel(ch.key, 'text', ch.name);
+                });
+              }
+            };
+          } catch {}
+        }
+
+        if (!isCurrentChannel) {
+          const toastPrefix = isDm ? m.msg.name : `${m.msg.name} [${srv?.name || 'Servidor'}]:`;
+          toast(`${toastPrefix} ${preview.slice(0, 50)}`);
+        }
+      }
+    }
   }
 }
 
@@ -904,7 +1025,17 @@ function renderRail() {
   const r = $('rail'); r.replaceChildren();
   const dmUnread = [...S.unread].some((k) => k[0] === 'd');
   r.append(h('div', { class: 'ico' + (S.view.kind === 'home' ? ' sel' : ''), title: 'Inicio / Amigos', onclick: goHome }, dmUnread ? '🔴' : h('img', { src: 'logo.svg', alt: 'EK' })));
-  for (const s of S.servers) r.append(h('div', { class: 'ico' + (S.view.sid === s.id ? ' sel' : ''), title: s.name, onclick: () => openServer(s.id) }, s.name.slice(0, 2).toUpperCase()));
+  for (const s of S.servers) {
+    const isMuted = (settings.mutedServers || []).includes(s.id);
+    const content = s.icon
+      ? h('img', { src: s.icon, alt: s.name })
+      : s.name.slice(0, 2).toUpperCase();
+    r.append(h('div', {
+      class: 'ico' + (S.view.sid === s.id ? ' sel' : '') + (isMuted ? ' muted-srv' : ''),
+      title: s.name + (isMuted ? ' (Silenciado)' : ''),
+      onclick: () => openServer(s.id)
+    }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
+  }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
 }
 function userItem(u, onclick, extra) {
@@ -1284,10 +1415,80 @@ function modalServerManage() {
   parts.push(
     h('button', {
       class: 'primary',
-      style: 'width:100%;padding:10px;margin-bottom:12px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px',
+      style: 'width:100%;padding:10px;margin-bottom:8px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px',
       onclick: () => { closeModal(); modalInviteFriends(sd.id); }
     }, '👥 Invitar amigos directamente a este servidor')
   );
+  const isMuted = (settings.mutedServers || []).includes(sd.id);
+  parts.push(
+    h('button', {
+      style: 'width:100%;padding:9px;margin-bottom:10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:8px',
+      onclick: () => {
+        if (!settings.mutedServers) settings.mutedServers = [];
+        if (isMuted) settings.mutedServers = settings.mutedServers.filter((id) => id !== sd.id);
+        else settings.mutedServers.push(sd.id);
+        saveSettings();
+        toast(isMuted ? '🔔 Notificaciones activadas para este servidor' : '🔕 Servidor silenciado (sin sonidos ni avisos)');
+        closeModal();
+        renderRail();
+      }
+    }, isMuted ? '🔔 Desmutear notificaciones de este servidor' : '🔕 Silenciar notificaciones de este servidor')
+  );
+  if (myRank >= 3) {
+    const srvIcoPv = h('div', {
+      class: 'avatar',
+      style: `width:60px;height:60px;font-size:24px;border-radius:18px;background:#1e2230;background-size:cover;background-position:center;${sd.icon ? `background-image:url(${sd.icon})` : ''}`
+    }, sd.icon ? '' : sd.name.slice(0, 2).toUpperCase());
+
+    const srvFile = h('input', { type: 'file', accept: 'image/*', class: 'hidden', onchange: () => {
+      const f = srvFile.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+          const s = Math.min(img.width, img.height);
+          x.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 128, 128);
+          let out = c.toDataURL('image/webp', 0.82);
+          if (out.length > 58000) out = c.toDataURL('image/webp', 0.62);
+          if (out.length > 58000) out = c.toDataURL('image/jpeg', 0.65);
+          srvIcoPv.style.backgroundImage = `url(${out})`;
+          srvIcoPv.textContent = '';
+          rpc('server.setIcon', { id: sd.id, icon: out }).then(() => {
+            sd.icon = out;
+            const targetSrv = S.servers.find(s => s.id === sd.id);
+            if (targetSrv) targetSrv.icon = out;
+            renderRail();
+            toast('Icono del servidor actualizado con éxito');
+          }).catch(e => toast(e.message));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(f);
+    } });
+
+    parts.push(
+      h('div', { class: 'sect' }, 'Icono del Servidor'),
+      h('div', { style: 'display:flex;align-items:center;gap:14px;background:var(--bg3);border-radius:10px;padding:10px;margin-bottom:10px' },
+        srvIcoPv,
+        h('div', { style: 'display:flex;flex-direction:column;gap:6px;flex:1' },
+          h('button', { style: 'padding:6px 12px;font-size:12px;font-weight:600', onclick: () => srvFile.click() }, '📷 Cambiar imagen del servidor'),
+          sd.icon ? h('button', { style: 'padding:5px 10px;font-size:11px;opacity:0.85', onclick: () => {
+            rpc('server.setIcon', { id: sd.id, icon: null }).then(() => {
+              sd.icon = null;
+              srvIcoPv.style.backgroundImage = '';
+              srvIcoPv.textContent = sd.name.slice(0, 2).toUpperCase();
+              const targetSrv = S.servers.find(s => s.id === sd.id);
+              if (targetSrv) targetSrv.icon = null;
+              renderRail();
+              toast('Icono del servidor eliminado');
+            }).catch(e => toast(e.message));
+          } }, 'Quitar imagen') : null,
+          srvFile
+        )
+      )
+    );
+  }
   if (sd.invite) {
     parts.push(h('label', null, '🔗 Código de invitación (clic para copiar y compartir con tus amigos)',
       h('input', { value: sd.invite, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(e.target.value); toast('Código copiado'); } })));
@@ -1917,9 +2118,13 @@ function leaveCall(silent) {
   if (S.outgoing) { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
   if (!S.call) return;
   if (!silent) { sendRaw('voice.leave', {}); ringer.beep([520, 360]); }
-  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false;
+  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false; S.stageCollapsed = false;
   $('micLive').style.width = '0%';
-  $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden'); $('meetMenu')?.classList.add('hidden');
+  $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden');
+  $('stageWrap').classList.remove('collapsed');
+  $('stageResizer')?.classList.remove('hidden');
+  $('voicePill')?.classList.add('hidden');
+  $('meetMenu')?.classList.add('hidden');
   tiles.forEach((t) => { t.boostCtx?.close().catch(() => {}); t.el.remove(); });
   tiles.clear(); renderCenter(); updateStatTimer(); updatePingTimer();
   syncOverlay();
@@ -1949,6 +2154,7 @@ const ICONS = {
   sound: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
   game: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="6"/></svg>',
   overlay: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+  collapse: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" x2="21" y1="10" y2="3"/><line x1="3" x2="10" y1="21" y2="14"/></svg>',
 };
 function getSvg(name, size = 16) {
   const tpl = ICONS[name] || '';
@@ -1972,6 +2178,44 @@ function cycleStageSize() {
   const next = SIZES[(idx + 1) % SIZES.length];
   setStagePreset(next.vh);
   toast(`Tamaño del escenario: ${next.label} (${next.desc} — ${next.vh}%)`);
+}
+
+function toggleStageCollapse(force) {
+  if (!S.call) return;
+  S.stageCollapsed = force !== undefined ? !!force : !S.stageCollapsed;
+  $('stageWrap')?.classList.toggle('collapsed', S.stageCollapsed);
+  $('stageResizer')?.classList.toggle('hidden', S.stageCollapsed);
+  $('voicePill')?.classList.toggle('hidden', !S.stageCollapsed);
+  if (S.stageCollapsed) {
+    updateVoicePill();
+    toast('Escenario minimizado (hablando en segundo plano para ver el chat)');
+  }
+  updateDock();
+}
+
+function updateVoicePill() {
+  if (!S.call) {
+    $('voicePill')?.classList.add('hidden');
+    return;
+  }
+  const c = S.call;
+  const pillTitle = $('vpillTitle');
+  if (pillTitle) pillTitle.textContent = `🔊 ${S.callLabel || 'Llamada de voz'}`;
+  const pillInfo = $('vpillInfo');
+  if (pillInfo) {
+    const total = 1 + c.peers.size;
+    pillInfo.textContent = `${total} ${total === 1 ? 'persona' : 'personas'} · ${c.muted ? '🔇 Silenciado' : '🎙️ En vivo'}`;
+  }
+  const muteBtn = $('vpillMute');
+  if (muteBtn) {
+    muteBtn.className = 'vpill-btn' + (c.muted ? ' off' : '');
+    muteBtn.textContent = c.muted ? '🔇 Muteado' : '🎙️ Hablando';
+  }
+  const deafBtn = $('vpillDeaf');
+  if (deafBtn) {
+    deafBtn.className = 'vpill-btn' + (c.deaf ? ' off' : '');
+    deafBtn.textContent = c.deaf ? '🔇 Sordo' : '🎧 Audio';
+  }
 }
 
 // ---------- Tablero de Sonidos (Soundboard) Sincronizado ----------
@@ -2353,7 +2597,10 @@ function updateDock() {
   setM('mGameMode', S.gameMode ? 'on' : '', 'game');
   setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '', 'grid');
   setM('mMore', '', 'more');
+  setM('mCollapse', S.stageCollapsed ? 'on' : '', 'collapse');
+  $('mCollapse')?.setAttribute('title', S.stageCollapsed ? 'Mostrar cámaras (expandir)' : 'Minimizar escenario (ocultar cámaras para chatear a pantalla completa)');
   setSvg($('mLeaveIco'), 'hangup', 15);
+  updateVoicePill();
 
   if (settings.voiceMode === 'ptt') {
     const keyTxt = settings.pttKey === ' ' ? 'Espacio' : (settings.pttKey || 'Control');
@@ -2380,7 +2627,15 @@ $('bLoop').onclick = () => {
   if (next) toast('👂 Escuchando tu propio micrófono (desactívalo para no oírte doble)');
   updateDock();
 };
-$('bCam').onclick = async () => { try { await S.call?.setCamera(!S.call.camTrack); } catch (e) { toast('No se pudo abrir la cámara'); } updateDock(); renderStage(); pushState(); };
+$('bCam').onclick = async () => {
+  try {
+    const turningOn = !S.call?.camTrack;
+    await S.call?.setCamera(turningOn);
+    if (turningOn) ringer.beep([523, 784], 0.06, 0.1);
+    else ringer.beep([784, 523], 0.06, 0.08);
+  } catch (e) { toast('No se pudo abrir la cámara'); }
+  updateDock(); renderStage(); pushState();
+};
 $('bParty').onclick = () => modalParty();
 $('bSoundboard').onclick = () => modalSoundboard();
 $('mSoundboard').onclick = () => modalSoundboard();
@@ -2388,17 +2643,30 @@ $('bGameMode').onclick = () => toggleGameMode();
 $('mGameMode').onclick = () => toggleGameMode();
 $('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
+$('mCollapse').onclick = () => toggleStageCollapse();
+$('vpillExpand').onclick = () => toggleStageCollapse(false);
+$('vpillMute').onclick = () => $('bMute').click();
+$('vpillDeaf').onclick = () => $('bDeaf').click();
+$('vpillHang').onclick = () => leaveCall(false);
 $('bLeave').onclick = () => leaveCall(false);
 $('bScreen').onclick = async () => {
   const c = S.call; if (!c) return;
-  if (c.screenStream) { await c.stopScreen(); updateDock(); renderStage(); pushState(); return; }
+  if (c.screenStream) {
+    await c.stopScreen();
+    ringer.playStreamStop();
+    updateDock(); renderStage(); pushState();
+    return;
+  }
   let srcs = []; try { srcs = await window.epic.listSources(); } catch (e) { return toast('No se pudieron listar las pantallas'); }
   const screens = srcs.filter((s) => s.screen);
   const windows = srcs.filter((s) => !s.screen);
 
   const makeCard = (s) => h('div', { class: 'src', onclick: async () => {
     closeModal();
-    try { await c.startScreen(s.id); } catch (e) { return toast('No se pudo compartir la pantalla'); }
+    try {
+      await c.startScreen(s.id);
+      ringer.playStreamStart();
+    } catch (e) { return toast('No se pudo compartir la pantalla'); }
     updateDock(); renderStage(); pushState();
   } }, h('img', { src: s.thumb }), h('span', { title: s.name }, (s.screen ? '🖥️ ' : '🪟 ') + s.name));
 
@@ -2877,16 +3145,35 @@ function renderStage() {
     keep.add('party');
   }
   const me = tile('me', 'Tú' + (c.muted ? ' 🔇' : ''), S.me, false); keep.add('me'); setStream(me, c.main, !!c.camTrack, true);
-  if (c.screenStream) { const t = tile('me-screen', 'Tu pantalla', S.me, false); keep.add('me-screen'); setStream(t, new MediaStream(c.screenStream.getVideoTracks()), true, true); }
+  if (c.screenStream) {
+    const liveTracks = c.screenStream.getVideoTracks().filter((t) => t.readyState !== 'ended');
+    if (liveTracks.length > 0) {
+      const t = tile('me-screen', 'Tu pantalla', S.me, false);
+      keep.add('me-screen');
+      setStream(t, new MediaStream(liveTracks), true, true);
+    }
+  }
   for (const p of c.peers.values()) {
     const user = { id: p.id, name: p.name, color: p.user?.color, av: p.user?.av };
     const friend = friendByDm(S.callKey)?.id === p.id ? friendByDm(S.callKey) : null; if (friend) { user.color = friend.color; user.av = friend.av; }
     const label = p.name + (p.state?.muted ? ' 🔇' : '');
     const k = 'p' + p.id; keep.add(k);
     setStream(tile(k, label, user, true), p.streams.get(p.mainId) || null, !!p.state?.cam, false);
-    for (const [sid, st] of p.streams) {
-      if (sid === p.mainId) continue; const sk = `p${p.id}-${sid}`; keep.add(sk);
-      setStream(tile(sk, p.name + ' — pantalla', user, true), st, st.getVideoTracks().length > 0, false);
+    if (p.state?.screen) {
+      for (const [sid, st] of p.streams) {
+        if (sid === p.mainId) continue;
+        const liveVideo = st.getVideoTracks().filter((t) => t.readyState !== 'ended');
+        if (liveVideo.length === 0) {
+          p.streams.delete(sid);
+          continue;
+        }
+        const sk = `p${p.id}-${sid}`; keep.add(sk);
+        setStream(tile(sk, p.name + ' — pantalla', user, true), st, true, false);
+      }
+    } else {
+      for (const [sid] of p.streams) {
+        if (sid !== p.mainId) p.streams.delete(sid);
+      }
     }
   }
   for (const [k, t] of tiles) if (!keep.has(k)) { t.boostCtx?.close().catch(() => {}); t.el.remove(); tiles.delete(k); }
@@ -2965,7 +3252,12 @@ function updatePingTimer() {
       b.title = 'Semáforo de señal en vivo';
       return;
     }
-    const { rtt, loss } = info;
+    const { rtt, loss = 0 } = info;
+    if (rtt == null || isNaN(rtt)) {
+      b.textContent = S.call.peers.size ? '🟢 En línea' : '🟢 Sala lista';
+      b.title = 'Conexión WebRTC P2P activa';
+      return;
+    }
     const sem = rtt < 90 && loss < 2 ? '🟢' : rtt < 180 && loss < 6 ? '🟡' : '🔴';
     b.textContent = `${sem} ${rtt} ms${loss > 0 ? ` · ${loss}% pérd.` : ''}`;
     b.title = `Latencia P2P: ${rtt} ms · Pérdida de paquetes: ${loss}%`;

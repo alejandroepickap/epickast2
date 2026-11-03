@@ -16,7 +16,14 @@
     </div>
     <label>Servidor<input id="lgServer" placeholder="wss://epickast.onrender.com" autocomplete="off"></label>
     <label>Usuario<input id="lgUser" autocomplete="username"></label>
-    <label>Contraseña<input id="lgPass" type="password" autocomplete="current-password"></label>
+    <label>Contraseña
+      <div class="pass-wrap">
+        <input id="lgPass" type="password" autocomplete="current-password">
+        <button type="button" id="bTogglePass" class="eye-btn" title="Mostrar / ocultar contraseña">
+          <svg id="eyeIco" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </label>
     <label class="chk-row"><input id="lgRemember" type="checkbox" checked><span>Permanecer conectado al iniciar la aplicación</span></label>
     <div class="row"><button type="submit" data-mode="login" class="primary">Entrar</button><button type="submit" data-mode="register">Crear cuenta</button></div>
     <p id="lgError" class="err"></p>
@@ -90,9 +97,23 @@
           <button id="mMore" class="mbtn" title="Opciones de audio, anti-respiración y vista"></button>
           <div id="meetMenu" class="meet-menu hidden"></div>
         </div>
+        <button id="mCollapse" class="mbtn" title="Minimizar escenario (ocultar cámaras para chatear a pantalla completa)"></button>
         <button id="mLeave" class="mbtn hang" title="Colgar llamada"><span id="mLeaveIco"></span><span>Colgar</span></button>
       </div>
       <div id="stageResizer" title="Haz clic para alternar tamaños (S/M/L/XL) o arrastra hacia arriba/abajo"><span></span></div>
+    </div>
+    <div id="voicePill" class="voice-pill hidden">
+      <div class="vpill-left">
+        <span class="vpill-dot"></span>
+        <span id="vpillTitle" class="vpill-title">Llamada de voz</span>
+        <span id="vpillInfo" class="vpill-info">En llamada</span>
+      </div>
+      <div class="vpill-acts">
+        <button type="button" id="vpillExpand" class="vpill-btn" title="Mostrar cámaras / escenario de video">📹 Mostrar cámaras</button>
+        <button type="button" id="vpillMute" class="vpill-btn" title="Silenciar / activar micro">Micro</button>
+        <button type="button" id="vpillDeaf" class="vpill-btn" title="Silenciar audio">Audio</button>
+        <button type="button" id="vpillHang" class="vpill-btn vpill-hang" title="Colgar llamada">Colgar</button>
+      </div>
     </div>
     <div id="msgs"></div>
     <div id="typingBar" class="hidden"></div>
