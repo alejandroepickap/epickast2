@@ -2,6 +2,7 @@ node_modules/
 dist/
 server/data/
 *.log
+*.bat
 .DS_Store
 Thumbs.db
 docs/rea-evidence/*_graph*.json
