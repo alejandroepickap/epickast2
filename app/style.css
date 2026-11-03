@@ -319,6 +319,17 @@ body.mini-mode #side{order:2;border:0;display:none}
 .meter{height:10px;background:var(--bg);border-radius:6px;overflow:hidden;border:1px solid var(--line)}.meter>div{height:100%;width:0;background:var(--ok);transition:width .06s}
 .hint{color:var(--mu);font-size:12px}
 .prof{display:flex;gap:16px;align-items:center}
-#toast{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:6px;z-index:40}
-#toast div{background:var(--bg3);border:1px solid var(--line);padding:9px 14px;border-radius:9px;border-left:3px solid var(--ac);box-shadow:0 8px 24px #0008}
+#toast{position:fixed;right:20px;top:54px;display:flex;flex-direction:column;gap:6px;z-index:40;pointer-events:none}
+#toast div{background:var(--bg3);border:1px solid var(--line);padding:9px 14px;border-radius:9px;border-left:3px solid var(--ac);box-shadow:0 8px 24px #0008;pointer-events:auto}
+.settings-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.settings-card-title{font-size:12.5px;font-weight:700;color:var(--tx);display:flex;align-items:center;justify-content:space-between}
+details.settings-acc{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;transition:all .18s ease}
+details.settings-acc[open]{background:rgba(255,255,255,0.035);border-color:rgba(124,92,255,0.3)}
+details.settings-acc summary{padding:11px 14px;cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between;list-style:none}
+details.settings-acc summary::-webkit-details-marker{display:none}
+details.settings-acc summary .acc-title{font-size:13px;font-weight:700;color:var(--tx);display:flex;align-items:center;gap:8px}
+details.settings-acc summary .acc-desc{font-size:11px;font-weight:400;color:var(--mu);margin-top:2px}
+details.settings-acc summary .acc-arrow{font-size:12px;color:var(--mu);transition:transform .2s ease}
+details.settings-acc[open] summary .acc-arrow{transform:rotate(90deg);color:var(--ac)}
+details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(255,255,255,0.05)}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:#282c3e;border-radius:4px}

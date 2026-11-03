@@ -1845,7 +1845,18 @@ async function modalSettings() {
     return s;
   };
   const preset = (key, obj) => { const s = h('select', { onchange: () => { settings[key] = s.value; saveSettings(); S.call?.retune(); } }, Object.keys(obj).map((k) => h('option', { value: k, selected: settings[key] === k }, k))); return s; };
-  const chk = (key, text, after) => h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, h('input', { type: 'checkbox', style: 'width:auto', checked: !!settings[key], onchange: (e) => { settings[key] = e.target.checked; saveSettings(); after?.(); } }), text);
+  const chk = (key, text, after) => h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx);cursor:pointer' }, h('input', { type: 'checkbox', style: 'width:16px;height:16px;cursor:pointer;accent-color:var(--ac)', checked: !!settings[key], onchange: (e) => { settings[key] = e.target.checked; saveSettings(); after?.(); } }), text);
+  const acc = (icon, title, desc, ...children) => {
+    const summary = h('summary', null,
+      h('div', null,
+        h('div', { class: 'acc-title' }, `${icon} ${title}`),
+        desc ? h('div', { class: 'acc-desc' }, desc) : null
+      ),
+      h('span', { class: 'acc-arrow' }, '▸')
+    );
+    const body = h('div', { class: 'acc-body' }, ...children);
+    return h('details', { class: 'settings-acc' }, summary, body);
+  };
   const noiseSel = h('select', { onchange: () => { settings.noise = noiseSel.value; saveSettings(); if (mic && ownMic) startTest(); else hint.textContent = 'Se aplicará en la próxima llamada.'; } },
     [['high', 'Alta — RNNoise + Filtro 115 Hz + Anti-Respiración (recomendada)'], ['std', 'Estándar — Chromium'], ['off', 'Desactivada']].map(([v, t]) => h('option', { value: v, selected: settings.noise === v }, t)));
   const audioQSel = h('select', { onchange: () => { settings.audioKbps = Number(audioQSel.value); saveSettings(); S.call?.peers.forEach((p) => p.senders.mic && S.call.tuneAudio(p.senders.mic)); } },
@@ -1924,33 +1935,69 @@ async function modalSettings() {
   const swA = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === settings.accent ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { settings.accent = c; saveSettings(); applyAccent(); swA.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
   const vol = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: settings.ringVol, onchange: () => { settings.ringVol = Number(vol.value); saveSettings(); ringer.start('in'); setTimeout(() => ringer.stop(), 1200); } });
   const dlLink = httpBase() + '/download/latest';
+
+  const testSpkBtn = h('button', {
+    style: 'padding:5px 12px;border-radius:8px;font-weight:700;font-size:11.5px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer',
+    onclick: () => {
+      ringer.start('in');
+      setTimeout(() => ringer.stop(), 900);
+      toast('🔊 Reproduciendo tono de prueba en altavoces...');
+    }
+  }, '🔔 Probar');
+
   const diagBtn = h('button', {
     class: 'primary',
-    style: 'display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;font-size:13px;font-weight:700;border-radius:10px;margin-bottom:8px;background:linear-gradient(135deg,rgba(124,92,255,0.9),rgba(99,102,241,0.9));color:#fff',
+    style: 'display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;font-size:13px;font-weight:700;border-radius:10px;margin-bottom:6px;background:linear-gradient(135deg,rgba(124,92,255,0.95),rgba(99,102,241,0.95));color:#fff;border:0;cursor:pointer',
     onclick: () => {
       closeModal();
       modalDiagnostics();
     }
-  }, '🎙️ Diagnóstico y Calibración Completa de Audio y Video');
-  modal(`Ajustes · EpicKast v${S.appVer}`,
-    diagBtn,
-    h('label', null, 'Modo de transmisión del micrófono',
-      h('select', { onchange: (e) => {
-        settings.voiceMode = e.target.value;
-        saveSettings();
-        if (S.call) {
-          if (settings.voiceMode === 'ptt') S.call.setMuted(true);
-          else S.call.setMuted(false);
-          updateDock();
-        }
-        closeModal();
-        modalSettings();
-      } },
-        h('option', { value: 'vad', selected: settings.voiceMode !== 'ptt' }, 'Activación continua / por voz (VAD)'),
-        h('option', { value: 'ptt', selected: settings.voiceMode === 'ptt' }, 'Pulsar para hablar (Push-to-Talk / PTT)')
-      )
+  }, '🎯 Diagnóstico y Calibración Rápida de Audio y Video');
+
+  // Tarjeta 1: Micrófono (lo esencial para saber si se escucha)
+  const micCard = h('div', { class: 'settings-card' },
+    h('div', { class: 'settings-card-title' },
+      h('span', null, '🎙️ Micrófono de entrada'),
+      testBtn
     ),
-    settings.voiceMode === 'ptt' ? h('div', { style: 'background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.25);border-radius:10px;padding:10px 12px;margin:4px 0 8px;display:flex;flex-direction:column;gap:8px' },
+    sel('audioinput', 'mic'),
+    meter,
+    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--tx);cursor:pointer;margin-top:2px' }, mon, 'Escucharme en audífonos durante la prueba')
+  );
+
+  // Tarjeta 2: Altavoces / Auriculares
+  const spkCard = h('div', { class: 'settings-card' },
+    h('div', { class: 'settings-card-title' },
+      h('span', null, '🔊 Altavoces / Auriculares'),
+      testSpkBtn
+    ),
+    sel('audiooutput', 'spk')
+  );
+
+  // Tarjeta 3: Cámara
+  const camCard = h('div', { class: 'settings-card' },
+    h('div', { class: 'settings-card-title' }, '📷 Cámara Web'),
+    sel('videoinput', 'cam')
+  );
+
+  // Tarjeta 4: Modo de transmisión
+  const modeCard = h('div', { class: 'settings-card' },
+    h('div', { class: 'settings-card-title' }, '🗣️ Modo de Transmisión de Voz'),
+    h('select', { onchange: (e) => {
+      settings.voiceMode = e.target.value;
+      saveSettings();
+      if (S.call) {
+        if (settings.voiceMode === 'ptt') S.call.setMuted(true);
+        else S.call.setMuted(false);
+        updateDock();
+      }
+      closeModal();
+      modalSettings();
+    } },
+      h('option', { value: 'vad', selected: settings.voiceMode !== 'ptt' }, 'Activación continua / por voz (VAD)'),
+      h('option', { value: 'ptt', selected: settings.voiceMode === 'ptt' }, 'Pulsar para hablar (Push-to-Talk / PTT)')
+    ),
+    settings.voiceMode === 'ptt' ? h('div', { style: 'background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.25);border-radius:10px;padding:10px 12px;margin:4px 0 2px;display:flex;flex-direction:column;gap:8px' },
       h('div', { style: 'font-weight:700;font-size:12px;color:#c4b5fd' }, '🎙️ Configuración de Pulsar para Hablar (PTT)'),
       h('div', { style: 'display:flex;gap:8px;align-items:center' },
         h('button', {
@@ -1972,42 +2019,28 @@ async function modalSettings() {
             window.addEventListener('keydown', handler, true);
           }
         }, `Tecla asignada: [ ${settings.pttKey === ' ' ? 'Barra Espaciadora' : (settings.pttKey || 'Control')} ]`),
-        h('span', { style: 'font-size:11.5px;color:var(--mu)' }, '(Haz clic y presiona tu tecla preferida: Ctrl, Shift, etc.)')
+        h('span', { style: 'font-size:11.5px;color:var(--mu)' }, '(Haz clic y presiona la tecla que quieras)')
       ),
       chk('pttCue', 'Reproducir bip sonoro al activar y soltar el micrófono')
-    ) : null,
-    h('label', null, 'Micrófono', sel('audioinput', 'mic')),
-    h('label', null, h('span', null, 'Volumen de tu micrófono: ', micGainLbl), micGainInput),
+    ) : null
+  );
+
+  // Acordeón 1: Ajustes avanzados de voz
+  const accAudio = acc('🎛️', 'Ajustes Avanzados de Micrófono y Supresión de Ruido', 'Sensibilidad, volumen, puerta de voz y calidad de llamada',
+    h('label', null, h('span', null, 'Volumen del micrófono: ', micGainLbl), micGainInput),
     h('label', null, h('span', null, '🌬️ Filtro Anti-Respiración (Puerta de Voz): ', gateLbl), gateInput),
-    h('label', null, 'Calidad de audio en llamada', audioQSel),
-    h('label', null, 'Supresión de ruido', noiseSel), hint,
-    h('div', { class: 'row' }, testBtn), meter,
-    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, mon, 'Escuchar mi propia voz durante la prueba'),
-    h('label', null, 'Cámara', sel('videoinput', 'cam')),
-    h('label', null, 'Altavoces', sel('audiooutput', 'spk')),
+    h('label', null, 'Supresión de ruido por IA', noiseSel),
+    hint,
+    h('label', null, 'Calidad de audio en llamada', audioQSel)
+  );
+
+  // Acordeón 2: Video y Pantalla
+  const accVideo = acc('🖥️', 'Video y Pantalla Compartida', 'Resolución, FPS, aceleración gráfica y modo juego',
     h('label', null, 'Calidad de cámara', preset('camPreset', CAM_PRESETS)),
     h('label', null, 'Calidad de pantalla', preset('screenPreset', SCREEN_PRESETS)),
-    chk('gameMode', '🎮 Modo Juego por defecto (reduce fps y bitrate para dar 100% de CPU/Ping al juego)', () => {
-      if (S.call) S.call.setGameMode(settings.gameMode);
-      S.gameMode = settings.gameMode;
-      updateDock();
-    }),
-    h('div', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0 8px' },
-      h('button', {
-        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
-        onclick: () => toggleOverlay()
-      }, '🎮 Overlay Gamer Flotante'),
-      h('button', {
-        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
-        onclick: () => { closeModal(); modalSoundboard(); }
-      }, '🔊 Tablero de Sonidos')
-    ),
-    chk('screenAudio', 'Compartir audio del sistema (usa audífonos para evitar eco)'),
-    chk('hwPrefer', 'Preferir H.264 por hardware (reiniciar llamada para aplicar)'),
-    h('div', { class: 'hint', style: 'margin-top:-6px;line-height:1.4;color:#a5b4fc;font-size:11.5px' },
-      'ℹ️ ¿Qué es H.264? Delega la compresión de video al chip de tu tarjeta gráfica (NVIDIA, AMD o Intel) en lugar de usar el procesador. Recomendado para jugar o compartir pantalla con 0 caídas de FPS.'
-    ),
-    chk('disableGpu', 'Deshabilitar aceleración por hardware (estilo Discord; soluciona pantallas negras al compartir Chrome o juegos)', async () => {
+    chk('screenAudio', 'Compartir audio del sistema por defecto (usa audífonos para evitar eco)'),
+    chk('hwPrefer', 'Preferir compresión H.264 por hardware (NVIDIA, AMD o Intel)'),
+    chk('disableGpu', 'Deshabilitar aceleración por hardware (soluciona pantallas negras al compartir)', async () => {
       await window.epic.setConfig?.({ disableGpu: settings.disableGpu });
       if (confirm(settings.disableGpu
         ? 'Aceleración por hardware desactivada.\n\n¿Deseas reiniciar EpicKast ahora para aplicar el cambio y evitar pantallas negras al compartir?'
@@ -2015,18 +2048,59 @@ async function modalSettings() {
         window.epic.relaunch?.();
       }
     }),
-    chk('stats', 'Mostrar estadísticas (CPU/RAM, codificador HW/CPU)', updateStatTimer),
-    h('label', null, '⌨️ Atajo global para Silenciar / Activar micro (incluso jugando)',
-      h('input', { value: settings.keyMute || 'Alt+M', placeholder: 'Ej. Alt+M o CommandOrControl+Shift+M', onchange: (e) => { settings.keyMute = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de micrófono actualizado'); } })),
-    h('label', null, '⌨️ Atajo global para Silenciar audio (Deafen)',
-      h('input', { value: settings.keyDeaf || 'Alt+D', placeholder: 'Ej. Alt+D', onchange: (e) => { settings.keyDeaf = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de audio actualizado'); } })),
+    chk('gameMode', '🎮 Modo Juego por defecto (prioriza 100% de FPS y Ping del juego)', () => {
+      if (S.call) S.call.setGameMode(settings.gameMode);
+      S.gameMode = settings.gameMode;
+      updateDock();
+    }),
+    h('div', { style: 'display:flex;gap:8px;align-items:center;margin-top:4px' },
+      h('button', {
+        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
+        onclick: () => toggleOverlay()
+      }, '🎮 Abrir Overlay Gamer'),
+      h('button', {
+        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
+        onclick: () => { closeModal(); modalSoundboard(); }
+      }, '🔊 Abrir Soundboard')
+    )
+  );
+
+  // Acordeón 3: Atajos
+  const accShortcuts = acc('⌨️', 'Atajos de Teclado Globales', 'Combinaciones de teclas activas dentro de juegos',
+    h('label', null, 'Silenciar / Activar micrófono',
+      h('input', { value: settings.keyMute || 'Alt+M', placeholder: 'Ej. Alt+M', onchange: (e) => { settings.keyMute = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de micrófono actualizado'); } })),
+    h('label', null, 'Silenciar / Activar audio (Deafen)',
+      h('input', { value: settings.keyDeaf || 'Alt+D', placeholder: 'Ej. Alt+D', onchange: (e) => { settings.keyDeaf = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de audio actualizado'); } }))
+  );
+
+  // Acordeón 4: Apariencia y Notificaciones
+  const accVisual = acc('🎨', 'Apariencia y Notificaciones', 'Colores de acento, volumen de timbre y alertas',
     h('label', null, 'Color de acento', swA),
     h('label', null, 'Volumen del timbre', vol),
-    chk('dnd', 'No molestar (sin timbre ni avisos de mensajes)'),
-    h('label', null, '📦 Enlace de descarga/actualización para tus amigos (clic para copiar)',
+    chk('dnd', 'Modo No molestar (silenciar timbre y avisos)'),
+    chk('stats', 'Mostrar estadísticas de red (CPU, RAM y Ping en vivo)', updateStatTimer)
+  );
+
+  // Acordeón 5: Conexión y Cuenta
+  const accAccount = acc('🌐', 'Servidor y Cuenta', 'Servidor activo, enlace de descarga para amigos y sesión',
+    h('label', null, 'Servidor conectado', h('input', { value: settings.server, onchange: (e) => { settings.server = normUrl(e.target.value); saveSettings(); toast('Se aplicará al volver a iniciar sesión'); } })),
+    h('label', null, '📦 Enlace de descarga para amigos (clic para copiar)',
       h('input', { value: dlLink, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(dlLink); toast('Enlace de descarga copiado'); } })),
-    h('label', null, 'Servidor', h('input', { value: settings.server, onchange: (e) => { settings.server = normUrl(e.target.value); saveSettings(); toast('Se aplicará al volver a iniciar sesión'); } })),
-    h('button', { class: 'danger', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, 'Cerrar sesión'));
+    h('button', { class: 'danger', style: 'margin-top:6px', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, 'Cerrar sesión')
+  );
+
+  modal(`Ajustes · EpicKast v${S.appVer}`,
+    diagBtn,
+    micCard,
+    spkCard,
+    camCard,
+    modeCard,
+    accAudio,
+    accVideo,
+    accShortcuts,
+    accVisual,
+    accAccount
+  );
 }
 
 // ---------- llamadas entrantes / salientes ----------
