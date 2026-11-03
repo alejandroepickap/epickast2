@@ -195,7 +195,7 @@ async function searchYouTube(raw) {
   const listMatch = /[?&]list=([A-Za-z0-9_-]{10,})/.exec(q);
   if (listMatch && (/youtube\.com\/playlist/i.test(q) || !/(?:v=|youtu\.be\/)/.test(q) || /list=PL/i.test(q))) {
     try {
-      const r = await fetch(`https://www.youtube.com/playlist?list=${encodeURIComponent(listMatch[1])}&hl=es`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8' } });
+      const r = await fetch(`https://www.youtube.com/playlist?list=${encodeURIComponent(listMatch[1])}&hl=es`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=1.0,en;q=0.5' } });
       const html = await r.text();
       const m = /var ytInitialData = (\{.*?\});<\/script>/s.exec(html);
       if (m) {
@@ -230,7 +230,7 @@ async function searchYouTube(raw) {
   }
   // 4) Búsqueda por texto en YouTube (sin API key)
   try {
-    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=es`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8' } });
+    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}&hl=es&gl=MX`, { headers: { 'User-Agent': ua, 'Accept-Language': 'es-419,es;q=0.9,en;q=0.8' } });
     const html = await r.text();
     const m = /var ytInitialData = (\{.*?\});<\/script>/s.exec(html);
     if (!m) return [];
@@ -800,7 +800,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.8';
+  let version = '1.5.9';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
@@ -853,7 +853,7 @@ window.onYouTubeIframeAPIReady = function() {
   p = new YT.Player('player', {
     width: '100%', height: '100%',
     videoId: curVid || undefined,
-    playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, origin: location.origin },
+    playerVars: { autoplay: 1, controls: 1, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, origin: location.origin, hl: 'es', cc_lang_pref: 'es', gl: 'MX' },
     events: {
       onReady: () => {
         ready = true;

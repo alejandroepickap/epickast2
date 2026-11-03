@@ -91,7 +91,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.5.8', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.5.9', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -1786,7 +1786,7 @@ async function copyDiagnosticReport() {
     '   📋 REPORTE DE DIAGNÓSTICO EPICKAST',
     '========================================',
     `Fecha: ${new Date().toLocaleString()}`,
-    `Versión App: v${S.appVer || '1.5.8'}`,
+    `Versión App: v${S.appVer || '1.5.9'}`,
     `Código de Error: ${errCode}`,
     `Usuario: ${S.me?.name || 'No autenticado'} (ID: ${S.me?.id || '-'})`,
     `Servidor: ${settings.server || 'No configurado'}`,
@@ -2912,11 +2912,7 @@ function updateDock() {
   setM('mDeaf', c.deaf ? 'off' : '', c.deaf ? 'deafOff' : 'deaf');
   setM('mCam', c.camTrack ? 'on' : '', c.camTrack ? 'cam' : 'camOff');
   setM('mScreen', c.screenStream ? 'on' : '', 'screen');
-  setM('mParty', hasParty ? 'on' : '', 'party');
-  setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '', 'grid');
   setM('mMore', '', 'more');
-  setM('mCollapse', S.stageCollapsed ? 'on' : '', S.stageCollapsed ? 'chevronUp' : 'chevronDown');
-  $('mCollapse')?.setAttribute('title', S.stageCollapsed ? 'Expandir cámaras y escenario' : 'Minimizar escenario (ocultar cámaras para chatear)');
   setSvg($('mLeaveIco'), 'hangup', 15);
   updateVoicePill();
 
@@ -2960,7 +2956,8 @@ if ($('mSoundboard')) $('mSoundboard').onclick = () => modalSoundboard();
 if ($('mGameMode')) $('mGameMode').onclick = () => toggleGameMode();
 $('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
-$('mCollapse').onclick = () => toggleStageCollapse();
+if ($('bMiniExit')) $('bMiniExit').onclick = () => window.epic.toggleMini?.(false);
+if ($('mCollapse')) $('mCollapse').onclick = () => toggleStageCollapse();
 $('vpillExpand').onclick = () => toggleStageCollapse(false);
 $('vpillMute').onclick = () => $('bMute').click();
 $('vpillDeaf').onclick = () => $('bDeaf').click();
@@ -3027,9 +3024,9 @@ $('mMute').onclick = () => $('bMute').click();
 $('mDeaf').onclick = () => $('bDeaf').click();
 $('mCam').onclick = () => $('bCam').click();
 $('mScreen').onclick = () => $('bScreen').click();
-$('mParty').onclick = () => modalParty();
+if ($('mParty')) $('mParty').onclick = () => modalParty();
 $('mLeave').onclick = () => $('bLeave').click();
-$('mHideNoVid').onclick = () => {
+if ($('mHideNoVid')) $('mHideNoVid').onclick = () => {
   settings.hideNoVideo = !settings.hideNoVideo;
   saveSettings();
   toast(settings.hideNoVideo ? 'Mostrando solo cámaras y pantallas activas' : 'Mostrando todos los participantes en cuadrícula');
@@ -3041,7 +3038,7 @@ function setStagePreset(vh) {
   applyStageHeight();
   updateDock();
 }
-$('mSizeBtn').onclick = (e) => {
+if ($('mSizeBtn')) $('mSizeBtn').onclick = (e) => {
   e.stopPropagation();
   $('meetMenu')?.classList.add('hidden');
   $('mSizeMenu')?.classList.toggle('hidden');
@@ -3388,7 +3385,7 @@ function syncPartyTile() {
     t.video.classList.add('hidden');
     t.video.pause?.();
     t.iframe.classList.remove('hidden');
-    const targetSrc = `${httpBase()}/yt-player?v=${encodeURIComponent(cur.ytId)}`;
+    const targetSrc = `${httpBase()}/yt-player?v=${encodeURIComponent(cur.ytId)}&hl=es&gl=MX`;
     if (t.curVid !== cur.ytId) {
       t.curVid = cur.ytId;
       t.curPos = p.pos || 0;
@@ -3709,3 +3706,21 @@ function updatePingTimer() {
 }
 
 autoLogin();
+
+// Global Escape key to exit fullscreen, mini mode or stage theater
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    } else if (S.mini) {
+      window.epic.toggleMini?.(false);
+    } else if (S.focusTile) {
+      S.focusTile = null;
+      renderStage();
+      toast('Spotlight desactivado');
+    } else if ((Number(settings.stageHeight) || 60) > 60) {
+      setStagePreset(60);
+      toast('Escenario restaurado a tamaño equilibrado (60%)');
+    }
+  }
+});

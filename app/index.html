@@ -41,7 +41,6 @@
           <div id="voiceInfo"></div>
           <div class="vmeta">
             <span id="pingBadge" class="ping" title="Latencia y calidad de señal P2P"></span>
-            <div class="micbar" title="Nivel de tu micrófono en vivo (la puerta anti-respiración filtra sonidos bajos)"><div id="micLive"></div></div>
           </div>
         </div>
         <div class="vquick">
@@ -51,6 +50,7 @@
           <button id="bLeave" class="qbtn hang" title="Colgar llamada"><i></i><span>Colgar</span></button>
         </div>
       </div>
+      <div class="micbar" title="Nivel de tu micrófono en vivo (la puerta anti-respiración filtra ruidos)"><div id="micLive"></div></div>
       <div id="dockDrawer" class="dock hidden">
         <button id="bCam" class="dockbtn" title="Encender / apagar cámara"><i></i><span>Cámara</span></button>
         <button id="bScreen" class="dockbtn" title="Compartir pantalla"><i></i><span>Pantalla</span></button>
@@ -73,28 +73,10 @@
         <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)"></button>
         <button id="mCam" class="mbtn" title="Encender / apagar cámara"></button>
         <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana"></button>
-        <button id="mParty" class="mbtn hidden" title="EpicBot DJ"></button>
-        <button id="mHideNoVid" class="mbtn hidden" title="Modo cuadrícula"></button>
-        <div class="msep hidden"></div>
-        <div class="msize-wrap hidden">
-          <button id="mSizeBtn" class="mbtn" title="Tamaño del escenario (clic para abrir opciones o doble clic en escenario)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
-            <span id="mSizeBadge" class="m-badge">M</span>
-          </button>
-          <div id="mSizeMenu" class="meet-menu hidden" style="min-width:185px">
-            <div style="font-size:10.5px;font-weight:700;color:var(--mu);padding:2px 8px 6px;text-transform:uppercase;letter-spacing:.5px">Tamaño de cámaras</div>
-            <button data-sz="38"><span>S — Compacto</span> <small>38%</small></button>
-            <button data-sz="60"><span>M — Equilibrado</span> <small>60%</small></button>
-            <button data-sz="80"><span>L — Amplio</span> <small>80%</small></button>
-            <button data-sz="94"><span>XL — Modo Teatro</span> <small>94%</small></button>
-          </div>
-        </div>
-        <button id="mCollapse" class="mbtn hidden" title="Minimizar escenario"></button>
         <div class="mmore-wrap">
-          <button id="mMore" class="mbtn" title="Opciones avanzadas, soundboard, modo juego y diagnóstico"></button>
+          <button id="mMore" class="mbtn" title="Opciones avanzadas, vista, música y utilidades"></button>
           <div id="meetMenu" class="meet-menu hidden"></div>
         </div>
-        <div class="msep hidden"></div>
         <button id="mLeave" class="mbtn hang" title="Colgar llamada"><span id="mLeaveIco"></span><span>Colgar</span></button>
       </div>
       <div id="stageResizer" title="Haz clic para alternar tamaños (S/M/L/XL) o arrastra hacia arriba/abajo"><span></span></div>
@@ -126,6 +108,7 @@
   <aside id="members"></aside>
 </div>
 
+<button id="bMiniExit" title="Volver a ventana normal">⤢</button>
 <div id="callOverlay" class="hidden"></div>
 <div id="modal" class="hidden"></div>
 <div id="toast"></div>

@@ -111,10 +111,10 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .vtop{display:flex;justify-content:space-between;align-items:center;gap:6px}
 .vstatus{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hidden}
 #voiceInfo{font-size:12px;font-weight:600;color:var(--ok);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vmeta{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden}
-.ping{font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;background:#161a24;white-space:nowrap;color:var(--tx);flex:none;overflow:hidden;text-overflow:ellipsis;max-width:76px}
-.micbar{width:32px;height:5px;background:#1c202c;border-radius:4px;overflow:hidden;flex:none}
-#micLive{height:100%;width:0%;background:var(--ok);transition:width .08s}
+.vmeta{display:flex;align-items:center;min-width:0;overflow:hidden}
+.ping{font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;background:#161a24;white-space:nowrap;color:var(--tx);flex:none;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.micbar{width:100%;height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;flex:none;margin-top:2px}
+#micLive{height:100%;width:0%;background:var(--ok);border-radius:2px;transition:width .06s linear}
 .vquick{display:flex;gap:4px;align-items:center;flex:none}
 .qbtn{width:30px;height:30px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#d1d5db;cursor:pointer;transition:all .15s ease;flex:none}
 .qbtn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.18)}
@@ -294,7 +294,13 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .item:hover .side-call{opacity:1}
 .side-call:hover{background:rgba(16,185,129,0.16);border-color:rgba(16,185,129,0.32);color:#34d399;filter:none}
 
-/* ---- Modo Ventana sobre Ventana (Mini Flotante Always-on-Top) ---- */
+/* ---- Modo Ventana sobre Ventana (Mini Flotante 100% Video sin bordes) ---- */
+#bMiniExit{position:fixed;top:8px;right:8px;z-index:9999;width:30px;height:30px;border-radius:8px;background:rgba(15,18,25,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.22);color:#fff;font-size:15px;cursor:pointer;display:none;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.6);opacity:0;transition:opacity .15s ease,transform .1s ease,background .15s}
+body.mini-mode #bMiniExit{display:inline-flex!important}
+body.mini-mode:hover #bMiniExit,body.mini-mode #bMiniExit:hover{opacity:1!important}
+#bMiniExit:hover{background:var(--ac);border-color:#a29bfe;transform:scale(1.08)}
+
+body.mini-mode{background:#000!important}
 body.mini-mode #rail,
 body.mini-mode #sideTitle,
 body.mini-mode #sideList,
@@ -305,21 +311,28 @@ body.mini-mode #composer,
 body.mini-mode #home,
 body.mini-mode #members,
 body.mini-mode #updateBar,
-body.mini-mode #stageResizer{display:none!important}
-body.mini-mode #main{display:flex;flex-direction:column;height:100%}
-body.mini-mode #center{flex:1;order:1;min-height:0}
-body.mini-mode #stageWrap{height:100%!important;max-height:none;border:0}
-body.mini-mode #stage{height:100%;padding:6px 6px 38px;gap:6px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));grid-auto-rows:1fr}
-body.mini-mode #stage.spotlight{display:flex;flex-direction:row;gap:6px}
-body.mini-mode #stage.spotlight .tile.focused{flex:1 1 0}
-body.mini-mode #stageSideStrip{width:95px;gap:5px}
-body.mini-mode .tile video{object-fit:contain}
-body.mini-mode .tile .nm{font-size:10px;padding:2px 6px;bottom:4px;left:4px}
-body.mini-mode .tile .tbtns{opacity:0;pointer-events:none}
-body.mini-mode .tile:hover .tbtns{opacity:1;pointer-events:auto}
-body.mini-mode .vol-wrap{display:none}
-body.mini-mode #meetBar{bottom:4px;padding:2px 6px;gap:3px;transform:translateX(-50%) scale(0.85)}
-body.mini-mode #side{order:2;border:0;display:none}
+body.mini-mode #stageResizer,
+body.mini-mode #meetBar,
+body.mini-mode #meetMenu,
+body.mini-mode #toast,
+body.mini-mode #voiceDock,
+body.mini-mode #voicePill,
+body.mini-mode #stageSideStrip,
+body.mini-mode .vol-wrap,
+body.mini-mode .tbtns,
+body.mini-mode .nm,
+body.mini-mode .stat,
+body.mini-mode .party-ctrl,
+body.mini-mode #side{display:none!important}
+body.mini-mode #main{display:flex;flex-direction:column;height:100%;background:#000!important}
+body.mini-mode #center{flex:1;order:1;min-height:0;background:#000!important}
+body.mini-mode #stageWrap{height:100%!important;max-height:100%!important;border:0!important;border-radius:0!important;margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important}
+body.mini-mode #stage{height:100%!important;width:100%!important;padding:0!important;margin:0!important;gap:0!important;display:flex!important;align-items:center!important;justify-content:center!important;background:#000!important}
+body.mini-mode .tile,
+body.mini-mode .party-tile{border:0!important;border-radius:0!important;width:100%!important;height:100%!important;margin:0!important;padding:0!important;background:#000!important;box-shadow:none!important}
+body.mini-mode .tile video,
+body.mini-mode .party-tile .yt-frame,
+body.mini-mode .party-tile .yt-direct{width:100%!important;height:100%!important;border:0!important;border-radius:0!important;object-fit:contain!important}
 
 /* ---- avatares y llamadas ---- */
 .avatar{border-radius:50%;display:inline-grid;place-items:center;font-weight:700;color:#fff;background-size:cover;background-position:center;flex:none;position:relative;user-select:none}
