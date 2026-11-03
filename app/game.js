@@ -1,10 +1,11 @@
-// EpicKast: Cyber Squad Defense & Cajas CS
-// Minijuego multijugador ultraligero (<3MB RAM, Canvas 2D puro, audio sintetizado con Web Audio)
+// EpicKast: EpicStrike 2D • Co-op Arena Shooter & Cajas CS
+// Shooter multijugador 2D de acción con WASD + Mouse, construcción de defensas, hordas, jefe titán y ruleta de cajas CS.
+// Optimizado para rendimiento extremo: <4MB RAM, Canvas 2D puro, audio sintetizado Web Audio (0 archivos externos).
 
 (function(global) {
   'use strict';
 
-  // --- Sistema de Audio Sintetizado (Zero Assets, Zero Latencia) ---
+  // --- Sistema de Audio Sintetizado en Tiempo Real (Zero Latencia, Zero Assets) ---
   const AudioFX = {
     ctx: null,
     getCtx() {
@@ -17,312 +18,408 @@
       }
       return this.ctx;
     },
-    tick() {
-      const c = this.getCtx();
-      if (!c) return;
+    shoot(type = 'pistol') {
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        if (type === 'rifle') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(620, t);
+          osc.frequency.exponentialRampToValueAtTime(140, t + 0.08);
+          g.gain.setValueAtTime(0.18, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t); osc.stop(t + 0.09);
+        } else if (type === 'shotgun') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(340, t);
+          osc.frequency.exponentialRampToValueAtTime(60, t + 0.16);
+          g.gain.setValueAtTime(0.35, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t); osc.stop(t + 0.17);
+        } else if (type === 'plasma') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(800, t);
+          osc.frequency.exponentialRampToValueAtTime(90, t + 0.22);
+          g.gain.setValueAtTime(0.28, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t); osc.stop(t + 0.23);
+        } else { // pistol
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(540, t);
+          osc.frequency.exponentialRampToValueAtTime(160, t + 0.07);
+          g.gain.setValueAtTime(0.15, t);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t); osc.stop(t + 0.08);
+        }
+      } catch {}
+    },
+    hit() {
+      const c = this.getCtx(); if (!c) return;
       try {
         const osc = c.createOscillator();
         const g = c.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(800, c.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(120, c.currentTime + 0.04);
-        g.gain.setValueAtTime(0.2, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.04);
-        osc.connect(g);
-        g.connect(c.destination);
-        osc.start();
-        osc.stop(c.currentTime + 0.05);
-      } catch {}
-    },
-    laser() {
-      const c = this.getCtx();
-      if (!c) return;
-      try {
-        const osc = c.createOscillator();
-        const g = c.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(880, c.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(150, c.currentTime + 0.09);
+        osc.frequency.setValueAtTime(160, c.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, c.currentTime + 0.05);
         g.gain.setValueAtTime(0.12, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.09);
-        osc.connect(g);
-        g.connect(c.destination);
-        osc.start();
-        osc.stop(c.currentTime + 0.1);
+        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.05);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(); osc.stop(c.currentTime + 0.06);
       } catch {}
     },
     boom() {
-      const c = this.getCtx();
-      if (!c) return;
+      const c = this.getCtx(); if (!c) return;
       try {
+        const t = c.currentTime;
         const osc = c.createOscillator();
         const g = c.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(160, c.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(30, c.currentTime + 0.35);
-        g.gain.setValueAtTime(0.3, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.35);
-        osc.connect(g);
-        g.connect(c.destination);
-        osc.start();
-        osc.stop(c.currentTime + 0.4);
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.exponentialRampToValueAtTime(25, t + 0.38);
+        g.gain.setValueAtTime(0.4, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(t); osc.stop(t + 0.4);
       } catch {}
     },
-    build() {
-      const c = this.getCtx();
-      if (!c) return;
+    coin() {
+      const c = this.getCtx(); if (!c) return;
       try {
+        const t = c.currentTime;
         const osc = c.createOscillator();
         const g = c.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(320, c.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(640, c.currentTime + 0.12);
-        g.gain.setValueAtTime(0.15, c.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.12);
-        osc.connect(g);
-        g.connect(c.destination);
-        osc.start();
-        osc.stop(c.currentTime + 0.15);
+        osc.frequency.setValueAtTime(987.77, t);
+        osc.frequency.setValueAtTime(1318.51, t + 0.06);
+        g.gain.setValueAtTime(0.12, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(t); osc.stop(t + 0.22);
+      } catch {}
+    },
+    tick() {
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(900, c.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, c.currentTime + 0.035);
+        g.gain.setValueAtTime(0.2, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.035);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(); osc.stop(c.currentTime + 0.04);
       } catch {}
     },
     goldFanfare() {
-      const c = this.getCtx();
-      if (!c) return;
+      const c = this.getCtx(); if (!c) return;
       try {
         const t = c.currentTime;
-        const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
-        notes.forEach((f, i) => {
+        [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((f, i) => {
           const osc = c.createOscillator();
           const g = c.createGain();
           osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, t + i * 0.1);
-          g.gain.setValueAtTime(0.001, t + i * 0.1);
-          g.gain.linearRampToValueAtTime(0.25, t + i * 0.1 + 0.03);
-          g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.1 + 0.6);
-          osc.connect(g);
-          g.connect(c.destination);
-          osc.start(t + i * 0.1);
-          osc.stop(t + i * 0.1 + 0.7);
+          osc.frequency.setValueAtTime(f, t + i * 0.09);
+          g.gain.setValueAtTime(0.001, t + i * 0.09);
+          g.gain.linearRampToValueAtTime(0.25, t + i * 0.09 + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.09 + 0.65);
+          osc.connect(g); g.connect(c.destination);
+          osc.start(t + i * 0.09); osc.stop(t + i * 0.09 + 0.7);
         });
       } catch {}
     }
   };
 
-  // --- Base de Datos de Cajas e Ítems estilo Counter-Strike ---
-  const SKINS_CATALOG = [
-    // ⚪ Mil-Spec / Común (Gris/Azul claro)
-    { id: 'm_steel', name: 'Muro de Acero Táctico', type: 'wall', rarity: 'milspec', color: '#94a3b8', bg: '#334155' },
-    { id: 't_rusty', name: 'Torreta Oxidada Rust', type: 'turret', rarity: 'milspec', color: '#cbd5e1', bg: '#475569' },
-    { id: 'g_diesel', name: 'Generador Diésel Vintage', type: 'solar', rarity: 'milspec', color: '#a1a1aa', bg: '#3f3f46' },
+  // --- Catálogo de Armas y Skins estilo Counter-Strike ---
+  const SKINS = [
+    // ⚪ Mil-Spec (Azul claro)
+    { id: 'p_classic', name: 'Pistola Clásica USP-S', type: 'weapon', rarity: 'milspec', color: '#93c5fd', bg: '#1e3a8a', bulletColor: '#60a5fa' },
+    { id: 'w_steel', name: 'Barrera Táctica de Acero', type: 'build', rarity: 'milspec', color: '#94a3b8', bg: '#334155' },
+    { id: 't_sentry', name: 'Torreta Centinela Rust', type: 'build', rarity: 'milspec', color: '#cbd5e1', bg: '#475569' },
 
-    // 🔵 Restricted / Raro (Azul eléctrico)
-    { id: 'm_graphene', name: 'Muro de Grafeno Reforzado', type: 'wall', rarity: 'restricted', color: '#38bdf8', bg: '#0369a1' },
-    { id: 't_cobalt', name: 'Torreta Centinela Blue Cobalt', type: 'turret', rarity: 'restricted', color: '#60a5fa', bg: '#1d4ed8' },
-    { id: 't_frost', name: 'Torreta Criogénica Frostbite', type: 'tesla', rarity: 'restricted', color: '#7dd3fc', bg: '#0284c7' },
+    // 🔵 Restricted (Púrpura claro)
+    { id: 'r_ak', name: 'Rifle de Asalto Blue Phosphor', type: 'weapon', rarity: 'restricted', color: '#38bdf8', bg: '#0369a1', bulletColor: '#38bdf8' },
+    { id: 's_frost', name: 'Escopeta Nova Frostbite', type: 'weapon', rarity: 'restricted', color: '#818cf8', bg: '#3730a3', bulletColor: '#818cf8' },
+    { id: 't_tesla', name: 'Torreta Tesla Criogénica', type: 'build', rarity: 'restricted', color: '#a78bfa', bg: '#5b21b6' },
 
-    // 🟣 Classified / Épico (Púrpura Neón)
-    { id: 't_electro', name: 'Torreta Tesla Neón Púrpura', type: 'tesla', rarity: 'classified', color: '#c084fc', bg: '#7e22ce' },
-    { id: 'p_cyber', name: 'Cañón de Plasma Cyberpunk 2077', type: 'plasma', rarity: 'classified', color: '#f472b6', bg: '#be185d' },
-    { id: 'm_nano', name: 'Muro Nano-Cristal Translúcido', type: 'wall', rarity: 'classified', color: '#e879f9', bg: '#a21caf' },
+    // 🟣 Classified (Rosa / Fucsia)
+    { id: 'r_cyber', name: 'Rifle M4A4 Cyberpunk Neón', type: 'weapon', rarity: 'classified', color: '#f472b6', bg: '#9d174d', bulletColor: '#f472b6' },
+    { id: 'p_vortex', name: 'Cañón de Plasma Vortex', type: 'weapon', rarity: 'classified', color: '#c084fc', bg: '#6b21a8', bulletColor: '#c084fc' },
 
-    // 🔴 Covert / Legendario (Rojo Fuego)
-    { id: 'p_hyperbeast', name: 'Cañón de Plasma HyperBeast', type: 'plasma', rarity: 'covert', color: '#f43f5e', bg: '#9f1239' },
-    { id: 't_asiimov', name: 'Torreta de Asalto Asiimov', type: 'turret', rarity: 'covert', color: '#fb923c', bg: '#c2410c' },
-    { id: 'm_vulcan', name: 'Muro Blindado Vulcanite', type: 'wall', rarity: 'covert', color: '#ef4444', bg: '#b91c1c' },
+    // 🔴 Covert (Rojo Legendario)
+    { id: 'r_asiimov', name: 'Rifle AWP / AK Asiimov', type: 'weapon', rarity: 'covert', color: '#fb923c', bg: '#9a3412', bulletColor: '#f97316' },
+    { id: 'p_hyperbeast', name: 'Cañón de Plasma HyperBeast', type: 'weapon', rarity: 'covert', color: '#ef4444', bg: '#991b1b', bulletColor: '#ef4444' },
 
-    // 🟡 ★ ESPECIAL EXTRAORDINARIO (Dorado - Cuchillo / Dragon Lore)
+    // 🟡 ★ ESPECIAL EXTRAORDINARIO (Dorado - Cuchillos CS)
     { id: 'knife_karambit', name: '★ Cuchillo Karambit EpicKast', type: 'knife', rarity: 'gold', color: '#fbbf24', bg: '#b45309', badge: '★ Karambit' },
-    { id: 'knife_butterfly', name: '★ Cuchillo Mariposa Neón Fade', type: 'knife', rarity: 'gold', color: '#f59e0b', bg: '#d97706', badge: '★ Mariposa' },
-    { id: 't_dragonlore', name: '★ Torreta Dragón Lore Dorada', type: 'turret', rarity: 'gold', color: '#fde047', bg: '#ca8a04', badge: '★ Dragón Lore' }
+    { id: 'knife_butterfly', name: '★ Cuchillo Mariposa Fade Neón', type: 'knife', rarity: 'gold', color: '#f59e0b', bg: '#d97706', badge: '★ Mariposa' },
+    { id: 'r_dragonlore', name: '★ Rifle Dragón Lore Dorado', type: 'weapon', rarity: 'gold', color: '#fde047', bg: '#ca8a04', bulletColor: '#fde047' }
   ];
 
-  const RARITY_INFO = {
-    milspec: { name: 'Común (Mil-Spec)', color: '#4b69ff', text: '#cbd5e1' },
-    restricted: { name: 'Raro (Restricted)', color: '#8847ff', text: '#e0e7ff' },
-    classified: { name: 'Épico (Classified)', color: '#d32ce6', text: '#f5d0fe' },
-    covert: { name: 'Legendario (Covert)', color: '#eb4b4b', text: '#ffe4e6' },
-    gold: { name: '★ ESPECIAL EXTRAORDINARIO ★', color: '#ffd700', text: '#fef08a' }
+  const RARITY_MAP = {
+    milspec: { name: 'Común (Mil-Spec)', color: '#4b69ff' },
+    restricted: { name: 'Raro (Restricted)', color: '#8847ff' },
+    classified: { name: 'Épico (Classified)', color: '#d32ce6' },
+    covert: { name: 'Legendario (Covert)', color: '#eb4b4b' },
+    gold: { name: '★ ESPECIAL EXTRAORDINARIO ★', color: '#ffd700' }
   };
 
-  const CRATES = [
-    { id: 'classic', name: 'Caja Clásica EpicKast', icon: '📦', cost: 100 },
-    { id: 'neon', name: 'Caja Cíber-Asalto Neón', icon: '🎁', cost: 200 },
-    { id: 'elite', name: 'Caja Élite Dragón CS', icon: '⭐', cost: 350 }
-  ];
-
-  // --- Almacenamiento Local de Inventario ---
-  function getInventory() {
+  function loadGameData() {
     try {
-      const raw = localStorage.getItem('epickast_game_inv');
-      if (raw) return JSON.parse(raw);
+      const d = JSON.parse(localStorage.getItem('epickast_strike_data') || '{}');
+      return {
+        credits: typeof d.credits === 'number' && d.credits >= 100 ? d.credits : 250,
+        crates: d.crates || 1,
+        unlocked: Array.isArray(d.unlocked) ? d.unlocked : ['p_classic', 'w_steel', 't_sentry'],
+        equipped: d.equipped || { weapon: 'p_classic', build: 't_sentry', knife: null }
+      };
     } catch {}
-    return {
-      credits: 200,
-      crates: 1,
-      unlocked: ['m_steel', 't_rusty'],
-      equipped: { wall: 'm_steel', turret: 't_rusty', tesla: null, plasma: null, knife: null },
-      stats: { wavesCleared: 0, kills: 0, cratesOpened: 0 }
-    };
+    return { credits: 250, crates: 1, unlocked: ['p_classic', 'w_steel', 't_sentry'], equipped: { weapon: 'p_classic', build: 't_sentry', knife: null } };
   }
 
-  function saveInventory(inv) {
-    try {
-      localStorage.setItem('epickast_game_inv', JSON.stringify(inv));
-    } catch {}
+  function saveGameData(data) {
+    try { localStorage.setItem('epickast_strike_data', JSON.stringify(data)); } catch {}
   }
 
-  // --- Motor Principal del Minijuego (Squad Defense) ---
+  // --- Clase Principal: EpicStrike 2D ---
   class CyberDefenseGame {
     constructor(container, socket, roomKey, currentUser) {
       this.container = container;
       this.socket = socket;
       this.roomKey = roomKey || 'room_default';
-      this.currentUser = currentUser || { name: 'Jugador', id: 'p1' };
-      this.inv = getInventory();
+      this.currentUser = currentUser || { name: 'Tú', id: 'p1' };
+      this.data = loadGameData();
+
+      // Dimensiones de la arena de juego
+      this.width = 720;
+      this.height = 460;
+
+      // Estado del jugador
+      this.player = {
+        x: this.width / 2,
+        y: this.height / 2,
+        vx: 0, vy: 0,
+        speed: 210,
+        hp: 100, maxHp: 100,
+        angle: 0,
+        currentWeapon: 'rifle', // 'pistol', 'rifle', 'shotgun', 'plasma'
+        lastShotTime: 0
+      };
+
+      // Control de teclado y mouse
+      this.keys = { KeyW: false, KeyA: false, KeyS: false, KeyD: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false, Space: false };
+      this.mouse = { x: this.width / 2, y: this.height / 2, isDown: false, rightDown: false };
+
+      // Entidades
+      this.bullets = [];      // { x, y, vx, vy, dmg, color, fromPlayer, life }
+      this.enemies = [];      // { x, y, vx, vy, hp, maxHp, speed, radius, type, shootTimer }
+      this.enemyBullets = []; // { x, y, vx, vy, dmg }
+      this.structures = [];   // { x, y, type: 'wall'|'turret', hp, maxHp, lastShot, user }
+      this.particles = [];    // { x, y, vx, vy, life, maxLife, color, size }
+      this.pickups = [];      // { x, y, type: 'credit'|'crate'|'heal', val }
+      this.teammates = new Map(); // id -> { name, x, y, angle, hp, isBot }
+
+      // Niveles y Oleadas
+      this.wave = 1;
+      this.maxWaves = 5;
+      this.gameState = 'play'; // 'play', 'cleared', 'gameover'
+      this.enemiesSpawned = 0;
+      this.enemiesTotalWave = 15;
+      this.spawnTimer = 0;
+      this.score = 0;
+      this.shakeIntensity = 0;
 
       this.running = false;
       this.animId = null;
 
-      // Estado del Juego
-      this.gridSize = 12;
-      this.cellSize = 36;
-      this.coreHp = 1000;
-      this.maxCoreHp = 1000;
-      this.wave = 1;
-      this.maxWaves = 5;
-      this.waveState = 'prep'; // 'prep', 'running', 'cleared', 'gameover'
-      this.waveTimeLeft = 0;
-      this.enemiesToSpawn = 0;
-      this.spawnTimer = 0;
-
-      // Entidades
-      this.buildings = []; // { x, y, type, hp, maxHp, level, user, skin, lastShot }
-      this.enemies = []; // { x, y, hp, maxHp, speed, reward, type, radius }
-      this.projectiles = []; // { x, y, tx, ty, speed, dmg, color }
-      this.particles = []; // { x, y, vx, vy, life, maxLife, color }
-
-      // Construcción seleccionada por el jugador
-      this.selectedTool = 'turret'; // 'wall', 'turret', 'tesla', 'plasma', 'solar'
-
       this.initDom();
+      this.bindInputs();
       this.bindSocket();
+      this.startWave(1);
       this.startLoop();
     }
 
     initDom() {
       this.container.innerHTML = `
-        <div class="cd-wrap">
-          <div class="cd-header">
+        <div class="cd-wrap" style="width: 760px; max-width: 98vw; background:#0b0e17">
+          <div class="cd-header" style="background:#131826; border-bottom:1px solid #1f293d">
             <div class="cd-title">
-              <span class="cd-ico">🎮</span>
+              <span class="cd-ico">⚡</span>
               <div>
-                <strong>Cyber Squad Defense</strong>
-                <span class="cd-badge">v1.7.2 Co-op</span>
+                <strong>EpicStrike 2D • Arena Co-op</strong>
+                <span class="cd-badge">v1.7.3</span>
               </div>
             </div>
             <div class="cd-stats">
-              <div class="cd-stat">🛡️ Núcleo: <b id="cdCoreHp">${this.coreHp}/${this.maxCoreHp}</b></div>
-              <div class="cd-stat">⚡ Créditos: <b id="cdCredits">${this.inv.credits}</b></div>
-              <div class="cd-stat">🏆 Oleada: <b id="cdWave">${this.wave}/${this.maxWaves}</b></div>
-              <div class="cd-stat">📦 Cajas: <b id="cdCrates">${this.inv.crates}</b></div>
+              <div class="cd-stat">❤️ Salud: <b id="esHp">100/100</b></div>
+              <div class="cd-stat">⚡ Créditos: <b id="esCredits">${this.data.credits}</b></div>
+              <div class="cd-stat">🏆 Nivel: <b id="esWave">1/5</b></div>
+              <div class="cd-stat">📦 Cajas: <b id="esCrates">${this.data.crates}</b></div>
             </div>
             <div class="cd-acts">
-              <button id="cdBtnCrate" class="cd-btn gold">🎁 Abrir Cajas CS</button>
-              <button id="cdBtnClose" class="cd-btn">✕ Salir</button>
+              <button id="esBtnBot" class="cd-btn" title="Añadir un bot aliado a tu escuadrón para probar el modo cooperativo">🤖 +Bot Aliado</button>
+              <button id="esBtnCrate" class="cd-btn gold">🎁 Abrir Cajas CS</button>
+              <button id="esBtnClose" class="cd-btn">✕ Salir</button>
             </div>
           </div>
 
-          <div class="cd-main">
-            <div class="cd-canvas-box">
-              <canvas id="cdCanvas" width="${this.gridSize * this.cellSize}" height="${this.gridSize * this.cellSize}"></canvas>
-              <div id="cdWaveOverlay" class="cd-wave-overlay">
-                <div class="cd-overlay-box">
-                  <h2 id="cdOverlayTitle">Nivel 1: Incursión Inicial</h2>
-                  <p id="cdOverlayDesc">Construye defensas alrededor del Núcleo del Servidor y sobrevive a los drones enemigos.</p>
-                  <button id="cdBtnStartWave" class="cd-btn big primary">⚔️ Iniciar Oleada</button>
+          <div class="cd-main" style="padding:10px; gap:10px; flex-direction:column; align-items:center">
+            <!-- Barra Superior de Armas y Acciones -->
+            <div style="display:flex; justify-content:space-between; width:100%; max-width:720px; font-size:12px; color:#cbd5e1; align-items:center">
+              <div style="display:flex; gap:6px">
+                <button class="es-wbtn active" data-w="rifle">🔫 [1] Rifle</button>
+                <button class="es-wbtn" data-w="shotgun">💥 [2] Escopeta</button>
+                <button class="es-wbtn" data-w="plasma">⚡ [3] Plasma</button>
+                <button class="es-wbtn" data-w="pistol">🎯 [4] Pistola</button>
+              </div>
+              <div style="display:flex; gap:8px; align-items:center">
+                <span>Construir:</span>
+                <button id="esBuildTurret" class="cd-btn small" title="Construir torreta centinela cerca de ti (Coste: 80⚡)">🔫 Torreta (80⚡)</button>
+                <button id="esBuildWall" class="cd-btn small" title="Construir muro de escudo (Coste: 40⚡)">🧱 Muro (40⚡)</button>
+              </div>
+            </div>
+
+            <!-- Canvas del Shooter 2D -->
+            <div style="position:relative; width:720px; height:460px; border-radius:12px; overflow:hidden; border:2px solid #1f293d; box-shadow:0 8px 30px rgba(0,0,0,0.7)">
+              <canvas id="esCanvas" width="${this.width}" height="${this.height}" style="background:#080b12; display:block; cursor:crosshair"></canvas>
+
+              <!-- Pantalla de Estado (Game Over / Nivel Superado) -->
+              <div id="esOverlay" class="cd-wave-overlay hidden">
+                <div class="cd-overlay-box" style="background:#131826; border:2px solid #38bdf8; border-radius:14px; padding:20px; max-width:380px">
+                  <h2 id="esOverlayTitle" style="color:#ef4444; font-size:22px; margin:0">¡MISION FALLIDA!</h2>
+                  <p id="esOverlayDesc" style="color:#94a3b8; font-size:13px; line-height:1.4">Has sido derrotado. Reinicia la partida con tus créditos listos para defender la base.</p>
+                  <button id="esOverlayBtn" class="cd-btn big primary" style="font-weight:700">🔄 Reiniciar Partida</button>
                 </div>
               </div>
             </div>
 
-            <div class="cd-sidebar">
-              <h3>🛠️ Taller de Construcción</h3>
-              <div class="cd-tools">
-                <button class="cd-tool active" data-type="wall">
-                  <div class="tool-ico">🧱</div>
-                  <div class="tool-info"><b>Muro de Escudo</b><span>50 ⚡ • 500 HP</span></div>
-                </button>
-                <button class="cd-tool" data-type="turret">
-                  <div class="tool-ico">🔫</div>
-                  <div class="tool-info"><b>Torreta Centinela</b><span>100 ⚡ • Ataque Rápido</span></div>
-                </button>
-                <button class="cd-tool" data-type="tesla">
-                  <div class="tool-ico">⚡</div>
-                  <div class="tool-info"><b>Torreta Tesla</b><span>150 ⚡ • Ralentiza Área</span></div>
-                </button>
-                <button class="cd-tool" data-type="plasma">
-                  <div class="tool-ico">💥</div>
-                  <div class="tool-info"><b>Cañón Plasma</b><span>200 ⚡ • Daño Masivo</span></div>
-                </button>
-                <button class="cd-tool" data-type="solar">
-                  <div class="tool-ico">🔋</div>
-                  <div class="tool-info"><b>Módulo Cuántico</b><span>75 ⚡ • +15⚡ cada 5s</span></div>
-                </button>
-              </div>
-
-              <div class="cd-objectives">
-                <h4>🎯 Misiones del Nivel</h4>
-                <div id="cdObjText" class="obj-text">• Construye al menos 2 torretas de defensa.<br>• Destruye a los drones sin que el núcleo caiga.<br>• Recompensa: +150 ⚡ y 1x Caja Clásica CS.</div>
-              </div>
-
-              <div class="cd-equipped-card">
-                <h4>✨ Tu Skin Equipada</h4>
-                <div id="cdEquippedPreview" class="equipped-preview">Cargando skin...</div>
-              </div>
+            <!-- Barra Inferior de Ayuda y Escuadrón -->
+            <div style="display:flex; justify-content:space-between; width:100%; max-width:720px; font-size:11px; color:#94a3b8">
+              <div>🕹️ <b>Controles</b>: [W,A,S,D] Moverte • [Mouse] Apuntar y Disparar • [Espacio] Torreta rápida</div>
+              <div id="esSquadList" style="color:#38bdf8; font-weight:600">👥 Escuadrón: Tú (${this.currentUser.name})</div>
             </div>
           </div>
         </div>
-        <div id="cdCrateModal" class="cd-crate-modal hidden"></div>
+
+        <!-- Modal de Ruleta CS -->
+        <div id="esCrateModal" class="cd-crate-modal hidden"></div>
       `;
 
-      this.canvas = this.container.querySelector('#cdCanvas');
+      this.canvas = this.container.querySelector('#esCanvas');
       this.ctx = this.canvas.getContext('2d');
 
-      // Eventos UI
-      this.container.querySelectorAll('.cd-tool').forEach(btn => {
+      // Botones de Armas
+      this.container.querySelectorAll('.es-wbtn').forEach(btn => {
         btn.onclick = () => {
-          this.container.querySelectorAll('.cd-tool').forEach(b => b.classList.remove('active'));
+          this.container.querySelectorAll('.es-wbtn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          this.selectedTool = btn.dataset.type;
+          this.player.currentWeapon = btn.dataset.w;
         };
       });
 
-      this.container.querySelector('#cdBtnStartWave').onclick = () => this.startWave();
-      this.container.querySelector('#cdBtnCrate').onclick = () => this.openCrateScreen();
-      this.container.querySelector('#cdBtnClose').onclick = () => this.destroy();
+      // Construcción manual desde barra
+      this.container.querySelector('#esBuildTurret').onclick = () => this.placeStructure('turret');
+      this.container.querySelector('#esBuildWall').onclick = () => this.placeStructure('wall');
 
-      this.canvas.onclick = (e) => this.handleCanvasClick(e);
+      // Acciones Header
+      this.container.querySelector('#esBtnBot').onclick = () => this.addSquadBot();
+      this.container.querySelector('#esBtnCrate').onclick = () => this.openCrateScreen();
+      this.container.querySelector('#esBtnClose').onclick = () => this.destroy();
 
-      this.updateEquippedDisplay();
-      this.centerServerCore();
+      // Botón del Overlay (Reiniciar)
+      this.container.querySelector('#esOverlayBtn').onclick = () => {
+        if (this.gameState === 'gameover') {
+          this.resetGame();
+        } else {
+          this.nextWave();
+        }
+      };
     }
 
-    centerServerCore() {
-      const mid = Math.floor(this.gridSize / 2);
-      // Colocar Núcleo Central
-      this.buildings.push({
-        x: mid - 1, y: mid - 1, type: 'core', w: 2, h: 2,
-        hp: this.coreHp, maxHp: this.maxCoreHp, user: 'Servidor', skin: null
+    bindInputs() {
+      this.onKeyDown = (e) => {
+        if (this.keys[e.code] !== undefined) this.keys[e.code] = true;
+        if (e.code === 'Digit1') this.selectWeapon('rifle');
+        if (e.code === 'Digit2') this.selectWeapon('shotgun');
+        if (e.code === 'Digit3') this.selectWeapon('plasma');
+        if (e.code === 'Digit4') this.selectWeapon('pistol');
+        if (e.code === 'Space') { e.preventDefault(); this.placeStructure('turret'); }
+      };
+
+      this.onKeyUp = (e) => {
+        if (this.keys[e.code] !== undefined) this.keys[e.code] = false;
+      };
+
+      this.onMouseMove = (e) => {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mouse.x = e.clientX - rect.left;
+        this.mouse.y = e.clientY - rect.top;
+        this.player.angle = Math.atan2(this.mouse.y - this.player.y, this.mouse.x - this.player.x);
+      };
+
+      this.onMouseDown = (e) => {
+        if (e.button === 0) this.mouse.isDown = true;
+        if (e.button === 2) { e.preventDefault(); this.placeStructure('wall'); }
+      };
+
+      this.onMouseUp = (e) => {
+        if (e.button === 0) this.mouse.isDown = false;
+      };
+
+      this.onContextMenu = (e) => e.preventDefault();
+
+      window.addEventListener('keydown', this.onKeyDown);
+      window.addEventListener('keyup', this.onKeyUp);
+      this.canvas.addEventListener('mousemove', this.onMouseMove);
+      this.canvas.addEventListener('mousedown', this.onMouseDown);
+      window.addEventListener('mouseup', this.onMouseUp);
+      this.canvas.addEventListener('contextmenu', this.onContextMenu);
+    }
+
+    selectWeapon(w) {
+      this.player.currentWeapon = w;
+      this.container.querySelectorAll('.es-wbtn').forEach(b => {
+        b.classList.toggle('active', b.dataset.w === w);
       });
+      AudioFX.tick();
     }
 
     bindSocket() {
       if (!this.socket) return;
       this.onSocketMsg = (d) => {
         if (d?.t === 'game.event' && d.action) {
-          this.handleRemoteAction(d.action, d.from);
+          const act = d.action;
+          if (act.type === 'peer_move') {
+            this.teammates.set(act.id, {
+              name: d.from || 'Compañero',
+              x: act.x, y: act.y, angle: act.angle, hp: act.hp
+            });
+            this.updateSquadHud();
+          } else if (act.type === 'peer_shoot') {
+            this.bullets.push({
+              x: act.x, y: act.y,
+              vx: Math.cos(act.angle) * 580,
+              vy: Math.sin(act.angle) * 580,
+              dmg: act.dmg || 25,
+              color: act.color || '#38bdf8',
+              fromPlayer: true, life: 60
+            });
+            AudioFX.shoot(act.weapon);
+          } else if (act.type === 'peer_build') {
+            this.structures.push({
+              x: act.x, y: act.y, type: act.bType,
+              hp: act.hp, maxHp: act.hp, lastShot: 0, user: d.from
+            });
+            AudioFX.coin();
+          }
         }
       };
-      // Escucha mensajes del socket
       if (typeof this.socket.on === 'function') {
         this.socket.on('message', this.onSocketMsg);
       }
@@ -340,157 +437,193 @@
       }
     }
 
-    handleRemoteAction(act, fromUser) {
-      if (act.type === 'build') {
-        this.buildings.push({
-          x: act.x, y: act.y, type: act.buildingType,
-          hp: act.hp, maxHp: act.maxHp, level: act.level || 1,
-          user: fromUser || act.user, skin: act.skin
-        });
-        AudioFX.build();
-        this.spawnTextFloat(act.x * this.cellSize + 18, act.y * this.cellSize, `${fromUser || 'Aliado'} construyó`);
-      } else if (act.type === 'start_wave') {
-        this.startWave(true);
-      }
-    }
+    addSquadBot() {
+      const botId = 'bot_' + Math.random().toString(36).slice(2, 6);
+      const names = ['Bot Ghost', 'Bot Viper', 'Bot Shadow', 'Bot Titan'];
+      const botName = names[this.teammates.size % names.length];
 
-    handleCanvasClick(e) {
-      const rect = this.canvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      const gx = Math.floor(clickX / this.cellSize);
-      const gy = Math.floor(clickY / this.cellSize);
-
-      if (gx < 0 || gx >= this.gridSize || gy < 0 || gy >= this.gridSize) return;
-
-      // Verificar si ya hay edificio en esa casilla
-      const existing = this.buildings.find(b => {
-        if (b.type === 'core') {
-          return gx >= b.x && gx < b.x + b.w && gy >= b.y && gy < b.y + b.h;
-        }
-        return b.x === gx && b.y === gy;
+      this.teammates.set(botId, {
+        name: botName,
+        x: this.player.x + (Math.random() * 80 - 40),
+        y: this.player.y + (Math.random() * 80 - 40),
+        angle: 0, hp: 100, maxHp: 100,
+        isBot: true, shootTimer: 0
       });
 
-      if (existing) {
-        if (existing.type !== 'core' && existing.level < 3 && this.inv.credits >= 80) {
-          // Mejorar edificio
-          this.inv.credits -= 80;
-          existing.level = (existing.level || 1) + 1;
-          existing.hp = Math.min(existing.hp + 200, existing.maxHp * 1.5);
-          saveInventory(this.inv);
-          this.updateStatsUi();
-          AudioFX.build();
-          this.spawnTextFloat(gx * this.cellSize + 18, gy * this.cellSize, `Nivel ${existing.level}!`);
-        }
-        return;
-      }
+      this.updateSquadHud();
+      AudioFX.coin();
+      this.spawnFloatingText(this.player.x, this.player.y - 20, `+ ${botName} unido al escuadrón`, '#22c55e');
+    }
 
-      // Costos por herramienta
-      const costs = { wall: 50, turret: 100, tesla: 150, plasma: 200, solar: 75 };
-      const maxHps = { wall: 600, turret: 300, tesla: 250, plasma: 350, solar: 200 };
-      const cost = costs[this.selectedTool] || 100;
+    updateSquadHud() {
+      const el = this.container.querySelector('#esSquadList');
+      if (!el) return;
+      const mates = Array.from(this.teammates.values()).map(m => m.name);
+      el.textContent = `👥 Escuadrón (${mates.length + 1}): Tú (${this.currentUser.name})` + (mates.length ? ', ' + mates.join(', ') : '');
+    }
 
-      if (this.inv.credits < cost) {
+    placeStructure(type) {
+      const cost = type === 'wall' ? 40 : 80;
+      if (this.data.credits < cost) {
         AudioFX.tick();
-        this.spawnTextFloat(clickX, clickY, '¡Faltan créditos ⚡!');
+        this.spawnFloatingText(this.player.x, this.player.y - 20, `¡Faltan créditos! Requiere ${cost}⚡`, '#f87171');
         return;
       }
-
-      this.inv.credits -= cost;
-      saveInventory(this.inv);
+      this.data.credits -= cost;
+      saveGameData(this.data);
       this.updateStatsUi();
-      AudioFX.build();
+      AudioFX.coin();
 
-      const equippedSkinId = this.inv.equipped[this.selectedTool];
-      const skinObj = SKINS_CATALOG.find(s => s.id === equippedSkinId) || null;
+      // Colocar enfrente del jugador
+      const px = this.player.x + Math.cos(this.player.angle) * 36;
+      const py = this.player.y + Math.sin(this.player.angle) * 36;
+      const hp = type === 'wall' ? 450 : 250;
 
-      const newBuilding = {
-        x: gx, y: gy, type: this.selectedTool,
-        hp: maxHps[this.selectedTool], maxHp: maxHps[this.selectedTool],
-        level: 1, user: this.currentUser.name, skin: skinObj, lastShot: 0
-      };
-
-      this.buildings.push(newBuilding);
-
-      // Transmitir a compañeros en la sala
-      this.sendAction({
-        type: 'build',
-        x: gx, y: gy,
-        buildingType: this.selectedTool,
-        hp: newBuilding.hp,
-        maxHp: newBuilding.maxHp,
-        user: this.currentUser.name,
-        skin: skinObj
+      this.structures.push({
+        x: px, y: py, type, hp, maxHp: hp, lastShot: 0, user: this.currentUser.name
       });
+
+      this.sendAction({ type: 'peer_build', bType: type, x: px, y: py, hp });
+      this.spawnFloatingText(px, py - 10, type === 'wall' ? '🧱 Muro colocado' : '🔫 Torreta activa', '#38bdf8');
     }
 
-    startWave(fromRemote = false) {
-      if (this.waveState === 'running') return;
-      this.waveState = 'running';
-      this.container.querySelector('#cdWaveOverlay').classList.add('hidden');
+    startWave(num) {
+      this.wave = num;
+      this.gameState = 'play';
+      this.enemies = [];
+      this.enemyBullets = [];
+      this.enemiesSpawned = 0;
+      this.spawnTimer = 0;
 
-      if (!fromRemote) {
-        this.sendAction({ type: 'start_wave', wave: this.wave });
-      }
-
-      // Configuración según el Nivel
-      const waveConfigs = [
-        { count: 12, hp: 50, speed: 0.8, type: 'drone' },
-        { count: 20, hp: 90, speed: 1.1, type: 'runner' },
-        { count: 28, hp: 160, speed: 0.7, type: 'tank' },
-        { count: 1, hp: 3500, speed: 0.4, type: 'boss' }, // Nivel 4 Boss
-        { count: 45, hp: 220, speed: 1.2, type: 'elite' } // Nivel 5 Endless
+      // Configuración por nivel
+      const configs = [
+        { total: 15, name: 'Nivel 1: Despejar Sector', desc: 'Elimina los drones ligeros de exploración.', reward: 250 },
+        { total: 25, name: 'Nivel 2: Incursión Cyborg', desc: 'Cyborgs veloces armados con pistolas de plasma.', reward: 350 },
+        { total: 35, name: 'Nivel 3: Asedio Blindado', desc: 'Mechs acorazados con alta defensa y cadencia.', reward: 500 },
+        { total: 1,  name: 'Nivel 4: JEFE TITÁN GOLIATH', desc: '¡Destruye al colosal Titan Bípedo con 3500 HP!', reward: 1000 },
+        { total: 60, name: 'Nivel 5: Supervivencia Élite', desc: 'Oleadas infinitas combinadas. ¡Defiende tu posición!', reward: 1500 }
       ];
 
-      const cfg = waveConfigs[Math.min(this.wave - 1, waveConfigs.length - 1)];
-      this.enemiesToSpawn = cfg.count;
-      this.currentEnemyCfg = cfg;
-      this.spawnTimer = 0;
+      this.currentConfig = configs[Math.min(num - 1, configs.length - 1)];
+      this.enemiesTotalWave = this.currentConfig.total;
+      this.container.querySelector('#esOverlay').classList.add('hidden');
+      this.updateStatsUi();
+
+      this.spawnFloatingText(this.width / 2, 80, `⚡ ${this.currentConfig.name}`, '#fde047', 22);
+    }
+
+    resetGame() {
+      // REINICIO COMPLETO Y LIMPIO: GARANTIZA CRÉDITOS Y SALUD
+      this.player.hp = 100;
+      this.player.x = this.width / 2;
+      this.player.y = this.height / 2;
+      this.player.vx = 0;
+      this.player.vy = 0;
+
+      // Asegurar créditos mínimos para volver a jugar
+      if (this.data.credits < 250) {
+        this.data.credits = 250;
+      }
+      saveGameData(this.data);
+
+      this.bullets = [];
+      this.enemyBullets = [];
+      this.enemies = [];
+      this.structures = [];
+      this.pickups = [];
+
+      this.startWave(1);
+      this.updateStatsUi();
+      AudioFX.goldFanfare();
+    }
+
+    nextWave() {
+      if (this.wave < this.maxWaves) {
+        this.startWave(this.wave + 1);
+      } else {
+        this.resetGame();
+      }
     }
 
     spawnEnemy() {
-      if (this.enemiesToSpawn <= 0) return;
-      this.enemiesToSpawn--;
+      if (this.enemiesSpawned >= this.enemiesTotalWave) return;
+      this.enemiesSpawned++;
 
+      const isBoss = (this.wave === 4);
       const side = Math.floor(Math.random() * 4);
       let x = 0, y = 0;
-      const maxPx = this.gridSize * this.cellSize;
+      if (side === 0) { x = Math.random() * this.width; y = -30; }
+      else if (side === 1) { x = this.width + 30; y = Math.random() * this.height; }
+      else if (side === 2) { x = Math.random() * this.width; y = this.height + 30; }
+      else { x = -30; y = Math.random() * this.height; }
 
-      if (side === 0) { x = Math.random() * maxPx; y = 0; }
-      else if (side === 1) { x = maxPx; y = Math.random() * maxPx; }
-      else if (side === 2) { x = Math.random() * maxPx; y = maxPx; }
-      else { x = 0; y = Math.random() * maxPx; }
+      if (isBoss) {
+        this.enemies.push({
+          x: this.width / 2, y: -50,
+          vx: 0, vy: 0,
+          hp: 3500, maxHp: 3500,
+          speed: 40, radius: 34,
+          type: 'boss', shootTimer: 0
+        });
+        this.shakeIntensity = 12;
+        AudioFX.boom();
+      } else {
+        const types = ['drone', 'trooper', 'tank'];
+        const type = this.wave === 1 ? 'drone' : (this.wave === 2 ? (Math.random() > 0.4 ? 'trooper' : 'drone') : types[Math.floor(Math.random() * types.length)]);
+        const hp = type === 'tank' ? 180 : (type === 'trooper' ? 70 : 35);
+        const speed = type === 'tank' ? 65 : (type === 'trooper' ? 95 : 140);
+        const radius = type === 'tank' ? 16 : 10;
 
-      const isBoss = this.currentEnemyCfg.type === 'boss';
-
-      this.enemies.push({
-        x, y,
-        hp: this.currentEnemyCfg.hp,
-        maxHp: this.currentEnemyCfg.hp,
-        speed: this.currentEnemyCfg.speed,
-        type: this.currentEnemyCfg.type,
-        radius: isBoss ? 20 : 8,
-        reward: isBoss ? 400 : 15
-      });
-    }
-
-    spawnTextFloat(x, y, text, color = '#38bdf8') {
-      this.particles.push({
-        x, y, vx: (Math.random() - 0.5) * 0.5, vy: -1.2,
-        life: 0, maxLife: 50, text, color, isText: true
-      });
-    }
-
-    spawnExplosion(x, y, color = '#f97316', count = 10) {
-      for (let i = 0; i < count; i++) {
-        const ang = Math.random() * Math.PI * 2;
-        const spd = 1 + Math.random() * 2.5;
-        this.particles.push({
-          x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-          life: 0, maxLife: 25 + Math.random() * 15, color, isText: false
+        this.enemies.push({
+          x, y, vx: 0, vy: 0,
+          hp, maxHp: hp, speed, radius,
+          type, shootTimer: Math.random() * 1.5
         });
       }
+    }
+
+    shoot() {
+      const now = performance.now();
+      const delays = { pistol: 220, rifle: 110, shotgun: 550, plasma: 750 };
+      const cd = delays[this.player.currentWeapon] || 150;
+
+      if (now - this.player.lastShotTime < cd) return;
+      this.player.lastShotTime = now;
+
+      const w = this.player.currentWeapon;
+      const angle = this.player.angle;
+      const sx = this.player.x + Math.cos(angle) * 18;
+      const sy = this.player.y + Math.sin(angle) * 18;
+
+      AudioFX.shoot(w);
+
+      if (w === 'shotgun') {
+        for (let i = -2; i <= 2; i++) {
+          const spr = angle + (i * 0.12);
+          this.bullets.push({
+            x: sx, y: sy,
+            vx: Math.cos(spr) * 520, vy: Math.sin(spr) * 520,
+            dmg: 18, color: '#f59e0b', fromPlayer: true, life: 35
+          });
+        }
+      } else if (w === 'plasma') {
+        this.bullets.push({
+          x: sx, y: sy,
+          vx: Math.cos(angle) * 380, vy: Math.sin(angle) * 380,
+          dmg: 150, color: '#ec4899', isPlasma: true, fromPlayer: true, life: 70
+        });
+      } else {
+        const dmg = w === 'rifle' ? 26 : 20;
+        const color = w === 'rifle' ? '#38bdf8' : '#60a5fa';
+        this.bullets.push({
+          x: sx, y: sy,
+          vx: Math.cos(angle) * 620, vy: Math.sin(angle) * 620,
+          dmg, color, fromPlayer: true, life: 60
+        });
+      }
+
+      // Sincronizar disparo con otros miembros
+      this.sendAction({ type: 'peer_shoot', weapon: w, x: sx, y: sy, angle, dmg: 25 });
     }
 
     startLoop() {
@@ -499,7 +632,7 @@
 
       const step = (now) => {
         if (!this.running) return;
-        const dt = Math.min((now - lastTime) / 1000, 0.1);
+        const dt = Math.min((now - lastTime) / 1000, 0.05);
         lastTime = now;
 
         this.update(dt);
@@ -507,366 +640,500 @@
 
         this.animId = requestAnimationFrame(step);
       };
-
       this.animId = requestAnimationFrame(step);
     }
 
     update(dt) {
-      const mid = (this.gridSize * this.cellSize) / 2;
+      if (this.gameState === 'gameover') return;
 
-      // 1. Spawning
-      if (this.waveState === 'running' && this.enemiesToSpawn > 0) {
+      // 1. Movimiento del Jugador (WASD)
+      let dx = 0, dy = 0;
+      if (this.keys.KeyW || this.keys.ArrowUp) dy -= 1;
+      if (this.keys.KeyS || this.keys.ArrowDown) dy += 1;
+      if (this.keys.KeyA || this.keys.ArrowLeft) dx -= 1;
+      if (this.keys.KeyD || this.keys.ArrowRight) dx += 1;
+
+      if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+
+      this.player.x += dx * this.player.speed * dt;
+      this.player.y += dy * this.player.speed * dt;
+
+      // Limitar a los bordes
+      this.player.x = Math.max(16, Math.min(this.width - 16, this.player.x));
+      this.player.y = Math.max(16, Math.min(this.height - 16, this.player.y));
+
+      // Disparo automático si mantiene presionado el ratón
+      if (this.mouse.isDown) this.shoot();
+
+      // Transmisión de movimiento periódica
+      if (Math.random() < 0.2) {
+        this.sendAction({
+          type: 'peer_move',
+          id: this.currentUser.id || 'me',
+          x: Math.round(this.player.x),
+          y: Math.round(this.player.y),
+          angle: this.player.angle,
+          hp: this.player.hp
+        });
+      }
+
+      // 2. IA de Bots Compañeros (Co-op)
+      this.teammates.forEach((bot) => {
+        if (!bot.isBot) return;
+        // Seguir al jugador a distancia
+        const distToPlayer = Math.hypot(this.player.x - bot.x, this.player.y - bot.y);
+        if (distToPlayer > 80) {
+          const ang = Math.atan2(this.player.y - bot.y, this.player.x - bot.x);
+          bot.x += Math.cos(ang) * 160 * dt;
+          bot.y += Math.sin(ang) * 160 * dt;
+        }
+
+        // Buscar enemigo cercano y dispararle
+        let nearestEn = null;
+        let minDist = 320;
+        for (const en of this.enemies) {
+          const d = Math.hypot(en.x - bot.x, en.y - bot.y);
+          if (d < minDist) { minDist = d; nearestEn = en; }
+        }
+
+        if (nearestEn) {
+          bot.angle = Math.atan2(nearestEn.y - bot.y, nearestEn.x - bot.x);
+          bot.shootTimer = (bot.shootTimer || 0) + dt;
+          if (bot.shootTimer > 0.22) {
+            bot.shootTimer = 0;
+            this.bullets.push({
+              x: bot.x, y: bot.y,
+              vx: Math.cos(bot.angle) * 580, vy: Math.sin(bot.angle) * 580,
+              dmg: 24, color: '#38bdf8', fromPlayer: true, life: 50
+            });
+            AudioFX.shoot('rifle');
+          }
+        }
+      });
+
+      // 3. Torretas construidas disparan automáticamente
+      this.structures.forEach((st) => {
+        if (st.type === 'turret') {
+          st.lastShot = (st.lastShot || 0) + dt;
+          if (st.lastShot > 0.35) {
+            let target = null;
+            let md = 260;
+            for (const en of this.enemies) {
+              const d = Math.hypot(en.x - st.x, en.y - st.y);
+              if (d < md) { md = d; target = en; }
+            }
+            if (target) {
+              st.lastShot = 0;
+              const ang = Math.atan2(target.y - st.y, target.x - st.x);
+              this.bullets.push({
+                x: st.x, y: st.y,
+                vx: Math.cos(ang) * 520, vy: Math.sin(ang) * 520,
+                dmg: 28, color: '#38bdf8', fromPlayer: true, life: 45
+              });
+              AudioFX.shoot('pistol');
+            }
+          }
+        }
+      });
+
+      // 4. Balas de Jugador avanzan
+      for (let i = this.bullets.length - 1; i >= 0; i--) {
+        const b = this.bullets[i];
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        b.life--;
+
+        // Colisión con enemigos
+        for (let j = this.enemies.length - 1; j >= 0; j--) {
+          const en = this.enemies[j];
+          if (Math.hypot(en.x - b.x, en.y - b.y) < en.radius + 6) {
+            en.hp -= b.dmg;
+            AudioFX.hit();
+            this.spawnSparks(b.x, b.y, b.color, 4);
+            this.spawnFloatingText(en.x, en.y - 12, `-${b.dmg}`, b.color);
+
+            if (b.isPlasma) {
+              this.shakeIntensity = 5;
+              this.spawnSparks(b.x, b.y, '#ec4899', 15);
+            }
+
+            b.life = 0;
+            break;
+          }
+        }
+
+        if (b.life <= 0 || b.x < 0 || b.x > this.width || b.y < 0 || b.y > this.height) {
+          this.bullets.splice(i, 1);
+        }
+      }
+
+      // 5. Spawning de Enemigos
+      if (this.enemiesSpawned < this.enemiesTotalWave) {
         this.spawnTimer += dt;
-        if (this.spawnTimer > (this.currentEnemyCfg.type === 'boss' ? 1.0 : 0.8)) {
+        if (this.spawnTimer > (this.wave === 4 ? 1.0 : 0.75)) {
           this.spawnTimer = 0;
           this.spawnEnemy();
         }
       }
 
-      // 2. Módulos Cuánticos / Solares generan créditos pasivos
-      this.buildings.forEach(b => {
-        if (b.type === 'solar') {
-          b.timer = (b.timer || 0) + dt;
-          if (b.timer >= 5) {
-            b.timer = 0;
-            this.inv.credits += 15 * (b.level || 1);
-            saveInventory(this.inv);
-            this.updateStatsUi();
-            this.spawnTextFloat(b.x * this.cellSize + 18, b.y * this.cellSize, '+15 ⚡', '#10b981');
-          }
-        }
-      });
-
-      // 3. Torretas disparan a enemigos
-      const nowMs = performance.now();
-      this.buildings.forEach(b => {
-        if (b.type === 'turret' || b.type === 'tesla' || b.type === 'plasma') {
-          const cd = b.type === 'turret' ? 450 : (b.type === 'tesla' ? 700 : 1200);
-          if (nowMs - (b.lastShot || 0) >= cd) {
-            const bx = b.x * this.cellSize + 18;
-            const by = b.y * this.cellSize + 18;
-            const range = (b.type === 'plasma' ? 180 : 130) + (b.level - 1) * 25;
-
-            // Buscar enemigo más cercano
-            let target = null;
-            let minDist = range;
-            for (const en of this.enemies) {
-              const d = Math.hypot(en.x - bx, en.y - by);
-              if (d < minDist) {
-                minDist = d;
-                target = en;
-              }
-            }
-
-            if (target) {
-              b.lastShot = nowMs;
-              const dmg = (b.type === 'plasma' ? 90 : (b.type === 'tesla' ? 35 : 25)) * (b.level || 1);
-              const color = b.skin?.color || (b.type === 'plasma' ? '#f43f5e' : (b.type === 'tesla' ? '#a855f7' : '#38bdf8'));
-
-              this.projectiles.push({
-                x: bx, y: by, tx: target.x, ty: target.y,
-                target, speed: 380, dmg, color, type: b.type
-              });
-
-              AudioFX.laser();
-            }
-          }
-        }
-      });
-
-      // 4. Proyectiles avanzan
-      for (let i = this.projectiles.length - 1; i >= 0; i--) {
-        const p = this.projectiles[i];
-        const dx = p.tx - p.x;
-        const dy = p.ty - p.y;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist < 10 || !p.target || p.target.hp <= 0) {
-          // Impacto
-          if (p.target && p.target.hp > 0) {
-            p.target.hp -= p.dmg;
-            if (p.type === 'tesla') p.target.speed *= 0.6; // Ralentizar
-            this.spawnTextFloat(p.tx, p.ty, `-${p.dmg}`, p.color);
-            this.spawnExplosion(p.tx, p.ty, p.color, 4);
-          }
-          this.projectiles.splice(i, 1);
-        } else {
-          p.x += (dx / dist) * p.speed * dt;
-          p.y += (dy / dist) * p.speed * dt;
-        }
-      }
-
-      // 5. Enemigos avanzan hacia el Núcleo y atacan muros
+      // 6. Actualización de Enemigos
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const en = this.enemies[i];
         if (en.hp <= 0) {
           // Destruido
           AudioFX.boom();
-          this.spawnExplosion(en.x, en.y, '#eab308', 12);
-          this.inv.credits += en.reward;
-          this.inv.stats.kills++;
-          saveInventory(this.inv);
+          this.spawnSparks(en.x, en.y, '#eab308', 20);
+          this.shakeIntensity = en.type === 'boss' ? 16 : 4;
+
+          // Soltar Créditos
+          const rew = en.type === 'boss' ? 400 : (en.type === 'tank' ? 35 : 15);
+          this.data.credits += rew;
+          this.score += rew * 10;
+          saveGameData(this.data);
           this.updateStatsUi();
+          AudioFX.coin();
+          this.spawnFloatingText(en.x, en.y, `+${rew}⚡`, '#22c55e', 14);
+
           this.enemies.splice(i, 1);
           continue;
         }
 
-        // Buscar si colisiona con un muro
-        const egx = Math.floor(en.x / this.cellSize);
-        const egy = Math.floor(en.y / this.cellSize);
-        const blocker = this.buildings.find(b => b.x === egx && b.y === egy && b.type !== 'core');
+        // Avanzar hacia el jugador o compañero más cercano
+        const dx = this.player.x - en.x;
+        const dy = this.player.y - en.y;
+        const dist = Math.hypot(dx, dy);
 
-        if (blocker) {
-          blocker.hp -= 25 * dt;
-          if (blocker.hp <= 0) {
-            AudioFX.boom();
-            this.spawnExplosion(en.x, en.y, '#ef4444', 15);
-            this.buildings = this.buildings.filter(b => b !== blocker);
-          }
-        } else {
-          // Avanzar hacia el centro (Núcleo)
-          const dx = mid - en.x;
-          const dy = mid - en.y;
-          const dist = Math.hypot(dx, dy);
+        if (dist > 15) {
+          en.x += (dx / dist) * en.speed * dt;
+          en.y += (dy / dist) * en.speed * dt;
+        }
 
-          if (dist < 32) {
-            // Dañar el núcleo
-            this.coreHp -= en.type === 'boss' ? 80 * dt : 15 * dt;
-            this.updateStatsUi();
-            if (this.coreHp <= 0) {
-              this.coreHp = 0;
-              this.waveState = 'gameover';
-              this.showWaveOverlay('¡NÚCLEO DESTRUIDO!', 'Las defensas cayeron. Vuelve a intentarlo.', 'Reiniciar');
-            }
-          } else {
-            en.x += (dx / dist) * en.speed * 60 * dt;
-            en.y += (dy / dist) * en.speed * 60 * dt;
+        // Si es Trooper o Boss, disparar al jugador
+        if (en.type === 'trooper' || en.type === 'boss') {
+          en.shootTimer = (en.shootTimer || 0) + dt;
+          const cadence = en.type === 'boss' ? 0.6 : 1.6;
+          if (en.shootTimer >= cadence) {
+            en.shootTimer = 0;
+            const ang = Math.atan2(dy, dx);
+            this.enemyBullets.push({
+              x: en.x, y: en.y,
+              vx: Math.cos(ang) * (en.type === 'boss' ? 340 : 260),
+              vy: Math.sin(ang) * (en.type === 'boss' ? 340 : 260),
+              dmg: en.type === 'boss' ? 22 : 12
+            });
+            AudioFX.shoot('pistol');
           }
+        }
+
+        // Daño por contacto al jugador
+        if (dist < en.radius + 14) {
+          this.damagePlayer(en.type === 'boss' ? 45 * dt : 18 * dt);
         }
       }
 
-      // 6. Verificar si la oleada fue superada
-      if (this.waveState === 'running' && this.enemiesToSpawn <= 0 && this.enemies.length === 0) {
-        this.waveState = 'cleared';
-        this.inv.crates += 1;
-        this.inv.credits += 150 * this.wave;
-        this.inv.stats.wavesCleared++;
-        saveInventory(this.inv);
+      // 7. Balas de enemigos avanzan
+      for (let i = this.enemyBullets.length - 1; i >= 0; i--) {
+        const eb = this.enemyBullets[i];
+        eb.x += eb.vx * dt;
+        eb.y += eb.vy * dt;
+
+        // Choque con muros
+        let blocked = false;
+        for (const st of this.structures) {
+          if (st.type === 'wall' && Math.hypot(st.x - eb.x, st.y - eb.y) < 22) {
+            st.hp -= eb.dmg;
+            blocked = true;
+            this.spawnSparks(eb.x, eb.y, '#38bdf8', 4);
+            break;
+          }
+        }
+        if (blocked) { this.enemyBullets.splice(i, 1); continue; }
+
+        // Choque con jugador
+        if (Math.hypot(this.player.x - eb.x, this.player.y - eb.y) < 16) {
+          this.damagePlayer(eb.dmg);
+          this.spawnSparks(eb.x, eb.y, '#ef4444', 8);
+          this.enemyBullets.splice(i, 1);
+          continue;
+        }
+
+        if (eb.x < 0 || eb.x > this.width || eb.y < 0 || eb.y > this.height) {
+          this.enemyBullets.splice(i, 1);
+        }
+      }
+
+      // 8. Limpiar estructuras destruidas
+      this.structures = this.structures.filter(s => s.hp > 0);
+
+      // 9. Verificar condición de victoria de la oleada
+      if (this.enemiesSpawned >= this.enemiesTotalWave && this.enemies.length === 0) {
+        this.gameState = 'cleared';
+        this.data.crates += 1;
+        this.data.credits += this.currentConfig.reward;
+        saveGameData(this.data);
         this.updateStatsUi();
         AudioFX.goldFanfare();
 
-        if (this.wave >= this.maxWaves) {
-          this.showWaveOverlay('🎉 ¡VICTORIA TOTAL!', '¡Tu escuadrón defendió la base con éxito! Has ganado 2x Cajas Élite.', 'Jugar de nuevo');
-          this.inv.crates += 1;
-          saveInventory(this.inv);
-        } else {
-          this.showWaveOverlay(
-            `¡OLEADA ${this.wave} SUPERADA!`,
-            `Recompensa: +${150 * this.wave} ⚡ y 1x Caja de Botín CS entregada a tu inventario.`,
-            `Comenzar Oleada ${this.wave + 1}`
-          );
-          this.wave++;
-        }
+        const ov = this.container.querySelector('#esOverlay');
+        const t = this.container.querySelector('#esOverlayTitle');
+        const d = this.container.querySelector('#esOverlayDesc');
+        const b = this.container.querySelector('#esOverlayBtn');
+
+        t.textContent = `🎉 ¡${this.currentConfig.name.toUpperCase()} SUPERADO!`;
+        t.style.color = '#22c55e';
+        d.innerHTML = `Has defendido la arena con éxito.<br><b>Recompensa:</b> +${this.currentConfig.reward}⚡ y <b>1x Caja CS</b> otorgada.`;
+        b.textContent = this.wave >= this.maxWaves ? '🏆 Finalizar Campaña' : `⚔️ Siguiente Nivel (${this.wave + 1})`;
+        ov.classList.remove('hidden');
       }
 
-      // 7. Partículas
+      // 10. Partículas y Screen Shake
+      if (this.shakeIntensity > 0) this.shakeIntensity *= 0.9;
       for (let i = this.particles.length - 1; i >= 0; i--) {
         const pt = this.particles[i];
+        pt.x += pt.vx; pt.y += pt.vy;
         pt.life++;
-        pt.x += pt.vx;
-        pt.y += pt.vy;
-        if (pt.life >= pt.maxLife) {
-          this.particles.splice(i, 1);
-        }
+        if (pt.life >= pt.maxLife) this.particles.splice(i, 1);
       }
+    }
+
+    damagePlayer(amount) {
+      this.player.hp -= amount;
+      this.shakeIntensity = Math.min(10, this.shakeIntensity + 3);
+      AudioFX.hit();
+      this.updateStatsUi();
+
+      if (this.player.hp <= 0) {
+        this.player.hp = 0;
+        this.gameState = 'gameover';
+        AudioFX.boom();
+
+        const ov = this.container.querySelector('#esOverlay');
+        const t = this.container.querySelector('#esOverlayTitle');
+        const d = this.container.querySelector('#esOverlayDesc');
+        const b = this.container.querySelector('#esOverlayBtn');
+
+        t.textContent = '💀 ¡HAS CAÍDO EN COMBATE!';
+        t.style.color = '#ef4444';
+        d.innerHTML = `Las defensas fueron superadas en la Oleada ${this.wave}.<br>Al reiniciar obtendrás tus <b>250⚡ de inicio</b> y salud al 100%.`;
+        b.textContent = '🔄 Reiniciar Partida';
+        ov.classList.remove('hidden');
+      }
+    }
+
+    spawnSparks(x, y, color = '#f59e0b', count = 8) {
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const s = 1 + Math.random() * 3;
+        this.particles.push({
+          x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+          color, life: 0, maxLife: 15 + Math.random() * 10
+        });
+      }
+    }
+
+    spawnFloatingText(x, y, text, color = '#38bdf8', size = 12) {
+      this.particles.push({
+        x, y, vx: (Math.random() - 0.5) * 0.4, vy: -1.0,
+        text, color, size, isText: true, life: 0, maxLife: 45
+      });
     }
 
     render() {
       const ctx = this.ctx;
-      const w = this.canvas.width;
-      const h = this.canvas.height;
+      const w = this.width;
+      const h = this.height;
 
-      // Fondo oscuro cyberpunk
-      ctx.fillStyle = '#0a0d14';
+      ctx.save();
+
+      // Screen Shake
+      if (this.shakeIntensity > 0.5) {
+        const sx = (Math.random() - 0.5) * this.shakeIntensity;
+        const sy = (Math.random() - 0.5) * this.shakeIntensity;
+        ctx.translate(sx, sy);
+      }
+
+      // Fondo oscuro cyberpunk con rejilla tecnológica
+      ctx.fillStyle = '#080c14';
       ctx.fillRect(0, 0, w, h);
 
-      // Rejilla
-      ctx.strokeStyle = '#1e2638';
+      ctx.strokeStyle = '#121826';
       ctx.lineWidth = 1;
-      for (let x = 0; x <= w; x += this.cellSize) {
+      for (let x = 0; x < w; x += 36) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
-      for (let y = 0; y <= h; y += this.cellSize) {
+      for (let y = 0; y < h; y += 36) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
 
-      // Edificios
-      this.buildings.forEach(b => {
-        const bx = b.x * this.cellSize;
-        const by = b.y * this.cellSize;
-
-        if (b.type === 'core') {
-          // Núcleo
-          const cw = b.w * this.cellSize;
-          const ch = b.h * this.cellSize;
-          ctx.fillStyle = '#1e1b4b';
-          ctx.fillRect(bx, by, cw, ch);
-          ctx.strokeStyle = '#6366f1';
+      // Muros y Torretas
+      this.structures.forEach(st => {
+        if (st.type === 'wall') {
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(st.x - 14, st.y - 14, 28, 28);
+          ctx.strokeStyle = '#38bdf8';
           ctx.lineWidth = 2;
-          ctx.strokeRect(bx + 4, by + 4, cw - 8, ch - 8);
-
-          ctx.fillStyle = '#818cf8';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText('NÚCLEO', bx + cw / 2, by + ch / 2 - 2);
-          ctx.fillText('SERVIDOR', bx + cw / 2, by + ch / 2 + 12);
+          ctx.strokeRect(st.x - 14, st.y - 14, 28, 28);
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('🧱', st.x, st.y + 4);
         } else {
-          // Defensas
-          const skinCol = b.skin?.color || '#38bdf8';
-          const bgCol = b.skin?.bg || '#1e293b';
-
-          ctx.fillStyle = bgCol;
-          ctx.fillRect(bx + 2, by + 2, this.cellSize - 4, this.cellSize - 4);
-          ctx.strokeStyle = skinCol;
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(bx + 2, by + 2, this.cellSize - 4, this.cellSize - 4);
-
-          // Icono o diseño
-          ctx.fillStyle = skinCol;
-          ctx.font = '16px sans-serif';
-          ctx.textAlign = 'center';
-          const icon = b.type === 'wall' ? '🧱' : (b.type === 'turret' ? '🔫' : (b.type === 'tesla' ? '⚡' : (b.type === 'plasma' ? '💥' : '🔋')));
-          ctx.fillText(icon, bx + this.cellSize / 2, by + this.cellSize / 2 + 5);
-
-          // Barra de vida
-          const hpPct = Math.max(0, b.hp / b.maxHp);
-          ctx.fillStyle = '#ef4444';
-          ctx.fillRect(bx + 4, by + this.cellSize - 6, this.cellSize - 8, 3);
-          ctx.fillStyle = '#22c55e';
-          ctx.fillRect(bx + 4, by + this.cellSize - 6, (this.cellSize - 8) * hpPct, 3);
-
-          if (b.level > 1) {
-            ctx.fillStyle = '#fde047';
-            ctx.font = 'bold 9px sans-serif';
-            ctx.fillText(`★${b.level}`, bx + this.cellSize - 8, by + 10);
-          }
+          ctx.fillStyle = '#1e1b4b';
+          ctx.beginPath(); ctx.arc(st.x, st.y, 14, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#818cf8'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.fillStyle = '#c084fc';
+          ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('🔫', st.x, st.y + 4);
         }
       });
 
-      // Proyectiles
-      this.projectiles.forEach(p => {
-        ctx.fillStyle = p.color || '#38bdf8';
+      // Balas del jugador
+      this.bullets.forEach(b => {
+        ctx.fillStyle = b.color;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.type === 'plasma' ? 5 : 3, 0, Math.PI * 2);
+        ctx.arc(b.x, b.y, b.isPlasma ? 6 : 3, 0, Math.PI * 2);
         ctx.fill();
+      });
+
+      // Balas de enemigos
+      this.enemyBullets.forEach(eb => {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath(); ctx.arc(eb.x, eb.y, 3.5, 0, Math.PI * 2); ctx.fill();
       });
 
       // Enemigos
       this.enemies.forEach(en => {
-        ctx.fillStyle = en.type === 'boss' ? '#ef4444' : (en.type === 'runner' ? '#f59e0b' : '#a855f7');
-        ctx.beginPath();
-        ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        if (en.type === 'boss') {
+          // Jefe Titán Goliath
+          ctx.fillStyle = '#7f1d1d';
+          ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
 
-        // Barra de vida del enemigo
-        const enHpPct = Math.max(0, en.hp / en.maxHp);
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(en.x - 12, en.y - en.radius - 8, 24, 3);
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(en.x - 12, en.y - en.radius - 8, 24 * enHpPct, 3);
+          ctx.fillStyle = '#fee2e2';
+          ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('GOLIATH', en.x, en.y + 4);
+
+          // Barra de vida superior del Jefe
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.fillRect(w / 2 - 140, 16, 280, 14);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(w / 2 - 138, 18, 276 * (en.hp / en.maxHp), 10);
+          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+          ctx.strokeRect(w / 2 - 140, 16, 280, 14);
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif';
+          ctx.fillText(`JEFE TITÁN: ${Math.round(en.hp)} / ${en.maxHp}`, w / 2, 26);
+        } else {
+          ctx.fillStyle = en.type === 'tank' ? '#312e81' : (en.type === 'trooper' ? '#701a75' : '#831843');
+          ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = en.type === 'tank' ? '#818cf8' : '#f43f5e';
+          ctx.lineWidth = 1.5; ctx.stroke();
+
+          // Barra de vida pequeña
+          const pct = Math.max(0, en.hp / en.maxHp);
+          ctx.fillStyle = '#ef4444'; ctx.fillRect(en.x - 10, en.y - en.radius - 6, 20, 3);
+          ctx.fillStyle = '#22c55e'; ctx.fillRect(en.x - 10, en.y - en.radius - 6, 20 * pct, 3);
+        }
       });
 
-      // Partículas y Textos flotantes
+      // Compañeros (Co-op)
+      this.teammates.forEach(m => {
+        ctx.fillStyle = '#059669';
+        ctx.beginPath(); ctx.arc(m.x, m.y, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(m.name, m.x, m.y - 18);
+      });
+
+      // Jugador
+      ctx.save();
+      ctx.translate(this.player.x, this.player.y);
+      ctx.rotate(this.player.angle);
+
+      // Cuerpo del agente
+      ctx.fillStyle = '#2563eb';
+      ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2; ctx.stroke();
+
+      // Cañón del arma
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(8, -3, 14, 6);
+
+      ctx.restore();
+
+      // Nombre y barra de vida sobre el jugador
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`Tú (${this.currentUser.name})`, this.player.x, this.player.y - 20);
+
+      const pPct = Math.max(0, this.player.hp / this.player.maxHp);
+      ctx.fillStyle = '#ef4444'; ctx.fillRect(this.player.x - 14, this.player.y - 16, 28, 4);
+      ctx.fillStyle = '#10b981'; ctx.fillRect(this.player.x - 14, this.player.y - 16, 28 * pPct, 4);
+
+      // Partículas y Textos
       this.particles.forEach(pt => {
         if (pt.isText) {
-          ctx.fillStyle = pt.color || '#fff';
-          ctx.font = 'bold 11px sans-serif';
+          ctx.fillStyle = pt.color;
+          ctx.font = `bold ${pt.size || 12}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText(pt.text, pt.x, pt.y);
         } else {
-          ctx.fillStyle = pt.color || '#f97316';
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
-          ctx.fill();
+          ctx.fillStyle = pt.color;
+          ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2); ctx.fill();
         }
       });
-    }
 
-    showWaveOverlay(title, desc, btnText) {
-      const o = this.container.querySelector('#cdWaveOverlay');
-      this.container.querySelector('#cdOverlayTitle').textContent = title;
-      this.container.querySelector('#cdOverlayDesc').textContent = desc;
-      const b = this.container.querySelector('#cdBtnStartWave');
-      b.textContent = btnText;
-      o.classList.remove('hidden');
+      ctx.restore();
     }
 
     updateStatsUi() {
-      const ch = this.container.querySelector('#cdCoreHp');
-      if (ch) ch.textContent = `${Math.round(this.coreHp)}/${this.maxCoreHp}`;
-      const cc = this.container.querySelector('#cdCredits');
-      if (cc) cc.textContent = this.inv.credits;
-      const cw = this.container.querySelector('#cdWave');
-      if (cw) cw.textContent = `${this.wave}/${this.maxWaves}`;
-      const cr = this.container.querySelector('#cdCrates');
-      if (cr) cr.textContent = this.inv.crates;
+      const h = this.container.querySelector('#esHp');
+      if (h) h.textContent = `${Math.round(this.player.hp)}/100`;
+      const c = this.container.querySelector('#esCredits');
+      if (c) c.textContent = this.data.credits;
+      const w = this.container.querySelector('#esWave');
+      if (w) w.textContent = `${this.wave}/${this.maxWaves}`;
+      const cr = this.container.querySelector('#esCrates');
+      if (cr) cr.textContent = this.data.crates;
     }
 
-    updateEquippedDisplay() {
-      const el = this.container.querySelector('#cdEquippedPreview');
-      if (!el) return;
-      const tSkin = SKINS_CATALOG.find(s => s.id === this.inv.equipped.turret);
-      const wSkin = SKINS_CATALOG.find(s => s.id === this.inv.equipped.wall);
-      el.innerHTML = `
-        <div style="font-size:12px;display:flex;flex-direction:column;gap:4px">
-          <div>🔫 Torreta: <b style="color:${tSkin?.color || '#fff'}">${tSkin?.name || 'Estándar'}</b></div>
-          <div>🧱 Muro: <b style="color:${wSkin?.color || '#fff'}">${wSkin?.name || 'Estándar'}</b></div>
-        </div>
-      `;
-    }
-
-    // --- Sistema de Apertura de Cajas Estilo Counter-Strike ---
+    // --- Sistema de Apertura de Cajas CS:GO ---
     openCrateScreen() {
-      const modal = this.container.querySelector('#cdCrateModal');
+      const modal = this.container.querySelector('#esCrateModal');
       modal.classList.remove('hidden');
 
-      const renderModal = () => {
+      const render = () => {
         modal.innerHTML = `
           <div class="cd-crate-dialog">
             <div class="crate-top">
               <h2>🎁 APERTURA DE CAJAS • COUNTER-STRIKE EDICIÓN EPICKAST</h2>
-              <button id="cdCloseCrates" class="cd-btn">✕ Cerrar</button>
+              <button id="esCloseCrates" class="cd-btn">✕ Volver a la Batalla</button>
             </div>
 
             <div class="crate-summary">
-              <span>Tienes <b>${this.inv.crates}</b> Caja(s) disponibles</span>
-              <button id="cdBtnBuyCrate" class="cd-btn small">+ Comprar Caja (150⚡)</button>
+              <span>Tienes <b>${this.data.crates}</b> Caja(s) disponibles</span>
+              <button id="esBtnBuyCrate" class="cd-btn small">+ Comprar Caja (150⚡)</button>
             </div>
 
-            <!-- Carrusel de Ruleta CS -->
+            <!-- Ruleta Horizontal CS -->
             <div class="roulette-viewport">
               <div class="roulette-marker">▼</div>
-              <div id="rouletteTrack" class="roulette-track"></div>
+              <div id="csTrack" class="roulette-track"></div>
             </div>
 
             <div class="crate-actions">
-              <button id="cdBtnRoll" class="cd-btn big gold" ${this.inv.crates <= 0 ? 'disabled' : ''}>
-                🔓 ABRIR CAJA (Girar Ruleta)
+              <button id="csBtnSpin" class="cd-btn big gold" ${this.data.crates <= 0 ? 'disabled' : ''}>
+                🔓 ABRIR CAJA (Girar Ruleta CS)
               </button>
             </div>
 
-            <div id="crateWinnerArea" class="crate-winner hidden"></div>
+            <div id="csWinnerArea" class="crate-winner hidden"></div>
 
             <div class="inventory-section">
-              <h3>🎒 Tu Inventario de Skins y Armas</h3>
+              <h3>🎒 Tu Armería y Skins Desbloqueadas</h3>
               <div class="inv-grid">
-                ${SKINS_CATALOG.map(item => {
-                  const isUnlocked = this.inv.unlocked.includes(item.id);
-                  const isEquipped = Object.values(this.inv.equipped).includes(item.id);
-                  const rarity = RARITY_INFO[item.rarity];
+                ${SKINS.map(item => {
+                  const isUnlocked = this.data.unlocked.includes(item.id);
+                  const isEquipped = Object.values(this.data.equipped).includes(item.id);
+                  const rarity = RARITY_MAP[item.rarity];
                   return `
                     <div class="inv-item ${isUnlocked ? '' : 'locked'}" style="border-color:${rarity.color}">
                       <div class="inv-rarity-badge" style="background:${rarity.color}">${rarity.name}</div>
@@ -882,22 +1149,19 @@
           </div>
         `;
 
-        modal.querySelector('#cdCloseCrates').onclick = () => {
-          modal.classList.add('hidden');
-          this.updateEquippedDisplay();
-        };
+        modal.querySelector('#esCloseCrates').onclick = () => modal.classList.add('hidden');
 
-        modal.querySelector('#cdBtnBuyCrate').onclick = () => {
-          if (this.inv.credits >= 150) {
-            this.inv.credits -= 150;
-            this.inv.crates += 1;
-            saveInventory(this.inv);
+        modal.querySelector('#esBtnBuyCrate').onclick = () => {
+          if (this.data.credits >= 150) {
+            this.data.credits -= 150;
+            this.data.crates += 1;
+            saveGameData(this.data);
             this.updateStatsUi();
-            AudioFX.build();
-            renderModal();
+            AudioFX.coin();
+            render();
           } else {
             AudioFX.tick();
-            alert('¡No tienes suficientes créditos! Supera oleadas para ganar más ⚡.');
+            alert('¡Te faltan créditos! Supera oleadas o destruye enemigos para conseguir más ⚡.');
           }
         };
 
@@ -905,61 +1169,52 @@
           btn.onclick = () => {
             const id = btn.dataset.id;
             const type = btn.dataset.type;
-            this.inv.equipped[type] = id;
-            saveInventory(this.inv);
-            AudioFX.build();
-            renderModal();
+            this.data.equipped[type] = id;
+            saveGameData(this.data);
+            AudioFX.coin();
+            render();
           };
         });
 
-        modal.querySelector('#cdBtnRoll').onclick = () => this.spinCsRoulette(modal, renderModal);
+        modal.querySelector('#csBtnSpin').onclick = () => this.spinRoulette(modal, render);
       };
 
-      renderModal();
+      render();
     }
 
-    spinCsRoulette(modal, renderModal) {
-      if (this.inv.crates <= 0) return;
-      this.inv.crates -= 1;
-      this.inv.stats.cratesOpened++;
-      saveInventory(this.inv);
+    spinRoulette(modal, renderCallback) {
+      if (this.data.crates <= 0) return;
+      this.data.crates -= 1;
+      saveGameData(this.data);
       this.updateStatsUi();
 
-      const btnRoll = modal.querySelector('#cdBtnRoll');
-      btnRoll.disabled = true;
+      const btnSpin = modal.querySelector('#csBtnSpin');
+      btnSpin.disabled = true;
 
-      // Calcular el ítem ganador según probabilidades reales estilo CS:GO
+      // Probabilidades reales estilo CS:GO
       const roll = Math.random() * 100;
-      let winningRarity = 'milspec';
-      if (roll < 0.26) winningRarity = 'gold'; // 0.26% Cuchillo / Dragon Lore
-      else if (roll < 0.90) winningRarity = 'covert'; // 0.64% Rojo Covert
-      else if (roll < 4.10) winningRarity = 'classified'; // 3.2% Rosa
-      else if (roll < 20.08) winningRarity = 'restricted'; // 15.98% Azul
-      else winningRarity = 'milspec'; // 79.92% Común
+      let wonRarity = 'milspec';
+      if (roll < 0.26) wonRarity = 'gold';       // 0.26% Cuchillo / Dragon Lore
+      else if (roll < 0.90) wonRarity = 'covert'; // 0.64% Rojo
+      else if (roll < 4.10) wonRarity = 'classified'; // 3.2% Rosa
+      else if (roll < 20.08) wonRarity = 'restricted'; // 15.98% Azul
+      else wonRarity = 'milspec'; // 79.92% Común
 
-      const eligible = SKINS_CATALOG.filter(s => s.rarity === winningRarity);
-      const winner = eligible[Math.floor(Math.random() * eligible.length)] || SKINS_CATALOG[0];
+      const eligible = SKINS.filter(s => s.rarity === wonRarity);
+      const winner = eligible[Math.floor(Math.random() * eligible.length)] || SKINS[0];
 
-      // Generar 45 cartas para la ruleta
-      const track = modal.querySelector('#rouletteTrack');
+      const track = modal.querySelector('#csTrack');
       track.style.transition = 'none';
       track.style.transform = 'translateX(0px)';
 
       const cards = [];
-      const winnerIndex = 36; // La carta ganadora estará en la posición 36
-
+      const winnerIndex = 35;
       for (let i = 0; i < 45; i++) {
-        if (i === winnerIndex) {
-          cards.push(winner);
-        } else {
-          // Items aleatorios decorativos
-          const r = SKINS_CATALOG[Math.floor(Math.random() * SKINS_CATALOG.length)];
-          cards.push(r);
-        }
+        cards.push(i === winnerIndex ? winner : SKINS[Math.floor(Math.random() * SKINS.length)]);
       }
 
       track.innerHTML = cards.map(item => {
-        const rar = RARITY_INFO[item.rarity];
+        const rar = RARITY_MAP[item.rarity];
         return `
           <div class="roulette-card" style="border-bottom: 4px solid ${rar.color}">
             <div class="card-type">${item.type.toUpperCase()}</div>
@@ -968,68 +1223,54 @@
         `;
       }).join('');
 
-      // Calcular desplazamiento exacto (cada carta tiene 120px de ancho + 8px gap)
       const cardWidth = 128;
-      const targetOffset = (winnerIndex * cardWidth) - (320 - cardWidth / 2) + Math.floor(Math.random() * 40 - 20);
+      const targetOffset = (winnerIndex * cardWidth) - (320 - cardWidth / 2) + Math.floor(Math.random() * 30 - 15);
 
-      // Reproducir sonido mecánico tipo ticker CS
-      let tickInterval = 60;
-      let tickTimer = null;
-      const startTicker = () => {
-        let elapsed = 0;
-        const tickStep = () => {
-          AudioFX.tick();
-          elapsed += tickInterval;
-          tickInterval = Math.pow(elapsed / 1000, 1.8) * 40 + 60;
-          if (elapsed < 4600) {
-            tickTimer = setTimeout(tickStep, tickInterval);
-          }
-        };
-        tickStep();
+      // Sonido de ticker mecánico
+      let elapsed = 0;
+      let interval = 55;
+      const tickLoop = () => {
+        AudioFX.tick();
+        elapsed += interval;
+        interval = Math.pow(elapsed / 1000, 1.8) * 38 + 55;
+        if (elapsed < 4600) setTimeout(tickLoop, interval);
       };
+      tickLoop();
 
-      startTicker();
-
-      // Animación suave con desaceleración natural
       setTimeout(() => {
-        track.style.transition = 'transform 4.8s cubic-bezier(0.10, 0.85, 0.20, 1)';
+        track.style.transition = 'transform 4.8s cubic-bezier(0.12, 0.82, 0.22, 1)';
         track.style.transform = `translateX(-${targetOffset}px)`;
       }, 50);
 
-      // Finalización del giro
       setTimeout(() => {
-        if (!this.inv.unlocked.includes(winner.id)) {
-          this.inv.unlocked.push(winner.id);
-        }
-        // Equipar automáticamente
-        this.inv.equipped[winner.type] = winner.id;
-        saveInventory(this.inv);
+        if (!this.data.unlocked.includes(winner.id)) this.data.unlocked.push(winner.id);
+        this.data.equipped[winner.type] = winner.id;
+        saveGameData(this.data);
 
-        if (winner.rarity === 'gold') {
-          AudioFX.goldFanfare();
-        } else {
-          AudioFX.build();
-        }
+        if (winner.rarity === 'gold') AudioFX.goldFanfare();
+        else AudioFX.coin();
 
-        const area = modal.querySelector('#crateWinnerArea');
-        const rar = RARITY_INFO[winner.rarity];
+        const area = modal.querySelector('#csWinnerArea');
+        const rar = RARITY_MAP[winner.rarity];
         area.innerHTML = `
           <div class="winner-box" style="border-color:${rar.color}">
             <span class="winner-badge" style="background:${rar.color}">${rar.name}</span>
             <h2 style="color:${winner.color}">${winner.name}</h2>
-            <p>¡Desbloqueado y equipado con éxito en tu armería!</p>
+            <p>¡Obtenido y equipado con éxito en tu personaje!</p>
           </div>
         `;
         area.classList.remove('hidden');
-
-        btnRoll.disabled = false;
-        setTimeout(() => renderModal(), 2500);
+        btnSpin.disabled = false;
+        setTimeout(() => renderCallback(), 2600);
       }, 5000);
     }
 
     destroy() {
       this.running = false;
       if (this.animId) cancelAnimationFrame(this.animId);
+      window.removeEventListener('keydown', this.onKeyDown);
+      window.removeEventListener('keyup', this.onKeyUp);
+      window.removeEventListener('mouseup', this.onMouseUp);
       this.container.innerHTML = '';
     }
   }
