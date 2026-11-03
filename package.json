@@ -49,7 +49,7 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
-      "artifactName": "EpicKast-Instalador-${version}.exe"
+      "artifactName": "EpicKast-Instalador.exe"
     }
   },
   "dependencies": {
