@@ -412,9 +412,13 @@ app.whenReady().then(() => {
         try { fs.unlinkSync(tempAsar); } catch {}
       }
       await downloadFile(url, tempAsar, (pct, cur, tot) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('app:update-progress', { percent: pct, current: cur, total: tot, asar: true });
-        }
+        try {
+          if (e?.sender && !e.sender.isDestroyed()) {
+            e.sender.send('app:update-progress', { percent: pct, current: cur, total: tot, asar: true });
+          } else if (win && !win.isDestroyed()) {
+            win.webContents.send('app:update-progress', { percent: pct, current: cur, total: tot, asar: true });
+          }
+        } catch {}
       });
       // Verificar tamaño
       const stat = fs.statSync(tempAsar);

@@ -98,7 +98,7 @@ const S = {
   stageCollapsed: false,
 };
 
-window.epic.version?.().then((v) => { if (v) S.appVer = v; }).catch(() => {});
+window.epic.version?.().then((v) => { if (v) { S.appVer = v; renderRail(); } }).catch(() => {});
 window.epic.onMiniChanged?.((val) => {
   S.mini = !!val;
   document.body.classList.toggle('mini-mode', S.mini);
@@ -560,6 +560,8 @@ async function checkServerUpdate() {
 
     // Función de descarga automática en segundo plano (Discord-Style)
     const runAutoDownload = async () => {
+      label.textContent = '⚡ Descargando actualización v' + info.version + ' en segundo plano...';
+      actionArea.replaceChildren(h('span', { style: 'font-size:11px;color:#a78bfa;font-weight:600' }, '⏳ Descargando en segundo plano...'));
       // Escuchar progreso en vivo
       window.epic?.onUpdateProgress?.((prog) => {
         if (!isReady && prog?.percent !== undefined) {
@@ -1133,6 +1135,12 @@ function renderRail() {
     }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.6.7';
+  r.append(h('div', {
+    class: 'rail-version',
+    style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
+    title: 'EpicKast ' + verTxt
+  }, verTxt));
 }
 function userItem(u, onclick, extra) {
   return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : ''), onclick },
