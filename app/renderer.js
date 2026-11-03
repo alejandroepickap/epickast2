@@ -1271,11 +1271,12 @@ function modalMemberCard(sd, m) {
         m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null
       ),
       canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
-      (canKick || canBan) ? h('div', { class: 'mod-box' },
+      (canKick || canBan || userVoiceKey) ? h('div', { class: 'mod-box' },
         h('div', { class: 'mod-title' }, '⚖️ Herramientas de Moderación'),
-        userVoiceKey ? h('div', { style: 'display:flex;gap:6px' },
+        userVoiceKey ? h('div', { class: 'mod-actions-grid' },
           h('button', {
-            style: 'flex:1;font-size:11.5px',
+            type: 'button',
+            class: 'mod-btn voice',
             onclick: async () => {
               await safe(rpc('voice.serverMute', { key: userVoiceKey, userId: m.id, mute: true }));
               toast(`Micrófono de ${m.name} silenciado para todos`);
@@ -1283,7 +1284,8 @@ function modalMemberCard(sd, m) {
             }
           }, '🔇 Silenciar micro'),
           h('button', {
-            style: 'flex:1;font-size:11.5px',
+            type: 'button',
+            class: 'mod-btn voice',
             onclick: async () => {
               await safe(rpc('voice.serverMute', { key: userVoiceKey, userId: m.id, mute: false }));
               toast(`Silencio retirado a ${m.name}`);
@@ -1291,24 +1293,41 @@ function modalMemberCard(sd, m) {
             }
           }, '🔊 Desilenciar')
         ) : null,
-        moveSel ? h('label', null, 'Mover de canal de voz', moveSel) : null,
-        h('div', { class: 'prof-actions' },
+        moveSel ? h('div', { class: 'mod-row' },
+          h('label', { style: 'font-size:11px;color:var(--mu);margin-bottom:3px;display:block' }, '🔀 Mover a canal de voz:'),
+          moveSel
+        ) : null,
+        h('div', { class: 'mod-actions-grid' },
           canKick ? h('button', {
-            style: 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14)',
-            onclick: () => confirm(`¿Expulsar a ${m.name} del servidor?`) && safe(rpc('server.kick', { id: sd.id, userId: m.id })).then(closeModal)
-          }, 'Expulsar') : null,
+            type: 'button',
+            class: 'mod-btn kick',
+            onclick: () => confirm(`¿Expulsar a ${m.name} del servidor?`) && safe(rpc('server.kick', { id: sd.id, userId: m.id })).then(() => { toast(`Usuario ${m.name} expulsado`); closeModal(); })
+          }, '👢 Expulsar') : null,
           canBan ? h('button', {
-            class: 'danger',
+            type: 'button',
+            class: 'mod-btn ban',
             onclick: async () => {
               const reason = prompt(`Motivo del baneo para ${m.name} (opcional):`, 'Comportamiento no adecuado o spam');
               if (reason !== null) {
                 await safe(rpc('server.ban', { id: sd.id, userId: m.id, reason }));
-                toast(`Usuario ${m.name} expulsado y baneado`);
+                toast(`Usuario ${m.name} baneado`);
                 closeModal();
               }
             }
-          }, '🚫 Banear del servidor') : null
-        )
+          }, '🚫 Banear') : null
+        ),
+        canKick ? h('button', {
+          type: 'button',
+          class: 'mod-btn spam',
+          style: 'width:100%',
+          onclick: async () => {
+            if (confirm(`¿Borrar los mensajes recientes de ${m.name} en este canal?`)) {
+              await safe(rpc('server.deleteUserMessages', { id: sd.id, chanId: S.chan, userId: m.id }));
+              toast(`Mensajes de ${m.name} limpiados`);
+              closeModal();
+            }
+          }
+        }, '🧹 Limpiar mensajes recientes (Anti-Spam)') : null
       ) : null
     )
   );
@@ -3089,7 +3108,15 @@ $('mMore').onclick = (e) => {
     return b;
   };
 
-  // Fila 1: Escenario y vista
+  // 1. Tamaños del Escenario agrupados todos juntos (S, M, L, XL)
+  const gridSizes = h('div', { class: 'meet-grid size-grid' },
+    tileBtn('S', 'Tamaño S (38% altura escenario)', () => { setStagePreset(38); menu.classList.add('hidden'); }, Math.abs(curVh - 38) <= 5, 'sz'),
+    tileBtn('M', 'Tamaño M (60% equilibrado)', () => { setStagePreset(60); menu.classList.add('hidden'); }, Math.abs(curVh - 60) <= 5, 'sz'),
+    tileBtn('L', 'Tamaño L (80% amplio)', () => { setStagePreset(80); menu.classList.add('hidden'); }, Math.abs(curVh - 80) <= 5, 'sz'),
+    tileBtn('XL', 'Modo Teatro XL (94% pantalla)', () => { setStagePreset(94); menu.classList.add('hidden'); }, Math.abs(curVh - 94) <= 5, 'sz')
+  );
+
+  // 2. Modos de Vista y Pantalla
   const gridVistas = h('div', { class: 'meet-grid' },
     tileBtn(S.stageCollapsed ? '🔼' : '🔽', S.stageCollapsed ? 'Expandir escenario de video' : 'Minimizar escenario (ver chat)', () => { toggleStageCollapse(); menu.classList.add('hidden'); }, S.stageCollapsed),
     tileBtn('⊞', !settings.hideNoVideo ? 'Modo Cuadrícula: Mostrando todos (clic para ocultar sin cámara)' : 'Modo Cuadrícula: Solo cámaras (clic para ver todos)', () => {
@@ -3099,28 +3126,20 @@ $('mMore').onclick = (e) => {
       renderStage();
       menu.classList.add('hidden');
     }, !settings.hideNoVideo),
-    tileBtn('S', 'Tamaño S (38% altura escenario)', () => { setStagePreset(38); menu.classList.add('hidden'); }, Math.abs(curVh - 38) <= 5, 'sz'),
-    tileBtn('M', 'Tamaño M (60% equilibrado)', () => { setStagePreset(60); menu.classList.add('hidden'); }, Math.abs(curVh - 60) <= 5, 'sz')
+    tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini),
+    tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive)
   );
 
-  // Fila 2: Tamaños amplios + audio
-  const gridAudio = h('div', { class: 'meet-grid' },
-    tileBtn('L', 'Tamaño L (80% amplio)', () => { setStagePreset(80); menu.classList.add('hidden'); }, Math.abs(curVh - 80) <= 5, 'sz'),
-    tileBtn('XL', 'Modo Teatro XL (94% pantalla)', () => { setStagePreset(94); menu.classList.add('hidden'); }, Math.abs(curVh - 94) <= 5, 'sz'),
+  // 3. Audio, Música y Gaming
+  const gridAudioGaming = h('div', { class: 'meet-grid' },
     tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
-    tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); })
-  );
-
-  // Fila 3: Gaming y utilidades
-  const gridGaming = h('div', { class: 'meet-grid' },
-    tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring),
+    tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }),
     tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
-    tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive),
-    tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini)
+    tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring)
   );
 
-  // Fila 4: Stats y diagnóstico
-  const gridUtil = h('div', { class: 'meet-grid' },
+  // 4. Diagnóstico y Utilidades
+  const gridUtil = h('div', { class: 'meet-grid util-grid' },
     tileBtn('📊', settings.stats ? 'Estadísticas HW/Ping: ON' : 'Estadísticas HW y Ping: OFF', () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); }, settings.stats),
     tileBtn('🎯', 'Diagnóstico y Códigos de Error', () => { modalDiagnostics(); menu.classList.add('hidden'); })
   );
@@ -3143,12 +3162,13 @@ $('mMore').onclick = (e) => {
   );
 
   menu.replaceChildren(
-    h('div', { class: 'meet-sect-label' }, 'Vista y Escenario'),
+    h('div', { class: 'meet-sect-label' }, 'Tamaño del Escenario'),
+    gridSizes,
+    h('div', { class: 'meet-sect-label' }, 'Vista y Pantalla'),
     gridVistas,
-    h('div', { class: 'meet-sect-label' }, 'Audio y Música'),
-    gridAudio,
-    h('div', { class: 'meet-sect-label' }, 'Gaming y Utilidades'),
-    gridGaming,
+    h('div', { class: 'meet-sect-label' }, 'Audio y Gaming'),
+    gridAudioGaming,
+    h('div', { class: 'meet-sect-label' }, 'Diagnóstico'),
     gridUtil,
     gateRow,
     tipBar
