@@ -462,53 +462,41 @@ app.whenReady().then(() => {
         throw new Error('No hay actualización pendiente lista');
       }
 
-      const applyCmd = path.join(app.getPath('temp'), 'epickast-apply-asar.cmd');
-      const cmdContent = [
-        '@echo off',
-        'setlocal enabledelayedexpansion',
-        'chcp 65001 >nul',
-        'set /a close_tries=0',
-        ':wait_close',
-        'set /a close_tries+=1',
-        'taskkill /f /im "EpicKast.exe" >nul 2>&1',
-        'timeout /t 1 /nobreak >nul',
-        'tasklist /fi "imagename eq EpicKast.exe" 2>nul | find /i "EpicKast.exe" >nul',
-        'if not errorlevel 1 (',
-        '    if !close_tries! leq 15 goto wait_close',
-        ')',
-        'set /a copy_tries=0',
-        ':try_copy',
-        'set /a copy_tries+=1',
-        'if not exist "' + pendingAsar + '" goto launch_app',
-        'del /f /q "' + targetAsar + '" >nul 2>&1',
-        'move /y "' + pendingAsar + '" "' + targetAsar + '" >nul 2>&1',
-        'if not errorlevel 1 goto copy_ok',
-        'copy /y "' + pendingAsar + '" "' + targetAsar + '" >nul 2>&1',
-        'if not errorlevel 1 (',
-        '    del /f /q "' + pendingAsar + '" >nul 2>&1',
-        '    goto copy_ok',
-        ')',
-        'if !copy_tries! leq 30 (',
-        '    timeout /t 1 /nobreak >nul',
-        '    goto try_copy',
-        ')',
-        ':copy_ok',
-        ':launch_app',
-        'timeout /t 1 /nobreak >nul',
-        'if exist "' + targetExe + '" (',
-        '    start "" "' + targetExe + '"',
-        ') else (',
-        '    start "" "' + process.execPath + '"',
-        ')',
-        'del "%~f0" >nul 2>&1',
-        'exit'
+      // Script VBScript 100% silencioso y sin terminales CMD ni ventanas de consola bloqueadas
+      const vbsPath = path.join(app.getPath('temp'), 'epickast-apply-update.vbs');
+      const vbsLines = [
+        'Set sh = CreateObject("WScript.Shell")',
+        'Set fso = CreateObject("Scripting.FileSystemObject")',
+        'WScript.Sleep 600',
+        'sh.Run "taskkill /f /im EpicKast.exe", 0, True',
+        'WScript.Sleep 600',
+        'pending = "' + pendingAsar.replace(/\\/g, '\\\\') + '"',
+        'target = "' + targetAsar.replace(/\\/g, '\\\\') + '"',
+        'exe = "' + targetExe.replace(/\\/g, '\\\\') + '"',
+        'For i = 1 To 25',
+        '  On Error Resume Next',
+        '  If fso.FileExists(pending) Then',
+        '    If fso.FileExists(target) Then fso.DeleteFile target, True',
+        '    fso.MoveFile pending, target',
+        '    If Err.Number = 0 Then Exit For',
+        '  End If',
+        '  WScript.Sleep 400',
+        'Next',
+        'WScript.Sleep 400',
+        'If fso.FileExists(exe) Then',
+        '  sh.Run """" & exe & """", 1, False',
+        'Else',
+        '  sh.Run """" & "' + process.execPath.replace(/\\/g, '\\\\') + '" & """", 1, False',
+        'End If',
+        'On Error Resume Next',
+        'fso.DeleteFile WScript.ScriptFullName, True'
       ].join('\r\n');
 
-      fs.writeFileSync(applyCmd, cmdContent, 'utf8');
+      fs.writeFileSync(vbsPath, vbsLines, 'utf8');
       isQuitting = true;
 
       const { spawn } = require('child_process');
-      const child = spawn('cmd.exe', ['/c', applyCmd], {
+      const child = spawn('wscript.exe', [vbsPath], {
         detached: true,
         stdio: 'ignore',
         windowsHide: true,
