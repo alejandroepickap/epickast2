@@ -41,7 +41,7 @@ function icoSvg(name, size = 15) {
 
 const DEFAULTS = {
   server: 'wss://epickast.onrender.com', mic: '', cam: '', spk: '',
-  camPreset: '720p30', screenPreset: '1080p30', screenAudio: false,
+  camPreset: '720p30', screenPreset: '1080p30', screenAudio: true, hideOwnScreenPreview: false,
   hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.006, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
   keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 60, hideNoVideo: true,
@@ -2658,16 +2658,33 @@ $('bScreen').onclick = async () => {
   const screens = srcs.filter((s) => s.screen);
   const windows = srcs.filter((s) => !s.screen);
 
+  const audioChk = h('input', {
+    type: 'checkbox',
+    style: 'width:17px;height:17px;margin:0;accent-color:var(--ac);cursor:pointer',
+    checked: settings.screenAudio !== false,
+    onchange: (e) => {
+      settings.screenAudio = e.target.checked;
+      saveSettings();
+    }
+  });
+  const audioRow = h('label', {
+    style: 'display:flex;flex-direction:row;align-items:center;gap:9px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;cursor:pointer;font-size:12.5px;color:var(--tx);font-weight:600'
+  },
+    audioChk,
+    h('span', null, '🔊 Compartir también el audio del sistema (juegos, videos, música)')
+  );
+
   const makeCard = (s) => h('div', { class: 'src', onclick: async () => {
     closeModal();
     try {
-      await c.startScreen(s.id);
+      await c.startScreen(s.id, settings.screenAudio !== false);
       ringer.playStreamStart();
     } catch (e) { return toast('No se pudo compartir la pantalla'); }
     updateDock(); renderStage(); pushState();
   } }, h('img', { src: s.thumb }), h('span', { title: s.name }, (s.screen ? '🖥️ ' : '🪟 ') + s.name));
 
   const content = h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-height:68vh;overflow-y:auto' },
+    audioRow,
     screens.length ? h('div', { class: 'sect', style: 'margin:0' }, '🖥️ Pantallas completas (Recomendado — sin pantallas negras)') : null,
     screens.length ? h('div', { class: 'srcs' }, screens.map(makeCard)) : null,
     windows.length ? h('div', { class: 'sect', style: 'margin-top:6px' }, '🪟 Ventanas y aplicaciones') : null,
@@ -2822,7 +2839,21 @@ function tile(key, label, user, withVol = false) {
     setSvg(pip, 'mini', 13);
     const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } });
     setSvg(fs, 'size', 13);
-    const tbtns = h('div', { class: 'tbtns' }, pinBtn, fitBtn, pip, fs);
+    let hidePrevBtn = null;
+    if (key === 'me-screen') {
+      hidePrevBtn = h('button', {
+        title: 'Ocultar mi vista previa (Ahorra 100% de CPU y GPU en tu PC)',
+        onclick: (e) => {
+          e.stopPropagation();
+          settings.hideOwnScreenPreview = !settings.hideOwnScreenPreview;
+          saveSettings();
+          renderStage();
+          toast(settings.hideOwnScreenPreview ? 'Vista previa oculta (ahorrando recursos)' : 'Vista previa visible');
+        }
+      });
+      setSvg(hidePrevBtn, 'eye', 13);
+    }
+    const tbtns = h('div', { class: 'tbtns' }, hidePrevBtn, pinBtn, fitBtn, pip, fs);
     let volWrap = null;
     if (withVol && user?.id) {
       const cur = getUserVol(user.id);
@@ -2836,13 +2867,44 @@ function tile(key, label, user, withVol = false) {
       volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt);
     }
     const el = h('div', { class: 'tile', 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
-    $('stage').append(el); t = { el, video, nm, av, stat, tbtns, pinBtn, fitBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
+    $('stage').append(el); t = { key, el, video, nm, av, stat, tbtns, pinBtn, fitBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
   }
   const k = `${user?.id}:${user?.av}:${user?.color}`;
   if (t.avKey !== k) { t.avKey = k; t.av.replaceChildren(avatar(user, 72)); }
   t.nm.textContent = label; return t;
 }
 function setStream(t, stream, hasVideo, muted) {
+  if (t.key === 'me-screen' && settings.hideOwnScreenPreview) {
+    if (t.video.srcObject) {
+      t.video.srcObject = null;
+      t.vCount = 0;
+    }
+    t.video.classList.add('noVideo');
+    t.av.style.display = 'none';
+    if (!t.savingCard) {
+      t.savingCard = h('div', { class: 'saving-card' },
+        h('div', { style: 'font-size:26px;margin-bottom:4px' }, '🖥️'),
+        h('div', { style: 'font-weight:700;font-size:13px;color:#fff' }, 'Transmitiendo tu pantalla'),
+        h('div', { style: 'font-size:11.5px;color:#94a3b8;margin-top:2px' }, '🟢 En vivo · Vista previa pausada para ahorrar CPU y GPU'),
+        h('button', {
+          style: 'margin-top:10px;padding:5px 12px;font-size:11px;font-weight:600;border-radius:7px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;cursor:pointer',
+          onclick: (e) => {
+            e.stopPropagation();
+            settings.hideOwnScreenPreview = false;
+            saveSettings();
+            renderStage();
+          }
+        }, '▶ Mostrar vista previa')
+      );
+      t.el.append(t.savingCard);
+    }
+    t.savingCard.style.display = 'flex';
+    t.hasVideo = true;
+    t.tbtns.style.display = '';
+    return;
+  } else if (t.savingCard) {
+    t.savingCard.style.display = 'none';
+  }
   const vCount = stream ? stream.getVideoTracks().length : 0;
   const aCount = stream ? stream.getAudioTracks().length : 0;
   if (t.video.srcObject !== stream || t.vCount !== vCount || t.aCount !== aCount) {

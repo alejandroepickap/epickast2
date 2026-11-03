@@ -281,7 +281,7 @@ app.whenReady().then(() => {
       const srcs = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 0, height: 0 } });
       const s = srcs.find((x) => x.id === sel.id);
       if (!s) return cb({});
-      cb(sel.audio && s.id.startsWith('screen:') ? { video: s, audio: 'loopback' } : { video: s });
+      cb(sel.audio ? { video: s, audio: 'loopback' } : { video: s });
     } catch { cb({}); }
   }, { useSystemPicker: false });
 

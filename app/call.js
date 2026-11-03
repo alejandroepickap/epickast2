@@ -451,10 +451,14 @@ class Call {
     }
     this.retune();
   }
-  async startScreen(sourceId) {
+  async startScreen(sourceId, withAudio) {
     const pr = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['1080p30'];
-    await window.epic.selectSource(sourceId, !!this.settings.screenAudio);
-    const st = await navigator.mediaDevices.getDisplayMedia({ video: { width: { max: pr.w }, height: { max: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } }, audio: !!this.settings.screenAudio });
+    const shareAudio = withAudio !== undefined ? !!withAudio : (this.settings.screenAudio !== false);
+    await window.epic.selectSource(sourceId, shareAudio);
+    const st = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: { max: pr.w }, height: { max: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } },
+      audio: shareAudio
+    });
     await this.stopScreen();
     this.screenStream = st;
     const v = st.getVideoTracks()[0];
