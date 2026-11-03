@@ -721,10 +721,10 @@ function releaseInfo() {
     });
     if (files.length) file = files[0];
   }
-  const directExe = process.env.DIRECT_EXE_URL || null;
+  const directExe = process.env.DIRECT_EXE_URL || 'https://www.dropbox.com/scl/fi/e2lvf09xwg4kn00wwm8s7/EpicKast-Instalador-1.5.5.exe?rlkey=5c1oqsoumsoyglrfhligpauat&st=lpw1splz&dl=1';
   const directZip = process.env.DIRECT_ZIP_URL || null;
   const ghUrl = directZip || `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
-  const ghExe = directExe || `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.exe`;
+  const ghExe = directExe;
   return {
     version,
     file: file || `EpicKast-v${version}-Amigos.zip`,
