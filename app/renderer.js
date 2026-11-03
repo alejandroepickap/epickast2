@@ -47,6 +47,7 @@ const DEFAULTS = {
   keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 60, hideNoVideo: true,
   partyVol: 0.75, partyAudioOnly: false, autoGameDetect: true, customActivity: '',
   hideSide: false, hideMembers: false, disableGpu: false,
+  voiceMode: 'vad', pttKey: 'Control', pttCue: true, gameMode: false,
 };
 const ROLES = {
   owner:  { label: 'Dueño',       group: '👑 Dueño',            badge: '👑', color: '#fbbf24', rank: 4 },
@@ -82,12 +83,17 @@ const S = {
   mini: false, appVer: '1.4.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
+  gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
 };
 
 window.epic.version?.().then((v) => { if (v) S.appVer = v; }).catch(() => {});
 window.epic.onMiniChanged?.((val) => {
   S.mini = !!val;
   document.body.classList.toggle('mini-mode', S.mini);
+  updateDock();
+});
+window.epic.onOverlayStatus?.((val) => {
+  S.overlayActive = !!val;
   updateDock();
 });
 window.epic.onShortcut?.((act) => {
@@ -231,6 +237,12 @@ function onMsg(ev) {
     case 'voice.joined': S.call?.addPeer(m.user); ringer.beep([520, 680]); break;
     case 'voice.left': S.call?.removePeer(m.userId); ringer.beep([600, 420]); break;
     case 'voice.peerstate': { const p = S.call?.peers.get(m.userId); if (p) { p.state = m.state; renderStage(); } break; }
+    case 'voice.sound':
+      if (m.from !== S.me?.id) {
+        playSoundEffect(m.sound);
+        toast(`🔊 ${m.name || 'Alguien'} reprodujo: ${SOUND_NAMES[m.sound] || m.sound}`);
+      }
+      break;
     case 'voice.kicked': leaveCall(true); toast('Te uniste desde otro dispositivo'); break;
     case 'rtc.signal': S.call?.handleSignal(m.from, m.data); break;
     case 'call.incoming': showIncoming(m); break;
@@ -1353,6 +1365,241 @@ function modalProfile() {
     } }, 'Guardar'));
 }
 
+async function modalDiagnostics() {
+  let devs = [];
+  try { devs = await navigator.mediaDevices.enumerateDevices(); } catch {}
+
+  let curMicId = settings.mic || '';
+  let curSpkId = settings.spk || '';
+  let curCamId = settings.cam || '';
+  let curRes = settings.camPreset || '720p30';
+  let curGate = settings.voiceGate ?? 0.006;
+
+  let micStream = null, audioCtx = null, analyser = null;
+  let camStream = null;
+  let rafId = null;
+
+  const micSel = h('select', { onchange: () => { curMicId = micSel.value; initMic(); } },
+    h('option', { value: '' }, 'Micrófono predeterminado'),
+    devs.filter((d) => d.kind === 'audioinput').map((d, i) => h('option', { value: d.deviceId, selected: curMicId === d.deviceId }, d.label || `Micrófono ${i + 1}`))
+  );
+
+  const meterBar = h('div', { style: 'height:100%;width:0%;background:linear-gradient(90deg,#10b981,#fbbf24,#ef4444);border-radius:4px;transition:width .06s' });
+  const meterWrap = h('div', { class: 'meter', style: 'flex:1;height:12px;background:#141722;border-radius:6px;overflow:hidden;position:relative' }, meterBar);
+  const statusBadge = h('span', { style: 'font-size:11.5px;color:var(--mu);min-width:115px' }, '⚪ En silencio');
+
+  const gateLabel = h('span', { style: 'font-size:11.5px;color:#c4b5fd;font-weight:600' }, `${Math.round((curGate / 0.06) * 100)}%`);
+  const gateSlider = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: curGate, oninput: () => {
+    curGate = Number(gateSlider.value);
+    gateLabel.textContent = `${Math.round((curGate / 0.06) * 100)}%`;
+  } });
+
+  const calBtn = h('button', { style: 'font-size:12px;padding:6px 12px;border-radius:8px' }, '🎯 Calibrar Ruido Ambiente (2s)');
+  calBtn.onclick = () => {
+    calBtn.disabled = true;
+    calBtn.textContent = '🤫 Silencio por favor... (2s)';
+    let maxAmbient = 0;
+    const start = performance.now();
+    const poll = () => {
+      if (!analyser) return;
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      if (rms > maxAmbient) maxAmbient = rms;
+      if (performance.now() - start < 2000) {
+        requestAnimationFrame(poll);
+      } else {
+        const recommended = Math.max(0.004, Math.min(0.04, maxAmbient * 1.4));
+        curGate = Math.round(recommended * 1000) / 1000;
+        gateSlider.value = curGate;
+        gateLabel.textContent = `${Math.round((curGate / 0.06) * 100)}%`;
+        calBtn.disabled = false;
+        calBtn.textContent = '✅ Calibrado';
+        toast(`Filtro ajustado a tu entorno: ${Math.round((curGate / 0.06) * 100)}%`);
+      }
+    };
+    poll();
+  };
+
+  const recBtn = h('button', { style: 'font-size:12px;padding:6px 12px;border-radius:8px' }, '🔴 Grabar y escuchar mi voz (3s)');
+  recBtn.onclick = async () => {
+    if (!micStream) return;
+    recBtn.disabled = true;
+    recBtn.textContent = '🎙️ Habla ahora (3s)...';
+    try {
+      const rec = new MediaRecorder(micStream);
+      const chunks = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      rec.onstop = () => {
+        recBtn.textContent = '🔊 Reproduciendo tu voz...';
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const audio = new Audio(URL.createObjectURL(blob));
+        if (curSpkId && audio.setSinkId) audio.setSinkId(curSpkId).catch(() => {});
+        audio.onended = () => {
+          recBtn.disabled = false;
+          recBtn.textContent = '🔴 Grabar y escuchar mi voz (3s)';
+        };
+        audio.play().catch(() => { recBtn.disabled = false; recBtn.textContent = '🔴 Grabar y escuchar mi voz (3s)'; });
+      };
+      rec.start();
+      setTimeout(() => rec.stop(), 3000);
+    } catch {
+      recBtn.disabled = false;
+      recBtn.textContent = '🔴 Grabar y escuchar mi voz (3s)';
+    }
+  };
+
+  const spkSel = h('select', { onchange: () => { curSpkId = spkSel.value; } },
+    h('option', { value: '' }, 'Altavoces predeterminados'),
+    devs.filter((d) => d.kind === 'audiooutput').map((d, i) => h('option', { value: d.deviceId, selected: curSpkId === d.deviceId }, d.label || `Altavoz ${i + 1}`))
+  );
+  const toneBtn = h('button', { style: 'font-size:12px;padding:6px 12px;border-radius:8px' }, '🔔 Probar altavoces');
+  toneBtn.onclick = () => {
+    ringer.beep([523, 659, 784, 1046]);
+    toast('Reproduciendo tono de prueba en altavoces...');
+  };
+
+  const camSel = h('select', { onchange: () => { curCamId = camSel.value; initCam(); } },
+    h('option', { value: '' }, 'Cámara predeterminada'),
+    devs.filter((d) => d.kind === 'videoinput').map((d, i) => h('option', { value: d.deviceId, selected: curCamId === d.deviceId }, d.label || `Cámara ${i + 1}`))
+  );
+  const resSel = h('select', { onchange: () => { curRes = resSel.value; initCam(); } },
+    [['720p30', 'HD 720p (30 FPS - Fluido y ligero)'], ['1080p30', 'Full HD 1080p (30 FPS - Alta definición)']].map(([k, t]) => h('option', { value: k, selected: curRes === k }, t))
+  );
+
+  const camPreview = h('video', {
+    autoplay: true,
+    playsinline: true,
+    muted: true,
+    style: 'width:100%;height:160px;background:#06080d;border-radius:10px;border:1px solid rgba(255,255,255,0.1);object-fit:contain'
+  });
+
+  async function initMic() {
+    try {
+      if (micStream) micStream.getTracks().forEach((t) => t.stop());
+      cancelAnimationFrame(rafId);
+      const constraints = {
+        audio: curMicId ? { deviceId: { exact: curMicId } } : true,
+        video: false
+      };
+      micStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const src = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+
+      const loop = () => {
+        if (!analyser) return;
+        const buf = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        meterBar.style.width = Math.min(100, Math.round(rms * 280)) + '%';
+        if (rms > curGate) {
+          statusBadge.textContent = `🟢 Hablando (${Math.round(rms * 100)}%)`;
+          statusBadge.style.color = '#34d399';
+        } else {
+          statusBadge.textContent = '⚪ En silencio';
+          statusBadge.style.color = 'var(--mu)';
+        }
+        rafId = requestAnimationFrame(loop);
+      };
+      loop();
+    } catch {
+      statusBadge.textContent = '⚠️ Error de micrófono';
+    }
+  }
+
+  async function initCam() {
+    try {
+      if (camStream) camStream.getTracks().forEach((t) => t.stop());
+      const pr = CAM_PRESETS[curRes] || CAM_PRESETS['720p30'];
+      const constraints = {
+        video: {
+          deviceId: curCamId ? { exact: curCamId } : undefined,
+          width: { ideal: pr.w },
+          height: { ideal: pr.h },
+          frameRate: { ideal: pr.fps }
+        },
+        audio: false
+      };
+      camStream = await navigator.mediaDevices.getUserMedia(constraints);
+      camPreview.srcObject = camStream;
+    } catch {
+      camPreview.srcObject = null;
+    }
+  }
+
+  initMic();
+  initCam();
+
+  const cleanup = () => {
+    cancelAnimationFrame(rafId);
+    if (micStream) micStream.getTracks().forEach((t) => t.stop());
+    if (camStream) camStream.getTracks().forEach((t) => t.stop());
+    try { audioCtx?.close(); } catch {}
+  };
+  S.cleanup.push(cleanup);
+
+  const saveBtn = h('button', {
+    class: 'primary',
+    style: 'padding:11px 16px;font-size:13.5px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;margin-top:8px',
+    onclick: async () => {
+      settings.mic = curMicId;
+      settings.spk = curSpkId;
+      settings.cam = curCamId;
+      settings.camPreset = curRes;
+      settings.voiceGate = curGate;
+      saveSettings();
+      cleanup();
+      closeModal();
+
+      if (S.call) {
+        if (settings.spk) S.call.setSinkId?.(settings.spk);
+        if (S.call.mic) S.call.mic.setGate?.(settings.voiceGate);
+      }
+      toast('✅ ¡Diagnóstico completado! Todos tus ajustes han sido guardados.');
+    }
+  }, '✅ Guardar y Finalizar Diagnóstico');
+
+  const content = h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-height:76vh;overflow-y:auto;padding-right:4px' },
+    h('div', { style: 'font-size:12px;color:var(--mu);margin-bottom:-4px' },
+      'Verifica tus periféricos una sola vez. Tus opciones se quedarán guardadas permanentemente para todas tus llamadas.'
+    ),
+    h('div', { class: 'sect' }, '1. Micrófono y Puerta de Voz'),
+    h('label', null, 'Dispositivo de Entrada', micSel),
+    h('div', { style: 'display:flex;align-items:center;gap:10px;margin-top:2px' }, meterWrap, statusBadge),
+    h('label', null, h('span', null, 'Filtro Anti-Respiración (Puerta de Voz): ', gateLabel), gateSlider),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, calBtn, recBtn),
+
+    h('div', { class: 'sect', style: 'margin-top:6px' }, '2. Altavoces y Salida'),
+    h('label', null, 'Dispositivo de Salida', spkSel),
+    h('div', null, toneBtn),
+
+    h('div', { class: 'sect', style: 'margin-top:6px' }, '3. Cámara de Video'),
+    h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
+      h('label', null, 'Cámara', camSel),
+      h('label', null, 'Calidad', resSel)
+    ),
+    camPreview,
+
+    saveBtn
+  );
+
+  modal('Diagnóstico y Calibración de Audio y Video', content);
+}
+
 async function modalSettings() {
   let devs = []; try { devs = await navigator.mediaDevices.enumerateDevices(); } catch {}
   const sel = (kind, key) => {
@@ -1452,7 +1699,58 @@ async function modalSettings() {
   const swA = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === settings.accent ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { settings.accent = c; saveSettings(); applyAccent(); swA.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
   const vol = h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: settings.ringVol, onchange: () => { settings.ringVol = Number(vol.value); saveSettings(); ringer.start('in'); setTimeout(() => ringer.stop(), 1200); } });
   const dlLink = httpBase() + '/download/latest';
+  const diagBtn = h('button', {
+    class: 'primary',
+    style: 'display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 14px;font-size:13px;font-weight:700;border-radius:10px;margin-bottom:8px;background:linear-gradient(135deg,rgba(124,92,255,0.9),rgba(99,102,241,0.9));color:#fff',
+    onclick: () => {
+      closeModal();
+      modalDiagnostics();
+    }
+  }, '🎙️ Diagnóstico y Calibración Completa de Audio y Video');
   modal(`Ajustes · EpicKast v${S.appVer}`,
+    diagBtn,
+    h('label', null, 'Modo de transmisión del micrófono',
+      h('select', { onchange: (e) => {
+        settings.voiceMode = e.target.value;
+        saveSettings();
+        if (S.call) {
+          if (settings.voiceMode === 'ptt') S.call.setMuted(true);
+          else S.call.setMuted(false);
+          updateDock();
+        }
+        closeModal();
+        modalSettings();
+      } },
+        h('option', { value: 'vad', selected: settings.voiceMode !== 'ptt' }, 'Activación continua / por voz (VAD)'),
+        h('option', { value: 'ptt', selected: settings.voiceMode === 'ptt' }, 'Pulsar para hablar (Push-to-Talk / PTT)')
+      )
+    ),
+    settings.voiceMode === 'ptt' ? h('div', { style: 'background:rgba(124,92,255,0.08);border:1px solid rgba(124,92,255,0.25);border-radius:10px;padding:10px 12px;margin:4px 0 8px;display:flex;flex-direction:column;gap:8px' },
+      h('div', { style: 'font-weight:700;font-size:12px;color:#c4b5fd' }, '🎙️ Configuración de Pulsar para Hablar (PTT)'),
+      h('div', { style: 'display:flex;gap:8px;align-items:center' },
+        h('button', {
+          style: 'padding:7px 14px;border-radius:8px;font-weight:700;background:var(--ac);color:#fff;border:0;cursor:pointer',
+          onclick: (e) => {
+            const btn = e.target;
+            btn.textContent = '⌨️ Presiona cualquier tecla...';
+            const handler = (ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              let keyName = ev.key;
+              if (ev.code === 'Space') keyName = ' ';
+              settings.pttKey = keyName;
+              saveSettings();
+              btn.textContent = `Tecla asignada: [ ${settings.pttKey === ' ' ? 'Barra Espaciadora' : settings.pttKey} ]`;
+              toast(`Tecla PTT guardada: ${settings.pttKey === ' ' ? 'Espacio' : settings.pttKey}`);
+              window.removeEventListener('keydown', handler, true);
+            };
+            window.addEventListener('keydown', handler, true);
+          }
+        }, `Tecla asignada: [ ${settings.pttKey === ' ' ? 'Barra Espaciadora' : (settings.pttKey || 'Control')} ]`),
+        h('span', { style: 'font-size:11.5px;color:var(--mu)' }, '(Haz clic y presiona tu tecla preferida: Ctrl, Shift, etc.)')
+      ),
+      chk('pttCue', 'Reproducir bip sonoro al activar y soltar el micrófono')
+    ) : null,
     h('label', null, 'Micrófono', sel('audioinput', 'mic')),
     h('label', null, h('span', null, 'Volumen de tu micrófono: ', micGainLbl), micGainInput),
     h('label', null, h('span', null, '🌬️ Filtro Anti-Respiración (Puerta de Voz): ', gateLbl), gateInput),
@@ -1464,8 +1762,26 @@ async function modalSettings() {
     h('label', null, 'Altavoces', sel('audiooutput', 'spk')),
     h('label', null, 'Calidad de cámara', preset('camPreset', CAM_PRESETS)),
     h('label', null, 'Calidad de pantalla', preset('screenPreset', SCREEN_PRESETS)),
+    chk('gameMode', '🎮 Modo Juego por defecto (reduce fps y bitrate para dar 100% de CPU/Ping al juego)', () => {
+      if (S.call) S.call.setGameMode(settings.gameMode);
+      S.gameMode = settings.gameMode;
+      updateDock();
+    }),
+    h('div', { style: 'display:flex;gap:8px;align-items:center;margin:4px 0 8px' },
+      h('button', {
+        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
+        onclick: () => toggleOverlay()
+      }, '🎮 Overlay Gamer Flotante'),
+      h('button', {
+        style: 'flex:1;padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-weight:600;font-size:12px;cursor:pointer',
+        onclick: () => { closeModal(); modalSoundboard(); }
+      }, '🔊 Tablero de Sonidos')
+    ),
     chk('screenAudio', 'Compartir audio del sistema (usa audífonos para evitar eco)'),
     chk('hwPrefer', 'Preferir H.264 por hardware (reiniciar llamada para aplicar)'),
+    h('div', { class: 'hint', style: 'margin-top:-6px;line-height:1.4;color:#a5b4fc;font-size:11.5px' },
+      'ℹ️ ¿Qué es H.264? Delega la compresión de video al chip de tu tarjeta gráfica (NVIDIA, AMD o Intel) en lugar de usar el procesador. Recomendado para jugar o compartir pantalla con 0 caídas de FPS.'
+    ),
     chk('disableGpu', 'Deshabilitar aceleración por hardware (estilo Discord; soluciona pantallas negras al compartir Chrome o juegos)', async () => {
       await window.epic.setConfig?.({ disableGpu: settings.disableGpu });
       if (confirm(settings.disableGpu
@@ -1539,17 +1855,27 @@ async function joinCall(key, label) {
     myId: S.me.id,
     settings,
     ice: S.ice,
-    onChange: renderStage,
+    onChange: () => { renderStage(); syncOverlay(); },
     onSpeaking: (id, v, lv = 0) => {
       const k = id === 'me' ? 'me' : `p${id}`;
       document.querySelector(`[data-tile="${k}"]`)?.classList.toggle('speaking', v);
-      if (id === 'me') $('micLive').style.width = v ? Math.min(100, Math.round(lv * 180)) + '%' : '0%';
+      if (id === 'me') {
+        S.meSpeaking = v;
+        $('micLive').style.width = v ? Math.min(100, Math.round(lv * 180)) + '%' : '0%';
+      }
+      syncOverlay();
     },
   });
   call.onScreenEnded = () => pushState();
   call.onCamEnded = () => { updateDock(); pushState(); toast('La cámara está ocupada por otra app (ej. Discord) o se desconectó'); };
   try {
     await call.start();
+    if (settings.voiceMode === 'ptt') {
+      call.setMuted(true);
+    }
+    if (S.gameMode) {
+      call.setGameMode(true);
+    }
     const r = await rpc('voice.join', { key });
     call.ice = r.ice; S.call = call; S.callKey = key; S.callLabel = label;
     S.party = r.party || null;
@@ -1559,7 +1885,7 @@ async function joinCall(key, label) {
     if (r.ringing) { S.outgoing = { key, name: label }; ringer.start('out'); } else ringer.beep([480, 640]);
   } catch (e) { call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return; }
   $('voiceDock').classList.remove('hidden'); $('stageWrap').classList.remove('hidden');
-  updateDock(); renderCenter(); renderStage(); syncPartyTile(); updateStatTimer(); updatePingTimer(); pushState(); renderCallOverlay();
+  updateDock(); renderCenter(); renderStage(); syncPartyTile(); updateStatTimer(); updatePingTimer(); pushState(); renderCallOverlay(); syncOverlay();
 }
 function leaveCall(silent) {
   if (S.mini) window.epic.toggleMini?.(false);
@@ -1567,52 +1893,457 @@ function leaveCall(silent) {
   if (S.outgoing) { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
   if (!S.call) return;
   if (!silent) { sendRaw('voice.leave', {}); ringer.beep([520, 360]); }
-  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null;
+  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false;
   $('micLive').style.width = '0%';
   $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden'); $('meetMenu')?.classList.add('hidden');
   tiles.forEach((t) => { t.boostCtx?.close().catch(() => {}); t.el.remove(); });
   tiles.clear(); renderCenter(); updateStatTimer(); updatePingTimer();
+  syncOverlay();
 }
 function pushState() { const c = S.call; if (c) sendRaw('voice.state', { muted: c.muted, deaf: c.deaf, cam: !!c.camTrack, screen: c.screenStream?.id || null }); }
+const ICONS = {
+  mic: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
+  micOff: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></svg>',
+  deaf: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></svg>',
+  deafOff: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M4.6 4.6A9 9 0 0 0 3 10v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3"/><path d="M19 14h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3"/><path d="M21 10a9 9 0 0 0-14.4-7.2"/></svg>',
+  cam: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>',
+  camOff: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="m22 8-6 4 6 4V8Z"/><path d="M2 10v6a2 2 0 0 0 2 2h12a2 2 0 0 0 1.74-1"/><path d="M6 6h10a2 2 0 0 1 2 2v3"/></svg>',
+  screen: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>',
+  party: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+  grid: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>',
+  size: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>',
+  hangup: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 11.7 11.7 0 0 0 3.73.59 2 2 0 0 1 2 2v2.5a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.09-8.7A2 2 0 0 1 5.4 2h2.5a2 2 0 0 1 2 2 11.7 11.7 0 0 0 .59 3.73 2 2 0 0 1-.45 2.11L8.77 11.1"/><line x1="2" x2="22" y1="2" y2="22"/></svg>',
+  more: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
+  loop: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10v3"/><path d="M6 6v11"/><path d="M10 3v18"/><path d="M14 8v7"/><path d="M18 5v13"/><path d="M22 10v3"/></svg>',
+  mini: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="14" x="3" y="5" rx="2"/><rect width="7" height="5" x="12" y="12" rx="1"/></svg>',
+  pin: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="17" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V5a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1V2H6v1a1 1 0 0 0 1 1h1a1 1 0 0 1 1 1v5.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>',
+  pinOff: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><line x1="12" x2="12" y1="17" y2="22"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h10"/><path d="M15 9.34V5a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1V2H7.34"/></svg>',
+  crop: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/></svg>',
+  expand: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
+  chevronUp: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>',
+  chevronDown: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  sound: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+  game: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="6"/></svg>',
+  overlay: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+};
+function getSvg(name, size = 16) {
+  const tpl = ICONS[name] || '';
+  return tpl.replaceAll('{S}', String(size));
+}
+function setSvg(el, name, size = 16) {
+  if (!el) return;
+  el.innerHTML = getSvg(name, size);
+}
+
+const SIZES = [
+  { label: 'S', vh: 38, desc: 'Compacto' },
+  { label: 'M', vh: 60, desc: 'Equilibrado' },
+  { label: 'L', vh: 80, desc: 'Amplio' },
+  { label: 'XL', vh: 94, desc: 'Modo Teatro' },
+];
+function cycleStageSize() {
+  const cur = Number(settings.stageHeight) || 60;
+  let idx = SIZES.findIndex((s) => Math.abs(s.vh - cur) <= 8);
+  if (idx < 0) idx = 1;
+  const next = SIZES[(idx + 1) % SIZES.length];
+  setStagePreset(next.vh);
+  toast(`Tamaño del escenario: ${next.label} (${next.desc} — ${next.vh}%)`);
+}
+
+// ---------- Tablero de Sonidos (Soundboard) Sincronizado ----------
+const SOUND_NAMES = {
+  victory: '🎺 Fanfarria de Victoria',
+  airhorn: '📯 Bocina de Fiesta (Airhorn)',
+  badumtss: '🥁 Ba-Dum-Tss (Chiste)',
+  applause: '👏 Aplausos',
+  levelup: '⭐ Level Up (Arcade)',
+  ding: '🔔 Campana / Ding',
+  boing: '🌀 Resorte Cómico (Boing)',
+  gameover: '👾 Game Over (8-Bit)',
+};
+
+let soundCtx = null;
+function getSoundCtx() {
+  if (!soundCtx || soundCtx.state === 'closed') {
+    soundCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (soundCtx.state === 'suspended') soundCtx.resume().catch(() => {});
+  return soundCtx;
+}
+
+function playSoundEffect(name) {
+  try {
+    const ctx = getSoundCtx();
+    const now = ctx.currentTime;
+    switch (name) {
+      case 'victory': {
+        const notes = [
+          { f: 261.63, t: 0, d: 0.14 },
+          { f: 329.63, t: 0.14, d: 0.14 },
+          { f: 392.00, t: 0.28, d: 0.14 },
+          { f: 523.25, t: 0.42, d: 0.65 },
+          { f: 659.25, t: 0.42, d: 0.65 },
+          { f: 783.99, t: 0.42, d: 0.65 },
+        ];
+        notes.forEach(({ f, t, d }) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(f, now + t);
+          g.gain.setValueAtTime(0.001, now + t);
+          g.gain.exponentialRampToValueAtTime(0.28, now + t + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + t + d);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now + t);
+          osc.stop(now + t + d + 0.04);
+        });
+        break;
+      }
+      case 'applause': {
+        const dur = 2.0;
+        const bufSize = ctx.sampleRate * dur;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        filter.Q.setValueAtTime(2.0, now);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.01, now);
+        g.gain.linearRampToValueAtTime(0.25, now + 0.25);
+        g.gain.setValueAtTime(0.25, now + 1.2);
+        g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        src.connect(filter);
+        filter.connect(g);
+        g.connect(ctx.destination);
+        src.start(now);
+        src.stop(now + dur);
+        break;
+      }
+      case 'airhorn': {
+        const blasts = [
+          { t: 0, d: 0.11 },
+          { t: 0.14, d: 0.11 },
+          { t: 0.28, d: 0.11 },
+          { t: 0.42, d: 0.5 },
+        ];
+        blasts.forEach(({ t, d }) => {
+          [466, 622].forEach((freq) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now + t);
+            osc.frequency.linearRampToValueAtTime(freq * 1.02, now + t + d);
+            g.gain.setValueAtTime(0.001, now + t);
+            g.gain.linearRampToValueAtTime(0.16, now + t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.start(now + t);
+            osc.stop(now + t + d + 0.02);
+          });
+        });
+        break;
+      }
+      case 'badumtss': {
+        const hits = [
+          { t: 0, f: 140, d: 0.11 },
+          { t: 0.16, f: 160, d: 0.11 },
+        ];
+        hits.forEach(({ t, f, d }) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, now + t);
+          osc.frequency.exponentialRampToValueAtTime(45, now + t + d);
+          g.gain.setValueAtTime(0.32, now + t);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now + t);
+          osc.stop(now + t + d);
+        });
+        const cDur = 0.75;
+        const cBuf = ctx.createBuffer(1, Math.round(ctx.sampleRate * cDur), ctx.sampleRate);
+        const cd = cBuf.getChannelData(0);
+        for (let i = 0; i < cd.length; i++) cd[i] = Math.random() * 2 - 1;
+        const cSrc = ctx.createBufferSource();
+        cSrc.buffer = cBuf;
+        const cFilt = ctx.createBiquadFilter();
+        cFilt.type = 'highpass';
+        cFilt.frequency.setValueAtTime(6000, now + 0.34);
+        const cGain = ctx.createGain();
+        cGain.gain.setValueAtTime(0.001, now);
+        cGain.gain.setValueAtTime(0.26, now + 0.34);
+        cGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34 + cDur);
+        cSrc.connect(cFilt);
+        cFilt.connect(cGain);
+        cGain.connect(ctx.destination);
+        cSrc.start(now + 0.34);
+        cSrc.stop(now + 0.34 + cDur);
+        break;
+      }
+      case 'gameover': {
+        const seq = [
+          { f: 493.88, t: 0, d: 0.2 },
+          { f: 466.16, t: 0.2, d: 0.2 },
+          { f: 440.00, t: 0.4, d: 0.2 },
+          { f: 415.30, t: 0.6, d: 0.5 },
+        ];
+        seq.forEach(({ f, t, d }) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(f, now + t);
+          g.gain.setValueAtTime(0.12, now + t);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+          osc.connect(g);
+          g.connect(ctx.destination);
+          osc.start(now + t);
+          osc.stop(now + t + d + 0.02);
+        });
+        break;
+      }
+      case 'ding': {
+        const osc = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'sine'; osc.frequency.setValueAtTime(1760, now);
+        osc2.type = 'sine'; osc2.frequency.setValueAtTime(3520, now);
+        g.gain.setValueAtTime(0.26, now);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
+        osc.connect(g); osc2.connect(g); g.connect(ctx.destination);
+        osc.start(now); osc2.start(now);
+        osc.stop(now + 1.15); osc2.stop(now + 1.15);
+        break;
+      }
+      case 'boing': {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(750, now + 0.4);
+        g.gain.setValueAtTime(0.28, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(now); osc.stop(now + 0.55);
+        break;
+      }
+      case 'levelup': {
+        const notes = [330, 392, 523, 659, 784, 1046];
+        notes.forEach((freq, idx) => {
+          const t = idx * 0.075;
+          const d = idx === notes.length - 1 ? 0.4 : 0.075;
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + t);
+          g.gain.setValueAtTime(0.18, now + t);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+          osc.connect(g); g.connect(ctx.destination);
+          osc.start(now + t); osc.stop(now + t + d + 0.02);
+        });
+        break;
+      }
+    }
+  } catch (e) {
+    console.warn('playSoundEffect', e);
+  }
+}
+
+function modalSoundboard() {
+  const SOUNDS = [
+    { key: 'victory', name: 'Victoria', icon: '🏆', desc: 'Fanfarria triunfal de victoria' },
+    { key: 'airhorn', name: 'Airhorn', icon: '📯', desc: 'El clásico sonido de fiesta' },
+    { key: 'badumtss', name: 'Ba-Dum-Tss', icon: '🥁', desc: 'Remate de chiste gracioso' },
+    { key: 'applause', name: 'Aplausos', icon: '👏', desc: 'Ovación del público' },
+    { key: 'levelup', name: 'Level Up', icon: '⭐', desc: 'Subida de nivel retro arcade' },
+    { key: 'ding', name: 'Campana', icon: '🔔', desc: 'Campanita cristalina' },
+    { key: 'boing', name: 'Boing', icon: '🌀', desc: 'Resorte cómico de caricatura' },
+    { key: 'gameover', name: 'Game Over', icon: '👾', desc: 'Melodía de derrota 8-bit' },
+  ];
+
+  const grid = h('div', {
+    style: 'display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px',
+  }, SOUNDS.map((s) => {
+    return h('button', {
+      style: 'display:flex;align-items:center;gap:10px;padding:11px;background:#181b28;border:1px solid rgba(255,255,255,0.08);border-radius:10px;text-align:left;cursor:pointer;transition:all 0.15s ease',
+      onclick: () => {
+        playSoundEffect(s.key);
+        if (S.call) {
+          sendRaw('voice.sound', { sound: s.key, name: S.me?.name || 'Tú' });
+          toast(`🔊 Has enviado "${s.name}" a la llamada`);
+        } else {
+          toast(`🔊 Reproduciendo: ${s.name} (Prueba local)`);
+        }
+      },
+    },
+      h('span', { style: 'font-size:22px;line-height:1' }, s.icon),
+      h('div', { style: 'flex:1;overflow:hidden' },
+        h('div', { style: 'font-weight:700;font-size:12.5px;color:#f1f5f9' }, s.name),
+        h('div', { style: 'font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, s.desc)
+      )
+    );
+  }));
+
+  const info = h('div', {
+    style: 'font-size:11.5px;color:var(--mu);margin-top:12px;line-height:1.4;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px'
+  }, S.call ? '✨ Los sonidos se reproducen sincronizados para todos los miembros conectados a la llamada.' : 'ℹ️ Conéctate a una llamada para compartir los sonidos con tus amigos en tiempo real.');
+
+  modal('Tablero de Sonidos (Soundboard) 🔊', grid, info);
+}
+
+// ---------- Modo Juego (Baja Latencia / Mínimo Ping) ----------
+function toggleGameMode(enable) {
+  S.gameMode = enable === undefined ? !S.gameMode : !!enable;
+  if (S.call) S.call.setGameMode(S.gameMode);
+  toast(S.gameMode ? '🎮 Modo Juego activado: 15 fps y bitrate reducido para dar 100% de CPU/Ping a tu partida' : 'Modo Juego desactivado');
+  updateDock();
+}
+
+// ---------- Superposición Gamer Flotante (Overlay Transparente) ----------
+function syncOverlay() {
+  if (!window.epic?.updateOverlay) return;
+  if (!S.call) {
+    window.epic.updateOverlay({ peers: [] });
+    return;
+  }
+  const peers = [];
+  peers.push({
+    id: 'me',
+    name: S.me?.name || 'Tú',
+    color: S.me?.color || '#a855f7',
+    speaking: !!S.meSpeaking,
+    muted: !!S.call?.muted,
+  });
+  for (const [id, p] of S.call.peers.entries()) {
+    peers.push({
+      id,
+      name: p.user?.name || `Usuario ${id}`,
+      color: p.user?.color || '#3b82f6',
+      speaking: !!p.speaking,
+      muted: !!p.muted,
+    });
+  }
+  window.epic.updateOverlay({ peers, channel: S.callLabel || 'Llamada' });
+}
+
+function toggleOverlay(enable) {
+  if (!window.epic?.toggleOverlay) return;
+  window.epic.toggleOverlay(enable).then((active) => {
+    S.overlayActive = active;
+    syncOverlay();
+    toast(active ? '🎮 Overlay de voz sobre juegos activado' : 'Overlay cerrado');
+    updateDock();
+  }).catch(() => {});
+}
+
+// ---------- Pulsar para Hablar (Push-to-Talk / PTT) ----------
+let pttHolding = false;
+window.addEventListener('keydown', (e) => {
+  if (settings.voiceMode !== 'ptt' || !S.call) return;
+  const tag = e.target?.tagName?.toUpperCase();
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable;
+  const pttKey = settings.pttKey || 'Control';
+  
+  if (isInput && !['Control', 'Alt', 'Shift', 'Meta', 'CapsLock', 'Tab'].includes(e.key) && !/^F\d+$/.test(e.key)) {
+    return;
+  }
+
+  const matches = (e.key === pttKey) || (pttKey === ' ' && e.code === 'Space');
+  if (matches) {
+    if (e.repeat) return;
+    pttHolding = true;
+    if (S.call.muted) {
+      S.call.setMuted(false);
+      if (settings.pttCue !== false) ringer.beep([880], 0.04);
+      updateDock();
+      renderStage();
+      pushState();
+    }
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (settings.voiceMode !== 'ptt' || !S.call) return;
+  const pttKey = settings.pttKey || 'Control';
+  const matches = (e.key === pttKey) || (pttKey === ' ' && e.code === 'Space');
+  if (matches) {
+    pttHolding = false;
+    if (!S.call.muted) {
+      S.call.setMuted(true);
+      if (settings.pttCue !== false) ringer.beep([440], 0.04);
+      updateDock();
+      renderStage();
+      pushState();
+    }
+  }
+});
+
 function updateDock() {
   const c = S.call; if (!c) return;
   const ns = c.noiseMode === 'high' ? ' · 🔇 RNNoise' : '';
   if (!settings.stats) $('voiceInfo').textContent = `🔊 ${S.callLabel}${ns}`;
-  const setQ = (id, cls, ico) => {
+  const setQ = (id, cls, icoKey, sz = 16) => {
     const el = $(id); if (!el) return;
     el.className = 'qbtn' + (id === 'bLeave' ? ' hang' : '') + (cls ? ' ' + cls : '');
-    const i = el.querySelector('i'); if (i && ico) i.textContent = ico;
+    const i = el.querySelector('i'); if (i) setSvg(i, icoKey, sz);
   };
-  const setD = (id, cls, txt) => {
+  const setD = (id, cls, txt, icoKey) => {
     const el = $(id); if (!el) return;
     el.className = 'dockbtn' + (cls ? ' ' + cls : '');
     const sp = el.querySelector('span'); if (sp) sp.textContent = txt;
+    const i = el.querySelector('i'); if (i && icoKey) setSvg(i, icoKey, 16);
   };
-  const setM = (id, cls, ico) => {
+  const setM = (id, cls, icoKey, sz = 16) => {
     const el = $(id); if (!el) return;
     el.className = 'mbtn' + (cls ? ' ' + cls : '');
-    if (ico) el.textContent = ico;
+    setSvg(el, icoKey, sz);
   };
   const hasParty = !!S.party?.current;
-  setQ('bMute', c.muted ? 'off' : '', c.muted ? '🔇' : '🎤');
-  setQ('bDeaf', c.deaf ? 'off' : '', '🎧');
-  setQ('bDockMore', S.dockOpen ? 'on' : '', S.dockOpen ? '▾' : '▴');
-  $('dockDrawer')?.classList.toggle('hidden', !S.dockOpen);
-  setD('bLoop', c.mic?.monitoring ? 'on' : '', c.mic?.monitoring ? 'Oyéndome' : 'Oírme');
-  setD('bCam', c.camTrack ? 'on' : '', c.camTrack ? 'Cámara ON' : 'Cámara');
-  setD('bScreen', c.screenStream ? 'on' : '', c.screenStream ? 'Pantalla ON' : 'Pantalla');
-  setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ');
-  setD('bMini', S.mini ? 'on' : '', S.mini ? 'Expandir' : 'Flotante');
+  setQ('bMute', c.muted ? 'off' : '', c.muted ? 'micOff' : 'mic');
+  setQ('bDeaf', c.deaf ? 'off' : '', c.deaf ? 'deafOff' : 'deaf');
+  setQ('bDockMore', S.dockOpen ? 'on' : '', S.dockOpen ? 'chevronDown' : 'chevronUp');
+  setQ('bLeave', '', 'hangup');
 
-  setM('mMute', c.muted ? 'off' : '', c.muted ? '🔇' : '🎤');
-  setM('mDeaf', c.deaf ? 'off' : '', '🎧');
-  setM('mCam', c.camTrack ? 'on' : '', '📷');
-  setM('mScreen', c.screenStream ? 'on' : '', '🖥️');
-  setM('mParty', hasParty ? 'on' : '', '🎵');
-  setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '');
-  const sh = Math.round(Number(settings.stageHeight) || 60);
-  [['mSizeSm', 38], ['mSizeMd', 60], ['mSizeLg', 80], ['mSizeXl', 94]].forEach(([id, v]) => {
-    $(id)?.classList.toggle('on', Math.abs(sh - v) <= 5);
+  $('dockDrawer')?.classList.toggle('hidden', !S.dockOpen);
+  setD('bCam', c.camTrack ? 'on' : '', c.camTrack ? 'Cámara ON' : 'Cámara', c.camTrack ? 'cam' : 'camOff');
+  setD('bScreen', c.screenStream ? 'on' : '', c.screenStream ? 'Pantalla ON' : 'Pantalla', 'screen');
+  setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ', 'party');
+  setD('bSoundboard', '', 'Sonidos', 'sound');
+  setD('bGameMode', S.gameMode ? 'on' : '', S.gameMode ? 'Juegos ON' : 'Juegos', 'game');
+  setD('bOverlay', S.overlayActive ? 'on' : '', S.overlayActive ? 'Overlay ON' : 'Overlay', 'overlay');
+  setD('bLoop', c.mic?.monitoring ? 'on' : '', c.mic?.monitoring ? 'Oyéndome' : 'Oírme', 'loop');
+  setD('bMini', S.mini ? 'on' : '', S.mini ? 'Expandir' : 'Flotante', 'mini');
+
+  setM('mMute', c.muted ? 'off' : '', c.muted ? 'micOff' : 'mic');
+  setM('mDeaf', c.deaf ? 'off' : '', c.deaf ? 'deafOff' : 'deaf');
+  setM('mCam', c.camTrack ? 'on' : '', c.camTrack ? 'cam' : 'camOff');
+  setM('mScreen', c.screenStream ? 'on' : '', 'screen');
+  setM('mParty', hasParty ? 'on' : '', 'party');
+  setM('mSoundboard', '', 'sound');
+  setM('mGameMode', S.gameMode ? 'on' : '', 'game');
+  setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '', 'grid');
+  setM('mMore', '', 'more');
+  setSvg($('mLeaveIco'), 'hangup', 15);
+
+  if (settings.voiceMode === 'ptt') {
+    const keyTxt = settings.pttKey === ' ' ? 'Espacio' : (settings.pttKey || 'Control');
+    const tip = `Pulsar para hablar [${keyTxt}] · ${pttHolding ? '🎙️ Abierto' : 'Silenciado'}`;
+    $('bMute')?.setAttribute('title', tip);
+    $('mMute')?.setAttribute('title', tip);
+  }
+
+  const curVh = Math.round(Number(settings.stageHeight) || 60);
+  const curItem = SIZES.find((s) => Math.abs(s.vh - curVh) <= 8) || SIZES[1];
+  const badge = $('mSizeBadge');
+  if (badge) badge.textContent = curItem.label;
+  $('mSizeMenu')?.querySelectorAll('button').forEach((btn) => {
+    btn.classList.toggle('on', Number(btn.dataset.sz) === curItem.vh);
   });
 }
 $('bMute').onclick = () => { const c = S.call; if (!c) return; if (c.deaf) c.deaf = false; c.setMuted(!c.muted); updateDock(); renderStage(); syncPartyTile(); pushState(); };
@@ -1627,6 +2358,11 @@ $('bLoop').onclick = () => {
 };
 $('bCam').onclick = async () => { try { await S.call?.setCamera(!S.call.camTrack); } catch (e) { toast('No se pudo abrir la cámara'); } updateDock(); renderStage(); pushState(); };
 $('bParty').onclick = () => modalParty();
+$('bSoundboard').onclick = () => modalSoundboard();
+$('mSoundboard').onclick = () => modalSoundboard();
+$('bGameMode').onclick = () => toggleGameMode();
+$('mGameMode').onclick = () => toggleGameMode();
+$('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
 $('bLeave').onclick = () => leaveCall(false);
 $('bScreen').onclick = async () => {
@@ -1674,10 +2410,26 @@ function setStagePreset(vh) {
   applyStageHeight();
   updateDock();
 }
-$('mSizeSm').onclick = () => setStagePreset(38);
-$('mSizeMd').onclick = () => setStagePreset(60);
-$('mSizeLg').onclick = () => setStagePreset(80);
-$('mSizeXl').onclick = () => setStagePreset(94);
+$('mSizeBtn').onclick = (e) => {
+  e.stopPropagation();
+  $('meetMenu')?.classList.add('hidden');
+  $('mSizeMenu')?.classList.toggle('hidden');
+};
+$('mSizeMenu')?.querySelectorAll('button[data-sz]').forEach((btn) => {
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    setStagePreset(Number(btn.dataset.sz));
+    $('mSizeMenu')?.classList.add('hidden');
+  };
+});
+$('stageResizer').onclick = () => cycleStageSize();
+$('stage').ondblclick = (e) => {
+  if (e.target.id === 'stage' || e.target.id === 'stageSideStrip') cycleStageSize();
+};
+window.addEventListener('click', () => {
+  $('mSizeMenu')?.classList.add('hidden');
+  $('meetMenu')?.classList.add('hidden');
+});
 
 $('mMore').onclick = (e) => {
   e.stopPropagation();
@@ -1694,9 +2446,13 @@ $('mMore').onclick = (e) => {
   menu.replaceChildren(
     h('div', { style: 'font-size:11px;color:var(--mu);display:flex;justify-content:space-between' }, '🌬️ Filtro Anti-Respiración', gLbl),
     gRng,
+    h('button', { onclick: () => { modalSoundboard(); menu.classList.add('hidden'); } }, '🔊 Tablero de Sonidos (Soundboard)'),
+    h('button', { class: S.gameMode ? 'on' : '', onclick: () => { toggleGameMode(); menu.classList.add('hidden'); } }, '🎮 Modo Juego (Baja Latencia)', h('span', null, S.gameMode ? 'ON' : 'OFF')),
+    h('button', { class: S.overlayActive ? 'on' : '', onclick: () => { toggleOverlay(); menu.classList.add('hidden'); } }, '🎮 Overlay Gamer Flotante', h('span', null, S.overlayActive ? 'ON' : 'OFF')),
     h('button', { class: c?.mic?.monitoring ? 'on' : '', onclick: () => { $('bLoop').click(); menu.classList.add('hidden'); } }, '👂 Escuchar mi voz (Oírme)', h('span', null, c?.mic?.monitoring ? 'ON' : 'OFF')),
-    h('button', { class: S.mini ? 'on' : '', onclick: () => { $('bMini').click(); menu.classList.add('hidden'); } }, '📌 Ventana flotante', h('span', null, S.mini ? 'ON' : 'OFF')),
-    h('button', { class: settings.stats ? 'on' : '', onclick: () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); } }, '📊 Estadísticas HW/Ping', h('span', null, settings.stats ? 'ON' : 'OFF'))
+    h('button', { class: S.mini ? 'on' : '', onclick: () => { $('bMini').click(); menu.classList.add('hidden'); } }, '📌 Ventana flotante (PiP)', h('span', null, S.mini ? 'ON' : 'OFF')),
+    h('button', { class: settings.stats ? 'on' : '', onclick: () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); } }, '📊 Estadísticas HW/Ping', h('span', null, settings.stats ? 'ON' : 'OFF')),
+    h('button', { onclick: () => { modalDiagnostics(); menu.classList.add('hidden'); } }, '🎯 Diagnóstico de Audio y Video')
   );
   menu.classList.remove('hidden');
 };
@@ -1758,7 +2514,8 @@ function tile(key, label, user, withVol = false) {
     const isCam = key === 'me' || /^p\d+$/.test(key);
     const video = h('video', { autoplay: true, playsinline: true, onclick: () => toggleFocusTile(key), title: 'Clic para enfocar / ampliar esta cámara o transmisión' });
     const nm = h('div', { class: 'nm' }); const av = h('div', { class: 'av' }, avatar(user, 72)); const stat = h('div', { class: 'stat' });
-    const pinBtn = h('button', { title: 'Enfocar / ampliar esta cámara en el escenario (estilo Google Meet)', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } }, '📌 Enfocar');
+    const pinBtn = h('button', { title: 'Enfocar / ampliar esta cámara (Spotlight)', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } });
+    setSvg(pinBtn, 'pin', 13);
     const fitBtn = h('button', {
       class: '',
       title: 'Alternar entre imagen completa (sin recortar cámara) o rellenar cuadro',
@@ -1767,12 +2524,15 @@ function tile(key, label, user, withVol = false) {
         el.classList.toggle('cover');
         const isCover = el.classList.contains('cover');
         fitBtn.classList.toggle('on', isCover);
-        fitBtn.textContent = isCover ? '🔍' : '🔲';
+        setSvg(fitBtn, isCover ? 'crop' : 'expand', 13);
         toast(isCover ? 'Modo Rellenar (recorta bordes para llenar)' : 'Modo Completo (sin recortar cámara)');
       }
-    }, '🔲');
-    const pip = h('button', { title: 'Ventana sobre ventana (Picture-in-Picture)', onclick: (e) => { e.stopPropagation(); (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture?.()).catch(() => {}); } }, '🖼️ PiP');
-    const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } }, '⛶');
+    });
+    setSvg(fitBtn, 'expand', 13);
+    const pip = h('button', { title: 'Ventana sobre ventana (Picture-in-Picture)', onclick: (e) => { e.stopPropagation(); (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture?.()).catch(() => {}); } });
+    setSvg(pip, 'mini', 13);
+    const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } });
+    setSvg(fs, 'size', 13);
     const tbtns = h('div', { class: 'tbtns' }, pinBtn, fitBtn, pip, fs);
     let volWrap = null;
     if (withVol && user?.id) {
@@ -2151,7 +2911,8 @@ function renderStage() {
     t.el.classList.toggle('focused', foc);
     if (t.pinBtn) {
       t.pinBtn.classList.toggle('on', S.focusTile === k);
-      t.pinBtn.textContent = S.focusTile === k ? '📌 Enfocado' : '📌 Enfocar';
+      setSvg(t.pinBtn, S.focusTile === k ? 'pin' : 'pinOff', 13);
+      t.pinBtn.title = S.focusTile === k ? 'Desenfocar esta cámara' : 'Enfocar esta cámara (Spotlight)';
     }
   }
   updateDock();

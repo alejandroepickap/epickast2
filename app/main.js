@@ -138,9 +138,54 @@ app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '100');
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let win = null;
+let overlayWin = null;
+let isOverlayVisible = false;
 let pendingSource = null;
 let savedBounds = null;
 let isMiniMode = false;
+
+function createOverlayWindow() {
+  if (overlayWin && !overlayWin.isDestroyed()) return overlayWin;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width } = primaryDisplay.workAreaSize;
+  overlayWin = new BrowserWindow({
+    width: 200, height: 280,
+    x: width - 220, y: 50,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: true,
+    show: false,
+    hasShadow: false,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+  overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.loadFile(path.join(__dirname, 'overlay.html'));
+  overlayWin.on('closed', () => { overlayWin = null; isOverlayVisible = false; });
+  return overlayWin;
+}
+
+function toggleOverlay(enable) {
+  if (enable === undefined) enable = !isOverlayVisible;
+  isOverlayVisible = !!enable;
+  if (isOverlayVisible) {
+    const ow = createOverlayWindow();
+    ow.showInactive();
+  } else if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.hide();
+  }
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('overlay:status-changed', isOverlayVisible);
+  }
+  return isOverlayVisible;
+}
 
 function setMiniMode(enable) {
   if (!win || win.isDestroyed()) return false;
@@ -217,6 +262,12 @@ app.whenReady().then(() => {
     app.exit(0);
   });
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
+  ipcMain.handle('overlay:toggle', (e, enable) => toggleOverlay(enable));
+  ipcMain.handle('overlay:update', (e, data) => {
+    if (overlayWin && !overlayWin.isDestroyed() && isOverlayVisible) {
+      overlayWin.webContents.send('overlay:data', data);
+    }
+  });
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
   ipcMain.handle('app:download-and-install', async (e, url) => {

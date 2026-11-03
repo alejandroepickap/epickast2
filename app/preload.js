@@ -19,4 +19,8 @@ contextBridge.exposeInMainWorld('epic', {
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   relaunch: () => ipcRenderer.invoke('app:relaunch'),
+  toggleOverlay: (enable) => ipcRenderer.invoke('overlay:toggle', enable),
+  updateOverlay: (data) => ipcRenderer.invoke('overlay:update', data),
+  onOverlayData: (cb) => ipcRenderer.on('overlay:data', (_e, data) => cb(data)),
+  onOverlayStatus: (cb) => ipcRenderer.on('overlay:status-changed', (_e, val) => cb(val)),
 });

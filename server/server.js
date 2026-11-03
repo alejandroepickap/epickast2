@@ -672,6 +672,14 @@ const H = {
     for (const [id, v] of r) if (id !== ws.user.id) send(v.ws, { t: 'voice.peerstate', userId: ws.user.id, state: me.state });
     broadcastRoom(ws.room);
   },
+  'voice.sound': (ws, d) => {
+    const r = rooms.get(ws.room); if (!r) return;
+    const soundKey = clean(d.sound || '', 40);
+    const soundName = clean(d.name || ws.user.name, 40);
+    for (const [, v] of r) {
+      send(v.ws, { t: 'voice.sound', from: ws.user.id, sound: soundKey, name: soundName, customUrl: d.customUrl ? String(d.customUrl).slice(0, 500) : null });
+    }
+  },
   'rtc.signal': (ws, d) => {
     const r = rooms.get(ws.room); const to = r?.get(Number(d.to));
     if (!r || !to) return;
@@ -682,7 +690,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.3';
+  let version = '1.5.4';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;

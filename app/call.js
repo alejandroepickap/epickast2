@@ -387,11 +387,20 @@ class Call {
   tuneVideo(sender, preset, kind) {
     this.setParams(sender, (prm) => {
       const e = prm.encodings[0];
-      e.maxBitrate = Math.round(preset.kbps * 1000 * this.share());
-      e.maxFramerate = preset.fps;
+      if (this.gameMode) {
+        e.maxBitrate = Math.min(320000, Math.round(preset.kbps * 1000 * 0.35));
+        e.maxFramerate = 15;
+      } else {
+        e.maxBitrate = Math.round(preset.kbps * 1000 * this.share());
+        e.maxFramerate = preset.fps;
+      }
       e.networkPriority = kind === 'screen' ? 'medium' : 'high';
       prm.degradationPreference = kind === 'screen' && preset.fps <= 30 ? 'maintain-resolution' : 'balanced';
     });
+  }
+  setGameMode(enabled) {
+    this.gameMode = !!enabled;
+    this.retune();
   }
   retune() {
     const cp = CAM_PRESETS[this.settings.camPreset] || CAM_PRESETS['720p30'];

@@ -64,18 +64,22 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .ping{font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;background:#161a24;white-space:nowrap;color:var(--tx)}
 .micbar{width:46px;height:5px;background:#1c202c;border-radius:4px;overflow:hidden;flex:none}
 #micLive{height:100%;width:0%;background:var(--ok);transition:width .08s}
-.vquick{display:flex;gap:4px;align-items:center;flex:none}
-.qbtn{width:30px;height:30px;padding:0;border-radius:8px;display:grid;place-items:center;font-size:14px;background:var(--bg3)}
-.qbtn i{font-style:normal}
+.vquick{display:flex;gap:5px;align-items:center;flex:none}
+.qbtn{width:32px;height:32px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg3);border:1px solid var(--line);color:#cfd6e4;cursor:pointer;transition:all .15s ease}
+.qbtn svg{display:block;flex:none}
+.qbtn i{display:inline-flex;align-items:center;justify-content:center}
 .qbtn span{display:none}
-.qbtn.on{background:#199e52;border-color:transparent;color:#fff}
+.qbtn.on{background:#10b981;border-color:transparent;color:#fff}
 .qbtn.off{background:var(--bad);border-color:transparent;color:#fff}
-.qbtn.hang{background:var(--bad);border-color:transparent;color:#fff}
-.dock{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding-top:4px;border-top:1px solid var(--line)}
-.dockbtn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 2px;font-size:10px;border-radius:8px;min-width:0}
-.dockbtn i{font-style:normal;font-size:14px}
-.dockbtn.on{background:#199e52;border-color:transparent;color:#fff}
-.dockbtn.off{background:var(--bad);border-color:transparent;color:#fff}
+.qbtn.hang{background:rgba(255,84,104,0.14);border-color:rgba(255,84,104,0.3);color:var(--bad)}
+.qbtn.hang:hover{background:var(--bad);color:#fff;border-color:transparent}
+.dock{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding-top:5px;border-top:1px solid var(--line)}
+.dockbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 2px;font-size:10.5px;font-weight:600;border-radius:8px;min-width:0;background:rgba(255,255,255,0.03);border:1px solid var(--line);color:var(--mu);cursor:pointer;transition:all .15s ease}
+.dockbtn:hover{background:rgba(255,255,255,0.08);color:var(--tx)}
+.dockbtn svg{display:block;flex:none}
+.dockbtn i{display:inline-flex;align-items:center;justify-content:center}
+.dockbtn.on{background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.38);color:#34d399}
+.dockbtn.off{background:rgba(255,84,104,0.18);border-color:rgba(255,84,104,0.38);color:var(--bad)}
 
 #meBar{padding:9px 10px;background:#0a0b10;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
 #meBar .who{display:flex;align-items:center;gap:9px;cursor:pointer;min-width:0;flex:1;border-radius:9px;padding:3px 5px}
@@ -145,19 +149,28 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .tile .tbtns button.on{background:var(--ac);color:#fff}
 
 /* ---- Barra flotante estilo Google Meet ---- */
-#meetBar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(18,21,30,0.92);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:999px;padding:4px 8px;display:flex;align-items:center;gap:5px;box-shadow:0 10px 28px #000b;z-index:12;opacity:.42;transition:opacity .18s}
+#meetBar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);background:rgba(18,21,30,0.92);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.12);border-radius:999px;padding:5px 8px;display:flex;align-items:center;gap:6px;box-shadow:0 10px 28px #000b;z-index:12;opacity:.55;transition:opacity .18s}
 #stageWrap:hover #meetBar,#meetBar:focus-within{opacity:1}
-.mbtn{width:32px;height:32px;border-radius:50%;padding:0;display:grid;place-items:center;font-size:14px;background:#232838;border:1px solid rgba(255,255,255,.07)}
-.mbtn.sz{font-size:11px;font-weight:700;width:28px;height:28px}
-.mbtn.on{background:var(--ac);color:#fff;border-color:transparent}
-.mbtn.off{background:var(--bad);color:#fff;border-color:transparent}
-.mbtn.hang{width:auto;border-radius:999px;padding:0 12px;font-size:12px;font-weight:600;background:var(--bad);color:#fff;border-color:transparent;display:flex;gap:4px}
+.mbtn{width:34px;height:34px;border-radius:50%;padding:0;display:inline-flex;align-items:center;justify-content:center;background:#1e2230;border:1px solid rgba(255,255,255,.08);color:#d1d5db;cursor:pointer;transition:all .15s ease}
+.mbtn:hover{background:#2b3145;color:#fff;border-color:rgba(255,255,255,.18)}
+.mbtn svg{display:block;flex:none}
+.mbtn.on{background:var(--ac);color:#fff;border-color:transparent;box-shadow:0 0 12px rgba(124,92,255,.35)}
+.mbtn.off{background:var(--bad);color:#fff;border-color:transparent;box-shadow:0 0 12px rgba(255,84,104,.35)}
+.mbtn.hang{width:auto;border-radius:999px;padding:0 13px;height:34px;font-size:12.5px;font-weight:600;background:var(--bad);color:#fff;border-color:transparent;display:inline-flex;align-items:center;gap:6px}
+.mbtn.hang:hover{background:#e03248}
+.mbtn.hang svg{display:block}
+.msize-wrap{position:relative}
+.m-badge{font-size:10px;font-weight:800;color:#c4b5fd;margin-left:2px;letter-spacing:-.3px}
 .msep{width:1px;height:18px;background:var(--line);margin:0 2px}
 .mmore-wrap{position:relative}
-.meet-menu{position:absolute;bottom:40px;right:0;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;min-width:235px;display:flex;flex-direction:column;gap:7px;box-shadow:0 14px 36px #000d;z-index:20}
-.meet-menu button{text-align:left;padding:6px 10px;font-size:12px;display:flex;justify-content:space-between;align-items:center}
-#stageResizer{height:7px;cursor:ns-resize;display:grid;place-items:center;background:#0b0d13;user-select:none}
-#stageResizer span{width:42px;height:3px;border-radius:3px;background:#32384e;transition:background .15s}
+.meet-menu{position:absolute;bottom:42px;right:0;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;min-width:210px;display:flex;flex-direction:column;gap:5px;box-shadow:0 14px 36px #000d;z-index:20}
+.meet-menu button{text-align:left;padding:6px 10px;font-size:12.5px;border-radius:7px;display:flex;justify-content:space-between;align-items:center;background:transparent;border:1px solid transparent;color:var(--tx)}
+.meet-menu button:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
+.meet-menu button.on{background:rgba(124,92,255,0.18);border-color:rgba(124,92,255,0.38);color:#c4b5fd;font-weight:600}
+.meet-menu small{color:var(--mu);font-size:11px}
+#stageResizer{height:8px;cursor:ns-resize;display:grid;place-items:center;background:#0b0d13;user-select:none;transition:background .15s}
+#stageResizer:hover{background:#131620}
+#stageResizer span{width:46px;height:3px;border-radius:3px;background:#32384e;transition:background .15s}
 #stageResizer:hover span{background:var(--ac)}
 
 #members{background:var(--bg2);border-left:1px solid var(--line);overflow-y:auto;padding:8px}

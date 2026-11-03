@@ -38,18 +38,21 @@
           </div>
         </div>
         <div class="vquick">
-          <button id="bMute" class="qbtn" title="Silenciar / activar micrófono (Alt+M)"><i>🎤</i><span>Micro</span></button>
-          <button id="bDeaf" class="qbtn" title="Silenciar audio de la llamada (Alt+D)"><i>🎧</i><span>Audio</span></button>
-          <button id="bDockMore" class="qbtn" title="Desplegar más controles de llamada"><i>▴</i></button>
-          <button id="bLeave" class="qbtn hang" title="Colgar llamada"><i>📵</i><span>Colgar</span></button>
+          <button id="bMute" class="qbtn" title="Silenciar / activar micrófono (Alt+M)"><i></i><span>Micro</span></button>
+          <button id="bDeaf" class="qbtn" title="Silenciar audio de la llamada (Alt+D)"><i></i><span>Audio</span></button>
+          <button id="bDockMore" class="qbtn" title="Desplegar más controles de llamada"><i></i></button>
+          <button id="bLeave" class="qbtn hang" title="Colgar llamada"><i></i><span>Colgar</span></button>
         </div>
       </div>
       <div id="dockDrawer" class="dock hidden">
-        <button id="bCam" class="dockbtn" title="Encender / apagar cámara"><i>📷</i><span>Cámara</span></button>
-        <button id="bScreen" class="dockbtn" title="Compartir pantalla"><i>🖥️</i><span>Pantalla</span></button>
-        <button id="bParty" class="dockbtn" title="EpicBot DJ: Ver YouTube o escuchar playlists juntos en la llamada"><i>🎵</i><span>Bot DJ</span></button>
-        <button id="bLoop" class="dockbtn" title="Escuchar mi propio micrófono (para probar cómo sueno)"><i>👂</i><span>Oírme</span></button>
-        <button id="bMini" class="dockbtn" title="Modo ventana sobre ventana (siempre visible encima)"><i>📌</i><span>Flotante</span></button>
+        <button id="bCam" class="dockbtn" title="Encender / apagar cámara"><i></i><span>Cámara</span></button>
+        <button id="bScreen" class="dockbtn" title="Compartir pantalla"><i></i><span>Pantalla</span></button>
+        <button id="bParty" class="dockbtn" title="EpicBot DJ: Ver YouTube o escuchar playlists juntos en la llamada"><i></i><span>Bot DJ</span></button>
+        <button id="bSoundboard" class="dockbtn" title="Tablero de Sonidos (Soundboard para llamadas)"><i></i><span>Sonidos</span></button>
+        <button id="bGameMode" class="dockbtn" title="Modo Juego: Optimizar ping y rendimiento para jugar"><i></i><span>Juegos</span></button>
+        <button id="bOverlay" class="dockbtn" title="Superposición de voz gamer (Overlay transparente sobre juegos)"><i></i><span>Overlay</span></button>
+        <button id="bLoop" class="dockbtn" title="Escuchar mi propio micrófono (para probar cómo sueno)"><i></i><span>Oírme</span></button>
+        <button id="bMini" class="dockbtn" title="Modo ventana sobre ventana (siempre visible encima)"><i></i><span>Flotante</span></button>
       </div>
     </div>
     <footer id="meBar"></footer>
@@ -60,25 +63,36 @@
     <div id="stageWrap" class="hidden">
       <div id="stage"></div>
       <div id="meetBar">
-        <button id="mMute" class="mbtn" title="Silenciar / activar micrófono (Alt+M)">🎤</button>
-        <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)">🎧</button>
-        <button id="mCam" class="mbtn" title="Encender / apagar cámara">📷</button>
-        <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana">🖥️</button>
-        <button id="mParty" class="mbtn" title="EpicBot DJ: Poner música, playlists o ver YouTube en conjunto">🎵</button>
-        <button id="mHideNoVid" class="mbtn" title="Mostrar todos los participantes en cuadrícula / Solo cámaras activas"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg></button>
+        <button id="mMute" class="mbtn" title="Silenciar / activar micrófono (Alt+M)"></button>
+        <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)"></button>
+        <button id="mCam" class="mbtn" title="Encender / apagar cámara"></button>
+        <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana"></button>
+        <button id="mParty" class="mbtn" title="EpicBot DJ: Poner música, playlists o ver YouTube en conjunto"></button>
+        <button id="mSoundboard" class="mbtn" title="Tablero de Sonidos (Soundboard en llamada)"></button>
+        <button id="mGameMode" class="mbtn" title="Modo Juego: Optimizar ping y ancho de banda"></button>
+        <button id="mHideNoVid" class="mbtn" title="Mostrar todos los participantes en cuadrícula / Solo cámaras activas"></button>
         <div class="msep"></div>
-        <button id="mSizeSm" class="mbtn sz" title="Tamaño compacto (32%)">S</button>
-        <button id="mSizeMd" class="mbtn sz" title="Tamaño medio (50%)">M</button>
-        <button id="mSizeLg" class="mbtn sz" title="Tamaño cine (76%)">L</button>
-        <button id="mSizeXl" class="mbtn sz" title="Tamaño máximo (92%)">XL</button>
+        <div class="msize-wrap">
+          <button id="mSizeBtn" class="mbtn" title="Tamaño del escenario (clic para abrir opciones o doble clic en escenario)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
+            <span id="mSizeBadge" class="m-badge">M</span>
+          </button>
+          <div id="mSizeMenu" class="meet-menu hidden" style="min-width:185px">
+            <div style="font-size:10.5px;font-weight:700;color:var(--mu);padding:2px 8px 6px;text-transform:uppercase;letter-spacing:.5px">Tamaño de cámaras</div>
+            <button data-sz="38"><span>S — Compacto</span> <small>38%</small></button>
+            <button data-sz="60"><span>M — Equilibrado</span> <small>60%</small></button>
+            <button data-sz="80"><span>L — Amplio</span> <small>80%</small></button>
+            <button data-sz="94"><span>XL — Modo Teatro</span> <small>94%</small></button>
+          </div>
+        </div>
         <div class="msep"></div>
         <div class="mmore-wrap">
-          <button id="mMore" class="mbtn" title="Opciones de audio, anti-respiración y vista">⋮</button>
+          <button id="mMore" class="mbtn" title="Opciones de audio, anti-respiración y vista"></button>
           <div id="meetMenu" class="meet-menu hidden"></div>
         </div>
-        <button id="mLeave" class="mbtn hang" title="Colgar llamada">📵 Colgar</button>
+        <button id="mLeave" class="mbtn hang" title="Colgar llamada"><span id="mLeaveIco"></span><span>Colgar</span></button>
       </div>
-      <div id="stageResizer" title="Arrastra hacia arriba o abajo para cambiar el tamaño del área de cámaras y transmisiones"><span></span></div>
+      <div id="stageResizer" title="Haz clic para alternar tamaños (S/M/L/XL) o arrastra hacia arriba/abajo"><span></span></div>
     </div>
     <div id="msgs"></div>
     <div id="typingBar" class="hidden"></div>
