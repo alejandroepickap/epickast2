@@ -317,6 +317,7 @@ function createTray() {
       click: () => {
         isQuitting = true;
         app.quit();
+        process.exit(0);
       },
     },
   ]);
@@ -385,10 +386,15 @@ app.whenReady().then(() => {
         win.webContents.send('app:update-progress', { percent: 100, installing: true });
       }
       // Ejecutar instalador NSIS silencioso /S con retardo de 1s para que Electron cierre limpiamente
-      const cmd = `timeout /t 1 /nobreak >nul & start "" "${tempExe}" /S`;
+      const updateBat = path.join(app.getPath('temp'), 'epickast-apply-update.bat');
+      const batContent = `@echo off\r\ntimeout /t 1 /nobreak >nul\r\ntaskkill /F /IM EpicKast.exe >nul 2>&1\r\npowershell -NoProfile -Command "Unblock-File -Path '${tempExe.replace(/\\/g, '\\\\')}' -ErrorAction SilentlyContinue" >nul 2>&1\r\nstart "" "${tempExe}"\r\nexit\r\n`;
+      fs.writeFileSync(updateBat, batContent, 'utf8');
+      isQuitting = true;
+      const cmd = updateBat;
       execFile('cmd.exe', ['/c', cmd], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
       setTimeout(() => {
         app.quit();
+        process.exit(0);
       }, 500);
       return { ok: true };
     } catch (err) {

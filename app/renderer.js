@@ -1593,6 +1593,76 @@ function modalProfile() {
     } }, 'Guardar'));
 }
 
+
+// ---------- Protocolo de Diagnóstico y Reporte de Errores ----------
+const recentErrors = [];
+window.addEventListener('error', (e) => {
+  recentErrors.push({ ts: new Date().toISOString(), type: 'JS_ERROR', msg: e.message || 'Error desconocido' });
+  if (recentErrors.length > 10) recentErrors.shift();
+});
+window.addEventListener('unhandledrejection', (e) => {
+  recentErrors.push({ ts: new Date().toISOString(), type: 'PROMISE_ERROR', msg: String(e.reason || 'Rechazo asíncrono') });
+  if (recentErrors.length > 10) recentErrors.shift();
+});
+
+async function copyDiagnosticReport() {
+  const lastErr = recentErrors[recentErrors.length - 1];
+  let errCode = 'ERR_OK_SISTEMA_ESTABLE';
+  if (lastErr) {
+    const m = (lastErr.msg || '').toLowerCase();
+    if (m.includes('update') || m.includes('descarga') || m.includes('install')) errCode = 'ERR_UPD_002';
+    else if (m.includes('webrtc') || m.includes('ice') || m.includes('peer') || m.includes('sdp')) errCode = 'ERR_RTC_001';
+    else if (m.includes('audio') || m.includes('mic') || m.includes('camera') || m.includes('device')) errCode = 'ERR_DEV_001';
+    else if (m.includes('websocket') || m.includes('connect') || m.includes('token') || m.includes('resume')) errCode = 'ERR_NET_001';
+    else errCode = 'ERR_APP_GENERAL';
+  }
+  
+  let pingText = 'No conectado a voz';
+  if (S.call) {
+    try {
+      const p = await S.call.pingSummary();
+      if (p?.rtt != null) pingText = `${p.rtt} ms (Pérdida: ${p.loss || 0}%)`;
+    } catch {}
+  } else if (S.ws?.readyState === 1) {
+    pingText = 'Servidor en línea (Sin llamada activa)';
+  } else {
+    pingText = 'Desconectado del servidor';
+  }
+
+  const lines = [
+    '========================================',
+    '   📋 REPORTE DE DIAGNÓSTICO EPICKAST',
+    '========================================',
+    `Fecha: ${new Date().toLocaleString()}`,
+    `Versión App: v${S.appVer || '1.5.7'}`,
+    `Código de Error: ${errCode}`,
+    `Usuario: ${S.me?.name || 'No autenticado'} (ID: ${S.me?.id || '-'})`,
+    `Servidor: ${settings.server || 'No configurado'}`,
+    `Estado de Conexión: ${pingText}`,
+    `Llamada Activa: ${S.call ? (S.callLabel || 'En llamada') : 'Ninguna'}`,
+    `Dispositivos:`,
+    ` - Micrófono ID: ${settings.mic || 'Predeterminado'}`,
+    ` - Altavoz ID: ${settings.spk || 'Predeterminado'}`,
+    ` - Cámara ID: ${settings.cam || 'Predeterminado'}`,
+    ` - Supresión Ruido: ${settings.noise}`,
+    ` - Puerta de Voz: ${Math.round(((settings.voiceGate ?? 0.006) / 0.06) * 100)}%`,
+    `Últimos Registros de Error:`,
+    recentErrors.length > 0
+      ? recentErrors.map((r) => ` • [${r.ts.slice(11, 19)}] [${r.type}] ${r.msg}`).join('\n')
+      : ' • Sin errores registrados durante esta sesión.',
+    '========================================',
+    'Envía este bloque al canal #soporte o al administrador.'
+  ];
+
+  const reportText = lines.join('\n');
+  try {
+    await navigator.clipboard.writeText(reportText);
+    toast('📋 Reporte de diagnóstico copiado al portapapeles. Pégalo en soporte.');
+  } catch {
+    prompt('Copia tu reporte de diagnóstico:', reportText);
+  }
+}
+
 async function modalDiagnostics() {
   let devs = [];
   try { devs = await navigator.mediaDevices.enumerateDevices(); } catch {}
@@ -1822,7 +1892,8 @@ async function modalDiagnostics() {
     ),
     camPreview,
 
-    saveBtn
+    saveBtn,
+    h('button', { style: 'margin-top:6px;width:100%;padding:9px 12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:10px;font-weight:700;font-size:12px;color:#fff;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico y Error (para Soporte)')
   );
 
   modal('Diagnóstico y Calibración de Audio y Video', content);
@@ -2089,6 +2160,7 @@ async function modalSettings() {
     h('label', null, 'Servidor conectado', h('input', { value: settings.server, onchange: (e) => { settings.server = normUrl(e.target.value); saveSettings(); toast('Se aplicará al volver a iniciar sesión'); } })),
     h('label', null, '📦 Enlace de descarga para amigos (clic para copiar)',
       h('input', { value: dlLink, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(dlLink); toast('Enlace de descarga copiado'); } })),
+    h('button', { style: 'margin-top:6px;padding:9px 12px;font-weight:700;font-size:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico y Error'),
     h('button', { class: 'danger', style: 'margin-top:6px', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, 'Cerrar sesión')
   );
 
