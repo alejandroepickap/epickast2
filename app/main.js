@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, scre
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const ofs = process.versions.electron ? require('original-fs') : require('node:fs');
 const https = require('node:https');
 const http = require('node:http');
 
@@ -27,7 +28,7 @@ function downloadFile(url, destPath, onProgress, maxRedirects = 5) {
       }
       const total = parseInt(res.headers['content-length'] || '0', 10);
       let downloaded = 0;
-      const fileStream = fs.createWriteStream(destPath);
+      const fileStream = ofs.createWriteStream(destPath);
       res.on('data', (chunk) => {
         downloaded += chunk.length;
         if (total > 0 && onProgress) {
@@ -412,7 +413,7 @@ app.whenReady().then(() => {
     let tempAsar = null;
     try {
       if (!url || typeof url !== 'string') throw new Error('URL de ASAR inválida');
-      const uniqueName = 'epickast-update-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.asar';
+      const uniqueName = 'epickast-update-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.bin';
       tempAsar = path.join(app.getPath('temp'), uniqueName);
 
       await downloadFile(url, tempAsar, (pct, cur, tot) => {
@@ -425,13 +426,13 @@ app.whenReady().then(() => {
         } catch {}
       });
 
-      const stat = fs.statSync(tempAsar);
+      const stat = ofs.statSync(tempAsar);
       if (stat.size < 500000) throw new Error('El paquete ASAR descargado está incompleto (' + stat.size + ' B)');
 
-      const appDir = path.dirname(app.getAppPath());
-      const pendingAsar = path.join(appDir, 'app.asar.pending');
-      fs.copyFileSync(tempAsar, pendingAsar);
-      try { fs.unlinkSync(tempAsar); } catch {}
+      const resourcesDir = process.resourcesPath || (app.isPackaged ? path.dirname(app.getAppPath()) : path.join(__dirname, '..', 'dist'));
+      const pendingAsar = path.join(resourcesDir, 'app.asar.pending');
+      ofs.copyFileSync(tempAsar, pendingAsar);
+      try { ofs.unlinkSync(tempAsar); } catch {}
       console.log('ASAR pendiente copiado a:', pendingAsar);
 
       const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
@@ -440,7 +441,7 @@ app.whenReady().then(() => {
 
       return { ok: true, size: stat.size };
     } catch (err) {
-      if (tempAsar) { try { fs.unlinkSync(tempAsar); } catch {} }
+      if (tempAsar) { try { ofs.unlinkSync(tempAsar); } catch {} }
       console.error('Error al descargar ASAR update:', err);
       const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
       const logFile = path.join(localAppDir, 'epickast-update.log');
@@ -451,13 +452,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:apply-asar-update', async () => {
     try {
-      const appDir = path.dirname(app.getAppPath());
-      const installDir = path.dirname(appDir);
+      const resourcesDir = process.resourcesPath || (app.isPackaged ? path.dirname(app.getAppPath()) : path.join(__dirname, '..', 'dist'));
+      const installDir = path.dirname(resourcesDir);
       const targetExe = path.join(installDir, 'EpicKast.exe');
-      const pendingAsar = path.join(appDir, 'app.asar.pending');
-      const targetAsar = path.join(appDir, 'app.asar');
+      const pendingAsar = path.join(resourcesDir, 'app.asar.pending');
+      const targetAsar = path.join(resourcesDir, 'app.asar');
 
-      if (!fs.existsSync(pendingAsar)) {
+      if (!ofs.existsSync(pendingAsar)) {
         throw new Error('No hay actualización pendiente lista');
       }
 
