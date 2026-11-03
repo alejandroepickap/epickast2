@@ -9,6 +9,36 @@
   --ok:#2ed573;
   --bad:#ff5468;
 }
+[data-theme="amoled"]{
+  --bg:#000000;
+  --bg2:#0a0a0c;
+  --bg3:#141418;
+  --line:rgba(255,255,255,0.08);
+}
+[data-theme="midnight"]{
+  --bg:#080c14;
+  --bg2:#0f1726;
+  --bg3:#182238;
+  --line:rgba(255,255,255,0.07);
+}
+[data-theme="emerald"]{
+  --bg:#05100c;
+  --bg2:#0b1a14;
+  --bg3:#122820;
+  --line:rgba(46,213,115,0.12);
+}
+[data-theme="crimson"]{
+  --bg:#120709;
+  --bg2:#1c0c10;
+  --bg3:#2a1319;
+  --line:rgba(255,84,104,0.12);
+}
+[data-theme="cyberpunk"]{
+  --bg:#0e0717;
+  --bg2:#170d26;
+  --bg3:#24153c;
+  --line:rgba(124,92,255,0.14);
+}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased}
 .hidden{display:none!important}
@@ -222,7 +252,11 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 /* ---- EpicBot DJ: Reproductor YouTube y Playlists sincronizado en llamadas ---- */
 .party-tile{background:#07080c;border-color:rgba(124,92,255,.45)}
 .party-tile .yt-frame,.party-tile .yt-direct{width:100%;height:calc(100% - 38px);border:0;background:#000;align-self:start}
-.party-tile .tbtns{bottom:44px;opacity:.7}
+.party-tile .tbtns{position:absolute;top:10px;right:10px;bottom:auto;left:auto;height:auto;display:inline-flex;flex-direction:row;align-items:center;gap:6px;z-index:15;opacity:.88;transition:opacity .15s ease;pointer-events:auto}
+.party-tile:hover .tbtns,.party-tile.focused .tbtns{opacity:1}
+.party-tile .tbtns button{height:28px;padding:0 10px;font-size:11.5px;font-weight:600;border-radius:8px;background:rgba(14,17,24,0.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.18);color:#f1f5f9;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.4);transition:background .15s,border-color .15s,transform .1s}
+.party-tile .tbtns button:hover{background:rgba(124,92,255,0.6);border-color:rgba(162,155,254,0.7);color:#fff;transform:translateY(-1px)}
+.party-tile .tbtns button.on{background:var(--ac);border-color:#a29bfe;color:#fff}
 .party-ctrl{position:absolute;left:0;right:0;bottom:0;height:38px;background:rgba(14,16,23,.96);border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:7px;padding:0 10px;z-index:5}
 .party-ctrl .p-btn{width:26px;height:26px;padding:0;border-radius:7px;display:grid;place-items:center;font-size:12px;background:var(--bg3);flex:none}
 .party-ctrl .p-title{font-size:12px;font-weight:600;color:#e2d9ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;cursor:pointer}
@@ -335,3 +369,13 @@ details.settings-acc summary .acc-arrow{font-size:12px;color:var(--mu);transitio
 details.settings-acc[open] summary .acc-arrow{transform:rotate(90deg);color:var(--ac)}
 details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid rgba(255,255,255,0.05)}
 ::-webkit-scrollbar{width:7px}::-webkit-scrollbar-thumb{background:#282c3e;border-radius:4px}
+
+/* ---- Discord Profile Card & Moderation ---- */
+.prof-banner{height:76px;border-radius:12px 12px 0 0;background:linear-gradient(135deg,#7c5cff,#4f46e5);position:relative}
+.prof-avatar-overlap{margin-top:-38px;margin-left:14px;border:4px solid var(--bg2);box-shadow:0 4px 14px rgba(0,0,0,0.6)}
+.prof-meta-card{padding:10px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.mod-box{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.mod-title{font-size:11px;font-weight:700;color:#c4b5fd;text-transform:uppercase;letter-spacing:.6px}
+.del-msg-btn{opacity:0;transition:opacity .12s;color:var(--bad)!important}
+.msg:hover .del-msg-btn{opacity:1}
+.ban-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--bg3);border-radius:8px;border:1px solid var(--line)}

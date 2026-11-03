@@ -64,6 +64,16 @@ if (!settings.server || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(setting
   localStorage.setItem('epickast.settings', JSON.stringify(settings));
 }
 const saveSettings = () => localStorage.setItem('epickast.settings', JSON.stringify(settings));
+function applyTheme(theme) {
+  theme = theme || settings.theme || 'dark';
+  if (theme === 'dark') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+}
+applyTheme(settings.theme);
+
 const userVols = JSON.parse(localStorage.getItem('epickast.volumes') || '{}'); // userId -> 0..2 (1 = 100%)
 const getUserVol = (uid) => (userVols[uid] !== undefined ? Number(userVols[uid]) : 1);
 const setUserVol = (uid, v) => { userVols[uid] = Math.round(v * 100) / 100; localStorage.setItem('epickast.volumes', JSON.stringify(userVols)); };
@@ -81,7 +91,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.5.7', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.5.8', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -249,6 +259,40 @@ function onMsg(ev) {
     case 'server.changed': if (S.sdata.has(m.id) || S.view.sid === m.id) refreshServer(m.id); break;
     case 'msg': onChatMsg(m); break;
     case 'msg.pinned': onMsgPinned(m); break;
+    case 'msg.deleted': {
+      if (m.channel === S.chan) {
+        const el = document.querySelector(`[data-mid="${m.id}"]`);
+        if (el) el.remove();
+      }
+      break;
+    }
+    case 'server.banned': {
+      toast(`🚫 Fuiste expulsado y baneado del servidor: ${m.reason || 'Por decisión de moderación'}`);
+      if (S.view.sid === m.serverId) goHome();
+      break;
+    }
+    case 'voice.serverMuted': {
+      if (S.call) {
+        if (m.muted) {
+          if (!S.call.muted) {
+            S.call.setMute(true);
+            updateDock();
+            pushState();
+          }
+          toast('🔇 Fuiste silenciado por un moderador');
+        } else {
+          toast('🔊 Un moderador reactivó tu micrófono');
+        }
+      }
+      break;
+    }
+    case 'voice.forceMove': {
+      if (S.call && m.toKey) {
+        toast(`📢 Un moderador te movió a "${m.channelName || 'otro canal'}"`);
+        joinCall(m.toKey, m.channelName);
+      }
+      break;
+    }
     case 'typing': onTyping(m); break;
     case 'voice.room':
       S.rooms.set(m.key, m.users);
@@ -713,7 +757,17 @@ const msgEl = (m) => h('div', { class: 'm', 'data-mid': m.id },
   ),
   h('div', { class: 'macts' },
     h('button', { title: 'Responder a este mensaje', onclick: () => setReply(m) }, '↩'),
-    h('button', { title: 'Fijar / Desfijar mensaje', onclick: () => rpc('msg.pin', { id: m.id }).catch((e) => toast(e.message)) }, '📌')
+    h('button', { title: 'Fijar / Desfijar mensaje', onclick: () => rpc('msg.pin', { id: m.id }).catch((e) => toast(e.message)) }, '📌'),
+    (m.userId === S.me?.id || (S.server && (ROLES[S.server.myRole]?.rank ?? 0) >= 2)) ?
+      h('button', {
+        class: 'del-msg-btn',
+        title: 'Eliminar mensaje (borrar texto o spam)',
+        onclick: () => {
+          if (confirm('¿Eliminar este mensaje permanentemente?')) {
+            rpc('msg.delete', { id: m.id }).catch((e) => toast(e.message));
+          }
+        }
+      }, '🗑️') : null
   )
 );
 
@@ -1145,6 +1199,22 @@ function modalMemberCard(sd, m) {
   const isFriend = S.friends.friends.some((f) => f.id === m.id);
   const canSetRole = myRank >= 3 && m.id !== sd.owner && (myRole === 'owner' || myRank > mRank);
   const canKick = myRank >= 2 && m.id !== S.me.id && myRank > mRank;
+  const canBan = canKick;
+
+  // Encontrar si el miembro está en un canal de voz de este servidor
+  let userVoiceKey = null;
+  let userVoiceName = null;
+  for (const ch of (sd.channels || [])) {
+    if (ch.type === 'voice') {
+      const k = 'c' + ch.id;
+      const list = S.rooms.get(k) || [];
+      if (list.some((u) => u.id === m.id)) {
+        userVoiceKey = k;
+        userVoiceName = ch.name;
+        break;
+      }
+    }
+  }
 
   const roleSel = canSetRole ? h('select', {
     onchange: async (e) => {
@@ -1156,22 +1226,87 @@ function modalMemberCard(sd, m) {
     h('option', { value: rk, selected: mRole === rk }, `${ROLES[rk].badge || '👤'} ${ROLES[rk].label}`)
   )) : null;
 
-  modal(`Perfil de ${m.name}`,
-    h('div', { class: 'prof' },
-      avatar(m, 72, m.online),
-      h('div', { style: 'display:flex;flex-direction:column;gap:4px;min-width:0' },
-        h('div', { style: 'font-size:17px;font-weight:700;color:' + (rInfo.color || 'var(--tx)') }, `${m.name} ${rInfo.badge || ''}`),
+  // Dropdown para mover de canal de voz
+  const otherVoiceChannels = (sd.channels || []).filter((ch) => ch.type === 'voice' && ('c' + ch.id) !== userVoiceKey);
+  const moveSel = (canKick && userVoiceKey && otherVoiceChannels.length > 0) ? h('select', {
+    onchange: async (e) => {
+      const targetKey = e.target.value;
+      if (!targetKey) return;
+      await safe(rpc('voice.moveUser', { currentKey: userVoiceKey, targetKey, userId: m.id }));
+      toast(`Moviendo a ${m.name}...`);
+      closeModal();
+    }
+  }, h('option', { value: '' }, '🔀 Mover a otro canal de voz...'), otherVoiceChannels.map((ch) =>
+    h('option', { value: 'c' + ch.id }, `🔊 ${ch.name}`)
+  )) : null;
+
+  const bannerBg = m.banner || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)';
+
+  const card = h('div', { class: 'prof-card' },
+    h('div', { class: 'prof-banner', style: `background:${bannerBg}` }),
+    h('div', { class: 'prof-body' },
+      h('div', { class: 'prof-avatar-row' },
+        h('div', { class: 'prof-avatar-overlap' }, avatar(m, 72, m.online)),
+        m.id !== S.me.id && !isFriend ? h('button', {
+          class: 'primary',
+          style: 'padding:6px 12px;font-size:12px',
+          onclick: () => safe(rpc('friends.add', { name: m.name })).then(() => { toast('Solicitud enviada'); closeModal(); })
+        }, icoSvg('userPlus', 13), ' Agregar') : null
+      ),
+      h('div', { class: 'prof-meta' },
+        h('div', { style: `font-size:18px;font-weight:700;color:${m.color || rInfo.color || 'var(--tx)'}` },
+          m.name,
+          rInfo.badge ? h('span', { class: 'role-badge', style: 'margin-left:6px', title: rInfo.label }, rInfo.badge) : null
+        ),
         h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${m.online ? '🟢 En línea' : '⚫ Desconectado'}`),
-        m.activity?.name ? h('div', { class: 'act-pill' }, `🎮 Jugando a ${m.activity.name}`) : null,
-        m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:2px' }, `“${m.bio}”`) : null
-      )
-    ),
-    canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
-    h('div', { class: 'row' },
-      m.id !== S.me.id && !isFriend ? h('button', { class: 'primary', onclick: () => safe(rpc('friends.add', { name: m.name })).then(() => { toast('Solicitud enviada'); closeModal(); }) }, icoSvg('userPlus', 14), ' Agregar amigo') : null,
-      canKick ? h('button', { class: 'danger', onclick: () => confirm(`¿Expulsar a ${m.name} del servidor?`) && safe(rpc('server.kick', { id: sd.id, userId: m.id })).then(closeModal) }, 'Expulsar del servidor') : null
+        m.activity?.name ? h('div', { class: 'act-pill', style: 'margin-top:2px' }, `🎮 Jugando a ${m.activity.name}`) : null,
+        userVoiceName ? h('div', { class: 'hint', style: 'color:#a29bfe;margin-top:2px' }, `🔊 En llamada: ${userVoiceName}`) : null,
+        m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null
+      ),
+      canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
+      (canKick || canBan) ? h('div', { class: 'mod-box' },
+        h('div', { class: 'mod-title' }, '⚖️ Herramientas de Moderación'),
+        userVoiceKey ? h('div', { style: 'display:flex;gap:6px' },
+          h('button', {
+            style: 'flex:1;font-size:11.5px',
+            onclick: async () => {
+              await safe(rpc('voice.serverMute', { key: userVoiceKey, userId: m.id, mute: true }));
+              toast(`Micrófono de ${m.name} silenciado para todos`);
+              closeModal();
+            }
+          }, '🔇 Silenciar micro'),
+          h('button', {
+            style: 'flex:1;font-size:11.5px',
+            onclick: async () => {
+              await safe(rpc('voice.serverMute', { key: userVoiceKey, userId: m.id, mute: false }));
+              toast(`Silencio retirado a ${m.name}`);
+              closeModal();
+            }
+          }, '🔊 Desilenciar')
+        ) : null,
+        moveSel ? h('label', null, 'Mover de canal de voz', moveSel) : null,
+        h('div', { class: 'prof-actions' },
+          canKick ? h('button', {
+            style: 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14)',
+            onclick: () => confirm(`¿Expulsar a ${m.name} del servidor?`) && safe(rpc('server.kick', { id: sd.id, userId: m.id })).then(closeModal)
+          }, 'Expulsar') : null,
+          canBan ? h('button', {
+            class: 'danger',
+            onclick: async () => {
+              const reason = prompt(`Motivo del baneo para ${m.name} (opcional):`, 'Comportamiento no adecuado o spam');
+              if (reason !== null) {
+                await safe(rpc('server.ban', { id: sd.id, userId: m.id, reason }));
+                toast(`Usuario ${m.name} expulsado y baneado`);
+                closeModal();
+              }
+            }
+          }, '🚫 Banear del servidor') : null
+        )
+      ) : null
     )
   );
+
+  modal(`Perfil de ${m.name}`, card);
 }
 function applyPanelsLayout() {
   const mainEl = $('main');
@@ -1572,12 +1707,29 @@ function modalProfile() {
     reader.readAsDataURL(f);
   } });
   const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
+  const BANNER_PRESETS = [
+    { name: '💜 Púrpura Imperial', val: 'linear-gradient(135deg, #7c5cff, #4f46e5)' },
+    { name: '🌊 Océano Cyan', val: 'linear-gradient(135deg, #06b6d4, #2563eb)' },
+    { name: '🌲 Esmeralda Cyber', val: 'linear-gradient(135deg, #10b981, #047857)' },
+    { name: '🔥 Carmesí Fuego', val: 'linear-gradient(135deg, #f43f5e, #9f1239)' },
+    { name: '⚡ Ámbar Sunset', val: 'linear-gradient(135deg, #f59e0b, #b45309)' },
+    { name: '🌑 Obsidiana Gamer', val: 'linear-gradient(135deg, #334155, #0f172a)' }
+  ];
+  let banner = me.banner || BANNER_PRESETS[0].val;
+  const bannerPreview = h('div', { class: 'prof-banner', style: `background:${banner};margin-bottom:8px` });
+  const bannerSelect = h('select', {
+    onchange: (e) => {
+      banner = e.target.value;
+      bannerPreview.style.background = banner;
+    }
+  }, BANNER_PRESETS.map((b) => h('option', { value: b.val, selected: banner === b.val }, b.name)));
   const bio = h('input', { value: me.bio || '', maxlength: 120, placeholder: 'Estado o frase (opcional)' });
   const customAct = h('input', { value: settings.customActivity || '', maxlength: 60, placeholder: S.detectedGame ? `Detectado automáticamente: ${S.detectedGame}` : 'Ej. VALORANT, Minecraft, Diseñando en 3D… (vacío = automático)' });
   const autoChk = h('input', { type: 'checkbox', style: 'width:auto', checked: settings.autoGameDetect !== false });
   modal('Mi perfil y actividad',
     h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('button', { onclick: () => file.click() }, '📷 Subir foto'), h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'), file)),
-    h('label', null, 'Color del avatar', sws),
+    h('label', null, 'Color del avatar y nombre', sws),
+    h('label', null, 'Banner de perfil estilo Discord', bannerPreview, bannerSelect),
     h('label', null, 'Estado / Biografía', bio),
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
     h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
@@ -1587,7 +1739,7 @@ function modalProfile() {
       saveSettings();
       S.lastSentActivity = '__force__';
       await syncActivity();
-      await safe(rpc('profile.set', { color, bio: bio.value, avatar: avatarData }));
+      await safe(rpc('profile.set', { color, banner, bio: bio.value, avatar: avatarData }));
       closeModal();
       toast('Perfil y actividad actualizados');
     } }, 'Guardar'));
@@ -1634,7 +1786,7 @@ async function copyDiagnosticReport() {
     '   📋 REPORTE DE DIAGNÓSTICO EPICKAST',
     '========================================',
     `Fecha: ${new Date().toLocaleString()}`,
-    `Versión App: v${S.appVer || '1.5.7'}`,
+    `Versión App: v${S.appVer || '1.5.8'}`,
     `Código de Error: ${errCode}`,
     `Usuario: ${S.me?.name || 'No autenticado'} (ID: ${S.me?.id || '-'})`,
     `Servidor: ${settings.server || 'No configurado'}`,
@@ -2147,8 +2299,26 @@ async function modalSettings() {
       h('input', { value: settings.keyDeaf || 'Alt+D', placeholder: 'Ej. Alt+D', onchange: (e) => { settings.keyDeaf = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de audio actualizado'); } }))
   );
 
+  const THEMES = [
+    { id: 'dark', name: '🌌 Oscuro EpicKast (Predeterminado)' },
+    { id: 'amoled', name: '🖤 Negro Puro AMOLED (Ultra Contraste)' },
+    { id: 'midnight', name: '🌃 Azul Medianoche (Navy Deep)' },
+    { id: 'emerald', name: '🌲 Esmeralda Cyberpunk (Dark Forest)' },
+    { id: 'crimson', name: '🍷 Carmesí Velvet (Rojo Vino Oscuro)' },
+    { id: 'cyberpunk', name: '🔮 Neón Synthwave (Violeta Cyberpunk)' }
+  ];
+  const themeSel = h('select', {
+    onchange: (e) => {
+      settings.theme = e.target.value;
+      saveSettings();
+      applyTheme(settings.theme);
+      toast(`Tema aplicado: ${THEMES.find((t) => t.id === settings.theme)?.name || settings.theme}`);
+    }
+  }, THEMES.map((t) => h('option', { value: t.id, selected: (settings.theme || 'dark') === t.id }, t.name)));
+
   // Acordeón 4: Apariencia y Notificaciones
-  const accVisual = acc('🎨', 'Apariencia y Notificaciones', 'Colores de acento, volumen de timbre y alertas',
+  const accVisual = acc('🎨', 'Apariencia y Notificaciones', 'Temas de fondo (0% de CPU/GPU), colores de acento y avisos',
+    h('label', null, 'Tema de fondo (0% de impacto en rendimiento)', themeSel),
     h('label', null, 'Color de acento', swA),
     h('label', null, 'Volumen del timbre', vol),
     chk('dnd', 'Modo No molestar (silenciar timbre y avisos)'),
@@ -2731,7 +2901,7 @@ function updateDock() {
   $('dockDrawer')?.classList.toggle('hidden', !S.dockOpen);
   setD('bCam', c.camTrack ? 'on' : '', c.camTrack ? 'Cámara ON' : 'Cámara', c.camTrack ? 'cam' : 'camOff');
   setD('bScreen', c.screenStream ? 'on' : '', c.screenStream ? 'Pantalla ON' : 'Pantalla', 'screen');
-  setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ', 'party');
+  if ($('bParty')) setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ', 'party');
   setD('bSoundboard', '', 'Sonidos', 'sound');
   setD('bGameMode', S.gameMode ? 'on' : '', S.gameMode ? 'Juegos ON' : 'Juegos', 'game');
   setD('bOverlay', S.overlayActive ? 'on' : '', S.overlayActive ? 'Overlay ON' : 'Overlay', 'overlay');
@@ -2784,7 +2954,7 @@ $('bCam').onclick = async () => {
   } catch (e) { toast('No se pudo abrir la cámara'); }
   updateDock(); renderStage(); pushState();
 };
-$('bParty').onclick = () => modalParty();
+if ($('bParty')) $('bParty').onclick = () => modalParty();
 $('bSoundboard').onclick = () => modalSoundboard();
 if ($('mSoundboard')) $('mSoundboard').onclick = () => modalSoundboard();
 if ($('mGameMode')) $('mGameMode').onclick = () => toggleGameMode();
@@ -3123,15 +3293,43 @@ function ensurePartyTile() {
     const iframe = h('iframe', { class: 'yt-frame', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', referrerpolicy: 'origin-when-cross-origin' });
     const video = h('video', { class: 'yt-direct hidden', autoplay: true, playsinline: true });
     const pinBtn = h('button', { title: 'Enfocar / ampliar el reproductor en el escenario', onclick: (e) => { e.stopPropagation(); toggleFocusTile('party'); } }, '📌 Enfocar');
-    const modeBtn = h('button', { title: 'Alternar entre ver video en escenario o modo solo música de fondo', onclick: (e) => {
-      e.stopPropagation();
-      settings.partyAudioOnly = !settings.partyAudioOnly;
-      saveSettings();
-      renderStage();
-      syncPartyTile();
-    } }, settings.partyAudioOnly ? '🎬 Ver video' : '🎧 Solo música');
-    const qBtn = h('button', { title: 'Abrir buscador de YouTube y cola de reproducción', onclick: (e) => { e.stopPropagation(); modalParty(); } }, '🎵 Cola / Buscar');
-    const tbtns = h('div', { class: 'tbtns' }, pinBtn, modeBtn, qBtn);
+    const pipBtn = h('button', {
+      title: 'Ventana flotante sobre otras apps (Always on top)',
+      onclick: (e) => {
+        e.stopPropagation();
+        S.focusTile = 'party';
+        renderStage();
+        window.epic?.toggleMini?.(true);
+        toast('Modo ventana flotante activado');
+      }
+    });
+    setSvg(pipBtn, 'mini', 13);
+    pipBtn.append(' Flotante');
+
+    const modeBtn = h('button', {
+      title: 'Alternar entre ver video en escenario o modo solo música de fondo',
+      onclick: (e) => {
+        e.stopPropagation();
+        settings.partyAudioOnly = !settings.partyAudioOnly;
+        saveSettings();
+        renderStage();
+        syncPartyTile();
+      }
+    }, settings.partyAudioOnly ? '🎬 Ver video' : '🎧 Solo música');
+
+    const qBtn = h('button', { title: 'Abrir buscador de YouTube y cola de reproducción', onclick: (e) => { e.stopPropagation(); modalParty(); } }, '🎵 Cola');
+
+    const fsBtn = h('button', {
+      title: 'Pantalla completa',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        else el.requestFullscreen?.().catch(() => {});
+      }
+    });
+    setSvg(fsBtn, 'size', 13);
+
+    const tbtns = h('div', { class: 'tbtns' }, modeBtn, qBtn, pipBtn, pinBtn, fsBtn);
 
     const playBtn = h('button', { class: 'p-btn', title: 'Pausar / Reproducir para toda la sala', onclick: (e) => {
       e.stopPropagation();

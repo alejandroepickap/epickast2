@@ -25,13 +25,14 @@ CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user_id INTEGER REFE
 CREATE TABLE IF NOT EXISTS friends(a INTEGER, b INTEGER, status TEXT, PRIMARY KEY(a,b));
 CREATE TABLE IF NOT EXISTS servers(id INTEGER PRIMARY KEY, name TEXT, owner INTEGER, invite TEXT UNIQUE, created INTEGER);
 CREATE TABLE IF NOT EXISTS members(server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, PRIMARY KEY(server_id,user_id));
+CREATE TABLE IF NOT EXISTS bans(server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, reason TEXT, banned_by INTEGER, created INTEGER, PRIMARY KEY(server_id,user_id));
 CREATE TABLE IF NOT EXISTS channels(id INTEGER PRIMARY KEY, server_id INTEGER REFERENCES servers(id) ON DELETE CASCADE, name TEXT, type TEXT);
 CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY, channel TEXT, user_id INTEGER, name TEXT, mime TEXT, size INTEGER, disk TEXT, ts INTEGER);
 CREATE INDEX IF NOT EXISTS file_ch ON files(channel,id);
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, channel TEXT, user_id INTEGER, text TEXT, ts INTEGER, file_id INTEGER);
 CREATE INDEX IF NOT EXISTS msg_ch ON messages(channel,id);
 `);
-for (const col of ['avatar TEXT', 'color TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
@@ -47,12 +48,13 @@ const SEED_FILE = path.join(__dirname, 'seed.json');
 
 function saveBackup() {
   try {
-    const users = all('SELECT id,name,salt,hash,avatar,color,bio,av,created FROM users');
+    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,created FROM users');
     const friends = all('SELECT a,b,status FROM friends');
     const servers = all('SELECT id,name,owner,invite,created FROM servers');
     const members = all('SELECT server_id,user_id,role FROM members');
     const channels = all('SELECT id,server_id,name,type,user_limit FROM channels');
-    const state = { ts: Date.now(), users, friends, servers, members, channels };
+    const bans = all('SELECT server_id,user_id,reason,banned_by,created FROM bans');
+    const state = { ts: Date.now(), users, friends, servers, members, channels, bans };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
     if (fs.existsSync(SEED_FILE) || !process.env.RENDER) {
       try { fs.writeFileSync(SEED_FILE, JSON.stringify(state, null, 2)); } catch {}
@@ -74,8 +76,13 @@ function restoreBackup() {
       const data = JSON.parse(fs.readFileSync(target, 'utf8'));
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
-          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,bio,av,created) VALUES(?,?,?,?,?,?,?,?,?)',
-            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.bio || null, u.av || 0, u.created || Date.now());
+          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
+            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.created || Date.now());
+        }
+        if (Array.isArray(data.bans)) {
+          for (const b of data.bans) {
+            run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id, b.user_id, b.reason || '', b.banned_by || null, b.created || Date.now());
+          }
         }
       }
       if (Array.isArray(data.friends)) {
@@ -157,8 +164,8 @@ function presenceAudience(uid) {
   return [...s, ...friendIds(uid)];
 }
 
-const selfView = (id) => ({ ...get('SELECT id,name,color,bio,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
-const profileOf = (id) => ({ ...(get('SELECT color,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
+const selfView = (id) => ({ ...get('SELECT id,name,color,banner,bio,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
+const profileOf = (id) => ({ ...(get('SELECT color,banner,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
 function roomUsers(key) {
   const r = rooms.get(key);
   return r ? [...r.entries()].map(([id, v]) => ({ id, name: v.name, state: v.state, ...profileOf(id) })) : [];
@@ -357,6 +364,7 @@ const H = {
   'server.join': (ws, d) => {
     const s = get('SELECT id FROM servers WHERE invite=?', clean(d.code, 32).toLowerCase());
     if (!s) fail('Invitación inválida');
+    if (get('SELECT 1 FROM bans WHERE server_id=? AND user_id=?', s.id, ws.user.id)) fail('Has sido baneado de este servidor');
     run(`INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,'member')`, s.id, ws.user.id);
     toUser(ws.user.id, { t: 'servers.changed' }); notifyServer(s.id);
     return { id: s.id };
@@ -375,6 +383,34 @@ const H = {
     for (const c of all('SELECT id FROM channels WHERE server_id=?', id)) { run('DELETE FROM messages WHERE channel=?', 'c' + c.id); parties.delete('c' + c.id); }
     run('DELETE FROM servers WHERE id=?', id);
     toUsers(m, { t: 'servers.changed' });
+  },
+  'server.ban': (ws, d) => {
+    const id = Number(d.id), target = Number(d.userId);
+    const myR = roleOf(id, ws.user.id), tarR = roleOf(id, target);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para banear');
+    if (target === ws.user.id) fail('No puedes banearte a ti mismo');
+    if (!tarR || roleRank(myR) <= roleRank(tarR)) fail('No puedes banear a alguien de igual o mayor rango');
+    const reason = clean(d.reason || 'Baneado por decisión de moderación', 160);
+    run('INSERT OR REPLACE INTO bans(server_id, user_id, reason, banned_by, created) VALUES(?,?,?,?,?)', id, target, reason, ws.user.id, Date.now());
+    run('DELETE FROM members WHERE server_id=? AND user_id=?', id, target);
+    toUser(target, { t: 'server.banned', serverId: id, reason });
+    toUser(target, { t: 'servers.changed' });
+    notifyServer(id);
+    return { ok: true, userId: target };
+  },
+  'server.unban': (ws, d) => {
+    const id = Number(d.id), target = Number(d.userId);
+    const myR = roleOf(id, ws.user.id);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para revocar baneo');
+    run('DELETE FROM bans WHERE server_id=? AND user_id=?', id, target);
+    return { ok: true, userId: target };
+  },
+  'server.bans': (ws, d) => {
+    const id = Number(d.id);
+    const myR = roleOf(id, ws.user.id);
+    if (!myR || roleRank(myR) < 2) fail('Sin permisos');
+    return all(`SELECT b.user_id userId, u.name, u.color, CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av, b.reason, b.created
+      FROM bans b JOIN users u ON u.id=b.user_id WHERE b.server_id=? ORDER BY b.created DESC`, id);
   },
   'server.kick': (ws, d) => {
     const id = Number(d.id), target = Number(d.userId);
@@ -418,6 +454,7 @@ const H = {
     if (!sid || !friendId) fail('Datos incompletos');
     const myRole = roleOf(sid, ws.user.id);
     if (!myRole) fail('No eres miembro del servidor');
+    if (get('SELECT 1 FROM bans WHERE server_id=? AND user_id=?', sid, friendId)) fail('Este usuario está baneado del servidor');
 
     const isFriend = get('SELECT 1 FROM friends WHERE ((a=? AND b=?) OR (a=? AND b=?)) AND status=\'accepted\'', ws.user.id, friendId, friendId, ws.user.id);
     if (!isFriend) fail('El usuario no es tu amigo');
@@ -606,6 +643,25 @@ const H = {
       LEFT JOIN messages rm ON rm.id=m.reply_to LEFT JOIN users ru ON ru.id=rm.user_id LEFT JOIN files rf ON rf.id=rm.file_id
       WHERE m.channel=? AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse();
   },
+  'msg.delete': (ws, d) => {
+    const id = Number(d.id);
+    const m = get('SELECT id, channel, user_id, file_id FROM messages WHERE id=?', id);
+    if (!m) fail('Mensaje inexistente');
+    const auth = authorize(m.channel, ws.user.id);
+    const isOwnerOrMod = auth.serverId ? (roleRank(roleOf(auth.serverId, ws.user.id)) >= 2) : false;
+    const isAuthor = m.user_id === ws.user.id;
+    if (!isAuthor && !isOwnerOrMod) fail('No tienes permiso para borrar este mensaje');
+    if (m.file_id) {
+      try {
+        const f = get('SELECT disk FROM files WHERE id=?', m.file_id);
+        if (f?.disk) fs.unlink(path.join(DATA, 'uploads', f.disk), () => {});
+        run('DELETE FROM files WHERE id=?', m.file_id);
+      } catch {}
+    }
+    run('DELETE FROM messages WHERE id=?', id);
+    toUsers(auth.audience, { t: 'msg.deleted', channel: m.channel, id });
+    return { ok: true, id };
+  },
   'msg.pin': (ws, d) => {
     const m = get('SELECT id,channel,pinned FROM messages WHERE id=?', Number(d.id));
     if (!m) fail('Mensaje no encontrado');
@@ -670,15 +726,16 @@ const H = {
       else fail('Imagen inválida o demasiado grande');
     }
     const color = d.color !== undefined ? (/^#[0-9a-f]{6}$/i.test(d.color) ? d.color : fail('Color inválido')) : cur.color;
+    const banner = d.banner !== undefined ? (d.banner ? clean(d.banner, 160) : null) : (cur.banner || null);
     const bio = d.bio !== undefined ? clean(d.bio, 120) : cur.bio;
-    run('UPDATE users SET avatar=?,color=?,bio=?,av=? WHERE id=?', avatar, color, bio, av, ws.user.id);
-    const pub = { id: ws.user.id, name: ws.user.name, color, bio, av: avatar ? av : 0 };
+    run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,av=? WHERE id=?', avatar, color, banner, bio, av, ws.user.id);
+    const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, av: avatar ? av : 0 };
     toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'profile.changed', profile: pub });
     return pub;
   },
   'profile.get': (ws, d) => {
-    const u = get('SELECT id,name,color,bio,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
-    return { id: u.id, name: u.name, color: u.color, bio: u.bio, av: u.avatar ? u.av : 0 };
+    const u = get('SELECT id,name,color,banner,bio,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
+    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, av: u.avatar ? u.av : 0 };
   },
   'profile.avatar': (ws, d) => ({ avatar: get('SELECT avatar FROM users WHERE id=?', Number(d.id))?.avatar || null }),
   'voice.leave': (ws) => leaveRoom(ws),
@@ -687,6 +744,43 @@ const H = {
     me.state = { muted: !!d.muted, deaf: !!d.deaf, cam: !!d.cam, screen: d.screen ? clean(d.screen, 80) : null };
     for (const [id, v] of r) if (id !== ws.user.id) send(v.ws, { t: 'voice.peerstate', userId: ws.user.id, state: me.state });
     broadcastRoom(ws.room);
+  },
+  'voice.serverMute': (ws, d) => {
+    const key = clean(d.key, 40);
+    const targetId = Number(d.userId);
+    const mute = !!d.mute;
+    const auth = authorize(key, ws.user.id);
+    if (!auth.serverId) fail('Solo disponible en canales de servidor');
+    const myR = roleOf(auth.serverId, ws.user.id), tarR = roleOf(auth.serverId, targetId);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para silenciar en servidor');
+    if (targetId !== ws.user.id && tarR && roleRank(myR) <= roleRank(tarR)) fail('No puedes silenciar a alguien de igual o mayor rango');
+    const r = rooms.get(key);
+    const targetEntry = r?.get(targetId);
+    if (targetEntry) {
+      targetEntry.state.serverMuted = mute;
+      if (mute) targetEntry.state.muted = true;
+      send(targetEntry.ws, { t: 'voice.serverMuted', key, muted: mute });
+      for (const [, v] of r) send(v.ws, { t: 'voice.peerstate', userId: targetId, state: targetEntry.state });
+      broadcastRoom(key);
+    }
+    return { ok: true, userId: targetId, muted: mute };
+  },
+  'voice.moveUser': (ws, d) => {
+    const curKey = clean(d.currentKey, 40);
+    const toKey = clean(d.targetKey, 40);
+    const targetId = Number(d.userId);
+    const aFrom = authorize(curKey, ws.user.id);
+    const aTo = authorize(toKey, ws.user.id);
+    if (!aFrom.serverId || aFrom.serverId !== aTo.serverId) fail('Canales incompatibles');
+    const myR = roleOf(aFrom.serverId, ws.user.id), tarR = roleOf(aFrom.serverId, targetId);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para mover usuarios');
+    if (targetId !== ws.user.id && tarR && roleRank(myR) <= roleRank(tarR)) fail('No puedes mover a alguien de mayor rango');
+    const r = rooms.get(curKey);
+    const targetEntry = r?.get(targetId);
+    if (!targetEntry) fail('El usuario no está en la sala de voz');
+    const toCh = get('SELECT name FROM channels WHERE id=?', Number(toKey.slice(1)));
+    send(targetEntry.ws, { t: 'voice.forceMove', toKey, channelName: toCh?.name || 'Canal de voz' });
+    return { ok: true, userId: targetId, toKey };
   },
   'voice.sound': (ws, d) => {
     const r = rooms.get(ws.room); if (!r) return;
@@ -706,7 +800,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.7';
+  let version = '1.5.8';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
