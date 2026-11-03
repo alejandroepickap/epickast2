@@ -1,5 +1,5 @@
 {
-  "ts": 1793737588469,
+  "ts": 1793738561597,
   "users": [
     {
       "id": 1,
@@ -72,6 +72,30 @@
       "bio": null,
       "av": 0,
       "created": 1793737587929
+    },
+    {
+      "id": 7,
+      "name": "ana_1793738561001",
+      "salt": "d24c15e2f392747a515d81c1a08de6e4",
+      "hash": "2e280246124cff9f7422c7268823c87c65158d39480a53fc746ca71db7ad8987",
+      "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
+      "color": "#ff8800",
+      "banner": null,
+      "bio": "hola",
+      "av": 1793738561288,
+      "created": 1793738561030
+    },
+    {
+      "id": 8,
+      "name": "beto_1793738561001",
+      "salt": "47b0579f52f9bee601eb548f55065987",
+      "hash": "a8fbcc1964ca11aeeaadd46fafbc4d5556521cb84f9fa49d92a874c33558e99a",
+      "avatar": null,
+      "color": null,
+      "banner": null,
+      "bio": null,
+      "av": 0,
+      "created": 1793738561064
     }
   ],
   "friends": [
@@ -93,6 +117,11 @@
     {
       "a": 5,
       "b": 6,
+      "status": "accepted"
+    },
+    {
+      "a": 7,
+      "b": 8,
       "status": "accepted"
     }
   ],
@@ -124,6 +153,13 @@
       "owner": 5,
       "invite": "3ba89800d5",
       "created": 1793737588265
+    },
+    {
+      "id": 5,
+      "name": "Mi Server",
+      "owner": 7,
+      "invite": "050e8542ba",
+      "created": 1793738561380
     }
   ],
   "members": [
@@ -160,6 +196,16 @@
     {
       "server_id": 4,
       "user_id": 6,
+      "role": "admin"
+    },
+    {
+      "server_id": 5,
+      "user_id": 7,
+      "role": "owner"
+    },
+    {
+      "server_id": 5,
+      "user_id": 8,
       "role": "admin"
     }
   ],
@@ -286,6 +332,48 @@
     {
       "id": 18,
       "server_id": 4,
+      "name": "🔒 Sala Duo",
+      "type": "voice",
+      "user_limit": 2
+    },
+    {
+      "id": 19,
+      "server_id": 5,
+      "name": "general",
+      "type": "text",
+      "user_limit": 0
+    },
+    {
+      "id": 20,
+      "server_id": 5,
+      "name": "multimedia-y-links",
+      "type": "text",
+      "user_limit": 0
+    },
+    {
+      "id": 21,
+      "server_id": 5,
+      "name": "🔊 Sala General",
+      "type": "voice",
+      "user_limit": 0
+    },
+    {
+      "id": 22,
+      "server_id": 5,
+      "name": "🎮 Gaming Squad",
+      "type": "voice",
+      "user_limit": 5
+    },
+    {
+      "id": 23,
+      "server_id": 5,
+      "name": "🎵 Música & YouTube",
+      "type": "voice",
+      "user_limit": 0
+    },
+    {
+      "id": 24,
+      "server_id": 5,
       "name": "🔒 Sala Duo",
       "type": "voice",
       "user_limit": 2

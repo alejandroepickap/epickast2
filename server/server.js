@@ -574,6 +574,18 @@ const H = {
     broadcastParty(key);
     return { added: tracks.length, party: partyView(key) };
   },
+  'game.action': (ws, d) => {
+    const key = d?.key || ws.room || 'global';
+    const r = rooms.get(key);
+    if (r) {
+      for (const [, v] of r) {
+        if (v.ws !== ws) {
+          send(v.ws, { t: 'game.event', from: ws.user?.name || 'Compañero', action: d.action });
+        }
+      }
+    }
+    return { ok: true };
+  },
   'party.control': (ws, d) => {
     const key = d?.key || ws.room;
     if (!key) fail('No estás en una sala de voz');

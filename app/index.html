@@ -7,6 +7,18 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="appSplash">
+  <div class="splash-content">
+    <div class="splash-logo-wrap">
+      <img src="logo.svg" alt="EK" class="splash-logo">
+      <div class="splash-ring"></div>
+      <div class="splash-ring ring2"></div>
+    </div>
+    <div class="splash-title">Epic<span>Kast</span></div>
+    <div class="splash-sub">Ultra-Low Latency Communication</div>
+    <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+  </div>
+</div>
 <div id="winBar">
   <div class="win-drag">
     <img src="logo.svg" alt="EK" class="win-logo">
@@ -70,6 +82,7 @@
         <button id="bGameMode" class="dockbtn" title="Modo Juego: Optimizar ping y rendimiento para jugar"><i></i><span>Juegos</span></button>
         <button id="bOverlay" class="dockbtn" title="Superposición de voz gamer (Overlay transparente sobre juegos)"><i></i><span>Overlay</span></button>
         <button id="bLoop" class="dockbtn" title="Escuchar mi propio micrófono (para probar cómo sueno)"><i></i><span>Oírme</span></button>
+        <button id="bMinigame" class="dockbtn" title="Minijuego Multijugador: Cyber Squad Defense & Cajas CS"><i></i><span>Minijuego</span></button>
         <button id="bMini" class="dockbtn" title="Modo ventana sobre ventana (siempre visible encima)"><i></i><span>Flotante</span></button>
       </div>
     </div>
@@ -125,6 +138,7 @@
 <div id="modal" class="hidden"></div>
 <div id="toast"></div>
 <script src="call.js"></script>
+<script src="game.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

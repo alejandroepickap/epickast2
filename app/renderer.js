@@ -93,6 +93,110 @@ applyAccent();
 applyStageHeight();
 applyShortcuts();
 
+function playEpicStartupSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const t = ctx.currentTime;
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.001, t);
+    master.gain.exponentialRampToValueAtTime(0.35, t + 0.05);
+    master.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    master.connect(ctx.destination);
+
+    // Sub-bass sweep
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(140, t);
+    subOsc.frequency.exponentialRampToValueAtTime(45, t + 0.35);
+    subGain.gain.setValueAtTime(0.65, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+    subOsc.connect(subGain);
+    subGain.connect(master);
+    subOsc.start(t);
+    subOsc.stop(t + 0.8);
+
+    // Punch transient
+    const punchOsc = ctx.createOscillator();
+    const punchGain = ctx.createGain();
+    punchOsc.type = 'triangle';
+    punchOsc.frequency.setValueAtTime(260, t);
+    punchOsc.frequency.exponentialRampToValueAtTime(80, t + 0.12);
+    punchGain.gain.setValueAtTime(0.45, t);
+    punchGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    punchOsc.connect(punchGain);
+    punchGain.connect(master);
+    punchOsc.start(t);
+    punchOsc.stop(t + 0.2);
+
+    // Crystalline Chime
+    const chimeTimes = [0.12, 0.22];
+    const freqs = [
+      [523.25, 783.99],
+      [1046.5, 1318.51, 1567.98]
+    ];
+    chimeTimes.forEach((delay, idx) => {
+      const startT = t + delay;
+      freqs[idx].forEach(f => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(f, startT);
+        gain.gain.setValueAtTime(0.001, startT);
+        gain.gain.linearRampToValueAtTime(0.18, startT + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startT + 0.9);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(startT);
+        osc.stop(startT + 1.0);
+      });
+    });
+
+    setTimeout(() => {
+      try { ctx.close(); } catch {}
+    }, 2000);
+  } catch {}
+}
+
+function handleAppSplash() {
+  const splash = $('appSplash');
+  if (!splash) return;
+  setTimeout(() => playEpicStartupSound(), 150);
+  setTimeout(() => {
+    splash.classList.add('fade-out');
+    setTimeout(() => {
+      try { splash.remove(); } catch {}
+    }, 550);
+  }, 1400);
+}
+
+handleAppSplash();
+
+function modalMinigame() {
+  const m = $('modal');
+  if (!m) return;
+  m.classList.remove('hidden');
+  m.replaceChildren();
+
+  const wrap = h('div');
+  m.appendChild(wrap);
+
+  if (window.CyberDefenseGame) {
+    new window.CyberDefenseGame(wrap, S.ws, S.chan || S.callKey || 'global', S.me);
+    const chk = setInterval(() => {
+      if (!wrap.children.length) {
+        clearInterval(chk);
+        m.classList.add('hidden');
+        m.replaceChildren();
+      }
+    }, 200);
+  }
+}
+
+
 const S = {
   ws: null, seq: 0, pend: new Map(), me: null, token: localStorage.getItem('epickast.token') || '', ice: [],
   friends: { friends: [], incoming: [], outgoing: [] }, servers: [], sdata: new Map(),
@@ -1222,7 +1326,7 @@ function renderRail() {
     }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.1';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.2';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -3073,6 +3177,7 @@ function updateDock() {
   if ($('bParty')) setD('bParty', hasParty ? 'on' : '', hasParty ? 'DJ Sonando' : 'Bot DJ', 'party');
   setD('bSoundboard', '', 'Sonidos', 'sound');
   setD('bGameMode', S.gameMode ? 'on' : '', S.gameMode ? 'Juegos ON' : 'Juegos', 'game');
+  if ($('bMinigame')) setD('bMinigame', '', 'Minijuego', 'game');
   setD('bOverlay', S.overlayActive ? 'on' : '', S.overlayActive ? 'Overlay ON' : 'Overlay', 'overlay');
   setD('bLoop', c.mic?.monitoring ? 'on' : '', c.mic?.monitoring ? 'Oyéndome' : 'Oírme', 'loop');
   setD('bMini', S.mini ? 'on' : '', S.mini ? 'Expandir' : 'Flotante', 'mini');
@@ -3124,6 +3229,7 @@ $('bSoundboard').onclick = () => modalSoundboard();
 if ($('mSoundboard')) $('mSoundboard').onclick = () => modalSoundboard();
 if ($('mGameMode')) $('mGameMode').onclick = () => toggleGameMode();
 if ($('bGameMode')) $('bGameMode').onclick = () => toggleGameMode();
+if ($('bMinigame')) $('bMinigame').onclick = () => modalMinigame();
 $('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
 if ($('bMiniExit')) $('bMiniExit').onclick = () => window.epic.toggleMini?.(false);
@@ -3279,6 +3385,7 @@ $('mMore').onclick = (e) => {
     tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
     tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }),
     tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
+    tileBtn('👾', 'Minijuego Co-op: Cyber Squad Defense & Cajas CS', () => { modalMinigame(); menu.classList.add('hidden'); }),
     tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring)
   );
 
