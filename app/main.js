@@ -213,7 +213,7 @@ function setMiniMode(enable) {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200, height: 770, minWidth: 820, minHeight: 520,
+    width: 1200, height: 770, minWidth: 820, minHeight: 520, frame: false,
     backgroundColor: '#0e1015', title: 'EpicKast', show: false, autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
@@ -393,93 +393,106 @@ app.whenReady().then(() => {
         win.webContents.send('app:update-progress', { percent: 100, installing: true });
       }
 
-      // Generar script de actualización en PowerShell con log persistente y espera síncrona (-Wait)
+      // Generar script desacoplado de Windows (inmune a la terminación del proceso Electron)
       const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
-      const targetApp = path.join(localAppDir, 'Programs', 'epickast', 'EpicKast.exe');
+      const targetDir = path.join(localAppDir, 'Programs', 'epickast');
+      const targetApp = path.join(targetDir, 'EpicKast.exe');
       const logFile = path.join(localAppDir, 'epickast-update.log');
-      const updatePs1 = path.join(app.getPath('temp'), 'epickast-apply-update.ps1');
+      const updaterCmd = path.join(app.getPath('temp'), 'epickast-updater.cmd');
 
-      const ps1Content = [
-        `# Script de actualizacion automatica de EpicKast`,
-        `$ErrorActionPreference = 'Continue'`,
-        `$logFile = '${logFile.replace(/'/g, "''")}'`,
-        `function Log($msg) {`,
-        `  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")`,
-        `  "[$ts] $msg" | Out-File -FilePath $logFile -Append -Encoding utf8`,
-        `}`,
-        `Log "=========================================================="`,
-        `Log "INICIANDO APLICACION DE ACTUALIZACION DE EPICKAST"`,
-        `Log "Instalador temporal: '${tempExe.replace(/'/g, "''")}'"`,
-        `Log "Destino final: '${targetApp.replace(/'/g, "''")}'"`,
-        ``,
-        `# 1. Esperar cierre de Electron`,
-        `Log "Esperando cierre del proceso principal..."`,
-        `Start-Sleep -Seconds 2`,
-        `Get-Process -Name 'EpicKast' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue`,
-        `Start-Sleep -Seconds 1`,
-        ``,
-        `# 2. Desbloquear archivo temporal`,
-        `Log "Desbloqueando archivo del instalador..."`,
-        `Unblock-File -LiteralPath '${tempExe.replace(/'/g, "''")}' -ErrorAction SilentlyContinue`,
-        ``,
-        `# 3. Ejecutar instalador NSIS silencioso y ESPERAR a que termine`,
-        `Log "Ejecutando instalador silencioso (/S)..."`,
-        `try {`,
-        `  $proc = Start-Process -FilePath '${tempExe.replace(/'/g, "''")}' -ArgumentList '/S' -PassThru -Wait`,
-        `  Log "Instalador finalizado. ExitCode: $($proc.ExitCode)"`,
-        `} catch {`,
-        `  Log "ERROR al ejecutar instalador: $_"`,
-        `}`,
-        ``,
-        `# 4. Esperar liberacion de archivos`,
-        `Start-Sleep -Seconds 3`,
-        ``,
-        `# 5. Asegurar accesos directos en Escritorio (normal y OneDrive)`,
-        `Log "Actualizando accesos directos de escritorio..."`,
-        `try {`,
-        `  $wsh = New-Object -ComObject WScript.Shell`,
-        `  $dirs = @(`,
-        `    [Environment]::GetFolderPath('Desktop'),`,
-        `    [Environment]::GetFolderPath('CommonDesktopDirectory'),`,
-        `    "$env:USERPROFILE\\OneDrive\\Escritorio",`,
-        `    "$env:USERPROFILE\\OneDrive\\Desktop"`,
-        `  )`,
-        `  foreach ($d in $dirs) {`,
-        `    if ($d -and (Test-Path $d)) {`,
-        `      $lnk = Join-Path $d 'EpicKast.lnk'`,
-        `      if (Test-Path $lnk) {`,
-        `        $s = $wsh.CreateShortcut($lnk)`,
-        `        $s.TargetPath = '${targetApp.replace(/'/g, "''")}'`,
-        `        $s.WorkingDirectory = (Split-Path '${targetApp.replace(/'/g, "''")}')`,
-        `        $s.IconLocation = '${targetApp.replace(/'/g, "''")},0'`,
-        `        $s.Save()`,
-        `        Log "Acceso directo actualizado: $lnk"`,
-        `      }`,
-        `    }`,
-        `  }`,
-        `} catch {`,
-        `  Log "Nota sobre accesos directos: $_"`,
-        `}`,
-        ``,
-        `# 6. Relanzar aplicacion instalada`,
-        `if (Test-Path '${targetApp.replace(/'/g, "''")}') {`,
-        `  Log "Relanzando EpicKast desde: '${targetApp.replace(/'/g, "''")}'"`,
-        `  Start-Process -FilePath '${targetApp.replace(/'/g, "''")}'`,
-        `  Log "EpicKast iniciado con exito."`,
-        `} else {`,
-        `  Log "ERROR CRITICO: No se encontro el archivo destino '${targetApp.replace(/'/g, "''")}'"`,
-        `}`,
-        `Log "PROCESO DE ACTUALIZACION COMPLETADO"`,
-        `Log "=========================================================="`
+      const cmdLines = [
+        '@echo off',
+        'chcp 65001 >nul',
+        'setlocal enabledelayedexpansion',
+        'set "LOGFILE=' + logFile + '"',
+        'echo ========================================================== >> "%LOGFILE%"',
+        'echo [%date% %time%] INICIANDO ACTUALIZACION DESACOPLADA DE EPICKAST >> "%LOGFILE%"',
+        'echo [%date% %time%] Instalador descargado: "' + tempExe + '" >> "%LOGFILE%"',
+        'echo [%date% %time%] Destino instalado: "' + targetApp + '" >> "%LOGFILE%"',
+        '',
+        ':: 1. Esperar activamente a que todos los procesos de EpicKast se cierren',
+        'echo [%date% %time%] Esperando cierre de procesos EpicKast... >> "%LOGFILE%"',
+        'set /a tries=0',
+        ':wait_close',
+        'set /a tries+=1',
+        'tasklist /fi "imagename eq EpicKast.exe" 2>nul | find /i "EpicKast.exe" >nul',
+        'if not errorlevel 1 (',
+        '    if !tries! leq 25 (',
+        '        timeout /t 1 /nobreak >nul',
+        '        goto wait_close',
+        '    ) else (',
+        '        echo [%date% %time%] Forzando cierre tras espera maxima... >> "%LOGFILE%"',
+        '        taskkill /f /im "EpicKast.exe" >nul 2>&1',
+        '        timeout /t 2 /nobreak >nul',
+        '    )',
+        ')',
+        'echo [%date% %time%] Proceso principal cerrado con exito. >> "%LOGFILE%"',
+        '',
+        ':: 2. Desbloquear archivo descargado de Windows Mark-of-the-Web',
+        'echo [%date% %time%] Desbloqueando archivo del instalador... >> "%LOGFILE%"',
+        'powershell -NoProfile -ExecutionPolicy Bypass -Command "Unblock-File -LiteralPath \'' + tempExe.replace(/\\/g, '\\\\') + '\' -ErrorAction SilentlyContinue" >> "%LOGFILE%" 2>&1',
+        '',
+        ':: 3. Ejecutar instalador NSIS silencioso y esperar termino',
+        'echo [%date% %time%] Ejecutando instalador silencioso (/S)... >> "%LOGFILE%"',
+        'start "" /wait "' + tempExe + '" /S',
+        'echo [%date% %time%] Instalador finalizado. Codigo de salida: %errorlevel% >> "%LOGFILE%"',
+        '',
+        ':: 4. Esperar liberacion de archivos del sistema',
+        'timeout /t 2 /nobreak >nul',
+        '',
+        ':: 5. Actualizar accesos directos en Escritorio (normal y OneDrive)',
+        'echo [%date% %time%] Actualizando accesos directos de escritorio... >> "%LOGFILE%"',
+        'powershell -NoProfile -ExecutionPolicy Bypass -Command "' +
+          'try { ' +
+          '  $wsh = New-Object -ComObject WScript.Shell; ' +
+          '  $dirs = @([Environment]::GetFolderPath(\'Desktop\'), [Environment]::GetFolderPath(\'CommonDesktopDirectory\'), \"$env:USERPROFILE\\OneDrive\\Escritorio\", \"$env:USERPROFILE\\OneDrive\\Desktop\"); ' +
+          '  $target = \'' + targetApp.replace(/\\/g, '\\\\') + '\'; ' +
+          '  foreach ($d in $dirs) { ' +
+          '    if ($d -and (Test-Path $d)) { ' +
+          '      $lnk = Join-Path $d \'EpicKast.lnk\'; ' +
+          '      if (Test-Path $lnk) { ' +
+          '        $s = $wsh.CreateShortcut($lnk); ' +
+          '        $s.TargetPath = $target; ' +
+          '        $s.WorkingDirectory = Split-Path $target; ' +
+          '        $s.IconLocation = \"$target,0\"; ' +
+          '        $s.Save(); ' +
+          '      } ' +
+          '    } ' +
+          '  } ' +
+          '} catch {}' +
+        '" >> "%LOGFILE%" 2>&1',
+        '',
+        ':: 6. Relanzar aplicacion actualizada',
+        'echo [%date% %time%] Relanzando EpicKast desde "' + targetApp + '"... >> "%LOGFILE%"',
+        'if exist "' + targetApp + '" (',
+        '    start "" "' + targetApp + '"',
+        '    echo [%date% %time%] EpicKast relanzado con exito. >> "%LOGFILE%"',
+        ') else (',
+        '    echo [%date% %time%] ERROR: No se encontro el destino instalado "' + targetApp + '" >> "%LOGFILE%"',
+        ')',
+        'echo [%date% %time%] ACTUALIZACION COMPLETADA CON EXITO. >> "%LOGFILE%"',
+        'echo ========================================================== >> "%LOGFILE%"',
+        'del "%~f0" >nul 2>&1',
+        'exit'
       ].join('\r\n');
 
-      fs.writeFileSync(updatePs1, ps1Content, 'utf8');
+      fs.writeFileSync(updaterCmd, cmdLines, 'utf8');
       isQuitting = true;
-      execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', updatePs1], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
+
+      // Lanzar proceso completamente desacoplado con cmd start (rompe el Job Object de Electron)
+      const { spawn } = require('child_process');
+      const child = spawn('cmd.exe', ['/c', 'start', '""', '/min', updaterCmd], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        shell: false
+      });
+      child.unref();
+
+      // Cerrar Electron limpiamente
       setTimeout(() => {
         app.quit();
-        process.exit(0);
-      }, 1500);
+      }, 350);
       return { ok: true };
     } catch (err) {
       console.error('Error al descargar e instalar actualización:', err);
