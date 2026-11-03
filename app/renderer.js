@@ -59,7 +59,7 @@ const ROLES = {
 };
 const settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem('epickast.settings') || '{}') };
 if (settings.voiceGate === 0.024 || settings.voiceGate === undefined) settings.voiceGate = 0.006;
-if (!settings.server || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(settings.server)) {
+if (!settings.server || /^ws:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(settings.server) || /epickast\.onrender\.com/i.test(settings.server)) {
   settings.server = DEFAULTS.server;
   localStorage.setItem('epickast.settings', JSON.stringify(settings));
 }
@@ -81,7 +81,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.5.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.5.6', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -527,6 +527,8 @@ async function checkServerUpdate() {
 }
 
 // ---------- datos ----------
+setInterval(() => { if (S.ws && S.me) checkServerUpdate(); }, 5 * 60 * 1000);
+window.addEventListener('focus', () => { if (S.ws && S.me) checkServerUpdate(); });
 async function loadFriends() { try { S.friends = await rpc('friends.list'); } catch {} renderSide(); renderHome(); renderCallOverlay(); }
 async function loadServers() {
   try { S.servers = await rpc('servers.list'); } catch { return; }
