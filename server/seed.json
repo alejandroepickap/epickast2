@@ -1,0 +1,71 @@
+{
+  "ts": 1793664054748,
+  "users": [
+    {
+      "id": 1,
+      "name": "EpicKap",
+      "salt": "26cf19b36b8794bc266c486f6ddcfa36",
+      "hash": "1566a57961351fc738a9b265443886e3155e23e3f40b2491897fa8f9aa5c9e0b",
+      "avatar": "data:image/webp;base64,UklGRvIJAABXRUJQVlA4WAoAAAAgAAAAfwAAfwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADZWUDggBAgAANApAJ0BKoAAgAA+YSqSRyQiIaEoFAnQgAwJYgDXHbf/Haw/2nzNqu/kNfGMZ2OftfYN6APMA/Vr9QOsB/M/9B6gP2A9Zf0FegB/Uv6j1i3oAftB6XP7VfBN+zP7PfAT+s3/dzjD+d9qH9z6E/z57ZcoV6L7Mflfy2+Tf613y+oz1Avxj+Wf3D8lvy841fMvMC9Wfon+n4z+5U/2/q53xf1Xyx/8z0985r5r/iP/T/k/gG/kn9I/5n5yd4D0af3CLGtm1tGwLV2oxzU1H8tChr5BP3hY1/3ny/A9uiLFgSvUY9gk7NdY0FOE9R8SNgIvwBjBWbfHfRBPxngSDgdtEQbLrZ7KITArsiK6jTnWv18uPnxvcLIlN/QiXJdt4fRb3Yoscn8FqGVarQgetmlpN9bxIKc9PTwNZAcRFy7qgqioBK1t5Dk8G9RIkFhEXHZgey4Fs1lsaoAA/vz0AAKeApZlPlWkwmWz/mO/VY4SuDQtHsoJ6TOYG5hVxs8TR0hQPOUZiefk8bnPeB9PkSmStJFD9FotAOWxZPzS8As4U3TW324KMf7eYIfInUi82GnjApA0TyGyi5VeGZi+f48wHN8KPPDehRxsWaV4dJOa0jI4wNOf1KgQehi0ZPh3nifwA7SKJegCFWlN4prbxqayVPXLJhObwE/hlzRcQWyXJqKImJ58fNmRYQjil8qccnNPAZAXiciEisYQFvG5c8xJfHWUImAoMf6ctoyOl2xzwNAQlV3km9IVFmRKhmap5t0dt0bF2TMvrHUzv3/3lERNuqWMMfnXbktFV9/sOagkoyCZDJLMwwuVO1seWP4olJSJPN9X6gq9Cz4TL3vHLpMonJ/eiXujpvnp1a8tdE3mwDLHMRV9xgNgZO23BTopzBIfso12X3Oc07kGfUqhxAQtSLffMuxOGVOs595Ocq7DOcs4vLqUR5DxNFTbJ6/8MaJDHUdl0SEfARnD+JOvW3xbHtZCFLJN3F4PyDI+WoIxBTyQ5e9qHxxz4StOKB4BJqS59jpPhwYlIUY8LB8mgEbY73VoFmO9TvbPsd3n9lc//BfvJ0iamaxkPlIswcMS/8ouKBo4Ja7YvY6x1xjy4+L6KEx54p28q4p193PRFQvmI4Y7ZvV1KT+nMfdtyYDQKhMPs+f+YS50CCIqrZsj3sJxHkxTrg39gT3xgwJryD9YJoFV5nf0e2hpkXSZ8Xgz1JIos8oQy6nCV6qWGc9sr3m+RRGm6XR8sWAp4hqKYRFlf8U1OqgJfcLnuYT8fjm0YCWxQFR04i3O8M+ZUuki0aXQtyiz6z5VtXYymom6jhamBfFfhEdYhHTTpSy7YFFfXaajgJBSLMuDmXnvmkjqP0x3IMa0jEPzSoeBkt9OKvbFVfmLJ9iCzGF1pTKoXSlPZOcIXMtALb4rvuTlMVjIo6SvvETDZtl48YjL//gfHPC2V10o8RstBcdXW9U98GyLtCd9QH9p9/wv3f/PbJ2nZRN3go1/wiOw8TMaTYoCAFlk7iNcJWZVaaYdeBxoLbg1FX3nS6xuIManrs6JdobGpxbyzIBD+SYQjlgcfUlEqiplhmBFsUHLCpthxuE9V/cRIZjhy8QEHrm4EbSvyAP/97bG7AMeP6B/2qBKz36qFhENB+arWoAVcAFwCt4Be6zgai9Q+VL/OY+ip4eeLH7041CbfFyWLqw7bl8j/lim+0/BlzY/CSZ3Os9p8006nDkUcdsunblm/mHxK7AeFMYUl65MB0+zKMhjqGUED8NMnnzK3kf8eoxVMCOgUq4vspjm7yH3XpPqGTfwEcn4zMCw8BFMFyuOnDo/avy6YVLaRfeb3nJd06lBeQ/dfd7dNMOKOFCX4V/7ZmaNfnuxrILOun69WCT3wXsDTk2gfMQVTOu6fyiIKMG3MRdByXazdM9UvgArlX+Jayi97wrmVN817vL8N/sgWB3pNytk1lUOvmwtObt/8O51nzy16/+qX1i+9dq6a/4T5GwDwUd8Hc5dB14sz0t416MzMMQQJyt/6XOOMAHSdn7wVc6xUsVQoTTsNG7Cwz+0DwQ/1RN8YvLQel3k41bpIoR0BZr4HphwX//Wn/IXL/b48mmX+Gil3lT54qQY//R21i7gffCFI9UwXQiMRT9pxfy0IARYyhb0/Nb2nybMwPCXcaBuALRLMthvZJ3rAdv7VryfADpnPfBJ0b79qn2Bwo9A7pPhTTXfCrfBEwSuoKbJiKDQlCrDxrVwy5dJgJ8E1vxeiClOaY//vA2ZEzln9yPSyXud84aN+qpdiMQ6SH22D09LAraNMewtHj9i3bgcenf+inVfcqytHfOsDBy71E03cF2aen1K7DEJHz//urVFKnI7Pn8mdvxxdelei0wOjzDmQ5aiufJtHlJE0PA33XlcVlFnKzcuM4BKzH4alML7udYCvfaz/F4XFRuQDgcZrOPNSfwuGmNbEsDny5O5XVJS66lUW5v8lsUkBDRDT//TRDrn5fdgUssE5M/BZ/B/8IFx87twqWoVjLdMWG8MAqjTlV2JL0B0aJtSySjuPiTnva06IA0SZW/xOl3QOcS/gErTH9aU3pXD0L6DXv/bbHjWzDIwrPTluLSvg+2ZanVnDFnn180G4M243PPhawqkPEQuPZsFhjWGOHAvqv0AxzzpOEe1tZIMv5nZ0uZG7c3nTUIP1vtKh1+YRLE7HTBHrDZ1+BWKf5c4l9/OExPhu+jALcmhdadiESyhAAAAAAAAAA==",
+      "color": "#00d2d3",
+      "bio": "probando",
+      "av": 1793656492215,
+      "created": 1793651836586
+    },
+    {
+      "id": 2,
+      "name": "EpicKap2",
+      "salt": "650f4425533f84ddc516a00d0bc317be",
+      "hash": "d1e03c39750caca55774fe59e749f676d98789cf85d62d2d39c328c3ff6ff284",
+      "avatar": null,
+      "color": null,
+      "bio": null,
+      "av": 0,
+      "created": 1793652086214
+    }
+  ],
+  "friends": [
+    {
+      "a": 2,
+      "b": 1,
+      "status": "accepted"
+    }
+  ],
+  "servers": [
+    {
+      "id": 1,
+      "name": "prueba de servidor",
+      "owner": 2,
+      "invite": "78e879b64b",
+      "created": 1793652253321
+    }
+  ],
+  "members": [
+    {
+      "server_id": 1,
+      "user_id": 2,
+      "role": "member"
+    },
+    {
+      "server_id": 1,
+      "user_id": 1,
+      "role": "member"
+    }
+  ],
+  "channels": [
+    {
+      "id": 1,
+      "server_id": 1,
+      "name": "general",
+      "type": "text",
+      "user_limit": 0
+    },
+    {
+      "id": 2,
+      "server_id": 1,
+      "name": "Sala de voz",
+      "type": "voice",
+      "user_limit": 0
+    }
+  ]
+}

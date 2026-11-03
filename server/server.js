@@ -41,6 +41,66 @@ const get = (s, ...a) => sql(s).get(...a);
 const all = (s, ...a) => sql(s).all(...a);
 const run = (s, ...a) => sql(s).run(...a);
 
+const BACKUP_FILE = path.join(DATA, 'backup-state.json');
+const SEED_FILE = path.join(__dirname, 'seed.json');
+
+function saveBackup() {
+  try {
+    const users = all('SELECT id,name,salt,hash,avatar,color,bio,av,created FROM users');
+    const friends = all('SELECT a,b,status FROM friends');
+    const servers = all('SELECT id,name,owner,invite,created FROM servers');
+    const members = all('SELECT server_id,user_id,role FROM members');
+    const channels = all('SELECT id,server_id,name,type,user_limit FROM channels');
+    const state = { ts: Date.now(), users, friends, servers, members, channels };
+    fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
+    if (fs.existsSync(SEED_FILE) || !process.env.RENDER) {
+      try { fs.writeFileSync(SEED_FILE, JSON.stringify(state, null, 2)); } catch {}
+    }
+  } catch (e) {
+    console.error('[backup] Error al guardar respaldo:', e);
+  }
+}
+
+function restoreBackup() {
+  try {
+    const count = get('SELECT count(*) c FROM users')?.c || 0;
+    const target = fs.existsSync(BACKUP_FILE) ? BACKUP_FILE : (fs.existsSync(SEED_FILE) ? SEED_FILE : null);
+    if (count === 0 && target) {
+      const data = JSON.parse(fs.readFileSync(target, 'utf8'));
+      if (Array.isArray(data.users)) {
+        for (const u of data.users) {
+          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,bio,av,created) VALUES(?,?,?,?,?,?,?,?,?)',
+            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.bio || null, u.av || 0, u.created || Date.now());
+        }
+      }
+      if (Array.isArray(data.friends)) {
+        for (const f of data.friends) {
+          run('INSERT OR IGNORE INTO friends(a,b,status) VALUES(?,?,?)', f.a, f.b, f.status);
+        }
+      }
+      if (Array.isArray(data.servers)) {
+        for (const s of data.servers) {
+          run('INSERT OR IGNORE INTO servers(id,name,owner,invite,created) VALUES(?,?,?,?,?)', s.id, s.name, s.owner, s.invite, s.created || Date.now());
+        }
+      }
+      if (Array.isArray(data.members)) {
+        for (const m of data.members) {
+          run('INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,?)', m.server_id, m.user_id, m.role || 'member');
+        }
+      }
+      if (Array.isArray(data.channels)) {
+        for (const c of data.channels) {
+          run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id, c.server_id, c.name, c.type, c.user_limit || 0);
+        }
+      }
+      console.log(`[backup] Restaurados ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores desde el respaldo ${path.basename(target)}.`);
+    }
+  } catch (e) {
+    console.error('[backup] Error al restaurar respaldo:', e);
+  }
+}
+restoreBackup();
+
 // ---------- utilidades ----------
 const conns = new Map();            // userId -> Set<ws>
 const rooms = new Map();            // roomKey -> Map<userId, {ws,name,state}>
@@ -581,7 +641,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.5.0';
+  let version = '1.5.1';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;
@@ -590,15 +650,15 @@ function releaseInfo() {
     files.sort((a, b) => {
       const aMatch = a.includes(version) ? 1 : 0, bMatch = b.includes(version) ? 1 : 0;
       if (aMatch !== bMatch) return bMatch - aMatch;
-      const aZip = a.startsWith('EpicKast-Instalador-') && a.endsWith('.zip') ? 1 : 0;
-      const bZip = b.startsWith('EpicKast-Instalador-') && b.endsWith('.zip') ? 1 : 0;
+      const aZip = a.endsWith('.zip') ? 1 : 0;
+      const bZip = b.endsWith('.zip') ? 1 : 0;
       if (aZip !== bZip) return bZip - aZip;
       return b.localeCompare(a, undefined, { numeric: true });
     });
     if (files.length) file = files[0];
   }
-  const ghUrl = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-Instalador-${version}.zip`;
-  return { version, file: file || `EpicKast-Instalador-${version}.zip`, downloadPath: '/download/latest', ghUrl };
+  const ghUrl = `https://github.com/epickap039/EpicKast/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
+  return { version, file: file || `EpicKast-v${version}-Amigos.zip`, downloadPath: '/download/latest', ghUrl };
 }
 
 // ---------- transporte ----------
@@ -675,6 +735,15 @@ const httpServer = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"ok":true,"app":"EpicKast"}'); }
   if (u.pathname === '/version') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(releaseInfo())); }
+  if (u.pathname === '/backup') {
+    saveBackup();
+    if (fs.existsSync(BACKUP_FILE)) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return fs.createReadStream(BACKUP_FILE).pipe(res);
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end('{}');
+  }
   if (u.pathname === '/yt-player') {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'origin-when-cross-origin' });
     return res.end(ytPlayerHtml(u.searchParams.get('v') || ''));
@@ -803,6 +872,7 @@ wss.on('connection', (ws, req) => {
             const salt = crypto.randomBytes(16).toString('hex');
             const id = Number(run('INSERT INTO users(name,salt,hash,created) VALUES(?,?,?,?)', name, salt, hashPw(pw, salt), Date.now()).lastInsertRowid);
             const token = newToken(); run('INSERT INTO sessions VALUES(?,?,?)', token, id, Date.now());
+            saveBackup();
             login(ws, id, name); return reply(true, { token, user: selfView(id), ice: iceServers() });
           }
           const u = get('SELECT id,name,salt,hash FROM users WHERE name=?', name);
@@ -819,6 +889,9 @@ wss.on('connection', (ws, req) => {
       }
       const h = H[m.t]; if (!h) fail('Operación desconocida');
       const res = h(ws, m);
+      if (['friends.add', 'friends.accept', 'friends.remove', 'server.create', 'server.join', 'server.leave', 'server.delete', 'channel.create', 'channel.delete', 'profile.set'].includes(m.t)) {
+        setTimeout(saveBackup, 300);
+      }
       if (res && typeof res.then === 'function') {
         res.then((v) => reply(true, v)).catch((e) => {
           if (!e.user) console.error('[error]', m.t, e);
