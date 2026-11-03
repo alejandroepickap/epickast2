@@ -94,13 +94,29 @@
         const t = c.currentTime;
         const osc = c.createOscillator();
         const g = c.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(987.77, t);
-        osc.frequency.setValueAtTime(1318.51, t + 0.06);
-        g.gain.setValueAtTime(0.12, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(880, t);
+        osc.frequency.setValueAtTime(1174, t + 0.04);
+        g.gain.setValueAtTime(0.04, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
         osc.connect(g); g.connect(c.destination);
-        osc.start(t); osc.stop(t + 0.22);
+        osc.start(t); osc.stop(t + 0.14);
+      } catch {}
+    },
+    roundCleared() {
+      // Notificación de victoria suave y breve (volumen muy bajo, sin bucle infinito)
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(523.25, t);
+        osc.frequency.exponentialRampToValueAtTime(659.25, t + 0.14);
+        g.gain.setValueAtTime(0.04, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+        osc.connect(g); g.connect(c.destination);
+        osc.start(t); osc.stop(t + 0.24);
       } catch {}
     },
     tick() {
@@ -253,7 +269,7 @@
               <span class="cd-ico">⚡</span>
               <div>
                 <strong>EpicStrike 2D • Arena Co-op</strong>
-                <span class="cd-badge">v1.7.3</span>
+                <span class="cd-badge">v1.7.4</span>
               </div>
             </div>
             <div class="cd-stats">
@@ -263,6 +279,7 @@
               <div class="cd-stat">📦 Cajas: <b id="esCrates">${this.data.crates}</b></div>
             </div>
             <div class="cd-acts">
+              <button id="esBtnInvite" class="cd-btn" style="background:#059669;border-color:#10b981;color:#fff;font-weight:700" title="Invitar a todos en la llamada/sala a unirse a la partida">📢 Invitar a jugar</button>
               <button id="esBtnBot" class="cd-btn" title="Añadir un bot aliado a tu escuadrón para probar el modo cooperativo">🤖 +Bot Aliado</button>
               <button id="esBtnCrate" class="cd-btn gold">🎁 Abrir Cajas Tácticas</button>
               <button id="esBtnClose" class="cd-btn">✕ Salir</button>
@@ -644,7 +661,7 @@
     }
 
     update(dt) {
-      if (this.gameState === 'gameover') return;
+      if (this.gameState !== 'play') return;
 
       // 1. Movimiento del Jugador (WASD)
       let dx = 0, dy = 0;
@@ -865,14 +882,14 @@
       // 8. Limpiar estructuras destruidas
       this.structures = this.structures.filter(s => s.hp > 0);
 
-      // 9. Verificar condición de victoria de la oleada
-      if (this.enemiesSpawned >= this.enemiesTotalWave && this.enemies.length === 0) {
+      // 9. Verificar condición de victoria de la oleada (ejecución única)
+      if (this.gameState === 'play' && this.enemiesSpawned >= this.enemiesTotalWave && this.enemies.length === 0) {
         this.gameState = 'cleared';
         this.data.crates += 1;
         this.data.credits += this.currentConfig.reward;
         saveGameData(this.data);
         this.updateStatsUi();
-        AudioFX.goldFanfare();
+        AudioFX.roundCleared();
 
         const ov = this.container.querySelector('#esOverlay');
         const t = this.container.querySelector('#esOverlayTitle');
@@ -942,142 +959,446 @@
       const ctx = this.ctx;
       const w = this.width;
       const h = this.height;
+      const now = Date.now();
 
       ctx.save();
+      ctx.imageSmoothingEnabled = false;
 
       // Screen Shake
       if (this.shakeIntensity > 0.5) {
         const sx = (Math.random() - 0.5) * this.shakeIntensity;
         const sy = (Math.random() - 0.5) * this.shakeIntensity;
-        ctx.translate(sx, sy);
+        ctx.translate(Math.round(sx), Math.round(sy));
       }
 
-      // Fondo oscuro cyberpunk con rejilla tecnológica
-      ctx.fillStyle = '#080c14';
+      // 1. PISO PIXEL ART: Arena Retro Sci-Fi con Baldosas Metálicas y Bordes de Advertencia
+      ctx.fillStyle = '#090d16';
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = '#121826';
+      // Cuadrícula de baldosas con remaches
+      ctx.strokeStyle = '#121a2c';
       ctx.lineWidth = 1;
-      for (let x = 0; x < w; x += 36) {
+      for (let x = 0; x < w; x += 32) {
         ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
       }
-      for (let y = 0; y < h; y += 36) {
+      for (let y = 0; y < h; y += 32) {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
       }
 
-      // Muros y Torretas
+      // Remaches metálicos en intersecciones
+      ctx.fillStyle = '#1e293b';
+      for (let x = 32; x < w; x += 64) {
+        for (let y = 32; y < h; y += 64) {
+          ctx.fillRect(x - 1, y - 1, 3, 3);
+        }
+      }
+
+      // Franja de peligro perimetral (Hazard Stripes pixeladas amarillo/negro)
+      const bw = 10;
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, w, bw);
+      ctx.fillRect(0, h - bw, w, bw);
+      ctx.fillRect(0, 0, bw, h);
+      ctx.fillRect(w - bw, 0, bw, h);
+
+      ctx.fillStyle = '#ca8a04';
+      for (let x = 0; x < w; x += 16) {
+        ctx.fillRect(x, 0, 8, bw);
+        ctx.fillRect(x, h - bw, 8, bw);
+      }
+      for (let y = 0; y < h; y += 16) {
+        ctx.fillRect(0, y, bw, 8);
+        ctx.fillRect(w - bw, y, bw, 8);
+      }
+
+      // 2. ESTRUCTURAS PIXEL ART (Muros y Torretas)
       this.structures.forEach(st => {
         if (st.type === 'wall') {
-          ctx.fillStyle = '#1e293b';
-          ctx.fillRect(st.x - 14, st.y - 14, 28, 28);
+          // Muro de Escudo Táctico Pixel Art
+          const px = Math.round(st.x);
+          const py = Math.round(st.y);
+          // Postes laterales metálicos
+          ctx.fillStyle = '#334155';
+          ctx.fillRect(px - 14, py - 14, 6, 28);
+          ctx.fillRect(px + 8, py - 14, 6, 28);
+          ctx.fillStyle = '#64748b';
+          ctx.fillRect(px - 13, py - 13, 2, 2);
+          ctx.fillRect(px - 13, py + 11, 2, 2);
+          ctx.fillRect(px + 11, py - 13, 2, 2);
+          ctx.fillRect(px + 11, py + 11, 2, 2);
+
+          // Campo de fuerza pixelado brillante con scanline
+          const pulse = (Math.sin(now * 0.008) + 1) * 0.5;
+          ctx.fillStyle = `rgba(56, 189, 248, ${0.25 + pulse * 0.25})`;
+          ctx.fillRect(px - 8, py - 12, 16, 24);
           ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(st.x - 14, st.y - 14, 28, 28);
+          ctx.lineWidth = 1;
+          ctx.strokeRect(px - 8, py - 12, 16, 24);
+
+          // Líneas de rejilla interna de energía
+          ctx.fillStyle = '#7dd3fc';
+          const scanY = py - 10 + (Math.floor(now * 0.04) % 20);
+          ctx.fillRect(px - 7, scanY, 14, 2);
+
+          // Barra de vida pixelada
+          const hpPct = Math.max(0, st.hp / st.maxHp);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(px - 12, py - 18, 24, 3);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(px - 12, py - 18, Math.round(24 * hpPct), 3);
+        } else {
+          // Torreta Centinela Pixel Art
+          const px = Math.round(st.x);
+          const py = Math.round(st.y);
+
+          // Trípode de base
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(px - 12, py - 12, 24, 24);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(px - 8, py - 8, 16, 16);
+
+          // Cabeza giratoria de la torreta
+          ctx.save();
+          ctx.translate(px, py);
+          const target = this.enemies[0];
+          const tAngle = target ? Math.atan2(target.y - py, target.x - px) : 0;
+          ctx.rotate(tAngle);
+
+          // Cañones dobles
           ctx.fillStyle = '#94a3b8';
-          ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText('🧱', st.x, st.y + 4);
-        } else {
-          ctx.fillStyle = '#1e1b4b';
-          ctx.beginPath(); ctx.arc(st.x, st.y, 14, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = '#818cf8'; ctx.lineWidth = 2; ctx.stroke();
+          ctx.fillRect(4, -5, 12, 3);
+          ctx.fillRect(4, 2, 12, 3);
+          // Núcleo de la torreta
+          ctx.fillStyle = '#4f46e5';
+          ctx.fillRect(-6, -6, 12, 12);
+          ctx.fillStyle = '#818cf8';
+          ctx.fillRect(-3, -3, 6, 6);
+          // Ojo láser central
           ctx.fillStyle = '#c084fc';
-          ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText('🔫', st.x, st.y + 4);
+          ctx.fillRect(1, -1, 3, 3);
+          ctx.restore();
+
+          // Barra de vida pixelada
+          const hpPct = Math.max(0, st.hp / st.maxHp);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(px - 12, py - 16, 24, 3);
+          ctx.fillStyle = '#a855f7';
+          ctx.fillRect(px - 12, py - 16, Math.round(24 * hpPct), 3);
         }
       });
 
-      // Balas del jugador
-      this.bullets.forEach(b => {
-        ctx.fillStyle = b.color;
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.isPlasma ? 6 : 3, 0, Math.PI * 2);
-        ctx.fill();
-      });
-
-      // Balas de enemigos
-      this.enemyBullets.forEach(eb => {
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath(); ctx.arc(eb.x, eb.y, 3.5, 0, Math.PI * 2); ctx.fill();
-      });
-
-      // Enemigos
-      this.enemies.forEach(en => {
-        if (en.type === 'boss') {
-          // Jefe Titán Goliath
-          ctx.fillStyle = '#7f1d1d';
-          ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
-
-          ctx.fillStyle = '#fee2e2';
-          ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-          ctx.fillText('GOLIATH', en.x, en.y + 4);
-
-          // Barra de vida superior del Jefe
-          ctx.fillStyle = 'rgba(0,0,0,0.6)';
-          ctx.fillRect(w / 2 - 140, 16, 280, 14);
-          ctx.fillStyle = '#ef4444';
-          ctx.fillRect(w / 2 - 138, 18, 276 * (en.hp / en.maxHp), 10);
-          ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
-          ctx.strokeRect(w / 2 - 140, 16, 280, 14);
-          ctx.fillStyle = '#fff'; ctx.font = 'bold 9px sans-serif';
-          ctx.fillText(`JEFE TITÁN: ${Math.round(en.hp)} / ${en.maxHp}`, w / 2, 26);
-        } else {
-          ctx.fillStyle = en.type === 'tank' ? '#312e81' : (en.type === 'trooper' ? '#701a75' : '#831843');
-          ctx.beginPath(); ctx.arc(en.x, en.y, en.radius, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = en.type === 'tank' ? '#818cf8' : '#f43f5e';
-          ctx.lineWidth = 1.5; ctx.stroke();
-
-          // Barra de vida pequeña
-          const pct = Math.max(0, en.hp / en.maxHp);
-          ctx.fillStyle = '#ef4444'; ctx.fillRect(en.x - 10, en.y - en.radius - 6, 20, 3);
-          ctx.fillStyle = '#22c55e'; ctx.fillRect(en.x - 10, en.y - en.radius - 6, 20 * pct, 3);
-        }
-      });
-
-      // Compañeros (Co-op)
-      this.teammates.forEach(m => {
-        ctx.fillStyle = '#059669';
-        ctx.beginPath(); ctx.arc(m.x, m.y, 13, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2; ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText(m.name, m.x, m.y - 18);
-      });
-
-      // Jugador
+      // 3. LÍNEA DE APUNTADO LÁSER PIXELADA (Del arma al ratón)
       ctx.save();
-      ctx.translate(this.player.x, this.player.y);
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const gunTipX = this.player.x + Math.cos(this.player.angle) * 18;
+      const gunTipY = this.player.y + Math.sin(this.player.angle) * 18;
+      ctx.moveTo(gunTipX, gunTipY);
+      ctx.lineTo(this.mouse.x, this.mouse.y);
+      ctx.stroke();
+      ctx.restore();
+
+      // Mirilla Retícula Pixel Art en el cursor
+      const mx = Math.round(this.mouse.x);
+      const my = Math.round(this.mouse.y);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(mx - 6, my, 4, 1);
+      ctx.fillRect(mx + 3, my, 4, 1);
+      ctx.fillRect(mx, my - 6, 1, 4);
+      ctx.fillRect(mx, my + 3, 1, 4);
+      ctx.fillRect(mx - 1, my - 1, 3, 3);
+
+      // 4. BALAS DEL JUGADOR (Trazadores Pixel Art)
+      this.bullets.forEach(b => {
+        const bx = Math.round(b.x);
+        const by = Math.round(b.y);
+        if (b.isPlasma) {
+          ctx.fillStyle = '#e879f9';
+          ctx.fillRect(bx - 4, by - 4, 8, 8);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(bx - 2, by - 2, 4, 4);
+        } else {
+          ctx.fillStyle = b.color || '#38bdf8';
+          ctx.fillRect(bx - 2, by - 2, 4, 4);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(bx - 1, by - 1, 2, 2);
+        }
+      });
+
+      // 5. BALAS ENEMIGAS (Proyectiles Pixel Rojos)
+      this.enemyBullets.forEach(eb => {
+        const ex = Math.round(eb.x);
+        const ey = Math.round(eb.y);
+        ctx.fillStyle = '#ef4444';
+        ctx.fillRect(ex - 2, ey - 2, 5, 5);
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(ex - 1, ey - 1, 3, 3);
+      });
+
+      // 6. ENEMIGOS PIXEL ART
+      this.enemies.forEach(en => {
+        const ex = Math.round(en.x);
+        const ey = Math.round(en.y);
+
+        if (en.type === 'boss') {
+          // TITÁN COLOSAL GOLIATH (Sprite Gigante Pixel Art)
+          ctx.save();
+          ctx.translate(ex, ey);
+          const bossAngle = Math.atan2(this.player.y - ey, this.player.x - ex);
+          ctx.rotate(bossAngle);
+
+          // Orugas/Pies mecha laterales
+          ctx.fillStyle = '#1c1917';
+          ctx.fillRect(-22, -26, 44, 8);
+          ctx.fillRect(-22, 18, 44, 8);
+
+          // Chasis blindado carmesí y obsidiana
+          ctx.fillStyle = '#7f1d1d';
+          ctx.fillRect(-18, -18, 36, 36);
+          ctx.fillStyle = '#991b1b';
+          ctx.fillRect(-14, -14, 28, 28);
+
+          // Silos de misiles en hombreras
+          ctx.fillStyle = '#f59e0b';
+          ctx.fillRect(-12, -16, 4, 4);
+          ctx.fillRect(-6, -16, 4, 4);
+          ctx.fillRect(-12, 12, 4, 4);
+          ctx.fillRect(-6, 12, 4, 4);
+
+          // Cañones dobles frontales
+          ctx.fillStyle = '#475569';
+          ctx.fillRect(14, -10, 16, 6);
+          ctx.fillRect(14, 4, 16, 6);
+          ctx.fillStyle = '#94a3b8';
+          ctx.fillRect(28, -9, 4, 4);
+          ctx.fillRect(28, 5, 4, 4);
+
+          // Reactor del Pecho (Pulsante)
+          const coreGlow = (Math.sin(now * 0.01) + 1) * 0.5;
+          ctx.fillStyle = coreGlow > 0.5 ? '#fef08a' : '#ef4444';
+          ctx.fillRect(-4, -4, 8, 8);
+
+          ctx.restore();
+
+          // Barra de Vida Superior del Jefe (Estilo Arcade Retro)
+          const barW = 320;
+          const barH = 16;
+          const bx = Math.round(w / 2 - barW / 2);
+          const by = 16;
+          ctx.fillStyle = 'rgba(10, 10, 15, 0.85)';
+          ctx.fillRect(bx, by, barW, barH);
+          ctx.strokeStyle = '#ca8a04';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(bx, by, barW, barH);
+
+          const hpPct = Math.max(0, en.hp / en.maxHp);
+          ctx.fillStyle = '#dc2626';
+          ctx.fillRect(bx + 2, by + 2, Math.round((barW - 4) * hpPct), barH - 4);
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`💀 JEFE TITÁN GOLIATH Mk-IV [${Math.round(en.hp)} / ${en.maxHp}]`, w / 2, by + 12);
+
+        } else if (en.type === 'tank') {
+          // Tanque Blindado Mecha Pixel Art
+          ctx.save();
+          ctx.translate(ex, ey);
+          const tankAngle = Math.atan2(this.player.y - ey, this.player.x - ex);
+          ctx.rotate(tankAngle);
+
+          // Orugas
+          ctx.fillStyle = '#1e293b';
+          ctx.fillRect(-14, -14, 28, 6);
+          ctx.fillRect(-14, 8, 28, 6);
+
+          // Casco blindado azul
+          ctx.fillStyle = '#1e3a8a';
+          ctx.fillRect(-10, -8, 20, 16);
+          ctx.fillStyle = '#2563eb';
+          ctx.fillRect(-6, -6, 12, 12);
+
+          // Cañón largo
+          ctx.fillStyle = '#64748b';
+          ctx.fillRect(6, -2, 12, 4);
+          ctx.restore();
+
+          // Barra de vida
+          const hpPct = Math.max(0, en.hp / en.maxHp);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(ex - 12, ey - 18, 24, 3);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fillRect(ex - 12, ey - 18, Math.round(24 * hpPct), 3);
+
+        } else if (en.type === 'trooper') {
+          // Cibercrawler Arácnido Pixel Art
+          ctx.save();
+          ctx.translate(ex, ey);
+          const crawlAngle = Math.atan2(this.player.y - ey, this.player.x - ex);
+          ctx.rotate(crawlAngle);
+
+          // Patas animadas
+          const legSwing = Math.sin(now * 0.02) * 3;
+          ctx.fillStyle = '#a855f7';
+          ctx.fillRect(-8, -12 + legSwing, 4, 4);
+          ctx.fillRect(4, -12 - legSwing, 4, 4);
+          ctx.fillRect(-8, 8 - legSwing, 4, 4);
+          ctx.fillRect(4, 8 + legSwing, 4, 4);
+
+          // Cuerpo púrpura
+          ctx.fillStyle = '#581c87';
+          ctx.fillRect(-8, -6, 16, 12);
+          ctx.fillStyle = '#c084fc';
+          ctx.fillRect(-4, -3, 8, 6);
+          ctx.restore();
+
+          // Barra de vida
+          const hpPct = Math.max(0, en.hp / en.maxHp);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(ex - 10, ey - 15, 20, 3);
+          ctx.fillStyle = '#c084fc';
+          ctx.fillRect(ex - 10, ey - 15, Math.round(20 * hpPct), 3);
+
+        } else {
+          // Dron Rastreador Volador Pixel Art
+          const propFrame = Math.floor(now * 0.05) % 2;
+          ctx.fillStyle = '#7f1d1d';
+          ctx.fillRect(ex - 8, ey - 8, 16, 16);
+          ctx.fillStyle = '#dc2626';
+          ctx.fillRect(ex - 5, ey - 5, 10, 10);
+
+          // Ojo rojo central
+          ctx.fillStyle = '#fee2e2';
+          ctx.fillRect(ex - 2, ey - 2, 4, 4);
+
+          // Aspas de propulsión pixeladas en cruz giratoria
+          ctx.fillStyle = propFrame === 0 ? '#94a3b8' : '#cbd5e1';
+          ctx.fillRect(ex - 10, ey - 10, 3, 3);
+          ctx.fillRect(ex + 7, ey - 10, 3, 3);
+          ctx.fillRect(ex - 10, ey + 7, 3, 3);
+          ctx.fillRect(ex + 7, ey + 7, 3, 3);
+
+          // Barra de vida
+          const hpPct = Math.max(0, en.hp / en.maxHp);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(ex - 10, ey - 14, 20, 3);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(ex - 10, ey - 14, Math.round(20 * hpPct), 3);
+        }
+      });
+
+      // 7. COMPAÑEROS DE ESCUADRÓN PIXEL ART (Bots y Amigos Co-op)
+      this.teammates.forEach(m => {
+        const mx = Math.round(m.x);
+        const my = Math.round(m.y);
+
+        ctx.save();
+        ctx.translate(mx, my);
+        ctx.rotate(m.angle || 0);
+
+        // Armadura de soldado verde esmeralda
+        ctx.fillStyle = '#064e3b';
+        ctx.fillRect(-10, -10, 20, 20);
+        ctx.fillStyle = '#059669';
+        ctx.fillRect(-7, -7, 14, 14);
+
+        // Casco con visor verde
+        ctx.fillStyle = '#34d399';
+        ctx.fillRect(-3, -3, 6, 6);
+
+        // Arma en mano
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(7, 1, 10, 4);
+        ctx.restore();
+
+        // Nombre y barra de vida
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(m.name, mx, my - 16);
+
+        const mPct = Math.max(0, m.hp / (m.maxHp || 100));
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(mx - 12, my - 13, 24, 3);
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect(mx - 12, my - 13, Math.round(24 * mPct), 3);
+      });
+
+      // 8. EL JUGADOR PIXEL ART (Soldado Comandante)
+      ctx.save();
+      const px = Math.round(this.player.x);
+      const py = Math.round(this.player.y);
+      ctx.translate(px, py);
       ctx.rotate(this.player.angle);
 
-      // Cuerpo del agente
-      ctx.fillStyle = '#2563eb';
-      ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 2; ctx.stroke();
+      // Animación de botas al caminar
+      const isMoving = this.keys.KeyW || this.keys.KeyA || this.keys.KeyS || this.keys.KeyD ||
+                       this.keys.ArrowUp || this.keys.ArrowLeft || this.keys.ArrowDown || this.keys.ArrowRight;
+      const stepOffset = isMoving ? Math.sin(now * 0.02) * 3 : 0;
 
-      // Cañón del arma
+      // Botas tácticas
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(-11, -12 + stepOffset, 5, 4);
+      ctx.fillRect(-11, 8 - stepOffset, 5, 4);
+
+      // Hombreras y blindaje corporal
+      ctx.fillStyle = '#1e3a8a';
+      ctx.fillRect(-10, -10, 20, 20);
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(-7, -7, 14, 14);
+
+      // Casco táctico y visor cibernético brillante
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-4, -4, 8, 8);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(0, -3, 5, 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(2, -2, 2, 4);
+
+      // Cañón del arma táctica seleccionada
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(6, 1, 12, 4);
       ctx.fillStyle = '#94a3b8';
-      ctx.fillRect(8, -3, 14, 6);
+      ctx.fillRect(10, 2, 7, 2);
+
+      // Destello de disparo pixelado (Muzzle Flash) si disparó hace menos de 50ms
+      if (now - this.player.lastShotTime < 50) {
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(18, 0, 6, 6);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(22, 1, 4, 4);
+      }
 
       ctx.restore();
 
-      // Nombre y barra de vida sobre el jugador
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(`Tú (${this.currentUser.name})`, this.player.x, this.player.y - 20);
+      // Placa de Nombre y Barra de Vida del Jugador
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Tú (${this.currentUser.name})`, px, py - 20);
 
       const pPct = Math.max(0, this.player.hp / this.player.maxHp);
-      ctx.fillStyle = '#ef4444'; ctx.fillRect(this.player.x - 14, this.player.y - 16, 28, 4);
-      ctx.fillStyle = '#10b981'; ctx.fillRect(this.player.x - 14, this.player.y - 16, 28 * pPct, 4);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(px - 16, py - 16, 32, 4);
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(px - 16, py - 16, Math.round(32 * pPct), 4);
 
-      // Partículas y Textos
+      // 9. PARTÍCULAS Y TEXTOS FLOTANTES
       this.particles.forEach(pt => {
         if (pt.isText) {
-          ctx.fillStyle = pt.color;
-          ctx.font = `bold ${pt.size || 12}px sans-serif`;
+          ctx.fillStyle = '#000000';
+          ctx.font = `bold ${pt.size || 12}px monospace`;
           ctx.textAlign = 'center';
-          ctx.fillText(pt.text, pt.x, pt.y);
-        } else {
+          ctx.fillText(pt.text, Math.round(pt.x) + 1, Math.round(pt.y) + 1);
           ctx.fillStyle = pt.color;
-          ctx.beginPath(); ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillText(pt.text, Math.round(pt.x), Math.round(pt.y));
+        } else {
+          // Chispa pixel art cuadrada
+          ctx.fillStyle = pt.color;
+          const sz = pt.size || 3;
+          ctx.fillRect(Math.round(pt.x), Math.round(pt.y), sz, sz);
         }
       });
 

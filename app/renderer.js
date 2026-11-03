@@ -185,7 +185,11 @@ function modalMinigame() {
   m.appendChild(wrap);
 
   if (window.CyberDefenseGame) {
-    new window.CyberDefenseGame(wrap, S.ws, S.chan || S.callKey || 'global', S.me);
+    new window.CyberDefenseGame(wrap, S.ws, S.chan || S.callKey || 'global', S.me, {
+      inviteAll: () => {
+        window.epicBroadcastGameInvite?.(S.chan || S.callKey || 'global');
+      }
+    });
     const chk = setInterval(() => {
       if (!wrap.children.length) {
         clearInterval(chk);
@@ -195,6 +199,15 @@ function modalMinigame() {
     }, 200);
   }
 }
+
+window.epicBroadcastGameInvite = (roomKey) => {
+  const myName = S.me?.name || 'Un amigo';
+  const inviteMsg = `🎮 ¡${myName} te ha invitado a jugar a EpicStrike 2D! Haz clic para unirte: epickast://game/join`;
+  if (S.chan) {
+    rpc('msg.send', { channel: S.chan, text: inviteMsg }).catch(() => {});
+  }
+  toast('📢 Invitación enviada al chat de la sala');
+};
 
 
 const S = {
@@ -898,6 +911,30 @@ function attachmentEl(m) {
 
 function renderMsgText(text) {
   if (!text) return null;
+
+  if (text.includes('epickast://game/join')) {
+    const cleanMsg = text.replace(/epickast:\/\/game\/join/i, '').trim();
+    return h('div', { class: 'tx' },
+      cleanMsg ? h('div', { style: 'margin-bottom:6px' }, cleanMsg) : null,
+      h('div', {
+        style: 'background:linear-gradient(135deg,rgba(15,23,42,0.95),rgba(24,35,58,0.98));border:1px solid #10b981;border-radius:10px;padding:12px 14px;max-width:340px;margin-top:4px;box-shadow:0 4px 16px rgba(0,0,0,0.3)'
+      },
+        h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:8px' },
+          h('span', { style: 'font-size:26px' }, '👾'),
+          h('div', null,
+            h('div', { style: 'font-size:11px;text-transform:uppercase;color:#34d399;font-weight:700' }, 'Partida Co-op en Vivo'),
+            h('div', { style: 'font-size:13px;font-weight:600;color:#fff' }, 'EpicStrike 2D • Arena de Combate')
+          )
+        ),
+        h('button', {
+          class: 'primary',
+          style: 'width:100%;padding:8px 12px;font-size:12px;font-weight:700;background:linear-gradient(90deg,#059669,#10b981);border:none;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px',
+          onclick: () => modalMinigame()
+        }, '⚔️ Unirme al Escuadrón')
+      )
+    );
+  }
+
   const match = /epickast:\/\/join\/([a-fA-F0-9]+)/i.exec(text);
   if (!match) return h('div', { class: 'tx' }, text);
 
@@ -1326,7 +1363,7 @@ function renderRail() {
     }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.3';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.4';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
