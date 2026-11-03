@@ -570,12 +570,11 @@ async function checkServerUpdate() {
     }
 
     const asarUrl = httpBase() + (info.asarDownloadPath || '/download/asar');
-    const exeUrl = info.directExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
     const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
 
-    // Mostrar barra de aviso
+    // Mostrar aviso SIN descargar automáticamente (solo con confirmación del usuario)
     bar.classList.remove('hidden');
-    const label = h('span', null, `✨ Descargando actualización v${info.version} en segundo plano...`);
+    const label = h('span', null, `✨ Nueva versión v${info.version} disponible`);
     const actionArea = h('div', { style: 'display:inline-flex;gap:8px;align-items:center' });
     const closeBtn = h('button', {
       style: 'background:transparent;border:0;color:#fff;opacity:0.75;font-size:14px;padding:2px 6px;cursor:pointer',
@@ -585,59 +584,44 @@ async function checkServerUpdate() {
 
     bar.replaceChildren(label, actionArea, closeBtn);
 
-    let isReady = false;
+    let isUpdating = false;
 
-    // Función para aplicar y reiniciar
-    const applyUpdate = async (btn) => {
-      btn.disabled = true;
-      btn.textContent = '⚡ Reiniciando en 1s...';
-      if (window.epic?.applyAsarUpdate) {
-        await window.epic.applyAsarUpdate();
-      } else if (window.epic?.installUpdate) {
-        await window.epic.installUpdate(exeUrl);
-      }
-    };
+    // Acción al hacer clic en instalar actualización
+    const startUpdateFlow = async (btn) => {
+      if (isUpdating) return;
+      isUpdating = true;
+      if (btn) btn.disabled = true;
+      label.textContent = `⚡ Descargando actualización v${info.version}...`;
+      actionArea.replaceChildren(h('span', { style: 'font-size:11px;color:#a78bfa;font-weight:600' }, '⏳ Descargando paquete...'));
 
-    // Función de descarga automática en segundo plano (Discord-Style)
-    const runAutoDownload = async () => {
-      label.textContent = '⚡ Descargando actualización v' + info.version + ' en segundo plano...';
-      actionArea.replaceChildren(h('span', { style: 'font-size:11px;color:#a78bfa;font-weight:600' }, '⏳ Descargando en segundo plano...'));
-      // Escuchar progreso en vivo
       window.epic?.onUpdateProgress?.((prog) => {
-        if (!isReady && prog?.percent !== undefined) {
+        if (prog?.percent !== undefined) {
           label.textContent = `⚡ Descargando actualización v${info.version} (${prog.percent}%)...`;
         }
       });
 
-      // 1. Intentar primero con ASAR ultraligero (2.2 MB instantáneo)
       let res = null;
       if (window.epic?.downloadAsarUpdate) {
         res = await window.epic.downloadAsarUpdate(asarUrl);
       }
 
-      // 2. Si falla ASAR, intentar con instalador .exe
-      if (!res?.ok && window.epic?.installUpdate) {
-        label.textContent = `⚡ Descargando instalador v${info.version}...`;
-        res = await window.epic.installUpdate(exeUrl);
-      }
-
       if (res?.ok) {
-        isReady = true;
-        label.textContent = `🚀 EpicKast v${info.version} lista para usar`;
-        const restartBtn = h('button', {
-          class: 'primary',
-          style: 'padding:5px 14px;font-size:12px;font-weight:700;background:#10b981;border-color:#34d399;cursor:pointer',
-          onclick: (e) => applyUpdate(e.currentTarget)
-        }, '⚡ Reiniciar ahora');
-        actionArea.replaceChildren(restartBtn);
-        toast(`Actualización v${info.version} descargada con éxito. Haz clic en Reiniciar ahora.`);
+        label.textContent = `🚀 Aplicando actualización v${info.version} y reiniciando...`;
+        actionArea.replaceChildren(h('span', { style: 'font-size:11px;color:#10b981;font-weight:700' }, '✓ Reiniciando en 1s...'));
+        toast(`Actualización v${info.version} descargada. Reiniciando EpicKast...`);
+        setTimeout(async () => {
+          if (window.epic?.applyAsarUpdate) {
+            await window.epic.applyAsarUpdate();
+          }
+        }, 1200);
       } else {
-        if (res?.error) toast('Aviso de descarga: ' + res.error);
+        isUpdating = false;
+        if (res?.error) toast('Error al descargar: ' + res.error);
         label.textContent = `✨ Actualización v${info.version} disponible`;
         const retryBtn = h('button', {
           class: 'primary',
-          style: 'padding:4px 10px;font-size:11px',
-          onclick: () => runAutoDownload()
+          style: 'padding:4px 10px;font-size:11px;background:#7c5cff',
+          onclick: (e) => startUpdateFlow(e.currentTarget)
         }, '⚡ Reintentar');
         const manualBtn = h('button', {
           style: 'padding:4px 10px;font-size:11px',
@@ -647,8 +631,18 @@ async function checkServerUpdate() {
       }
     };
 
-    // Iniciar automáticamente en segundo plano sin esperar clic
-    runAutoDownload();
+    const updateBtn = h('button', {
+      class: 'primary',
+      style: 'padding:4px 12px;font-size:11px;font-weight:700;background:#7c5cff;border-color:#906eff;cursor:pointer',
+      onclick: (e) => startUpdateFlow(e.currentTarget)
+    }, '📥 Instalar actualización');
+
+    const manualBtn = h('button', {
+      style: 'padding:4px 10px;font-size:11px',
+      onclick: () => window.epic?.openExternal?.(zipUrl)
+    }, '⬇ ZIP manual');
+
+    actionArea.replaceChildren(updateBtn, manualBtn);
   } catch {}
 }
 
@@ -1228,7 +1222,7 @@ function renderRail() {
     }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.6.8';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.6.9';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
