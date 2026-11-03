@@ -2402,28 +2402,7 @@ async function modalSettings() {
     accVideo,
     accShortcuts,
     accVisual,
-    accAccount,
-    acc('🗑️', 'Mantenimiento y Desinstalación', 'Eliminar EpicKast de este equipo por completo',
-      h('div', { style: 'display:flex;flex-direction:column;gap:10px;padding:4px 0' },
-        h('p', { class: 'hint', style: 'color:var(--mu);margin:0;font-size:12px' }, 'Al desinstalar se removerán los ejecutables, accesos directos de escritorio (incluyendo OneDrive) y registros de Windows.'),
-        h('button', {
-          id: 'bUninstallApp',
-          type: 'button',
-          class: 'mod-btn ban',
-          style: 'align-self:flex-start;padding:0 18px',
-          onclick: async () => {
-            if (confirm('¿Estás seguro de que deseas desinstalar EpicKast por completo de tu computadora?')) {
-              if (window.epic?.uninstall) {
-                const res = await window.epic.uninstall();
-                if (!res?.ok) toast('Error al iniciar desinstalador: ' + (res?.error || ''));
-              } else {
-                toast('La desinstalación solo está disponible en la app instalada.');
-              }
-            }
-          }
-        }, '🗑️ Desinstalar EpicKast del equipo')
-      )
-    )
+    accAccount
   );
 }
 
