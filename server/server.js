@@ -971,6 +971,25 @@ a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-de
 <li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast-b9fd.onrender.com</b>.</li>
 </ol></div></body></html>`);
   }
+  if (u.pathname === '/privacy' || u.pathname === '/privacidad') {
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    return res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>EpicKast — Política de Privacidad</title>
+<style>body{margin:0;min-height:100vh;background:#0e1015;color:#eef0f6;font-family:system-ui,sans-serif;padding:32px 20px;line-height:1.6}
+.container{max-width:760px;margin:0 auto;background:#151821;padding:36px;border-radius:16px;border:1px solid rgba(255,255,255,.08)}
+h1{color:#7c5cff;margin-top:0}h2{color:#f1f5f9;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px;margin-top:24px}
+p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div class="container">
+<h1>Política de Privacidad de EpicKast</h1>
+<p>Última actualización: Noviembre 2026. Editor: <strong>epickap</strong>.</p>
+<h2>1. Información y Datos del Usuario</h2>
+<p>EpicKast es una plataforma de comunicación personal y entretenimiento diseñada con principios de privacidad y mínimo uso de datos. No comercializamos, vendemos ni compartimos datos personales con terceros ni redes de publicidad.</p>
+<h2>2. Uso del Micrófono y Cámara</h2>
+<p>El acceso al micrófono y a la cámara web (o captura de pantalla) se utiliza exclusivamente cuando el usuario inicia activamente una llamada de voz, videollamada o comparte su pantalla en un canal. La transmisión de audio y video se procesa en tiempo real mediante WebRTC con encriptación estándar de extremo a extremo.</p>
+<h2>3. Almacenamiento Local</h2>
+<p>Las configuraciones de usuario (volumen, dispositivos seleccionados, temas y credenciales de sesión local) se almacenan de manera local y cifrada en el dispositivo del usuario.</p>
+<h2>4. Contacto</h2>
+<p>Para dudas sobre privacidad, soporte o solicitudes de eliminación de cuenta, contactar a través del repositorio oficial de EpicKast o con el editor <strong>epickap</strong>.</p>
+</div></body></html>`);
+  }
   if (u.pathname === '/download/asar' || u.pathname === '/update/asar') {
     const asarFile = path.join(__dirname, '..', 'release', 'app.asar');
     if (fs.existsSync(asarFile)) {

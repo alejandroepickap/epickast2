@@ -3385,7 +3385,7 @@ $('mMore').onclick = (e) => {
     tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
     tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }),
     tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
-    tileBtn('👾', 'Minijuego Co-op: Cyber Squad Defense & Cajas CS', () => { modalMinigame(); menu.classList.add('hidden'); }),
+    tileBtn('👾', 'Minijuego Co-op: EpicStrike 2D & Cajas Tácticas', () => { modalMinigame(); menu.classList.add('hidden'); }),
     tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring)
   );
 

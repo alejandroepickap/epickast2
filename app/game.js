@@ -1,5 +1,5 @@
-// EpicKast: EpicStrike 2D • Co-op Arena Shooter & Cajas CS
-// Shooter multijugador 2D de acción con WASD + Mouse, construcción de defensas, hordas, jefe titán y ruleta de cajas CS.
+// EpicKast: EpicStrike 2D • Co-op Arena Shooter & Cajas Tácticas
+// Shooter multijugador 2D de acción con WASD + Mouse, construcción de defensas, hordas, jefe titán y ruleta de cajas tácticas.
 // Optimizado para rendimiento extremo: <4MB RAM, Canvas 2D puro, audio sintetizado Web Audio (0 archivos externos).
 
 (function(global) {
@@ -136,7 +136,7 @@
     }
   };
 
-  // --- Catálogo de Armas y Skins estilo Counter-Strike ---
+  // --- Catálogo de Armas y Skins Tácticas ---
   const SKINS = [
     // ⚪ Mil-Spec (Azul claro)
     { id: 'p_classic', name: 'Pistola Clásica USP-S', type: 'weapon', rarity: 'milspec', color: '#93c5fd', bg: '#1e3a8a', bulletColor: '#60a5fa' },
@@ -264,7 +264,7 @@
             </div>
             <div class="cd-acts">
               <button id="esBtnBot" class="cd-btn" title="Añadir un bot aliado a tu escuadrón para probar el modo cooperativo">🤖 +Bot Aliado</button>
-              <button id="esBtnCrate" class="cd-btn gold">🎁 Abrir Cajas CS</button>
+              <button id="esBtnCrate" class="cd-btn gold">🎁 Abrir Cajas Tácticas</button>
               <button id="esBtnClose" class="cd-btn">✕ Salir</button>
             </div>
           </div>
@@ -1095,7 +1095,7 @@
       if (cr) cr.textContent = this.data.crates;
     }
 
-    // --- Sistema de Apertura de Cajas CS:GO ---
+    // --- Sistema de Apertura de Cajas Tácticas Cyber ---
     openCrateScreen() {
       const modal = this.container.querySelector('#esCrateModal');
       modal.classList.remove('hidden');

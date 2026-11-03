@@ -14,7 +14,8 @@
     "start": "electron .",
     "server": "node server/server.js",
     "test": "node tools/smoke-test.js",
-    "pack:friends": "electron-builder --win nsis zip --x64"
+    "pack:friends": "electron-builder --win nsis zip --x64",
+    "pack:store": "electron-builder --win appx --x64"
   },
   "build": {
     "appId": "com.epickap.epickast",
@@ -54,6 +55,14 @@
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico",
       "artifactName": "EpicKast-Instalador.exe"
+    },
+    "appx": {
+      "identityName": "epickap.EpicKast",
+      "publisher": "CN=84C8DA77-E7AA-4685-90E3-2D5F2F9BA6E9",
+      "publisherDisplayName": "epickap",
+      "applicationId": "epickap.EpicKast",
+      "backgroundColor": "#151821",
+      "artifactName": "EpicKast-Store.appx"
     }
   },
   "dependencies": {
