@@ -44,9 +44,9 @@ const DEFAULTS = {
   camPreset: '720p30', screenPreset: '1080p30', screenAudio: false,
   hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.006, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
-  keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 54, hideNoVideo: true,
+  keyMute: 'Alt+M', keyDeaf: 'Alt+D', stageHeight: 60, hideNoVideo: true,
   partyVol: 0.75, partyAudioOnly: false, autoGameDetect: true, customActivity: '',
-  hideSide: false, hideMembers: false,
+  hideSide: false, hideMembers: false, disableGpu: false,
 };
 const ROLES = {
   owner:  { label: 'Dueño',       group: '👑 Dueño',            badge: '👑', color: '#fbbf24', rank: 4 },
@@ -66,7 +66,7 @@ const userVols = JSON.parse(localStorage.getItem('epickast.volumes') || '{}'); /
 const getUserVol = (uid) => (userVols[uid] !== undefined ? Number(userVols[uid]) : 1);
 const setUserVol = (uid, v) => { userVols[uid] = Math.round(v * 100) / 100; localStorage.setItem('epickast.volumes', JSON.stringify(userVols)); };
 function applyAccent() { document.documentElement.style.setProperty('--ac', settings.accent); }
-function applyStageHeight() { document.documentElement.style.setProperty('--stage-h', `${Math.max(24, Math.min(92, Number(settings.stageHeight) || 54))}vh`); }
+function applyStageHeight() { document.documentElement.style.setProperty('--stage-h', `${Math.max(24, Math.min(94, Number(settings.stageHeight) || 60))}vh`); }
 function applyShortcuts() { window.epic.setShortcuts?.({ mute: settings.keyMute || '', deaf: settings.keyDeaf || '' }).catch(() => {}); }
 applyAccent();
 applyStageHeight();
@@ -300,6 +300,10 @@ $('loginForm').addEventListener('submit', async (e) => {
 });
 
 async function autoLogin() {
+  const appCfg = await window.epic.getConfig?.().catch(() => null);
+  if (appCfg && typeof appCfg.disableGpu === 'boolean') {
+    settings.disableGpu = appCfg.disableGpu;
+  }
   const saved = await window.epic.loadAuth?.().catch(() => null);
   const remember = localStorage.getItem('epickast.remember') !== '0' && (saved?.remember !== false);
   if (saved?.server && !/^ws:\/\/(127\.0\.0\.1|localhost)/i.test(saved.server) && !localStorage.getItem('epickast.settings')) {
@@ -1462,6 +1466,14 @@ async function modalSettings() {
     h('label', null, 'Calidad de pantalla', preset('screenPreset', SCREEN_PRESETS)),
     chk('screenAudio', 'Compartir audio del sistema (usa audífonos para evitar eco)'),
     chk('hwPrefer', 'Preferir H.264 por hardware (reiniciar llamada para aplicar)'),
+    chk('disableGpu', 'Deshabilitar aceleración por hardware (estilo Discord; soluciona pantallas negras al compartir Chrome o juegos)', async () => {
+      await window.epic.setConfig?.({ disableGpu: settings.disableGpu });
+      if (confirm(settings.disableGpu
+        ? 'Aceleración por hardware desactivada.\n\n¿Deseas reiniciar EpicKast ahora para aplicar el cambio y evitar pantallas negras al compartir?'
+        : 'Aceleración por hardware activada.\n\n¿Deseas reiniciar EpicKast ahora?')) {
+        window.epic.relaunch?.();
+      }
+    }),
     chk('stats', 'Mostrar estadísticas (CPU/RAM, codificador HW/CPU)', updateStatTimer),
     h('label', null, '⌨️ Atajo global para Silenciar / Activar micro (incluso jugando)',
       h('input', { value: settings.keyMute || 'Alt+M', placeholder: 'Ej. Alt+M o CommandOrControl+Shift+M', onchange: (e) => { settings.keyMute = e.target.value.trim(); saveSettings(); applyShortcuts(); toast('Atajo de micrófono actualizado'); } })),
@@ -1598,8 +1610,8 @@ function updateDock() {
   setM('mScreen', c.screenStream ? 'on' : '', '🖥️');
   setM('mParty', hasParty ? 'on' : '', '🎵');
   setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '');
-  const sh = Math.round(Number(settings.stageHeight) || 54);
-  [['mSizeSm', 32], ['mSizeMd', 52], ['mSizeLg', 76], ['mSizeXl', 92]].forEach(([id, v]) => {
+  const sh = Math.round(Number(settings.stageHeight) || 60);
+  [['mSizeSm', 38], ['mSizeMd', 60], ['mSizeLg', 80], ['mSizeXl', 94]].forEach(([id, v]) => {
     $(id)?.classList.toggle('on', Math.abs(sh - v) <= 5);
   });
 }
@@ -1621,12 +1633,26 @@ $('bScreen').onclick = async () => {
   const c = S.call; if (!c) return;
   if (c.screenStream) { await c.stopScreen(); updateDock(); renderStage(); pushState(); return; }
   let srcs = []; try { srcs = await window.epic.listSources(); } catch (e) { return toast('No se pudieron listar las pantallas'); }
-  const grid = h('div', { class: 'srcs' }, srcs.map((s) => h('div', { class: 'src', onclick: async () => {
+  const screens = srcs.filter((s) => s.screen);
+  const windows = srcs.filter((s) => !s.screen);
+
+  const makeCard = (s) => h('div', { class: 'src', onclick: async () => {
     closeModal();
     try { await c.startScreen(s.id); } catch (e) { return toast('No se pudo compartir la pantalla'); }
     updateDock(); renderStage(); pushState();
-  } }, h('img', { src: s.thumb }), h('span', null, (s.screen ? '🖥️ ' : '🪟 ') + s.name))));
-  modal('¿Qué quieres compartir?', grid);
+  } }, h('img', { src: s.thumb }), h('span', { title: s.name }, (s.screen ? '🖥️ ' : '🪟 ') + s.name));
+
+  const content = h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-height:68vh;overflow-y:auto' },
+    screens.length ? h('div', { class: 'sect', style: 'margin:0' }, '🖥️ Pantallas completas (Recomendado — sin pantallas negras)') : null,
+    screens.length ? h('div', { class: 'srcs' }, screens.map(makeCard)) : null,
+    windows.length ? h('div', { class: 'sect', style: 'margin-top:6px' }, '🪟 Ventanas y aplicaciones') : null,
+    windows.length ? h('div', { class: 'srcs' }, windows.map(makeCard)) : null,
+    h('div', { class: 'hint', style: 'background:rgba(124,92,255,0.09);border:1px solid rgba(124,92,255,0.25);border-radius:9px;padding:9px 12px;font-size:12px;color:#c4b5fd;line-height:1.4' },
+      '💡 Consejo: Si una ventana (como Chrome, Spotify o juegos) se ve en negro al compartirla, elige "Pantalla completa" o desactiva la Aceleración por hardware en Ajustes (⚙️).'
+    )
+  );
+
+  modal('¿Qué quieres compartir?', content);
 };
 
 // Controles de la barra flotante estilo Google Meet
@@ -1648,10 +1674,10 @@ function setStagePreset(vh) {
   applyStageHeight();
   updateDock();
 }
-$('mSizeSm').onclick = () => setStagePreset(32);
-$('mSizeMd').onclick = () => setStagePreset(52);
-$('mSizeLg').onclick = () => setStagePreset(76);
-$('mSizeXl').onclick = () => setStagePreset(92);
+$('mSizeSm').onclick = () => setStagePreset(38);
+$('mSizeMd').onclick = () => setStagePreset(60);
+$('mSizeLg').onclick = () => setStagePreset(80);
+$('mSizeXl').onclick = () => setStagePreset(94);
 
 $('mMore').onclick = (e) => {
   e.stopPropagation();
@@ -1733,7 +1759,18 @@ function tile(key, label, user, withVol = false) {
     const video = h('video', { autoplay: true, playsinline: true, onclick: () => toggleFocusTile(key), title: 'Clic para enfocar / ampliar esta cámara o transmisión' });
     const nm = h('div', { class: 'nm' }); const av = h('div', { class: 'av' }, avatar(user, 72)); const stat = h('div', { class: 'stat' });
     const pinBtn = h('button', { title: 'Enfocar / ampliar esta cámara en el escenario (estilo Google Meet)', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } }, '📌 Enfocar');
-    const fitBtn = h('button', { class: isCam ? 'on' : '', title: 'Alternar entre rellenar cuadro (Zoom por defecto) o ver imagen completa', onclick: (e) => { e.stopPropagation(); el.classList.toggle('cover'); fitBtn.classList.toggle('on', el.classList.contains('cover')); } }, '🔍');
+    const fitBtn = h('button', {
+      class: '',
+      title: 'Alternar entre imagen completa (sin recortar cámara) o rellenar cuadro',
+      onclick: (e) => {
+        e.stopPropagation();
+        el.classList.toggle('cover');
+        const isCover = el.classList.contains('cover');
+        fitBtn.classList.toggle('on', isCover);
+        fitBtn.textContent = isCover ? '🔍' : '🔲';
+        toast(isCover ? 'Modo Rellenar (recorta bordes para llenar)' : 'Modo Completo (sin recortar cámara)');
+      }
+    }, '🔲');
     const pip = h('button', { title: 'Ventana sobre ventana (Picture-in-Picture)', onclick: (e) => { e.stopPropagation(); (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture?.()).catch(() => {}); } }, '🖼️ PiP');
     const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } }, '⛶');
     const tbtns = h('div', { class: 'tbtns' }, pinBtn, fitBtn, pip, fs);
@@ -1749,8 +1786,8 @@ function tile(key, label, user, withVol = false) {
       } });
       volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt);
     }
-    const el = h('div', { class: 'tile' + (isCam ? ' cover' : ''), 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
-    $('stage').append(el); t = { el, video, nm, av, stat, tbtns, pinBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
+    const el = h('div', { class: 'tile', 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
+    $('stage').append(el); t = { el, video, nm, av, stat, tbtns, pinBtn, fitBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
   }
   const k = `${user?.id}:${user?.av}:${user?.color}`;
   if (t.avKey !== k) { t.avKey = k; t.av.replaceChildren(avatar(user, 72)); }
@@ -2089,6 +2126,26 @@ function renderStage() {
   const isSpotlight = !!autoFocusKey && tiles.has(autoFocusKey);
   stg.classList.toggle('spotlight', isSpotlight);
   stg.classList.toggle('solo', isSpotlight && visibleCount <= 1);
+
+  let sideStrip = $('stageSideStrip');
+  if (isSpotlight) {
+    if (!sideStrip) {
+      sideStrip = h('div', { id: 'stageSideStrip' });
+    }
+    const focusedTile = tiles.get(autoFocusKey);
+    if (focusedTile && focusedTile.el.parentElement !== stg) stg.prepend(focusedTile.el);
+    for (const [k, t] of tiles) {
+      if (k === autoFocusKey) continue;
+      sideStrip.append(t.el);
+    }
+    stg.append(sideStrip);
+  } else {
+    for (const [, t] of tiles) {
+      stg.append(t.el);
+    }
+    if (sideStrip) sideStrip.remove();
+  }
+
   for (const [k, t] of tiles) {
     const foc = isSpotlight && k === autoFocusKey;
     t.el.classList.toggle('focused', foc);

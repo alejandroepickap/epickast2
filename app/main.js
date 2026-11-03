@@ -103,10 +103,31 @@ const KNOWN_GAMES = {
 
 app.setAppUserModelId('com.epickap.epickast');
 
-// ---- Rendimiento (derivado de los hallazgos de REA sobre el cliente de Discord) ----
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
+const configPath = path.join(app.getPath('userData'), 'epickast-config.json');
+function readConfig() {
+  try {
+    if (fs.existsSync(configPath)) return JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  } catch {}
+  return {};
+}
+function writeConfig(data) {
+  try {
+    fs.writeFileSync(configPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch {}
+}
+
+const appConfig = readConfig();
+if (appConfig.disableGpu) {
+  // Deshabilitar aceleración por hardware (estilo Discord) para resolver pantallas negras en captura
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-software-rasterizer');
+} else {
+  // Rendimiento acelerado por GPU
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+}
+// NOTA: Se retira 'enable-zero-copy' porque provoca pantallas negras al capturar ventanas de apps DirectX/GPU
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,MediaRouter,Translate,HardwareMediaKeyHandling,AutofillServerCommunication');
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=192 --lite-mode');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
@@ -184,6 +205,17 @@ app.whenReady().then(() => {
   ipcMain.handle('sources:select', (e, id, audio) => { pendingSource = { id: String(id), audio: !!audio }; });
   ipcMain.handle('app:metrics', () => app.getAppMetrics().map((m) => ({ type: m.type, cpu: m.cpu.percentCPUUsage, mem: m.memory.workingSetSize })));
   ipcMain.handle('app:flash', () => { if (win && !win.isFocused()) win.flashFrame(true); });
+  ipcMain.handle('config:get', () => readConfig());
+  ipcMain.handle('config:set', (e, patch) => {
+    const cur = readConfig();
+    const next = { ...cur, ...patch };
+    writeConfig(next);
+    return next;
+  });
+  ipcMain.handle('app:relaunch', () => {
+    app.relaunch();
+    app.exit(0);
+  });
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });

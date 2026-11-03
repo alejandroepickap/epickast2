@@ -16,4 +16,7 @@ contextBridge.exposeInMainWorld('epic', {
   loadAuth: () => ipcRenderer.invoke('auth:load'),
   saveAuth: (data) => ipcRenderer.invoke('auth:save', data),
   detectGame: () => ipcRenderer.invoke('game:detect'),
+  getConfig: () => ipcRenderer.invoke('config:get'),
+  setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
+  relaunch: () => ipcRenderer.invoke('app:relaunch'),
 });
