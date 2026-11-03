@@ -819,16 +819,17 @@ function releaseInfo() {
     });
     if (files.length) file = files[0];
   }
-  const directExe = process.env.DIRECT_EXE_URL || 'https://www.dropbox.com/scl/fi/cmp9ejaxgduafw52vtq0q/EpicKast-Instalador.exe?rlkey=2hzhonhyw3aew9a5p9em80upp&st=3bllva08&dl=1';
+  const directExe = process.env.DIRECT_EXE_URL || null;
   const directZip = process.env.DIRECT_ZIP_URL || null;
-  const ghUrl = directZip || `https://github.com/alejandroepickap/epickast2/releases/latest/download/EpicKast-v${version}-Amigos.zip`;
-  const ghExe = directExe;
+  const ghUrl = directZip || `https://github.com/alejandroepickap/epickast2/releases/download/v${version}/EpicKast-v${version}-Amigos.zip`;
+  const ghExe = directExe || `https://github.com/alejandroepickap/epickast2/releases/download/v${version}/EpicKast-Instalador.exe`;
   return {
     version,
     file: file || `EpicKast-v${version}-Amigos.zip`,
     exeFile: exeFile || 'EpicKast-Instalador.exe',
     downloadPath: '/download/latest',
     exeDownloadPath: '/download/exe',
+    asarDownloadPath: '/download/asar',
     directExe,
     directZip,
     ghUrl,
@@ -945,6 +946,22 @@ a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-de
 <li>Abre <b>Instalar-Sin-Bloqueo.bat</b> (elimina el aviso de SmartScreen automáticamente e instala EpicKast).</li>
 <li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast-b9fd.onrender.com</b>.</li>
 </ol></div></body></html>`);
+  }
+  if (u.pathname === '/download/asar' || u.pathname === '/update/asar') {
+    const asarFile = path.join(__dirname, '..', 'release', 'app.asar');
+    if (fs.existsSync(asarFile)) {
+      const stat = fs.statSync(asarFile);
+      res.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'content-length': stat.size,
+        'content-disposition': 'attachment; filename="app.asar"',
+        'cache-control': 'no-cache'
+      });
+      return fs.createReadStream(asarFile).pipe(res);
+    } else {
+      res.writeHead(404, { 'content-type': 'text/plain' });
+      return res.end('app.asar no disponible');
+    }
   }
   if (u.pathname === '/download/latest') {
     const info = releaseInfo();

@@ -377,6 +377,96 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('app:version', () => app.getVersion());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
+  
+  ipcMain.handle('app:download-asar-update', async (e, url) => {
+    try {
+      if (!url || typeof url !== 'string') throw new Error('URL de ASAR inválida');
+      const tempAsar = path.join(app.getPath('temp'), 'epickast-update.asar');
+      if (fs.existsSync(tempAsar)) {
+        try { fs.unlinkSync(tempAsar); } catch {}
+      }
+      await downloadFile(url, tempAsar, (pct, cur, tot) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('app:update-progress', { percent: pct, current: cur, total: tot, asar: true });
+        }
+      });
+      // Verificar tamaño
+      const stat = fs.statSync(tempAsar);
+      if (stat.size < 500000) throw new Error('El paquete ASAR descargado está incompleto');
+
+      const appDir = path.dirname(app.getAppPath());
+      const pendingAsar = path.join(appDir, 'app.asar.pending');
+      fs.copyFileSync(tempAsar, pendingAsar);
+      console.log('ASAR pendiente copiado a:', pendingAsar);
+      return { ok: true, size: stat.size };
+    } catch (err) {
+      console.error('Error al descargar ASAR update:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('app:apply-asar-update', async () => {
+    try {
+      const appDir = path.dirname(app.getAppPath());
+      const installDir = path.dirname(appDir);
+      const targetExe = path.join(installDir, 'EpicKast.exe');
+      const pendingAsar = path.join(appDir, 'app.asar.pending');
+      const targetAsar = path.join(appDir, 'app.asar');
+
+      if (!fs.existsSync(pendingAsar)) {
+        throw new Error('No hay actualización pendiente lista');
+      }
+
+      const applyCmd = path.join(app.getPath('temp'), 'epickast-apply-asar.cmd');
+      const cmdContent = [
+        '@echo off',
+        'setlocal enabledelayedexpansion',
+        'set /a tries=0',
+        ':wait_close',
+        'set /a tries+=1',
+        'tasklist /fi "imagename eq EpicKast.exe" 2>nul | find /i "EpicKast.exe" >nul',
+        'if not errorlevel 1 (',
+        '    if !tries! leq 15 (',
+        '        timeout /t 1 /nobreak >nul',
+        '        goto wait_close',
+        '    ) else (',
+        '        taskkill /f /im "EpicKast.exe" >nul 2>&1',
+        '        timeout /t 1 /nobreak >nul',
+        '    )',
+        ')',
+        'move /y "' + pendingAsar + '" "' + targetAsar + '" >nul 2>&1',
+        'timeout /t 1 /nobreak >nul',
+        'if exist "' + targetExe + '" (',
+        '    start "" "' + targetExe + '"',
+        ') else (',
+        '    start "" "' + process.execPath + '"',
+        ')',
+        'del "%~f0" >nul 2>&1',
+        'exit'
+      ].join('\r\n');
+
+      fs.writeFileSync(applyCmd, cmdContent, 'utf8');
+      isQuitting = true;
+
+      const { spawn } = require('child_process');
+      const child = spawn('cmd.exe', ['/c', 'start', '""', '/min', applyCmd], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        shell: false
+      });
+      child.unref();
+
+      setTimeout(() => {
+        app.quit();
+      }, 250);
+      return { ok: true };
+    } catch (err) {
+      console.error('Error al aplicar ASAR update:', err);
+      return { ok: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('app:download-and-install', async (e, url) => {
     try {
       if (!url || typeof url !== 'string') throw new Error('URL inválida');

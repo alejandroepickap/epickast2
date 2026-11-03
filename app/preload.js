@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('epic', {
   version: () => ipcRenderer.invoke('app:version'),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   installUpdate: (url) => ipcRenderer.invoke('app:download-and-install', url),
+  downloadAsarUpdate: (url) => ipcRenderer.invoke('app:download-asar-update', url),
+  applyAsarUpdate: () => ipcRenderer.invoke('app:apply-asar-update'),
   getUpdateLog: () => ipcRenderer.invoke('app:getUpdateLog'),
   onUpdateProgress: (cb) => ipcRenderer.on('app:update-progress', (_e, data) => cb(data)),
   setShortcuts: (cfg) => ipcRenderer.invoke('shortcuts:set', cfg),

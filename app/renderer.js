@@ -524,56 +524,88 @@ async function checkServerUpdate() {
     const info = await rpc('app.version');
     S.srvRelease = info;
     const bar = $('updateBar');
-    if (info?.version && isNewerVersion(info.version, S.appVer) && (info.exeDownloadPath || info.downloadPath)) {
-      const exeUrl = info.directExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
-      const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
-
-      const updateBtn = h('button', {
-        class: 'primary',
-        style: 'padding:5px 12px;font-size:12px;font-weight:600',
-        onclick: async (e) => {
-          const btn = e.currentTarget;
-          if (window.epic?.installUpdate) {
-            btn.disabled = true;
-            btn.textContent = '⏳ Conectando...';
-            window.epic.onUpdateProgress?.((prog) => {
-              if (prog?.installing) {
-                btn.textContent = '🚀 Descarga completa. Instalando y reiniciando en breve...';
-              } else if (prog?.percent !== undefined) {
-                btn.textContent = `⚡ Descargando... ${prog.percent}%`;
-              }
-            });
-            const res = await window.epic.installUpdate(exeUrl);
-            if (!res?.ok) {
-              toast('No se pudo instalar automáticamente: ' + (res?.error || ''));
-              btn.disabled = false;
-              btn.textContent = '⚡ Reintentar actualización';
-            }
-          } else {
-            window.epic?.openExternal?.(zipUrl);
-          }
-        }
-      }, '⚡ Actualizar ahora');
-
-      const manualLink = h('button', {
-        style: 'padding:5px 10px;font-size:11px;opacity:0.85',
-        onclick: () => window.epic?.openExternal?.(zipUrl)
-      }, '⬇ ZIP manual');
-
-      const closeBtn = h('button', {
-        style: 'background:transparent;border:0;color:#fff;opacity:0.75;font-size:14px;padding:2px 6px;cursor:pointer',
-        title: 'Cerrar aviso',
-        onclick: () => bar.classList.add('hidden')
-      }, '✕');
-
-      bar.replaceChildren(
-        h('span', null, `✨ Nueva versión disponible (${info.version})`),
-        h('div', { style: 'display:inline-flex;gap:6px;align-items:center' }, updateBtn, manualLink, closeBtn)
-      );
-      bar.classList.remove('hidden');
-    } else {
+    if (!info?.version || !isNewerVersion(info.version, S.appVer)) {
       bar?.classList.add('hidden');
+      return;
     }
+
+    const asarUrl = httpBase() + (info.asarDownloadPath || '/download/asar');
+    const exeUrl = info.directExe || (httpBase() + (info.exeDownloadPath || '/download/exe'));
+    const zipUrl = httpBase() + (info.downloadPath || '/download/latest');
+
+    // Mostrar barra de aviso
+    bar.classList.remove('hidden');
+    const label = h('span', null, `✨ Descargando actualización v${info.version} en segundo plano...`);
+    const actionArea = h('div', { style: 'display:inline-flex;gap:8px;align-items:center' });
+    const closeBtn = h('button', {
+      style: 'background:transparent;border:0;color:#fff;opacity:0.75;font-size:14px;padding:2px 6px;cursor:pointer',
+      title: 'Cerrar aviso',
+      onclick: () => bar.classList.add('hidden')
+    }, '✕');
+
+    bar.replaceChildren(label, actionArea, closeBtn);
+
+    let isReady = false;
+
+    // Función para aplicar y reiniciar
+    const applyUpdate = async (btn) => {
+      btn.disabled = true;
+      btn.textContent = '⚡ Reiniciando en 1s...';
+      if (window.epic?.applyAsarUpdate) {
+        await window.epic.applyAsarUpdate();
+      } else if (window.epic?.installUpdate) {
+        await window.epic.installUpdate(exeUrl);
+      }
+    };
+
+    // Función de descarga automática en segundo plano (Discord-Style)
+    const runAutoDownload = async () => {
+      // Escuchar progreso en vivo
+      window.epic?.onUpdateProgress?.((prog) => {
+        if (!isReady && prog?.percent !== undefined) {
+          label.textContent = `⚡ Descargando actualización v${info.version} (${prog.percent}%)...`;
+        }
+      });
+
+      // 1. Intentar primero con ASAR ultraligero (2.2 MB instantáneo)
+      let res = null;
+      if (window.epic?.downloadAsarUpdate) {
+        res = await window.epic.downloadAsarUpdate(asarUrl);
+      }
+
+      // 2. Si falla ASAR, intentar con instalador .exe
+      if (!res?.ok && window.epic?.installUpdate) {
+        label.textContent = `⚡ Descargando instalador v${info.version}...`;
+        res = await window.epic.installUpdate(exeUrl);
+      }
+
+      if (res?.ok) {
+        isReady = true;
+        label.textContent = `🚀 EpicKast v${info.version} lista para usar`;
+        const restartBtn = h('button', {
+          class: 'primary',
+          style: 'padding:5px 14px;font-size:12px;font-weight:700;background:#10b981;border-color:#34d399;cursor:pointer',
+          onclick: (e) => applyUpdate(e.currentTarget)
+        }, '⚡ Reiniciar ahora');
+        actionArea.replaceChildren(restartBtn);
+        toast(`Actualización v${info.version} descargada con éxito. Haz clic en Reiniciar ahora.`);
+      } else {
+        label.textContent = `✨ Actualización v${info.version} disponible`;
+        const retryBtn = h('button', {
+          class: 'primary',
+          style: 'padding:4px 10px;font-size:11px',
+          onclick: () => runAutoDownload()
+        }, '⚡ Reintentar');
+        const manualBtn = h('button', {
+          style: 'padding:4px 10px;font-size:11px',
+          onclick: () => window.epic?.openExternal?.(zipUrl)
+        }, '⬇ ZIP manual');
+        actionArea.replaceChildren(retryBtn, manualBtn);
+      }
+    };
+
+    // Iniciar automáticamente en segundo plano sin esperar clic
+    runAutoDownload();
   } catch {}
 }
 
