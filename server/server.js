@@ -841,7 +841,7 @@ a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-de
 <ol class="steps">
 <li>Descarga el archivo <b>.zip</b> de arriba y extráelo.</li>
 <li>Abre <b>Instalar-Sin-Bloqueo.bat</b> (elimina el aviso de SmartScreen automáticamente e instala EpicKast).</li>
-<li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast.onrender.com</b>.</li>
+<li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast-b9fd.onrender.com</b>.</li>
 </ol></div></body></html>`);
   }
   if (u.pathname === '/download/latest') {

@@ -40,7 +40,7 @@ function icoSvg(name, size = 15) {
 }
 
 const DEFAULTS = {
-  server: 'wss://epickast.onrender.com', mic: '', cam: '', spk: '',
+  server: 'wss://epickast-b9fd.onrender.com', mic: '', cam: '', spk: '',
   camPreset: '720p30', screenPreset: '1080p30', screenAudio: true, hideOwnScreenPreview: false,
   hwPrefer: true, stats: false, noise: 'high', micGain: 1, voiceGate: 0.006, audioKbps: 96,
   accent: '#7c5cff', ringVol: 0.6, dnd: false, autoPip: true,
