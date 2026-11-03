@@ -800,7 +800,7 @@ const H = {
 
 function releaseInfo() {
   const root = path.join(__dirname, '..');
-  let version = '1.6.0';
+  let version = '1.6.1';
   try { version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version || version; } catch {}
   const dist = path.join(root, 'dist');
   let file = null;

@@ -91,7 +91,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.6.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.6.1', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -209,7 +209,14 @@ const ringer = {
 };
 
 // ---------- red ----------
-function toast(msg) { const t = h('div', null, msg); $('toast').append(t); setTimeout(() => t.remove(), 4200); }
+function toast(msg) {
+  const t = h('div', { class: 'toast-msg' }, msg);
+  $('toast').append(t);
+  setTimeout(() => {
+    t.classList.add('toast-exit');
+    setTimeout(() => t.remove(), 200);
+  }, 1600);
+}
 function connect(url) {
   return new Promise((res, rej) => {
     let ws; try { ws = new WebSocket(url); } catch { return rej(new Error('URL de servidor inválida')); }
@@ -3064,52 +3071,87 @@ $('mMore').onclick = (e) => {
   const menu = $('meetMenu');
   if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
   const c = S.call;
-  const gLbl = h('b', null, `${Math.round(((settings.voiceGate ?? 0.006) / 0.06) * 100)}%`);
-  const gRng = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.006, oninput: () => {
-    settings.voiceGate = Number(gRng.value);
-    saveSettings();
-    gLbl.textContent = `${Math.round((settings.voiceGate / 0.06) * 100)}%`;
-    c?.mic?.setGate?.(settings.voiceGate);
-  } });
   const curVh = Math.round(Number(settings.stageHeight) || 60);
-  const sect = (title) => h('div', { class: 'menu-sect' }, title);
-  const sizeBtns = SIZES.map((s) => h('button', {
-    class: Math.abs(s.vh - curVh) <= 8 ? 'on' : '',
-    style: 'padding:4px 6px;font-size:11px;flex:1;text-align:center;justify-content:center',
-    onclick: () => { setStagePreset(s.vh); menu.classList.add('hidden'); }
-  }, `${s.label} (${s.vh}%)`));
-  const sizeRow = h('div', { style: 'display:flex;gap:4px;margin-bottom:2px' }, ...sizeBtns);
-  menu.replaceChildren(
-    sect('📐 Escenario y Vista'),
-    h('button', {
-      onclick: () => { toggleStageCollapse(); menu.classList.add('hidden'); }
-    }, S.stageCollapsed ? '🔼 Expandir cámaras' : '🔽 Minimizar escenario (ver chat)'),
-    h('button', {
-      class: !settings.hideNoVideo ? 'on' : '',
-      onclick: () => {
-        settings.hideNoVideo = !settings.hideNoVideo;
-        saveSettings();
-        toast(settings.hideNoVideo ? 'Solo cámaras y pantallas activas' : 'Todos los participantes en cuadrícula');
-        renderStage();
-        menu.classList.add('hidden');
-      }
-    }, '⊞ Modo Cuadrícula (Meet)', h('span', null, !settings.hideNoVideo ? 'Todos' : 'Cámaras')),
-    h('div', { style: 'font-size:10.5px;color:var(--mu);margin:2px 0 2px 2px' }, 'Tamaño del escenario:'),
-    sizeRow,
 
-    sect('🎵 Música y Audio'),
-    h('button', { onclick: () => { modalParty(); menu.classList.add('hidden'); } }, '🎵 Bot DJ (YouTube / Música)'),
-    h('button', { onclick: () => { modalSoundboard(); menu.classList.add('hidden'); } }, '🔊 Tablero de Sonidos (Soundboard)'),
-    h('button', { class: c?.mic?.monitoring ? 'on' : '', onclick: () => { $('bLoop').click(); menu.classList.add('hidden'); } }, '👂 Escuchar mi propia voz (Oírme)', h('span', null, c?.mic?.monitoring ? 'ON' : 'OFF')),
-    h('div', { style: 'font-size:11px;color:var(--mu);display:flex;justify-content:space-between;margin-top:2px' }, '🌬️ Filtro Anti-Respiración', gLbl),
+  const tipBar = h('div', { id: 'meetMenuTip', class: 'menu-tip' }, 'Panel de Controles Rápidos');
+  const setTip = (txt) => { tipBar.textContent = txt; };
+
+  const tileBtn = (icon, tip, onClick, active = false, extraCls = '') => {
+    const b = h('button', {
+      type: 'button',
+      class: 'meet-tile' + (active ? ' on' : '') + (extraCls ? ' ' + extraCls : ''),
+      title: tip,
+      'data-tip': tip,
+      onmouseenter: () => setTip(tip),
+      onmouseleave: () => setTip('Panel de Controles Rápidos'),
+      onclick: (ev) => { ev.stopPropagation(); onClick(); }
+    }, icon);
+    return b;
+  };
+
+  // Fila 1: Escenario y vista
+  const gridVistas = h('div', { class: 'meet-grid' },
+    tileBtn(S.stageCollapsed ? '🔼' : '🔽', S.stageCollapsed ? 'Expandir escenario de video' : 'Minimizar escenario (ver chat)', () => { toggleStageCollapse(); menu.classList.add('hidden'); }, S.stageCollapsed),
+    tileBtn('⊞', !settings.hideNoVideo ? 'Modo Cuadrícula: Mostrando todos (clic para ocultar sin cámara)' : 'Modo Cuadrícula: Solo cámaras (clic para ver todos)', () => {
+      settings.hideNoVideo = !settings.hideNoVideo;
+      saveSettings();
+      toast(settings.hideNoVideo ? 'Solo cámaras y pantallas activas' : 'Todos los participantes en cuadrícula');
+      renderStage();
+      menu.classList.add('hidden');
+    }, !settings.hideNoVideo),
+    tileBtn('S', 'Tamaño S (38% altura escenario)', () => { setStagePreset(38); menu.classList.add('hidden'); }, Math.abs(curVh - 38) <= 5, 'sz'),
+    tileBtn('M', 'Tamaño M (60% equilibrado)', () => { setStagePreset(60); menu.classList.add('hidden'); }, Math.abs(curVh - 60) <= 5, 'sz')
+  );
+
+  // Fila 2: Tamaños amplios + audio
+  const gridAudio = h('div', { class: 'meet-grid' },
+    tileBtn('L', 'Tamaño L (80% amplio)', () => { setStagePreset(80); menu.classList.add('hidden'); }, Math.abs(curVh - 80) <= 5, 'sz'),
+    tileBtn('XL', 'Modo Teatro XL (94% pantalla)', () => { setStagePreset(94); menu.classList.add('hidden'); }, Math.abs(curVh - 94) <= 5, 'sz'),
+    tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
+    tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); })
+  );
+
+  // Fila 3: Gaming y utilidades
+  const gridGaming = h('div', { class: 'meet-grid' },
+    tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring),
+    tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
+    tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive),
+    tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini)
+  );
+
+  // Fila 4: Stats y diagnóstico
+  const gridUtil = h('div', { class: 'meet-grid' },
+    tileBtn('📊', settings.stats ? 'Estadísticas HW/Ping: ON' : 'Estadísticas HW y Ping: OFF', () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); }, settings.stats),
+    tileBtn('🎯', 'Diagnóstico y Códigos de Error', () => { modalDiagnostics(); menu.classList.add('hidden'); })
+  );
+
+  // Control deslizante de filtro anti-respiración
+  const gLbl = h('b', null, `${Math.round(((settings.voiceGate ?? 0.006) / 0.06) * 100)}%`);
+  const gRng = h('input', {
+    type: 'range', min: 0, max: 0.06, step: 0.002, value: settings.voiceGate ?? 0.006,
+    oninput: () => {
+      settings.voiceGate = Number(gRng.value);
+      saveSettings();
+      gLbl.textContent = `${Math.round((settings.voiceGate / 0.06) * 100)}%`;
+      c?.mic?.setGate?.(settings.voiceGate);
+    }
+  });
+  const gateRow = h('div', { class: 'gate-row' },
+    h('span', null, '🌬️ Filtro:'),
     gRng,
+    gLbl
+  );
 
-    sect('🎮 Gaming y Utilidades'),
-    h('button', { class: S.gameMode ? 'on' : '', onclick: () => { toggleGameMode(); menu.classList.add('hidden'); } }, '🎮 Modo Juego (Baja Latencia)', h('span', null, S.gameMode ? 'ON' : 'OFF')),
-    h('button', { class: S.overlayActive ? 'on' : '', onclick: () => { toggleOverlay(); menu.classList.add('hidden'); } }, '🎮 Overlay Gamer Flotante', h('span', null, S.overlayActive ? 'ON' : 'OFF')),
-    h('button', { class: S.mini ? 'on' : '', onclick: () => { $('bMini').click(); menu.classList.add('hidden'); } }, '📌 Ventana flotante (PiP)', h('span', null, S.mini ? 'ON' : 'OFF')),
-    h('button', { class: settings.stats ? 'on' : '', onclick: () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); } }, '📊 Estadísticas HW/Ping', h('span', null, settings.stats ? 'ON' : 'OFF')),
-    h('button', { onclick: () => { modalDiagnostics(); menu.classList.add('hidden'); } }, '🎯 Diagnóstico de Audio y Video')
+  menu.replaceChildren(
+    h('div', { class: 'meet-sect-label' }, 'Vista y Escenario'),
+    gridVistas,
+    h('div', { class: 'meet-sect-label' }, 'Audio y Música'),
+    gridAudio,
+    h('div', { class: 'meet-sect-label' }, 'Gaming y Utilidades'),
+    gridGaming,
+    gridUtil,
+    gateRow,
+    tipBar
   );
   menu.classList.remove('hidden');
 };
@@ -3636,23 +3678,38 @@ function renderStage() {
   stg.classList.toggle('spotlight', isSpotlight);
   stg.classList.toggle('solo', isSpotlight && visibleCount <= 1);
 
+  // Recolectar tiles visibles secundarios para la barra lateral de spotlight
+  const visibleSideTiles = [];
+  for (const [k, t] of tiles) {
+    if (k === autoFocusKey) continue;
+    if (!t.el.classList.contains('hide-tile')) {
+      visibleSideTiles.push(t.el);
+    } else {
+      t.el.remove();
+    }
+  }
+
   let sideStrip = $('stageSideStrip');
-  if (isSpotlight) {
-    if (!sideStrip) {
-      sideStrip = h('div', { id: 'stageSideStrip' });
-    }
+  const hasSideStrip = isSpotlight && visibleSideTiles.length > 0;
+  stg.classList.toggle('solo', !hasSideStrip && isSpotlight);
+
+  if (hasSideStrip) {
+    if (!sideStrip) sideStrip = h('div', { id: 'stageSideStrip' });
+    sideStrip.replaceChildren(...visibleSideTiles);
     const focusedTile = tiles.get(autoFocusKey);
-    if (focusedTile && focusedTile.el.parentElement !== stg) stg.prepend(focusedTile.el);
-    for (const [k, t] of tiles) {
-      if (k === autoFocusKey) continue;
-      sideStrip.append(t.el);
-    }
-    stg.append(sideStrip);
+    stg.replaceChildren(focusedTile.el, sideStrip);
   } else {
-    for (const [, t] of tiles) {
-      stg.append(t.el);
-    }
     if (sideStrip) sideStrip.remove();
+    const visibleTiles = [];
+    if (isSpotlight && autoFocusKey && tiles.has(autoFocusKey)) {
+      visibleTiles.push(tiles.get(autoFocusKey).el);
+    } else {
+      for (const [, t] of tiles) {
+        if (!t.el.classList.contains('hide-tile')) visibleTiles.push(t.el);
+        else t.el.remove();
+      }
+    }
+    stg.replaceChildren(...visibleTiles);
   }
 
   for (const [k, t] of tiles) {
@@ -3706,6 +3763,11 @@ function updatePingTimer() {
 }
 
 autoLogin();
+
+$('winMin')?.addEventListener('click', () => window.epic?.minimize?.());
+$('winMax')?.addEventListener('click', () => window.epic?.maximize?.());
+$('winClose')?.addEventListener('click', () => window.epic?.close?.());
+
 
 // Global Escape key to exit fullscreen, mini mode or stage theater
 window.addEventListener('keydown', (e) => {

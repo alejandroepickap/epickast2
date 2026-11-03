@@ -197,7 +197,7 @@ function setMiniMode(enable) {
     savedBounds = win.getBounds();
     const area = screen.getDisplayMatching(savedBounds).workArea;
     const w = 380, h = 250;
-    win.setMinimumSize(300, 200);
+    win.setMinimumSize(220, 140);
     win.setBounds({ x: area.x + area.width - w - 20, y: area.y + area.height - h - 20, width: w, height: h });
     win.setAlwaysOnTop(true, 'screen-saver');
     isMiniMode = true;
@@ -361,6 +361,13 @@ app.whenReady().then(() => {
     app.relaunch();
     app.exit(0);
   });
+    ipcMain.handle('window:minimize', () => win?.minimize());
+  ipcMain.handle('window:maximize', () => {
+    if (!win) return;
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  });
+  ipcMain.handle('window:close', () => win?.close());
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('overlay:toggle', (e, enable) => toggleOverlay(enable));
   ipcMain.handle('overlay:update', (e, data) => {

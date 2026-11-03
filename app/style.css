@@ -1,3 +1,17 @@
+
+/* ---- Barra superior de ventana frameless ---- */
+#winBar{height:30px;background:#090b10;display:flex;align-items:center;justify-content:space-between;padding:0 8px;-webkit-app-region:drag;user-select:none;border-bottom:1px solid rgba(255,255,255,0.05);flex:none;z-index:9999}
+.win-drag{display:flex;align-items:center;gap:7px;pointer-events:none}
+.win-logo{width:16px;height:16px;border-radius:4px}
+.win-title{font-size:11.5px;font-weight:600;color:#94a3b8;letter-spacing:.3px}
+.win-ctrls{display:flex;align-items:center;gap:2px;-webkit-app-region:no-drag}
+.win-ctrls button{width:28px;height:22px;border:0;background:transparent;color:#94a3b8;font-size:12px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;padding:0;transition:all .12s}
+.win-ctrls button:hover{background:rgba(255,255,255,0.08);color:#fff}
+.win-ctrls button#winClose:hover{background:#ef4444;color:#fff}
+
+body.mini-mode #winBar{display:none!important}
+body.mini-mode{-webkit-app-region:drag!important}
+body.mini-mode #bMiniExit{-webkit-app-region:no-drag!important}
 :root{
   --bg:#0e1015;
   --bg2:#151821;
@@ -183,7 +197,9 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 #stage.spotlight{display:flex;flex-direction:row;align-items:stretch;gap:12px}
 #stage.spotlight .tile.focused{flex:1 1 0;height:100%;min-width:0;min-height:0;border-color:rgba(124,92,255,0.7);box-shadow:0 0 0 2px rgba(124,92,255,.25)}
 #stageSideStrip{width:160px;max-width:25%;flex:none;display:flex;flex-direction:column;gap:8px;overflow-y:auto;overflow-x:hidden;padding-right:2px}
-#stageSideStrip:empty{display:none}
+#stageSideStrip:empty{display:none!important}
+#stage.solo{display:flex!important;align-items:center!important;justify-content:center!important}
+#stage.solo .tile{width:100%!important;height:100%!important;flex:1 1 0!important}
 #stageSideStrip .tile{width:100%;aspect-ratio:16/9;height:auto;flex:none}
 .tile{position:relative;background:#0c0e15;border-radius:12px;overflow:hidden;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s;min-height:0;min-width:0;height:100%;width:100%}
 .tile.hide-tile{display:none!important}
@@ -217,13 +233,19 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .m-badge{font-size:10px;font-weight:800;color:#e2e8f0;margin-left:2px;letter-spacing:-.3px}
 .msep{width:1px;height:18px;background:rgba(255,255,255,0.1);margin:0 2px}
 .mmore-wrap{position:relative}
-.meet-menu{position:absolute;bottom:46px;right:0;background:#151821;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:8px;min-width:260px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px;box-shadow:0 16px 40px rgba(0,0,0,0.7);z-index:100}
-.menu-sect{font-size:10.5px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.6px;padding:6px 6px 2px;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px}
-.menu-sect:first-child{border-top:0;margin-top:0;padding-top:2px}
-.meet-menu button{text-align:left;padding:6px 10px;font-size:12.5px;border-radius:7px;display:flex;justify-content:space-between;align-items:center;background:transparent;border:1px solid transparent;color:var(--tx)}
-.meet-menu button:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
-.meet-menu button.on{background:rgba(124,92,255,0.18);border-color:rgba(124,92,255,0.38);color:#c4b5fd;font-weight:600}
-.meet-menu small{color:var(--mu);font-size:11px}
+/* ---- Panel de botones de 3 puntos (Quick Controls Grid) ---- */
+.meet-menu{position:absolute;bottom:46px;right:0;background:rgba(18,21,30,0.96);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:10px;width:248px;box-shadow:0 18px 48px rgba(0,0,0,0.75);z-index:100;display:flex;flex-direction:column;gap:8px}
+.meet-sect-label{font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.6px;padding:2px 2px 0}
+.meet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.meet-tile{height:42px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);color:#d1d5db;font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .14s ease;user-select:none;position:relative}
+.meet-tile:hover{background:rgba(255,255,255,0.12);color:#fff;border-color:rgba(255,255,255,0.22);transform:scale(1.05)}
+.meet-tile.on{background:rgba(124,92,255,0.32);border-color:#a29bfe;color:#fff;box-shadow:0 0 12px rgba(124,92,255,0.35)}
+.meet-tile.sz{font-size:11.5px;font-weight:700}
+.menu-tip{font-size:11px;color:#c4b5fd;font-weight:600;text-align:center;padding:5px 8px;background:rgba(124,92,255,0.08);border-radius:8px;border:1px solid rgba(124,92,255,0.18);min-height:28px;display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gate-row{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06)}
+.gate-row span{font-size:11px;color:var(--mu);flex:none}
+.gate-row input{flex:1;padding:0;accent-color:var(--ac)}
+.gate-row b{font-size:11px;color:#c4b5fd;flex:none}
 #stageResizer{height:8px;cursor:ns-resize;display:grid;place-items:center;background:#0b0d13;user-select:none;transition:background .15s}
 #stageResizer:hover{background:#131620}
 #stageResizer span{width:46px;height:3px;border-radius:3px;background:#32384e;transition:background .15s}
