@@ -79,14 +79,14 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 
 #voiceDock{padding:8px 10px;background:#0c0e13;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .vtop{display:flex;justify-content:space-between;align-items:center;gap:6px}
-.vstatus{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.vstatus{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1;overflow:hidden}
 #voiceInfo{font-size:12px;font-weight:600;color:var(--ok);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vmeta{display:flex;align-items:center;gap:6px}
-.ping{font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;background:#161a24;white-space:nowrap;color:var(--tx)}
-.micbar{width:46px;height:5px;background:#1c202c;border-radius:4px;overflow:hidden;flex:none}
+.vmeta{display:flex;align-items:center;gap:5px;min-width:0;overflow:hidden}
+.ping{font-size:10px;font-weight:600;padding:1px 5px;border-radius:5px;background:#161a24;white-space:nowrap;color:var(--tx);flex:none;overflow:hidden;text-overflow:ellipsis;max-width:76px}
+.micbar{width:32px;height:5px;background:#1c202c;border-radius:4px;overflow:hidden;flex:none}
 #micLive{height:100%;width:0%;background:var(--ok);transition:width .08s}
-.vquick{display:flex;gap:5px;align-items:center;flex:none}
-.qbtn{width:32px;height:32px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#d1d5db;cursor:pointer;transition:all .15s ease}
+.vquick{display:flex;gap:4px;align-items:center;flex:none}
+.qbtn{width:30px;height:30px;padding:0;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#d1d5db;cursor:pointer;transition:all .15s ease;flex:none}
 .qbtn:hover{background:rgba(255,255,255,0.1);color:#fff;border-color:rgba(255,255,255,0.18)}
 .qbtn svg{display:block;flex:none}
 .qbtn i{display:inline-flex;align-items:center;justify-content:center}
@@ -187,7 +187,9 @@ label{display:flex;flex-direction:column;gap:5px;color:var(--mu);font-size:12px}
 .m-badge{font-size:10px;font-weight:800;color:#e2e8f0;margin-left:2px;letter-spacing:-.3px}
 .msep{width:1px;height:18px;background:rgba(255,255,255,0.1);margin:0 2px}
 .mmore-wrap{position:relative}
-.meet-menu{position:absolute;bottom:42px;right:0;background:var(--bg2);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px;min-width:210px;display:flex;flex-direction:column;gap:5px;box-shadow:0 14px 36px #000d;z-index:20}
+.meet-menu{position:absolute;bottom:46px;right:0;background:#151821;border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:8px;min-width:260px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px;box-shadow:0 16px 40px rgba(0,0,0,0.7);z-index:100}
+.menu-sect{font-size:10.5px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.6px;padding:6px 6px 2px;border-top:1px solid rgba(255,255,255,0.08);margin-top:4px}
+.menu-sect:first-child{border-top:0;margin-top:0;padding-top:2px}
 .meet-menu button{text-align:left;padding:6px 10px;font-size:12.5px;border-radius:7px;display:flex;justify-content:space-between;align-items:center;background:transparent;border:1px solid transparent;color:var(--tx)}
 .meet-menu button:hover{background:rgba(255,255,255,0.06);border-color:rgba(255,255,255,0.1)}
 .meet-menu button.on{background:rgba(124,92,255,0.18);border-color:rgba(124,92,255,0.38);color:#c4b5fd;font-weight:600}

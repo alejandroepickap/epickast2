@@ -74,10 +74,10 @@
         <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)"></button>
         <button id="mCam" class="mbtn" title="Encender / apagar cámara"></button>
         <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana"></button>
-        <button id="mParty" class="mbtn" title="EpicBot DJ: Poner música, playlists o ver YouTube en conjunto"></button>
-        <button id="mHideNoVid" class="mbtn" title="Mostrar todos los participantes en cuadrícula / Solo cámaras activas"></button>
-        <div class="msep"></div>
-        <div class="msize-wrap">
+        <button id="mParty" class="mbtn hidden" title="EpicBot DJ"></button>
+        <button id="mHideNoVid" class="mbtn hidden" title="Modo cuadrícula"></button>
+        <div class="msep hidden"></div>
+        <div class="msize-wrap hidden">
           <button id="mSizeBtn" class="mbtn" title="Tamaño del escenario (clic para abrir opciones o doble clic en escenario)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/></svg>
             <span id="mSizeBadge" class="m-badge">M</span>
@@ -90,12 +90,12 @@
             <button data-sz="94"><span>XL — Modo Teatro</span> <small>94%</small></button>
           </div>
         </div>
-        <button id="mCollapse" class="mbtn" title="Minimizar escenario (ocultar cámaras para chatear a pantalla completa)"></button>
+        <button id="mCollapse" class="mbtn hidden" title="Minimizar escenario"></button>
         <div class="mmore-wrap">
           <button id="mMore" class="mbtn" title="Opciones avanzadas, soundboard, modo juego y diagnóstico"></button>
           <div id="meetMenu" class="meet-menu hidden"></div>
         </div>
-        <div class="msep"></div>
+        <div class="msep hidden"></div>
         <button id="mLeave" class="mbtn hang" title="Colgar llamada"><span id="mLeaveIco"></span><span>Colgar</span></button>
       </div>
       <div id="stageResizer" title="Haz clic para alternar tamaños (S/M/L/XL) o arrastra hacia arriba/abajo"><span></span></div>

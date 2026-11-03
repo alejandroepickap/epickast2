@@ -81,7 +81,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.5.6', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.5.7', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -559,6 +559,7 @@ async function openChannel(key, type, name) {
   $('typingBar').classList.add('hidden');
   render(); $('msgs').replaceChildren();
   if (type === 'voice') return;
+  if ((type === 'text' || type === 'dm') && S.call && !S.stageCollapsed) toggleStageCollapse(true, true);
   try { const hist = await rpc('msg.history', { channel: key }); if (S.chan !== key) return; hist.forEach((m) => addMsg(m, false)); S.oldest = hist[0]?.id ?? null; $('msgs').scrollTop = 1e9; } catch (e) { toast(e.message); }
   $('msgInput').focus();
 }
@@ -2148,7 +2149,7 @@ function renderCallOverlay() {
 
 // ---------- llamada ----------
 async function joinCall(key, label) {
-  if (S.callKey === key) return;
+  if (S.callKey === key) { if (S.stageCollapsed) toggleStageCollapse(false); return; }
   if (S.incoming?.key === key) clearIncoming();
   leaveCall(false);
   const call = new Call({
@@ -2256,7 +2257,7 @@ function cycleStageSize() {
   toast(`Tamaño del escenario: ${next.label} (${next.desc} — ${next.vh}%)`);
 }
 
-function toggleStageCollapse(force) {
+function toggleStageCollapse(force, quiet = false) {
   if (!S.call) return;
   S.stageCollapsed = force !== undefined ? !!force : !S.stageCollapsed;
   $('stageWrap')?.classList.toggle('collapsed', S.stageCollapsed);
@@ -2264,7 +2265,7 @@ function toggleStageCollapse(force) {
   $('voicePill')?.classList.toggle('hidden', !S.stageCollapsed);
   if (S.stageCollapsed) {
     updateVoicePill();
-    toast('Escenario minimizado (hablando en segundo plano para ver el chat)');
+    if (!quiet) toast('Escenario minimizado (hablando en segundo plano para ver el chat)');
   }
   updateDock();
 }
@@ -2631,7 +2632,8 @@ window.addEventListener('keyup', (e) => {
 function updateDock() {
   const c = S.call; if (!c) return;
   const ns = c.noiseMode === 'high' ? ' · 🔇 RNNoise' : '';
-  if (!settings.stats) $('voiceInfo').textContent = `🔊 ${S.callLabel}${ns}`;
+  const cleanLabel = (S.callLabel || '').replace(/^🔊\s*/, '');
+  if (!settings.stats) $('voiceInfo').textContent = `🔊 ${cleanLabel}${ns}`;
   const setQ = (id, cls, icoKey, sz = 16) => {
     const el = $(id); if (!el) return;
     el.className = 'qbtn' + (id === 'bLeave' ? ' hang' : '') + (cls ? ' ' + cls : '');
@@ -2830,13 +2832,42 @@ $('mMore').onclick = (e) => {
     gLbl.textContent = `${Math.round((settings.voiceGate / 0.06) * 100)}%`;
     c?.mic?.setGate?.(settings.voiceGate);
   } });
+  const curVh = Math.round(Number(settings.stageHeight) || 60);
+  const sect = (title) => h('div', { class: 'menu-sect' }, title);
+  const sizeBtns = SIZES.map((s) => h('button', {
+    class: Math.abs(s.vh - curVh) <= 8 ? 'on' : '',
+    style: 'padding:4px 6px;font-size:11px;flex:1;text-align:center;justify-content:center',
+    onclick: () => { setStagePreset(s.vh); menu.classList.add('hidden'); }
+  }, `${s.label} (${s.vh}%)`));
+  const sizeRow = h('div', { style: 'display:flex;gap:4px;margin-bottom:2px' }, ...sizeBtns);
   menu.replaceChildren(
-    h('div', { style: 'font-size:11px;color:var(--mu);display:flex;justify-content:space-between' }, '🌬️ Filtro Anti-Respiración', gLbl),
-    gRng,
+    sect('📐 Escenario y Vista'),
+    h('button', {
+      onclick: () => { toggleStageCollapse(); menu.classList.add('hidden'); }
+    }, S.stageCollapsed ? '🔼 Expandir cámaras' : '🔽 Minimizar escenario (ver chat)'),
+    h('button', {
+      class: !settings.hideNoVideo ? 'on' : '',
+      onclick: () => {
+        settings.hideNoVideo = !settings.hideNoVideo;
+        saveSettings();
+        toast(settings.hideNoVideo ? 'Solo cámaras y pantallas activas' : 'Todos los participantes en cuadrícula');
+        renderStage();
+        menu.classList.add('hidden');
+      }
+    }, '⊞ Modo Cuadrícula (Meet)', h('span', null, !settings.hideNoVideo ? 'Todos' : 'Cámaras')),
+    h('div', { style: 'font-size:10.5px;color:var(--mu);margin:2px 0 2px 2px' }, 'Tamaño del escenario:'),
+    sizeRow,
+
+    sect('🎵 Música y Audio'),
+    h('button', { onclick: () => { modalParty(); menu.classList.add('hidden'); } }, '🎵 Bot DJ (YouTube / Música)'),
     h('button', { onclick: () => { modalSoundboard(); menu.classList.add('hidden'); } }, '🔊 Tablero de Sonidos (Soundboard)'),
+    h('button', { class: c?.mic?.monitoring ? 'on' : '', onclick: () => { $('bLoop').click(); menu.classList.add('hidden'); } }, '👂 Escuchar mi propia voz (Oírme)', h('span', null, c?.mic?.monitoring ? 'ON' : 'OFF')),
+    h('div', { style: 'font-size:11px;color:var(--mu);display:flex;justify-content:space-between;margin-top:2px' }, '🌬️ Filtro Anti-Respiración', gLbl),
+    gRng,
+
+    sect('🎮 Gaming y Utilidades'),
     h('button', { class: S.gameMode ? 'on' : '', onclick: () => { toggleGameMode(); menu.classList.add('hidden'); } }, '🎮 Modo Juego (Baja Latencia)', h('span', null, S.gameMode ? 'ON' : 'OFF')),
     h('button', { class: S.overlayActive ? 'on' : '', onclick: () => { toggleOverlay(); menu.classList.add('hidden'); } }, '🎮 Overlay Gamer Flotante', h('span', null, S.overlayActive ? 'ON' : 'OFF')),
-    h('button', { class: c?.mic?.monitoring ? 'on' : '', onclick: () => { $('bLoop').click(); menu.classList.add('hidden'); } }, '👂 Escuchar mi voz (Oírme)', h('span', null, c?.mic?.monitoring ? 'ON' : 'OFF')),
     h('button', { class: S.mini ? 'on' : '', onclick: () => { $('bMini').click(); menu.classList.add('hidden'); } }, '📌 Ventana flotante (PiP)', h('span', null, S.mini ? 'ON' : 'OFF')),
     h('button', { class: settings.stats ? 'on' : '', onclick: () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); } }, '📊 Estadísticas HW/Ping', h('span', null, settings.stats ? 'ON' : 'OFF')),
     h('button', { onclick: () => { modalDiagnostics(); menu.classList.add('hidden'); } }, '🎯 Diagnóstico de Audio y Video')
@@ -3375,7 +3406,8 @@ function updateStatTimer() {
   S.statTimer = setInterval(async () => {
     if (!S.call) return;
     const m = await window.epic.metrics().catch(() => []); const cpu = m.reduce((a, x) => a + x.cpu, 0); const mem = m.reduce((a, x) => a + x.mem, 0) / 1024;
-    $('voiceInfo').textContent = `🔊 ${S.callLabel} · CPU ${cpu.toFixed(0)}% · RAM ${(mem / 1024).toFixed(0)} MB`;
+    const cleanLabel = (S.callLabel || '').replace(/^🔊\s*/, '');
+    $('voiceInfo').textContent = `🔊 ${cleanLabel} · CPU ${cpu.toFixed(0)}% · RAM ${(mem / 1024).toFixed(0)} MB`;
     const st = await S.call.stats();
     for (const [id, txt] of st) { const t = tiles.get('p' + id); if (t) t.stat.textContent = txt; }
   }, 2000);
