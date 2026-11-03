@@ -91,7 +91,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.5.9', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.6.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -531,7 +531,7 @@ async function checkServerUpdate() {
             btn.textContent = '⏳ Conectando...';
             window.epic.onUpdateProgress?.((prog) => {
               if (prog?.installing) {
-                btn.textContent = '🚀 Reiniciando para aplicar actualización...';
+                btn.textContent = '🚀 Descarga completa. Instalando y reiniciando en breve...';
               } else if (prog?.percent !== undefined) {
                 btn.textContent = `⚡ Descargando... ${prog.percent}%`;
               }

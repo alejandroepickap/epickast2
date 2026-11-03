@@ -385,21 +385,113 @@ app.whenReady().then(() => {
       if (win && !win.isDestroyed()) {
         win.webContents.send('app:update-progress', { percent: 100, installing: true });
       }
-      // Ejecutar instalador NSIS silencioso /S con retardo de 1s para que Electron cierre limpiamente
-      const targetApp = path.join(process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local'), 'Programs', 'epickast', 'EpicKast.exe');
-      const updateBat = path.join(app.getPath('temp'), 'epickast-apply-update.bat');
-      const batContent = `@echo off\r\nping 127.0.0.1 -n 3 >nul\r\ntaskkill /F /IM EpicKast.exe >nul 2>&1\r\npowershell -NoProfile -Command "Unblock-File -LiteralPath '${tempExe.replace(/'/g, "''")}' -ErrorAction SilentlyContinue" >nul 2>&1\r\n"${tempExe}" /S\r\nping 127.0.0.1 -n 2 >nul\r\nstart "" "${targetApp}"\r\nexit\r\n`;
-      fs.writeFileSync(updateBat, batContent, 'utf8');
+
+      // Generar script de actualización en PowerShell con log persistente y espera síncrona (-Wait)
+      const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+      const targetApp = path.join(localAppDir, 'Programs', 'epickast', 'EpicKast.exe');
+      const logFile = path.join(localAppDir, 'epickast-update.log');
+      const updatePs1 = path.join(app.getPath('temp'), 'epickast-apply-update.ps1');
+
+      const ps1Content = [
+        `# Script de actualizacion automatica de EpicKast`,
+        `$ErrorActionPreference = 'Continue'`,
+        `$logFile = '${logFile.replace(/'/g, "''")}'`,
+        `function Log($msg) {`,
+        `  $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")`,
+        `  "[$ts] $msg" | Out-File -FilePath $logFile -Append -Encoding utf8`,
+        `}`,
+        `Log "=========================================================="`,
+        `Log "INICIANDO APLICACION DE ACTUALIZACION DE EPICKAST"`,
+        `Log "Instalador temporal: '${tempExe.replace(/'/g, "''")}'"`,
+        `Log "Destino final: '${targetApp.replace(/'/g, "''")}'"`,
+        ``,
+        `# 1. Esperar cierre de Electron`,
+        `Log "Esperando cierre del proceso principal..."`,
+        `Start-Sleep -Seconds 2`,
+        `Get-Process -Name 'EpicKast' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue`,
+        `Start-Sleep -Seconds 1`,
+        ``,
+        `# 2. Desbloquear archivo temporal`,
+        `Log "Desbloqueando archivo del instalador..."`,
+        `Unblock-File -LiteralPath '${tempExe.replace(/'/g, "''")}' -ErrorAction SilentlyContinue`,
+        ``,
+        `# 3. Ejecutar instalador NSIS silencioso y ESPERAR a que termine`,
+        `Log "Ejecutando instalador silencioso (/S)..."`,
+        `try {`,
+        `  $proc = Start-Process -FilePath '${tempExe.replace(/'/g, "''")}' -ArgumentList '/S' -PassThru -Wait`,
+        `  Log "Instalador finalizado. ExitCode: $($proc.ExitCode)"`,
+        `} catch {`,
+        `  Log "ERROR al ejecutar instalador: $_"`,
+        `}`,
+        ``,
+        `# 4. Esperar liberacion de archivos`,
+        `Start-Sleep -Seconds 3`,
+        ``,
+        `# 5. Asegurar accesos directos en Escritorio (normal y OneDrive)`,
+        `Log "Actualizando accesos directos de escritorio..."`,
+        `try {`,
+        `  $wsh = New-Object -ComObject WScript.Shell`,
+        `  $dirs = @(`,
+        `    [Environment]::GetFolderPath('Desktop'),`,
+        `    [Environment]::GetFolderPath('CommonDesktopDirectory'),`,
+        `    "$env:USERPROFILE\\OneDrive\\Escritorio",`,
+        `    "$env:USERPROFILE\\OneDrive\\Desktop"`,
+        `  )`,
+        `  foreach ($d in $dirs) {`,
+        `    if ($d -and (Test-Path $d)) {`,
+        `      $lnk = Join-Path $d 'EpicKast.lnk'`,
+        `      if (Test-Path $lnk) {`,
+        `        $s = $wsh.CreateShortcut($lnk)`,
+        `        $s.TargetPath = '${targetApp.replace(/'/g, "''")}'`,
+        `        $s.WorkingDirectory = (Split-Path '${targetApp.replace(/'/g, "''")}')`,
+        `        $s.IconLocation = '${targetApp.replace(/'/g, "''")},0'`,
+        `        $s.Save()`,
+        `        Log "Acceso directo actualizado: $lnk"`,
+        `      }`,
+        `    }`,
+        `  }`,
+        `} catch {`,
+        `  Log "Nota sobre accesos directos: $_"`,
+        `}`,
+        ``,
+        `# 6. Relanzar aplicacion instalada`,
+        `if (Test-Path '${targetApp.replace(/'/g, "''")}') {`,
+        `  Log "Relanzando EpicKast desde: '${targetApp.replace(/'/g, "''")}'"`,
+        `  Start-Process -FilePath '${targetApp.replace(/'/g, "''")}'`,
+        `  Log "EpicKast iniciado con exito."`,
+        `} else {`,
+        `  Log "ERROR CRITICO: No se encontro el archivo destino '${targetApp.replace(/'/g, "''")}'"`,
+        `}`,
+        `Log "PROCESO DE ACTUALIZACION COMPLETADO"`,
+        `Log "=========================================================="`
+      ].join('\r\n');
+
+      fs.writeFileSync(updatePs1, ps1Content, 'utf8');
       isQuitting = true;
-      execFile('cmd.exe', ['/c', updateBat], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
+      execFile('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', updatePs1], { windowsHide: true, detached: true, stdio: 'ignore' }).unref();
       setTimeout(() => {
         app.quit();
         process.exit(0);
-      }, 500);
+      }, 1500);
       return { ok: true };
     } catch (err) {
       console.error('Error al descargar e instalar actualización:', err);
       return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('app:getUpdateLog', () => {
+    try {
+      const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+      const logFile = path.join(localAppDir, 'epickast-update.log');
+      if (fs.existsSync(logFile)) {
+        const content = fs.readFileSync(logFile, 'utf8');
+        const lines = content.split(/\r?\n/).filter(Boolean);
+        return lines.slice(-30).join('\n');
+      }
+      return 'No hay registros de actualización previos.';
+    } catch (e) {
+      return 'Error al leer el archivo de registro: ' + e.message;
     }
   });
   ipcMain.handle('game:detect', () => new Promise((resolve) => {
