@@ -2154,7 +2154,7 @@ const ICONS = {
   sound: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
   game: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="6"/></svg>',
   overlay: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
-  collapse: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" x2="21" y1="10" y2="3"/><line x1="3" x2="10" y1="21" y2="14"/></svg>',
+  collapse: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
 };
 function getSvg(name, size = 16) {
   const tpl = ICONS[name] || '';
@@ -2593,12 +2593,10 @@ function updateDock() {
   setM('mCam', c.camTrack ? 'on' : '', c.camTrack ? 'cam' : 'camOff');
   setM('mScreen', c.screenStream ? 'on' : '', 'screen');
   setM('mParty', hasParty ? 'on' : '', 'party');
-  setM('mSoundboard', '', 'sound');
-  setM('mGameMode', S.gameMode ? 'on' : '', 'game');
   setM('mHideNoVid', !settings.hideNoVideo ? 'on' : '', 'grid');
   setM('mMore', '', 'more');
-  setM('mCollapse', S.stageCollapsed ? 'on' : '', 'collapse');
-  $('mCollapse')?.setAttribute('title', S.stageCollapsed ? 'Mostrar cámaras (expandir)' : 'Minimizar escenario (ocultar cámaras para chatear a pantalla completa)');
+  setM('mCollapse', S.stageCollapsed ? 'on' : '', S.stageCollapsed ? 'chevronUp' : 'chevronDown');
+  $('mCollapse')?.setAttribute('title', S.stageCollapsed ? 'Expandir cámaras y escenario' : 'Minimizar escenario (ocultar cámaras para chatear)');
   setSvg($('mLeaveIco'), 'hangup', 15);
   updateVoicePill();
 
@@ -2638,9 +2636,8 @@ $('bCam').onclick = async () => {
 };
 $('bParty').onclick = () => modalParty();
 $('bSoundboard').onclick = () => modalSoundboard();
-$('mSoundboard').onclick = () => modalSoundboard();
-$('bGameMode').onclick = () => toggleGameMode();
-$('mGameMode').onclick = () => toggleGameMode();
+if ($('mSoundboard')) $('mSoundboard').onclick = () => modalSoundboard();
+if ($('mGameMode')) $('mGameMode').onclick = () => toggleGameMode();
 $('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
 $('mCollapse').onclick = () => toggleStageCollapse();

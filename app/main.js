@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage, clipboard } = require('electron');
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -225,6 +225,48 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+
+  win.webContents.on('context-menu', (e, params) => {
+    const template = [];
+
+    if (params.linkURL) {
+      template.push(
+        { label: '🔗 Abrir enlace en navegador', click: () => shell.openExternal(params.linkURL) },
+        { label: '📋 Copiar dirección del enlace', click: () => clipboard.writeText(params.linkURL) },
+        { type: 'separator' }
+      );
+    }
+
+    if (params.hasImageContents && params.srcURL) {
+      template.push(
+        { label: '🖼️ Copiar imagen', click: () => win.webContents.copyImageAt(params.x, params.y) },
+        { type: 'separator' }
+      );
+    }
+
+    if (params.isEditable) {
+      template.push(
+        { role: 'undo', label: 'Deshacer' },
+        { role: 'redo', label: 'Rehacer' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Pegar' },
+        { type: 'separator' },
+        { role: 'selectAll', label: 'Seleccionar todo' }
+      );
+    } else if (params.selectionText && params.selectionText.trim().length > 0) {
+      template.push(
+        { role: 'copy', label: '📋 Copiar selección' },
+        { role: 'selectAll', label: 'Seleccionar todo' }
+      );
+    }
+
+    if (template.length > 0) {
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup({ window: win });
+    }
+  });
 }
 
 app.whenReady().then(() => {
