@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, desktopCapturer, session, shell, Menu, screen, globalShortcut, safeStorage, clipboard, Tray } = require('electron');
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -138,6 +138,8 @@ app.commandLine.appendSwitch('webrtc-max-cpu-consumption-percentage', '100');
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let win = null;
+let tray = null;
+let isQuitting = false;
 let overlayWin = null;
 let isOverlayVisible = false;
 let pendingSource = null;
@@ -226,6 +228,14 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      win.hide();
+      return false;
+    }
+  });
+
   win.webContents.on('context-menu', (e, params) => {
     const template = [];
 
@@ -267,6 +277,53 @@ function createWindow() {
       menu.popup({ window: win });
     }
   });
+}
+
+function createTray() {
+  if (tray) return;
+  const iconPath = path.join(__dirname, 'icon.png');
+  tray = new Tray(iconPath);
+  tray.setToolTip('EpicKast');
+
+  const showApp = () => {
+    if (win) {
+      if (!win.isVisible()) win.show();
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  };
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Abrir EpicKast',
+      click: showApp,
+    },
+    { type: 'separator' },
+    {
+      label: 'Silenciar micrófono',
+      click: () => {
+        if (win && !win.isDestroyed()) win.webContents.send('shortcut:trigger', 'mute');
+      },
+    },
+    {
+      label: 'Ensordecer / Silenciar audio',
+      click: () => {
+        if (win && !win.isDestroyed()) win.webContents.send('shortcut:trigger', 'deaf');
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Salir de EpicKast',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.on('double-click', showApp);
+  tray.on('click', showApp);
 }
 
 app.whenReady().then(() => {
@@ -386,6 +443,14 @@ app.whenReady().then(() => {
   });
 
   createWindow();
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  createTray();
+  app.on('second-instance', () => {
+    if (win) {
+      if (!win.isVisible()) win.show();
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
+  });
 });
-app.on('window-all-closed', () => app.quit());
+app.on('before-quit', () => { isQuitting = true; });
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

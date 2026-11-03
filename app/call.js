@@ -60,6 +60,10 @@ async function createMic(settings) {
           autoGainControl: true,
           channelCount: 1,
           sampleRate: 48000,
+          googEchoCancellation: true,
+          googAutoGainControl: true,
+          googNoiseSuppression: true,
+          googHighpassFilter: true,
         },
       });
     } catch (e) {
@@ -76,6 +80,10 @@ async function createMic(settings) {
         autoGainControl: true,
         channelCount: 1,
         sampleRate: 48000,
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
       },
     });
   }
@@ -454,10 +462,18 @@ class Call {
   async startScreen(sourceId, withAudio) {
     const pr = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['1080p30'];
     const shareAudio = withAudio !== undefined ? !!withAudio : (this.settings.screenAudio !== false);
+    // Si tenía encendido el monitoreo propio (escuchar mi voz), apagarlo para que el micro no se cuele al loopback
+    if (this.mic?.monitoring) {
+      this.setSelfMonitor(false);
+    }
     await window.epic.selectSource(sourceId, shareAudio);
     const st = await navigator.mediaDevices.getDisplayMedia({
       video: { width: { max: pr.w }, height: { max: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } },
-      audio: shareAudio
+      audio: shareAudio ? {
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: false,
+      } : false
     });
     await this.stopScreen();
     this.screenStream = st;

@@ -4,6 +4,10 @@
   "version": "1.5.5",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": "EpicKap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alejandroepickap/epickast2.git"
+  },
   "main": "app/main.js",
   "private": true,
   "scripts": {

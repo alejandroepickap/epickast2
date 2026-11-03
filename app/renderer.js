@@ -2667,11 +2667,16 @@ $('bScreen').onclick = async () => {
       saveSettings();
     }
   });
-  const audioRow = h('label', {
-    style: 'display:flex;flex-direction:row;align-items:center;gap:9px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;cursor:pointer;font-size:12.5px;color:var(--tx);font-weight:600'
+  const audioRow = h('div', {
+    style: 'display:flex;flex-direction:column;gap:6px;padding:10px 12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:10px;'
   },
-    audioChk,
-    h('span', null, '🔊 Compartir también el audio del sistema (juegos, videos, música)')
+    h('label', { style: 'display:flex;flex-direction:row;align-items:center;gap:9px;cursor:pointer;font-size:12.5px;color:var(--tx);font-weight:600' },
+      audioChk,
+      h('span', null, '🔊 Compartir también el audio del sistema (juegos, videos, música)')
+    ),
+    h('span', { style: 'font-size:11px;color:#94a3b8;margin-left:26px;line-height:1.3' },
+      '🎧 Tip anti-eco: Usa audífonos para que el audio del juego o llamada no se cuele a tu micrófono. Tu auto-monitoreo local se pausa automáticamente.'
+    )
   );
 
   const makeCard = (s) => h('div', { class: 'src', onclick: async () => {
