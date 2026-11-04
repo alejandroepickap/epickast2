@@ -466,6 +466,18 @@
                 🌀 ¡PORTAL ACTIVO! Camina hacia él para descender
               </div>
 
+              <!-- Modal de Game Over Interactivo -->
+              <div id="dGameOverModal" style="display:none; position:absolute; inset:0; background:rgba(12, 5, 20, 0.92); backdrop-filter:blur(6px); z-index:30; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+                <div style="font-size:42px; margin-bottom:8px;">💀</div>
+                <h2 style="color:#ef4444; font-size:22px; font-weight:900; margin:0 0 8px 0; letter-spacing:0.8px;">HAS CAÍDO EN LAS MINAS</h2>
+                <p style="color:#cbd5e1; font-size:13px; max-width:420px; margin:0 0 18px 0; line-height:1.4;">
+                  Los monstruos del Núcleo te han superado. Conservas tus llaves y monedas para reintentar la expedición.
+                </p>
+                <button id="dGoBtnRetry" style="background:linear-gradient(135deg, #eab308, #ca8a04); color:#0b0813; border:none; padding:12px 30px; border-radius:8px; font-weight:900; cursor:pointer; font-size:14px; box-shadow:0 0 20px rgba(234,179,8,0.5); text-transform:uppercase; letter-spacing:0.8px;">
+                  🔄 REINTENTAR DESDE EL NIVEL 1
+                </button>
+              </div>
+
               <!-- Modal de Victoria (Único y sin bugs) -->
               <div id="dVictoryModal" style="display:none; position:absolute; inset:0; background:rgba(8, 4, 18, 0.92); backdrop-filter:blur(6px); z-index:30; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
                 <div style="font-size:42px; margin-bottom:8px;">🏆</div>
@@ -612,6 +624,8 @@
       this.promptEl = this.container.querySelector('#dPortalPrompt');
       this.victoryModalEl = this.container.querySelector('#dVictoryModal');
       this.victoryModalEl.style.display = 'none';
+      this.gameOverModalEl = this.container.querySelector('#dGameOverModal');
+      this.gameOverModalEl.style.display = 'none';
 
       this.renderKeyIcons();
       this.renderInventoryList();
@@ -716,6 +730,10 @@
       };
 
       this.onMouseDown = (e) => {
+        if (this.gameState === 'gameover') {
+          this.restartDungeon();
+          return;
+        }
         if (e.button === 0) {
           this.mouse.isDown = true;
           if (!this.checkPortalEnter()) this.attackSword();
@@ -799,11 +817,40 @@
           this.restartDungeon();
         };
       }
+      const goRetry = this.container.querySelector('#dGoBtnRetry');
+      if (goRetry) {
+        goRetry.onclick = () => {
+          this.restartDungeon();
+        };
+      }
     }
 
     restartDungeon() {
       this.dungeonWon = false;
+      this.gameState = 'play';
       if (this.victoryModalEl) this.victoryModalEl.style.display = 'none';
+      if (this.gameOverModalEl) this.gameOverModalEl.style.display = 'none';
+
+      // Cambiar a pestaña de juego si estaba en inventario
+      const tabDungeon = this.container.querySelector('#dTabBtnDungeon');
+      const tabInv = this.container.querySelector('#dTabBtnInv');
+      const panelDungeon = this.container.querySelector('#dTabPanelDungeon');
+      const panelInv = this.container.querySelector('#dTabPanelInv');
+      if (tabDungeon && panelDungeon) {
+        this.activeTab = 'dungeon';
+        tabDungeon.style.background = '#110c1c';
+        tabDungeon.style.color = '#fbbf24';
+        tabDungeon.style.borderBottom = '2px solid #fbbf24';
+        if (tabInv) {
+          tabInv.style.background = '#160f24';
+          tabInv.style.color = '#94a3b8';
+          tabInv.style.borderBottom = '2px solid transparent';
+        }
+        panelDungeon.style.display = 'flex';
+        if (panelInv) panelInv.style.display = 'none';
+      }
+
+      this.player.hp = this.player.maxHp;
       this.loadFloor(1);
       AudioFX.itemPickup();
       this.spawnFloatingText(this.player.x, this.player.y - 20, '🔄 ¡Reiniciado al Nivel 1!', '#fbbf24', 14);
@@ -1271,8 +1318,9 @@
             const en = this.enemies[j];
             if (Math.hypot(p.x - en.x, p.y - en.y) < en.radius + p.radius) {
               en.hp -= p.dmg;
-              en.knockX = (p.vx > 0 ? 1 : -1) * 90;
-              en.knockY = (p.vy > 0 ? 1 : -1) * 90;
+              // Las flechas perforan sin empujar hacia atras a los enemigos
+              en.knockX = 0;
+              en.knockY = 0;
               this.spawnFloatingText(en.x, en.y - 12, `-${p.dmg}`, '#c084fc', 13);
               AudioFX.hitEnemy();
               this.projectiles.splice(i, 1);
@@ -1351,6 +1399,7 @@
       if (this.player.hp <= 0) {
         this.player.hp = 0;
         this.gameState = 'gameover';
+        if (this.gameOverModalEl) this.gameOverModalEl.style.display = 'flex';
         this.spawnFloatingText(this.player.x, this.player.y, '💀 CAÍDO EN LA MINA', '#ef4444', 16);
       }
 
@@ -1817,7 +1866,7 @@
         ctx.fillText(tm.name, tm.x, tm.y - 18);
       });
 
-      // 10. EL JUGADOR (Explorador del Núcleo HD)
+      // 10. EL JUGADOR (Explorador del Núcleo HD con Armadura y Armas Dinámicas)
       ctx.save();
       ctx.translate(this.player.x, this.player.y);
 
@@ -1829,20 +1878,46 @@
 
       ctx.rotate(this.player.angle);
 
-      // Capa de aventurero ondeando hacia atrás
+      // Determinar colores y texturas según equipo
+      const eqArmorId = this.inventory.equippedArmor?.id || 'leather_armor';
+      const eqWeaponId = this.inventory.equippedWeapon?.id || 'iron_sword';
+
+      let capeColor = '#1e293b';
+      let armorPrimary = '#0284c7';
+      let armorSecondary = '#0f172a';
+      let pauldronColor = '#b45309';
+
+      if (eqArmorId === 'armor_magma_mesh') {
+        capeColor = '#7f1d1d';
+        armorPrimary = '#dc2626';
+        armorSecondary = '#450a0a';
+        pauldronColor = '#f97316';
+      } else if (eqArmorId === 'armor_colossus' || eqArmorId === 'armor_obsidian') {
+        capeColor = '#2e1065';
+        armorPrimary = '#7e22ce';
+        armorSecondary = '#1e1b4b';
+        pauldronColor = '#c084fc';
+      } else if (eqArmorId === 'tunic_adventurer') {
+        capeColor = '#064e3b';
+        armorPrimary = '#10b981';
+        armorSecondary = '#022c22';
+        pauldronColor = '#d97706';
+      }
+
+      // Capa ondeando
       ctx.fillStyle = '#090d16';
       ctx.fillRect(-12, -7, 6, 14);
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = capeColor;
       ctx.fillRect(-10, -6, 5, 12);
 
-      // Torso y armadura
-      ctx.fillStyle = '#0f172a';
+      // Torso y armadura dinámica
+      ctx.fillStyle = armorSecondary;
       ctx.fillRect(-7, -7, 14, 14);
-      ctx.fillStyle = '#0284c7';
+      ctx.fillStyle = armorPrimary;
       ctx.fillRect(-5, -5, 10, 10);
 
-      // Hombreras y cinturón
-      ctx.fillStyle = '#b45309';
+      // Hombreras
+      ctx.fillStyle = pauldronColor;
       ctx.fillRect(-7, -8, 4, 16);
       ctx.fillStyle = '#fde047';
       ctx.fillRect(0, -2, 3, 4);
@@ -1858,13 +1933,30 @@
       ctx.fillRect(3, -3, 2, 2);
       ctx.fillRect(3, 2, 2, 2);
 
-      // Espada Rúnica forjada en la mano
-      ctx.fillStyle = '#64748b';
-      ctx.fillRect(6, 4, 14, 3);
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(8, 5, 11, 1);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(5, 2, 3, 7);
+      // Arma Dinámica en mano
+      if (eqWeaponId === 'sword_fire_core' || eqWeaponId === 'sword_fire') {
+        // Espada Flamígera con brasa incandescente
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(5, 2, 3, 7);
+        ctx.fillStyle = '#ea580c';
+        ctx.fillRect(6, 4, 16, 4);
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(8, 5, 12, 2);
+      } else if (eqWeaponId === 'dagger_copper') {
+        // Daga rápida de cobre
+        ctx.fillStyle = '#92400e';
+        ctx.fillRect(5, 2, 2, 5);
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(7, 3, 10, 3);
+      } else {
+        // Espada de hierro forjada estándar
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(6, 4, 14, 3);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(8, 5, 11, 1);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(5, 2, 3, 7);
+      }
 
       ctx.restore();
 
@@ -1874,7 +1966,8 @@
         ctx.translate(this.player.x, this.player.y);
         ctx.rotate(this.player.attackAngle);
         
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
+        const isFire = (this.inventory.equippedWeapon?.id || '').includes('fire');
+        ctx.strokeStyle = isFire ? 'rgba(249, 115, 22, 0.95)' : 'rgba(56, 189, 248, 0.9)';
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.arc(0, 0, 48, -Math.PI * 0.42, Math.PI * 0.42);
@@ -1933,7 +2026,7 @@
         ctx.fillText('💀 HAS CAÍDO EN LAS MINAS', this.width / 2, this.height / 2 - 20);
         ctx.fillStyle = '#94a3b8';
         ctx.font = '13px system-ui, sans-serif';
-        ctx.fillText('Pulsa el botón "🔄 Reiniciar" arriba para volver a intentarlo', this.width / 2, this.height / 2 + 15);
+        ctx.fillText('👉 Haz clic en la pantalla o pulsa "🔄 Reiniciar" para volver a intentarlo', this.width / 2, this.height / 2 + 15);
       }
 
       ctx.restore();

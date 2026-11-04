@@ -304,8 +304,8 @@ const serverView = (sid, uid) => {
       partyTrack: c.type === 'voice' ? (parties.get(key)?.current?.title || null) : undefined,
     };
   });
-  const members = all('SELECT u.id,u.name,u.color,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
-    id: m.id, name: m.name, color: m.color, bio: m.bio, av: m.av,
+  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
+    id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, av: m.av,
     role: m.id === s.owner ? 'owner' : (m.role || 'member'),
     online: isOnline(m.id),
     activity: activities.get(m.id) || null,
@@ -313,10 +313,10 @@ const serverView = (sid, uid) => {
   return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
-  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
+  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
   const out = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
-    const u = { id: r.uid, name: r.name, color: r.color, bio: r.bio, av: r.av, online: isOnline(r.uid), activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
+    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, av: r.av, online: isOnline(r.uid), activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
     if (r.status === 'accepted') out.friends.push(u); else if (r.b === uid) out.incoming.push(u); else out.outgoing.push(u);
   }
   return out;
@@ -742,7 +742,7 @@ const H = {
   },
   'call.decline': (ws, d) => { const r = rings.get(d.key); if (r && r.to === ws.user.id) stopRing(d.key, 'declined'); },
   'profile.set': (ws, d) => {
-    const cur = get('SELECT avatar,color,bio,av FROM users WHERE id=?', ws.user.id);
+    const cur = get('SELECT avatar,color,banner,bio,av FROM users WHERE id=?', ws.user.id);
     let { avatar, av } = cur;
     if (d.avatar !== undefined) {
       if (d.avatar === null || d.avatar === '') { avatar = null; av = Date.now(); }

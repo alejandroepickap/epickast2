@@ -191,7 +191,7 @@ function modalVault() {
 
   // CATÁLOGO DE 8 COSMÉTICOS EXCLUSIVOS DE PERFIL (TEMPORADA 1)
   const PROFILE_COSMETICS = [
-    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', rarity: 'gold', color: '#38bdf8', desc: 'Marco Azul Neón de Primera Edición con placa oficial "FUNDADOR" para llamadas, chat y perfil.' },
+    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', rarity: 'gold', color: '#38bdf8', desc: 'Marco Azul Neón con insignia "FUNDADOR" para llamadas, chat y perfil.' },
     { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#10b981', rarity: 'milspec', color: '#10b981', desc: 'Tu nombre y perfil resplandecen en verde esmeralda del Núcleo.' },
     { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#a855f7', rarity: 'milspec', color: '#a855f7', desc: 'Tu nombre y perfil resplandecen en púrpura amatista místico.' },
     { id: 'color_magma', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'milspec', color: '#f59e0b', desc: 'Tu nombre y perfil resplandecen en ámbar volcánico ardiente.' },
@@ -201,7 +201,6 @@ function modalVault() {
     { id: 'banner_sanctum', name: 'Banner: Sagrario del Gólem', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'covert', color: '#ef4444', desc: 'Estandarte majestuoso del Santuario Central del Coloso de Obsidiana.' }
   ];
 
-  // Configuración de cofres según llaves
   const CHEST_REWARDS = {
     copper: PROFILE_COSMETICS.filter(c => c.type === 'color'),
     silver: PROFILE_COSMETICS.filter(c => c.type === 'color' || c.id === 'banner_mines' || c.id === 'banner_amethyst'),
@@ -214,14 +213,40 @@ function modalVault() {
   };
 
   let selectedTier = 'copper';
-  if (dData.keys.obsidian > 0) selectedTier = 'obsidian';
-  else if (dData.keys.gold > 0) selectedTier = 'gold';
-  else if (dData.keys.silver > 0) selectedTier = 'silver';
+  if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
+  else if ((dData.keys.gold || 0) > 0) selectedTier = 'gold';
+  else if ((dData.keys.silver || 0) > 0) selectedTier = 'silver';
 
   let isSpinning = false;
 
   const wrap = h('div', { class: 'cd-crate-dialog', style: 'background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:22px;max-width:840px;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;max-height:90vh;overflow-y:auto;' });
   m.appendChild(wrap);
+
+  // Función universal para equipar cualquier cosmético
+  const equipCosmeticItem = (item) => {
+    if (!item) return;
+    if (item.type === 'frame') {
+      localStorage.setItem('epickast.equipped_frame', 'founder_blue');
+      document.querySelectorAll('.avatar').forEach(a => {
+        if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder');
+      });
+      toast('✨ Marco de Avatar FUNDADOR equipado con éxito');
+    } else if (item.type === 'color') {
+      localStorage.setItem('epickast.equipped_color', item.val);
+      rpc('profile.set', { color: item.val }).catch(() => {});
+      if (S.me) S.me.color = item.val;
+      toast(`✨ Color equipado: ${item.name}`);
+    } else if (item.type === 'banner') {
+      localStorage.setItem('epickast.equipped_banner', item.val);
+      rpc('profile.set', { banner: item.val }).catch(() => {});
+      if (S.me) S.me.banner = item.val;
+      toast(`✨ Banner equipado: ${item.name}`);
+    }
+    renderMe();
+    renderMembers();
+    renderSide();
+    renderCosmeticsGrid();
+  };
 
   const renderContent = () => {
     wrap.innerHTML = `
@@ -236,37 +261,38 @@ function modalVault() {
       <!-- Pestañas de Selección de Cofre -->
       <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:14px;">
         <button class="vTabBtn" data-tier="copper" style="background:${selectedTier==='copper'?'#2e1f0e':'#130e1d'};border:2px solid ${selectedTier==='copper'?'#d97706':'#33224b'};color:#fde047;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥉 Cofre Cobre<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
+          🥉 Cofre Cobre<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></span>
         </button>
         <button class="vTabBtn" data-tier="silver" style="background:${selectedTier==='silver'?'#1e2538':'#130e1d'};border:2px solid ${selectedTier==='silver'?'#cbd5e1':'#33224b'};color:#cbd5e1;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥈 Sagrario Plata<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
+          🥈 Sagrario Plata<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntSilver">${dData.keys.silver || 0}</b></span>
         </button>
         <button class="vTabBtn" data-tier="gold" style="background:${selectedTier==='gold'?'#2b1e06':'#130e1d'};border:2px solid ${selectedTier==='gold'?'#fbbf24':'#33224b'};color:#fbbf24;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥇 Cofre Oro<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
+          🥇 Cofre Oro<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></span>
         </button>
         <button class="vTabBtn" data-tier="obsidian" style="background:${selectedTier==='obsidian'?'#27123d':'#130e1d'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#33224b'};color:#c084fc;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          💎 Ancestral Núcleo<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
+          💎 Ancestral Núcleo<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
         </button>
       </div>
 
-      <!-- Ruleta Horizontal -->
-      <div class="roulette-viewport" style="position:relative;width:100%;height:135px;background:#08050e;border:2px solid #ca8a04;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 24px #000;">
-        <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:20px;z-index:10;">▼</div>
+      <!-- Ruleta Horizontal Visible Estilo CS:GO -->
+      <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:140px;background:#08050e;border:2px solid #ca8a04;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 24px #000;margin-bottom:14px;">
+        <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:24px;z-index:20;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9));">▼</div>
+        <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(to bottom, #fbbf24, rgba(251,191,36,0.15));transform:translateX(-50%);z-index:15;pointer-events:none;"></div>
         <div id="vTrack" class="roulette-track" style="display:flex;gap:8px;padding:12px 10px;will-change:transform;"></div>
       </div>
 
-      <!-- Botón Girar -->
-      <div style="text-align:center;margin-top:14px;">
-        <button id="vBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:13px;padding:12px 32px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.5);text-transform:uppercase;letter-spacing:0.8px;">
+      <!-- Botón de Abrir Cofre -->
+      <div style="text-align:center;margin-bottom:16px;">
+        <button id="vBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:13px;padding:12px 34px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.5);text-transform:uppercase;letter-spacing:0.8px;">
           ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`}
         </button>
       </div>
 
-      <!-- Área de Ganador -->
-      <div id="vWinnerArea" style="display:none;margin-top:14px;padding:12px;background:#1c142b;border:2px solid #38bdf8;border-radius:8px;text-align:center;"></div>
+      <!-- Área de Ganador Desbloqueado -->
+      <div id="vWinnerArea" style="display:none;margin-bottom:18px;padding:16px;background:#181126;border:2px solid #38bdf8;border-radius:10px;text-align:center;box-shadow:0 0 30px rgba(56,189,248,0.3);"></div>
 
       <!-- Catálogo de Cosméticos Desbloqueados -->
-      <div style="margin-top:20px;border-top:1px solid #291b3b;padding-top:14px;">
+      <div style="border-top:1px solid #291b3b;padding-top:14px;">
         <h3 style="color:#e2e8f0;font-size:13px;font-weight:800;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.8px;">
           🎨 Mis Cosméticos de Perfil (Temporada 1 • Minas de Magma)
         </h3>
@@ -293,19 +319,25 @@ function modalVault() {
       };
     });
 
-    // Renderizar Cuadrícula de Cosméticos
+    // Renderizar Cosméticos
     renderCosmeticsGrid();
 
-    // Girar
+    // Girar Ruleta
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
       spinBtn.onclick = () => {
         if (isSpinning || (dData.keys[selectedTier] || 0) <= 0) return;
         isSpinning = true;
         spinBtn.disabled = true;
+        wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
 
+        // Descontar llave
         dData.keys[selectedTier]--;
         try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+
+        // Actualizar etiqueta de llave
+        const cntEl = wrap.querySelector(`#keyCnt${selectedTier[0].toUpperCase() + selectedTier.slice(1)}`);
+        if (cntEl) cntEl.textContent = dData.keys[selectedTier] || 0;
 
         const pool = CHEST_REWARDS[selectedTier] || CHEST_REWARDS.copper;
         let winner;
@@ -329,17 +361,26 @@ function modalVault() {
         const track = wrap.querySelector('#vTrack');
         track.innerHTML = cards.map(c => {
           const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
+          let visualPreview = '';
+          if (c.type === 'frame') {
+            visualPreview = '<div style="width:34px;height:34px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 8px #38bdf8;display:grid;place-items:center;font-size:10px;font-weight:900;color:#38bdf8;margin-bottom:4px;">★</div>';
+          } else if (c.type === 'color') {
+            visualPreview = `<div style="width:28px;height:28px;border-radius:50%;background:${c.val};box-shadow:0 0 10px ${c.val};margin-bottom:4px;"></div>`;
+          } else {
+            visualPreview = `<div style="width:58px;height:16px;border-radius:4px;background:${c.val};margin-bottom:4px;border:1px solid rgba(255,255,255,0.2);"></div>`;
+          }
           return `
-            <div class="roulette-card" style="width:120px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-              <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${c.type.toUpperCase()}</div>
-              <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;text-align:center;">${c.name}</div>
+            <div class="roulette-card" style="width:120px;height:112px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+              <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:3px;letter-spacing:0.5px;">${c.rarity.toUpperCase()}</div>
+              ${visualPreview}
+              <div style="font-size:10.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.name}</div>
             </div>
           `;
         }).join('');
 
-        const cardWidth = 128;
-        const viewportWidth = 720;
-        const jitter = (Math.random() - 0.5) * 45;
+        const cardWidth = 128; // 120px + 8px gap
+        const viewportWidth = wrap.querySelector('#vRouletteViewport')?.clientWidth || 760;
+        const jitter = (Math.random() - 0.5) * 35;
         const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + jitter;
 
         track.style.transition = 'none';
@@ -367,7 +408,8 @@ function modalVault() {
 
         setTimeout(() => {
           isSpinning = false;
-          ringer.beep([440, 554, 659, 880], 0.06, 0.12);
+          wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
+          ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
 
           // Guardar cosmético desbloqueado
           if (!dData.cosmetics) dData.cosmetics = {};
@@ -375,29 +417,56 @@ function modalVault() {
 
           if (winner.id === 'founder_frame') {
             dData.founderFrameUnlocked = true;
-            try {
-              localStorage.setItem('epickast.equipped_frame', 'founder_blue');
-            } catch {}
-            document.querySelectorAll('.avatar').forEach(a => {
-              if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder');
-            });
-            toast('🎉 ¡FELICIDADES! Marco de Avatar FUNDADOR desbloqueado y equipado.');
           }
 
           try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
 
+          // Mostrar tarjeta de victoria sin sobreescribir la ruleta
           const winnerArea = wrap.querySelector('#vWinnerArea');
           const rColor = RARITY_COLORS[winner.rarity] || '#4b69ff';
           winnerArea.style.display = 'block';
           winnerArea.style.borderColor = rColor;
+
+          let previewHtml = '';
+          if (winner.type === 'color') {
+            previewHtml = `<div style="display:inline-block;width:32px;height:32px;border-radius:50%;background:${winner.val};box-shadow:0 0 12px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
+          } else if (winner.type === 'banner') {
+            previewHtml = `<div style="display:inline-block;width:80px;height:24px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
+          } else {
+            previewHtml = '<span style="font-size:24px;vertical-align:middle;margin-right:8px;">👑</span>';
+          }
+
           winnerArea.innerHTML = `
-            <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">¡HAS OBTENIDO!</div>
-            <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:6px;">${winner.name}</div>
-            <div style="font-size:11px;color:#cbd5e1;">${winner.desc}</div>
+            <div style="font-size:11px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🎉 ¡RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})</div>
+            <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:6px;display:flex;align-items:center;justify-content:center;">
+              ${previewHtml} <span>${winner.name}</span>
+            </div>
+            <div style="font-size:12px;color:#cbd5e1;max-width:540px;margin:0 auto 12px auto;">${winner.desc}</div>
+            <div>
+              <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:13px;padding:10px 26px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.5);letter-spacing:0.5px;">
+                ✨ EQUIPAR AHORA MISMO
+              </button>
+            </div>
           `;
 
-          renderContent();
-          populatePreview();
+          const equipBtn = winnerArea.querySelector('#vBtnEquipWinner');
+          if (equipBtn) {
+            equipBtn.onclick = () => {
+              equipCosmeticItem(winner);
+              equipBtn.textContent = '✓ ¡EQUIPADO EN TU PERFIL!';
+              equipBtn.style.background = '#047857';
+            };
+          }
+
+          // Actualizar botón de girar y grid
+          spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
+          spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
+          spinBtn.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
+          spinBtn.innerHTML = (dData.keys[selectedTier] || 0) > 0
+            ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})`
+            : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`;
+
+          renderCosmeticsGrid();
         }, duration + 200);
       };
     }
@@ -409,8 +478,8 @@ function modalVault() {
     grid.innerHTML = '';
 
     const eqFrame = localStorage.getItem('epickast.equipped_frame');
-    const eqColor = localStorage.getItem('epickast.equipped_color');
-    const eqBanner = localStorage.getItem('epickast.equipped_banner');
+    const eqColor = localStorage.getItem('epickast.equipped_color') || S.me?.color;
+    const eqBanner = localStorage.getItem('epickast.equipped_banner') || S.me?.banner;
 
     PROFILE_COSMETICS.forEach(c => {
       const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
@@ -420,58 +489,33 @@ function modalVault() {
 
       const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
       const card = document.createElement('div');
-      card.style.cssText = `background:#0e0817;border:2px solid ${isUnlocked ? rColor : '#291b3b'};border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;opacity:${isUnlocked ? '1' : '0.6'};`;
+      card.style.cssText = `background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;opacity:${isUnlocked ? '1' : '0.45'};`;
 
-      let previewHtml = '';
-      if (c.type === 'color') {
-        previewHtml = `<div style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="color:${c.val};font-weight:800;font-size:11px;">Muestra de Nombre</span></div>`;
-      } else if (c.type === 'banner') {
-        previewHtml = `<div style="height:28px;border-radius:4px;background:${c.val};border:1px solid rgba(255,255,255,0.2);"></div>`;
+      let preview = '';
+      if (c.type === 'frame') {
+        preview = '<div style="font-size:11px;color:#38bdf8;font-weight:700;">⭐ Marco Azul Animado</div>';
+      } else if (c.type === 'color') {
+        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:11px;color:${c.val};font-weight:700;">Muestra de Nombre</span></div>`;
       } else {
-        previewHtml = `<div style="font-size:10px;color:#38bdf8;font-weight:900;">⭐ Marco Azul Animado</div>`;
+        preview = `<div style="height:20px;border-radius:4px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>`;
       }
 
       card.innerHTML = `
-        <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} • ${c.type.toUpperCase()}</div>
-        <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;">${c.name}</div>
-        ${previewHtml}
-        <button class="vEqBtn" style="margin-top:auto;background:${!isUnlocked ? '#1e142e' : isEquipped ? '#059669' : '#2563eb'};color:#fff;border:none;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:700;cursor:${isUnlocked ? 'pointer' : 'not-allowed'};">
-          ${!isUnlocked ? '🔒 Bloqueado' : isEquipped ? '✓ Equipado' : 'Equipar'}
-        </button>
+        <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</div>
+        <div style="font-size:11px;font-weight:700;color:#fff;">${c.name}</div>
+        ${preview}
+        <div style="margin-top:auto;padding-top:4px;">
+          ${isEquipped 
+            ? '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:10.5px;font-weight:800;padding:5px;border-radius:4px;cursor:default;">✓ Equipado</button>'
+            : isUnlocked 
+              ? '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:10.5px;font-weight:800;padding:5px;border-radius:4px;cursor:pointer;">Equipar</button>'
+              : '<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:10.5px;font-weight:700;padding:5px;border-radius:4px;cursor:not-allowed;">🔒 Bloqueado</button>'}
+        </div>
       `;
 
-      if (isUnlocked) {
-        card.querySelector('.vEqBtn').onclick = () => {
-          if (c.type === 'frame') {
-            if (isEquipped) {
-              localStorage.removeItem('epickast.equipped_frame');
-              document.querySelectorAll('.avatar').forEach(a => { if (Number(a.dataset.uid) === S.me?.id) a.classList.remove('frame-founder'); });
-              toast('Marco desequipado');
-            } else {
-              localStorage.setItem('epickast.equipped_frame', 'founder_blue');
-              document.querySelectorAll('.avatar').forEach(a => { if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder'); });
-              toast('★ Marco de Fundador equipado');
-            }
-          } else if (c.type === 'color') {
-            if (isEquipped) {
-              localStorage.removeItem('epickast.equipped_color');
-              toast('Color restaurado al por defecto');
-            } else {
-              localStorage.setItem('epickast.equipped_color', c.val);
-              toast(`Color ${c.name} equipado`);
-            }
-            renderMembers();
-          } else if (c.type === 'banner') {
-            if (isEquipped) {
-              localStorage.removeItem('epickast.equipped_banner');
-              toast('Banner restaurado');
-            } else {
-              localStorage.setItem('epickast.equipped_banner', c.val);
-              toast(`${c.name} equipado para tu perfil`);
-            }
-          }
-          renderCosmeticsGrid();
-        };
+      const eqBtn = card.querySelector('.vEqBtn');
+      if (eqBtn) {
+        eqBtn.onclick = () => equipCosmeticItem(c);
       }
 
       grid.appendChild(card);
@@ -484,12 +528,22 @@ function modalVault() {
     track.style.transition = 'none';
     track.style.transform = 'translateX(0px)';
     const pool = CHEST_REWARDS[selectedTier] || CHEST_REWARDS.copper;
-    track.innerHTML = pool.concat(pool).concat(pool).map(item => {
+    const sample = pool.concat(pool).concat(pool);
+    track.innerHTML = sample.map(item => {
       const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
+      let visualPreview = '';
+      if (item.type === 'frame') {
+        visualPreview = '<div style="width:30px;height:30px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin-bottom:3px;">★</div>';
+      } else if (item.type === 'color') {
+        visualPreview = `<div style="width:24px;height:24px;border-radius:50%;background:${item.val};box-shadow:0 0 8px ${item.val};margin-bottom:3px;"></div>`;
+      } else {
+        visualPreview = `<div style="width:50px;height:14px;border-radius:4px;background:${item.val};margin-bottom:3px;border:1px solid rgba(255,255,255,0.2);"></div>`;
+      }
       return `
-        <div class="roulette-card" style="width:120px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-          <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${item.type.toUpperCase()}</div>
-          <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;text-align:center;">${item.name}</div>
+        <div class="roulette-card" style="width:120px;height:112px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+          <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:3px;">${item.rarity.toUpperCase()}</div>
+          ${visualPreview}
+          <div style="font-size:10.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
         </div>
       `;
     }).join('');
@@ -503,7 +557,9 @@ window.modalVault = modalVault;
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
 function openOfficialGuide(chKey = 'como_funciona') {
-  S.view = { kind: 'guide', sid: 'official_guide' };
+  const curSid = (S.view.kind === 'server' || S.view.kind === 'guide') ? (S.view.sid && S.sdata.has(S.view.sid) ? S.view.sid : S.servers[0]?.id) : S.servers[0]?.id;
+  S.lastServerId = curSid;
+  S.view = { kind: 'guide', sid: curSid || 'official_guide' };
   S.guideChannel = chKey;
   S.chan = null;
   S.chanType = 'guide';
@@ -844,7 +900,7 @@ $('bTogglePass')?.addEventListener('click', (e) => {
 });
 
 // ---------- avatares ----------
-const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd', '#00d2d3', '#ffa502'];
+const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd', '#00d2d3', '#ffa502', '#f59e0b', '#10b981', '#a855f7'];
 const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
 const avCache = new Map(); const avWait = new Set();
 function avatar(u, size = 32, online) {
@@ -1983,6 +2039,44 @@ function renderSide() {
     h('button', { class: 'btn-ico', onclick: () => modalInviteFriends(sd.id), title: 'Invitar amigos directamente a este servidor' }, '👥'),
     h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, canales y rangos' }, '⋯')
   );
+  // SECCIÓN OFICIAL DE GUÍAS E INSTRUCCIONES (PLEGABLE / OCULTABLE)
+  const guidesHidden = !!settings.hideServerGuides;
+  L.append(h('div', { class: 'sect', style: 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;' },
+    h('span', {
+      onclick: () => {
+        settings.hideServerGuides = !guidesHidden;
+        saveSettings();
+        renderSide();
+      }
+    }, (guidesHidden ? '▶' : '▼') + ' 📖 Guías e Información'),
+    h('button', {
+      title: guidesHidden ? 'Mostrar canales de instrucciones' : 'Ocultar canales de instrucciones',
+      style: 'background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;padding:2px 4px;',
+      onclick: () => {
+        settings.hideServerGuides = !guidesHidden;
+        saveSettings();
+        renderSide();
+      }
+    }, guidesHidden ? '👁️ Ver' : '✕ Ocultar')
+  ));
+
+  if (!guidesHidden) {
+    const sGuides = [
+      { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, transmisión y controles' },
+      { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Servidores, canales y roles' },
+      { key: 'mazmorras', name: '⚔️-mazmorras-y-recompensas', title: 'Minijuego, skins y recompensas' }
+    ];
+    sGuides.forEach(g => {
+      const isSel = S.view.kind === 'guide' && S.guideChannel === g.key;
+      L.append(h('div', {
+        class: 'item' + (isSel ? ' sel' : ''),
+        style: 'color:#c7d2fe;font-size:12.5px;padding-left:14px;',
+        title: g.title,
+        onclick: () => openOfficialGuide(g.key)
+      }, h('span', { class: 'nm', style: 'color:#a5b4fc;font-weight:600;' }, '# ' + g.name)));
+    });
+  }
+
   for (const type of ['text', 'voice']) {
     L.append(h('div', { class: 'sect' }, type === 'text' ? 'Canales de texto' : 'Canales de voz',
       myRank >= 3 ? h('button', { title: type === 'text' ? 'Crear canal de texto' : 'Crear canal de voz', onclick: () => modalChannel(sd.id, type) }, '+') : null));
@@ -2097,7 +2191,8 @@ function modalMemberCard(sd, m) {
     h('option', { value: 'c' + ch.id }, `🔊 ${ch.name}`)
   )) : null;
 
-  const bannerBg = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_banner')) ? localStorage.getItem('epickast.equipped_banner') : (m.banner || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)');
+  const bannerBg = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_banner')) ? localStorage.getItem('epickast.equipped_banner') : (m.banner || (m.id === S.me?.id ? S.me?.banner : null) || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)');
+  const memberNameColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || (m.id === S.me?.id ? S.me?.color : null) || rInfo.color || 'var(--tx)');
 
   const card = h('div', { class: 'prof-card' },
     h('div', { class: 'prof-banner', style: `background:${bannerBg}` }),
@@ -2111,7 +2206,7 @@ function modalMemberCard(sd, m) {
         }, icoSvg('userPlus', 13), ' Agregar') : null
       ),
       h('div', { class: 'prof-meta' },
-        h('div', { style: `font-size:18px;font-weight:700;color:${m.color || rInfo.color || 'var(--tx)'}` },
+        h('div', { style: `font-size:18px;font-weight:700;color:${memberNameColor}` },
           m.name,
           rInfo.badge ? h('span', { class: 'role-badge', style: 'margin-left:6px', title: rInfo.label }, rInfo.badge) : null
         ),
