@@ -2,14 +2,14 @@
 /**
  * Firebase Cloud Storage & Database Snapshot Adapter para EpicKast.
  * 
- * Soporta dos modalidades:
- * 1. Archivo de Cuenta de Servicio oficial de Firebase (serviceAccountKey.json) con OAuth2 JWT nativo.
- * 2. Configuración simple REST (firebase.config.json / FIREBASE_CONFIG).
+ * Utiliza la API oficial Google Cloud Storage JSON API (storage.googleapis.com) con
+ * autenticación nativa OAuth2 Service Account JWT (RS256).
  * 
- * Permite:
- * - Respaldo y restauración automática de la base SQLite (epickast.db).
- * - Persistencia de adjuntos en Google Cloud Storage / Firebase Storage.
- * - Cero dependencias nativas externas (utiliza crypto y https nativos de Node.js).
+ * Ventajas:
+ * 1. Acceso administrativo completo y seguro a Firebase Storage (epickast.firebasestorage.app).
+ * 2. Cero problemas con las reglas de seguridad de Storage (IAM Admin bypass).
+ * 3. Persistencia permanente de epickast.db y archivos adjuntos del chat en la nube de Firebase.
+ * 4. Cero dependencias externas pesadas o nativas (100% Node.js https y crypto).
  */
 const https = require('node:https');
 const crypto = require('node:crypto');
@@ -29,12 +29,12 @@ function base64url(input) {
 }
 
 /**
- * Busca configuración en variables de entorno o archivos locales.
+ * Carga la configuración desde variable de entorno o archivo de cuenta de servicio.
  */
 function loadConfig(dataDir) {
   if (config) return config;
 
-  // 1. Variable de entorno FIREBASE_SERVICE_ACCOUNT
+  // 1. Variable de entorno FIREBASE_SERVICE_ACCOUNT (Render producción)
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
       config = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -56,12 +56,11 @@ function loadConfig(dataDir) {
     }
   }
 
-  // 3. Búsqueda de archivos locales en server/ y dataDir
+  // 3. Archivos locales en server/
   const searchDirs = [__dirname, dataDir, path.join(__dirname, '..')].filter(Boolean);
   for (const dir of searchDirs) {
     if (!fs.existsSync(dir)) continue;
     const files = fs.readdirSync(dir);
-    // Buscar serviceAccountKey.json o archivos descargados de Firebase console (*firebase-adminsdk*.json)
     const saFile = files.find(f => /serviceAccountKey\.json$/i.test(f) || /firebase.*adminsdk.*\.json$/i.test(f));
     if (saFile) {
       try {
@@ -116,10 +115,10 @@ function request(options, bodyBuffer = null) {
 }
 
 /**
- * Obtiene un token de acceso OAuth2 para la Cuenta de Servicio de Google/Firebase.
+ * Obtiene o renueva el token de acceso OAuth2 para la cuenta de servicio.
  */
 async function getAccessToken(cfg) {
-  if (!cfg.private_key || !cfg.client_email) return null;
+  if (!cfg || !cfg.private_key || !cfg.client_email) return null;
   if (cachedToken && Date.now() < tokenExpiresAt - 60000) {
     return cachedToken;
   }
@@ -129,7 +128,7 @@ async function getAccessToken(cfg) {
     const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
     const payload = base64url(JSON.stringify({
       iss: cfg.client_email,
-      scope: 'https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/firebase.database',
+      scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/cloud-platform',
       aud: 'https://oauth2.googleapis.com/token',
       exp: now + 3600,
       iat: now
@@ -165,7 +164,7 @@ async function getAccessToken(cfg) {
       console.error('[firebase] Error al obtener token OAuth2:', res.statusCode, res.text());
     }
   } catch (e) {
-    console.error('[firebase] Excepción al generar token OAuth2:', e.message);
+    console.error('[firebase] Error generando token OAuth2:', e.message);
   }
   return null;
 }
@@ -178,76 +177,65 @@ function getStorageBucket(cfg) {
 }
 
 /**
- * Sube un archivo a Firebase Cloud Storage vía REST API.
+ * Sube un archivo a Google Cloud Storage / Firebase Storage vía JSON API.
  */
 async function uploadToStorage(cfg, destinationPath, fileBuffer, mimeType = 'application/octet-stream') {
   const bucket = getStorageBucket(cfg);
   if (!bucket) throw new Error('No se definió storageBucket ni project_id');
 
-  const encodedPath = encodeURIComponent(destinationPath);
-  const host = 'firebasestorage.googleapis.com';
-  const pathUrl = `/v0/b/${bucket}/o?name=${encodedPath}&uploadType=media`;
-
+  const token = await getAccessToken(cfg);
+  const encodedName = encodeURIComponent(destinationPath);
   const headers = {
     'Content-Type': mimeType,
     'Content-Length': fileBuffer.length,
   };
-
-  const token = await getAccessToken(cfg);
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  } else if (cfg.apiKey) {
-    // Si no hay token de cuenta de servicio, usar apiKey
-  }
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await request({
-    hostname: host,
+    hostname: 'storage.googleapis.com',
     port: 443,
-    path: pathUrl + (cfg.apiKey && !token ? `&key=${cfg.apiKey}` : ''),
+    path: `/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedName}`,
     method: 'POST',
     headers,
   }, fileBuffer);
 
   if (res.statusCode >= 200 && res.statusCode < 300) {
-    return { ok: true, downloadUrl: `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media` };
+    return { ok: true, name: destinationPath };
   } else {
-    // Si el bucket .firebasestorage.app dio error, intentar con .appspot.com como fallback
+    // Si da 404, intentar con bucket alternativo .appspot.com
     if (bucket.endsWith('.firebasestorage.app')) {
       const altBucket = bucket.replace('.firebasestorage.app', '.appspot.com');
       const altRes = await request({
-        hostname: host,
+        hostname: 'storage.googleapis.com',
         port: 443,
-        path: `/v0/b/${altBucket}/o?name=${encodedPath}&uploadType=media` + (cfg.apiKey && !token ? `&key=${cfg.apiKey}` : ''),
+        path: `/upload/storage/v1/b/${altBucket}/o?uploadType=media&name=${encodedName}`,
         method: 'POST',
         headers,
       }, fileBuffer);
       if (altRes.statusCode >= 200 && altRes.statusCode < 300) {
-        return { ok: true, downloadUrl: `https://firebasestorage.googleapis.com/v0/b/${altBucket}/o/${encodedPath}?alt=media` };
+        return { ok: true, name: destinationPath };
       }
     }
-    throw new Error(`Firebase Storage HTTP ${res.statusCode}: ${res.text()}`);
+    throw new Error(`Cloud Storage HTTP ${res.statusCode}: ${res.text()}`);
   }
 }
 
 /**
- * Descarga un archivo de Firebase Cloud Storage vía REST API.
+ * Descarga un archivo de Google Cloud Storage / Firebase Storage vía JSON API.
  */
 async function downloadFromStorage(cfg, destinationPath) {
   const bucket = getStorageBucket(cfg);
   if (!bucket) return null;
 
-  const encodedPath = encodeURIComponent(destinationPath);
-  const host = 'firebasestorage.googleapis.com';
-  const pathUrl = `/v0/b/${bucket}/o/${encodedPath}?alt=media` + (cfg.apiKey ? `&key=${cfg.apiKey}` : '');
-
-  const headers = {};
   const token = await getAccessToken(cfg);
+  const encodedName = encodeURIComponent(destinationPath);
+  const headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await request({
-    hostname: host,
+    hostname: 'storage.googleapis.com',
     port: 443,
-    path: pathUrl,
+    path: `/storage/v1/b/${bucket}/o/${encodedName}?alt=media`,
     method: 'GET',
     headers
   });
@@ -255,13 +243,13 @@ async function downloadFromStorage(cfg, destinationPath) {
   if (res.statusCode === 200) {
     return res.data;
   }
-  // Fallback con .appspot.com
+  // Fallback con .appspot.com si no se encontró en .firebasestorage.app
   if (bucket.endsWith('.firebasestorage.app')) {
     const altBucket = bucket.replace('.firebasestorage.app', '.appspot.com');
     const altRes = await request({
-      hostname: host,
+      hostname: 'storage.googleapis.com',
       port: 443,
-      path: `/v0/b/${altBucket}/o/${encodedPath}?alt=media`,
+      path: `/storage/v1/b/${altBucket}/o/${encodedName}?alt=media`,
       method: 'GET',
       headers
     });
@@ -271,7 +259,7 @@ async function downloadFromStorage(cfg, destinationPath) {
 }
 
 /**
- * Guarda el respaldo completo de la base de datos o JSON en Firebase.
+ * Guarda el respaldo completo de la base de datos o JSON en Firebase Storage.
  */
 async function syncDatabaseToFirebase(dataDir, backupStateObj) {
   const cfg = loadConfig(dataDir);
@@ -279,31 +267,9 @@ async function syncDatabaseToFirebase(dataDir, backupStateObj) {
 
   try {
     const jsonBuf = Buffer.from(JSON.stringify(backupStateObj, null, 2), 'utf8');
-
-    // 1. Si hay Realtime Database URL
-    const dbUrl = cfg.databaseURL || (cfg.project_id ? `https://${cfg.project_id}-default-rtdb.firebaseio.com` : null);
-    if (cfg.databaseURL) {
-      const u = new URL(cfg.databaseURL);
-      const token = await getAccessToken(cfg);
-      const pathUrl = `/epickast_backup.json` + (token ? `?access_token=${token}` : (cfg.databaseSecret ? `?auth=${cfg.databaseSecret}` : ''));
-
-      await request({
-        hostname: u.hostname,
-        port: 443,
-        path: pathUrl,
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': jsonBuf.length }
-      }, jsonBuf);
-      console.log('[firebase] Base de datos sincronizada con Firebase Realtime Database.');
-      return true;
-    }
-
-    // 2. Si hay Cloud Storage Bucket
-    if (getStorageBucket(cfg)) {
-      await uploadToStorage(cfg, 'backups/backup-state.json', jsonBuf, 'application/json');
-      console.log('[firebase] Base de datos sincronizada con Firebase Storage.');
-      return true;
-    }
+    await uploadToStorage(cfg, 'backups/backup-state.json', jsonBuf, 'application/json');
+    console.log('[firebase] Base de datos sincronizada exitosamente con Firebase Storage.');
+    return true;
   } catch (e) {
     console.warn('[firebase] Advertencia al sincronizar con Firebase:', e.message);
   }
@@ -311,43 +277,19 @@ async function syncDatabaseToFirebase(dataDir, backupStateObj) {
 }
 
 /**
- * Restaura la base de datos desde Firebase al arrancar el contenedor.
+ * Restaura la base de datos desde Firebase Storage al arrancar el contenedor.
  */
 async function restoreDatabaseFromFirebase(dataDir) {
   const cfg = loadConfig(dataDir);
   if (!cfg) return null;
 
   try {
-    // 1. Si hay Realtime Database
-    if (cfg.databaseURL) {
-      const u = new URL(cfg.databaseURL);
-      const token = await getAccessToken(cfg);
-      const pathUrl = `/epickast_backup.json` + (token ? `?access_token=${token}` : (cfg.databaseSecret ? `?auth=${cfg.databaseSecret}` : ''));
-
-      const res = await request({
-        hostname: u.hostname,
-        port: 443,
-        path: pathUrl,
-        method: 'GET'
-      });
-      if (res.statusCode === 200) {
-        const state = res.json();
-        if (state && Array.isArray(state.users) && state.users.length > 0) {
-          console.log(`[firebase] Respaldo restaurado desde Firebase Realtime DB (${state.users.length} usuarios).`);
-          return state;
-        }
-      }
-    }
-
-    // 2. Si hay Storage Bucket
-    if (getStorageBucket(cfg)) {
-      const buf = await downloadFromStorage(cfg, 'backups/backup-state.json');
-      if (buf) {
-        const state = JSON.parse(buf.toString('utf8'));
-        if (state && Array.isArray(state.users) && state.users.length > 0) {
-          console.log(`[firebase] Respaldo restaurado desde Firebase Storage (${state.users.length} usuarios).`);
-          return state;
-        }
+    const buf = await downloadFromStorage(cfg, 'backups/backup-state.json');
+    if (buf && buf.length > 0) {
+      const state = JSON.parse(buf.toString('utf8'));
+      if (state && Array.isArray(state.users) && state.users.length > 0) {
+        console.log(`[firebase] Respaldo restaurado desde Firebase Storage (${state.users.length} usuarios).`);
+        return state;
       }
     }
   } catch (e) {
@@ -361,14 +303,14 @@ async function restoreDatabaseFromFirebase(dataDir) {
  */
 async function syncAttachmentToFirebase(dataDir, diskFileName, localFilePath, mimeType) {
   const cfg = loadConfig(dataDir);
-  if (!cfg || !getStorageBucket(cfg)) return null;
+  if (!cfg) return null;
 
   try {
     const fileBuf = fs.readFileSync(localFilePath);
     const dest = `uploads/${diskFileName}`;
-    const res = await uploadToStorage(cfg, dest, fileBuf, mimeType);
+    await uploadToStorage(cfg, dest, fileBuf, mimeType);
     console.log(`[firebase] Adjunto respaldado en Firebase Storage: ${dest}`);
-    return res;
+    return { ok: true, dest };
   } catch (e) {
     console.warn('[firebase] Error al subir adjunto a Firebase Storage:', e.message);
     return null;
@@ -380,7 +322,7 @@ async function syncAttachmentToFirebase(dataDir, diskFileName, localFilePath, mi
  */
 async function fetchAttachmentFromFirebase(dataDir, diskFileName, localDestPath) {
   const cfg = loadConfig(dataDir);
-  if (!cfg || !getStorageBucket(cfg)) return false;
+  if (!cfg) return false;
 
   try {
     const buf = await downloadFromStorage(cfg, `uploads/${diskFileName}`);
