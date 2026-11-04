@@ -343,7 +343,7 @@ function modalVault() {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.2</h2>
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.3</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
           </div>
         </div>
@@ -536,6 +536,10 @@ function modalVault() {
         spinBtn.disabled = true;
         spinBtn.style.opacity = '0.5';
         wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
+        const prevWinner = wrap.querySelector('#vWinnerArea');
+        if (prevWinner) { prevWinner.style.display = 'none'; prevWinner.innerHTML = ''; }
+        const trk = wrap.querySelector('#vTrack');
+        if (trk) { trk.style.transition = 'none'; trk.style.transform = 'translateX(0px)'; trk.offsetHeight; }
 
         dData.keys[selectedTier] -= 1;
 
@@ -625,6 +629,13 @@ function modalVault() {
           if (tickInt) clearInterval(tickInt);
           isSpinning = false;
           wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
+          if (spinBtn) {
+            spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
+            spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
+            spinBtn.innerHTML = (dData.keys[selectedTier] || 0) > 0 ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega en el Dojo)`;
+          }
+          const dustEl = wrap.querySelector('#vDustCount');
+          if (dustEl) dustEl.textContent = dData.dust || 0;
           if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
 
           if (!isDuplicate) {
@@ -884,142 +895,105 @@ function openOfficialGuide(chKey = 'notas_version') {
 function renderGuideContent(chKey) {
   const container = h('div', { class: 'guide-container', style: 'padding:24px 32px;overflow-y:auto;height:100%;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;' });
 
-      if (chKey === 'notas_version_182') {
+            if (chKey === 'notas_version' || chKey === 'notas_version_182' || chKey === 'notas_version_181') {
     container.innerHTML = `
       <div style="max-width:820px;margin:0 auto;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid #28193f;padding-bottom:16px;">
           <span style="font-size:36px;">🚀</span>
           <div>
-            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Notas de la Versión v1.8.2</h1>
-            <p style="color:#94a3b8;font-size:13px;margin:0;">Registro oficial de cambios, optimizaciones y nuevas funcionalidades en formato de lista por puntos.</p>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Historial Oficial de Versiones</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Hilo unificado de notas de versión, optimizaciones y registros de desarrollo de EpicKast.</p>
           </div>
         </div>
 
-        <!-- 1. Dojo Elemental y Animaciones -->
+        <!-- ==================== VERSIÓN 1.8.3 (ACTUAL) ==================== -->
+        <div style="border:2px solid #818cf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#141328;box-shadow:0 8px 24px rgba(99,102,241,0.15);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #2d2b52;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#4f46e5;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.3</h2>
+            </div>
+            <span style="font-size:12px;color:#a5b4fc;font-weight:700;">Lanzamiento Estable</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#fde047;">🎬 Animaciones Cinemáticas Legendarias (Cartas 10+):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Las cartas de valor 10, 11 y 12 ahora cuentan con sellos dorados de poder y desatan secuencias cinemáticas especiales al ganar rondas (Dragón Ígneo, Ventisca del Cero Absoluto y Tsunami del Leviatán).</li>
+                <li>Ritmo de combate refinado en 3 fases: Revelación simultánea, Choque elemental o cinemático y Veredicto con diálogo del Sensei.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">🧠 Escalado de Dificultad Táctica por Sensei:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Piso 1 (Novicio Ignis):</b> Nivel básico e instintivo para familiarizarse con el juego.</li>
+                <li><b>Piso 2 (Monje de Escarcha):</b> Aprende tus patrones y busca combinaciones de trío.</li>
+                <li><b>Piso 3 (Guardián del Torrente):</b> Bloqueador táctico que lee qué elemento te daría la victoria y juega su counter directo.</li>
+                <li><b>Piso 4 (Campeón de Basalto):</b> Reserva cartas altas de 10+ para castigar empates de elemento.</li>
+                <li><b>Piso 5 (Sensei del Núcleo):</b> Modo Gran Maestro Implacable: cuenta cartas, predice jugadas con árbol minimax y bloquea tus líneas ganadoras.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#ec4899;">🎨 Colores y Gradientes de Nombre Visibles Everywhere:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Soporte nativo para renderizar gradientes de texto (Aurora Boreal, Fuego Volcánico) y colores cosméticos en la lista de miembros, mensajes de chat y barra de usuario.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#10b981;">🎰 Corrección Definitiva del Bug de Ruleta:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Limpieza automática del banner de recompensa anterior y reseteo del desplazamiento del reel para permitir giros continuos sin trabas.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#a855f7;">🧵 Unificación del Registro de Versiones:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Todas las notas de versión se integraron en un único hilo continuo cronológico.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.8.2 ==================== -->
         <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#38bdf8;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>🥋</span> 1. Dojo Elemental: Animaciones, Diálogos y Personajes
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Animaciones de Destrucción Elemental:</b> Efectos visuales de choque donde el Fuego calcina a la Nieve con llamas y humo, la Nieve congela y fragmenta al Agua en esquirlas, y el Agua apaga al Fuego con vapor.</li>
-            <li><b>Personajes con Contexto y Trasfondo:</b> Cada piso cuenta con un guardián con avatar, rango de cinturón, descripción y frases de combate contextuales que reaccionan a tus jugadas.</li>
-            <li><b>Temporizador de Turno (15s):</b> Contador regresivo con barra de color dinámica para mantener la agilidad del combate y evitar pausas infinitas.</li>
-            <li><b>Anuncios de Ronda Claros:</b> Cartel central prominente que explica claramente el motivo de la victoria, derrota o empate en cada mano.</li>
-            <li><b>Guía Visual "¿Cómo Jugar?":</b> Desplegable con el triángulo elemental, reglas de desempate por números y condiciones de victoria por Trío o Monolito.</li>
+          <h3 style="color:#c084fc;font-size:16px;font-weight:800;margin:0 0 10px 0;">Versión 1.8.2</h3>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Animaciones de Destrucción:</b> Fuego calcina Nieve, Nieve congela Agua y Agua apaga Fuego.</li>
+            <li><b>Personajes con Identidad:</b> Retratos de los 5 guardianes, rangos de cinturón y diálogos reactivos.</li>
+            <li><b>Temporizador de Turno:</b> Cuenta regresiva de 15 segundos para mantener duelos dinámicos.</li>
+            <li><b>Terminología Prémium:</b> Adopción de "Esencia Arcana" y "Sintonía Legendaria".</li>
+            <li><b>Accesibilidad:</b> Botón de cierre en esquina superior y atajo de teclado <code>ESC</code>.</li>
+            <li><b>DMs desde Servidores:</b> Envío directo de mensajes privados desde perfiles de miembros compartidos.</li>
+            <li><b>Menciones @:</b> Botón para destacar mensajes y notificar usuarios en servidores.</li>
           </ul>
         </div>
 
-        <!-- 2. Nueva Terminología Inmersiva -->
+        <!-- ==================== VERSIÓN 1.8.1 ==================== -->
         <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#f59e0b;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>✨</span> 2. Terminología Prémium: Esencia Arcana y Sintonía Legendaria
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Esencia Arcana:</b> Sustituye el término "Polvo", representando los fragmentos arcanos obtenidos al recibir cosméticos duplicados para forjar piezas directamente.</li>
-            <li><b>Sintonía Legendaria:</b> Sustituye la traducción literal "Piedad", indicando el progreso matemático de sintonización hacia la obtención de cosméticos Épicos (cada 10) y Legendarios garantizados (apertura 60).</li>
+          <h3 style="color:#94a3b8;font-size:16px;font-weight:800;margin:0 0 10px 0;">Versión 1.8.1</h3>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Bóveda Sobria y Discreta:</b> Rediseño con paleta slate oscura, eliminando saturaciones visuales.</li>
+            <li><b>Orden Estricto de Cosméticos:</b> Jerarquía por Legendarios (4), Épicos (5), Raros (7) y Comunes (10).</li>
+            <li><b>Minijuego Card-Jitsu:</b> Introducción del combate elemental en la pestaña del Dojo.</li>
+            <li><b>Reparación de Configuración:</b> Solución al error de carga del botón de ajustes.</li>
           </ul>
         </div>
 
-        <!-- 3. Experiencia de Usuario en la Bóveda -->
+        <!-- ==================== VERSIÓN 1.8.0 ==================== -->
         <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#10b981;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>🏛️</span> 3. Bóveda: Botón de Cierre y Tecla ESC
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Alineación Simétrica:</b> El botón de cierre ahora reside de forma fija y limpia en la esquina superior derecha del encabezado.</li>
-            <li><b>Salida con ESC:</b> Presionar la tecla <code>Escape</code> en cualquier momento cierra la Bóveda de inmediato sin necesidad del mouse.</li>
-          </ul>
-        </div>
-
-        <!-- 4. Mensajes Directos y Duelos desde Servidores -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#a855f7;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>💬</span> 4. DMs y Duelos PvP desde Perfiles de Servidor (Estilo Discord)
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Mensaje Directo Instantáneo:</b> Botón "Enviar Mensaje Directo" disponible al hacer clic en el perfil de cualquier miembro de un servidor compartido.</li>
-            <li><b>Desafío a Card-Jitsu 1v1:</b> Reta a amigos o miembros directamente a un combate en el Dojo.</li>
-            <li><b>Menciones @ y Resalte:</b> Botón para citar y mencionar autores con notificación sonoro-visual y resalte ámbar en el chat.</li>
+          <h3 style="color:#64748b;font-size:16px;font-weight:800;margin:0 0 10px 0;">Versión 1.8.0</h3>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Estados de Voz en Tiempo Real:</b> Iconos de silenciado, ensordecido y mute moderado en llamadas.</li>
+            <li><b>Persistencia Cloud:</b> Respaldo y restauración automática de SQLite en Firebase Storage.</li>
+            <li><b>Piedad Dura Determinista:</b> Algoritmo de garantía matemática en la apertura 60.</li>
           </ul>
         </div>
       </div>`;
-  } else if (chKey === 'notas_version') {
-    container.innerHTML = `
-      <div style="max-width:820px;margin:0 auto;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid #28193f;padding-bottom:16px;">
-          <span style="font-size:36px;">🚀</span>
-          <div>
-            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Notas de la Versión v1.8.1</h1>
-            <p style="color:#94a3b8;font-size:13px;margin:0;">Registro oficial de cambios, optimizaciones y nuevas funcionalidades en formato de lista.</p>
-          </div>
-        </div>
-
-        <!-- 1. Persistencia y Nube -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#fbbf24;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>☁️</span> 1. Persistencia Permanente en la Nube (Firebase Storage)
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Sincronización Total:</b> Todas las cuentas, contraseñas hash, llaves de mazmorra, monedas acumuladas, Esencia Arcana, inventario y cosméticos se respaldan automáticamente en <code>epickast.firebasestorage.app</code>.</li>
-            <li><b>Inmunidad a Reinicios:</b> Las hibernaciones o reinicios de contenedores en Render ya no provocan pérdida de datos; el servidor se auto-restaura de inmediato.</li>
-            <li><b>Fallback Multi-Origen:</b> Sistema resiliente que combina respaldo local con almacenamiento en la nube sin inconsistencias.</li>
-          </ul>
-        </div>
-
-        <!-- 2. Estados de Voz -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#38bdf8;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>🎙️</span> 2. Iconos y Estados de Voz en Tiempo Real
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>🔇 Silenciado:</b> Indicador visual cuando el participante silencia voluntariamente su micrófono.</li>
-            <li><b>🎧❌ Ensordecido:</b> Distintivo claro cuando un usuario desactiva la recepción de audio de la llamada.</li>
-            <li><b>🔇⛔ Silenciado por Moderador:</b> Alerta prioritaria cuando un moderador o administrador aplica silencio forzado a un usuario.</li>
-            <li><b>📹 Cámara Web:</b> Indicador visual cuando un participante activa su señal de vídeo.</li>
-            <li><b>🖥️ Transmisión de Pantalla:</b> Indicador activo para transmisiones compartidas a 60 FPS.</li>
-          </ul>
-        </div>
-
-        <!-- 3. Minijuego CyberDefense / Mazmorras -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#a855f7;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>⚔️</span> 3. Mazmorras del Núcleo v1.8.0 (Combate y Botín)
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>🧲 Imán de Botín (Loot Magnet):</b> Las armas, armaduras y llaves en el suelo son atraídas magnéticamente hacia el explorador al acercarse a menos de 135px.</li>
-            <li><b>⚔️ Auto-equipamiento Inteligente:</b> Al recoger un arma o armadura con mejores estadísticas, se equipa al instante mostrando aviso en pantalla y recalculando el daño y vida.</li>
-            <li><b>🖱️ Recolección Multifunción:</b> Recoge botín caminando, haciendo clic directo sobre él o pulsando la tecla <b>E</b> o <b>F</b>.</li>
-            <li><b>♻️ Reciclaje de Duplicados:</b> Los objetos de combate repetidos se transforman automáticamente en +60 monedas sin saturar la mochila.</li>
-            <li><b>⚡ Separación Física Anti-Atasco:</b> Corrección total del congelamiento al colisionar con enemigos; ahora cuenta con repulsión elástica, invulnerabilidad táctica (i-frames con parpadeo) y loop protegido.</li>
-          </ul>
-        </div>
-
-        <!-- 4. Bóveda de Reliquias Rediseñada -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#eab308;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>🏛️</span> 4. Bóveda de Reliquias y Armario de Cosméticos
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>📑 Organización por Pestañas:</b> División limpia entre "Ruleta y Cofres" y "Mi Armario de Cosméticos" para eliminar la saturación visual.</li>
-            <li><b>🔍 Filtros de Colección:</b> Acceso rápido a Todos, Marcos de Avatar, Banners, Colores de Nombre y Títulos.</li>
-            <li><b>🖼️ Vistas Previas Reales:</b> Visualización en vivo de marcos animados sobre avatares, banners fluidos y títulos honoríficos.</li>
-            <li><b>👤 Aplicación Inmediata:</b> Marcos, títulos y colores visibles en chat, llamadas, lista de miembros y perfil.</li>
-          </ul>
-        </div>
-
-        <!-- 5. Seguridad y Moderación -->
-        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;">
-          <h2 style="color:#ef4444;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
-            <span>🛡️</span> 5. Moderación, Privacidad y Descargas Seguras
-          </h2>
-          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>🚨 Reporte de Usuarios:</b> Herramienta para reportar abusos o spam registrada de forma segura en la base de datos.</li>
-            <li><b>🚫 Bloqueo Estricto:</b> Enmascaramiento y rechazo de mensajes directos de usuarios bloqueados.</li>
-            <li><b>🔒 Descargas Seguras:</b> Cabeceras <code>Content-Disposition: attachment</code> y <code>X-Content-Type-Options: nosniff</code> en todos los adjuntos.</li>
-          </ul>
-        </div>
-      </div>
-    `;
   } else if (chKey === 'como_funciona') {
     container.innerHTML = `
       <div style="max-width:820px;margin:0 auto;">
@@ -1339,7 +1313,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.2', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.8.3', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -1399,6 +1373,14 @@ $('bTogglePass')?.addEventListener('click', (e) => {
 
 // ---------- avatares ----------
 const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd', '#00d2d3', '#ffa502', '#f59e0b', '#10b981', '#a855f7'];
+function nameColorStyle(col) {
+  if (!col) return '';
+  if (col.startsWith('linear-gradient') || col.startsWith('radial-gradient')) {
+    return `background:${col};-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;font-weight:800;`;
+  }
+  return `color:${col};font-weight:700;`;
+}
+
 const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
 const avCache = new Map(); const avWait = new Set();
 function avatar(u, size = 32, online) {
@@ -2476,7 +2458,7 @@ function renderMe() {
     h('div', { class: 'who', title: 'Editar perfil y estado de juego', onclick: modalProfile },
       avatar(S.me, 34, true),
       h('div', { style: 'min-width:0' },
-        h('b', null, S.me.name),
+        h('b', { style: nameColorStyle(localStorage.getItem('epickast.equipped_color') || S.me.color) }, S.me.name),
         h('small', { class: S.me.activity?.name ? 'act-live' : '' }, actTxt)
       )
     ),
@@ -2536,9 +2518,7 @@ function renderSide() {
   if (S.view.kind === 'guide') {
     $('sideTitle').replaceChildren(h('span', { style: 'font-weight:800;color:#c7d2fe;display:flex;align-items:center;gap:6px;' }, '📘 Guías Oficiales'));
     const sGuides = [
-      { key: 'notas_version_182', name: '🚀-notas-de-la-version-v182', title: 'Novedades v1.8.2: Dojo con Animaciones, DMs y Menciones' },
-      { key: 'notas_version_181', name: '📜-notas-de-la-version-v181', title: 'Historial de cambios v1.8.1' },
-      { key: 'notas_version', name: '📜-notas-de-la-version-v180', title: 'Historial de cambios v1.8.0' },
+      { key: 'notas_version', name: '🚀-notas-de-la-version', title: 'Registro histórico y novedades de versión de EpicKast' },
       { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, streaming, bot DJ y controles' },
       { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, roles y permisos' },
       { key: 'mazmorras', name: '⚔️-boveda-y-dojo-de-cartas', title: 'Bóveda de Reliquias, Dojo de Cartas y Recompensas' }
@@ -3277,6 +3257,37 @@ function modalProfile() {
     reader.readAsDataURL(f);
   } });
   const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
+  
+  // Cosméticos Desbloqueados de la Bóveda (Colores y Gradientes Prémium)
+  let unlockedCosmeticColors = [];
+  try {
+    const rawVault = localStorage.getItem('epickast.dungeon.v1');
+    if (rawVault) {
+      const vData = JSON.parse(rawVault);
+      const VAULT_COLORS = [
+        { id: 'color_aurora', name: 'Aurora Boreal', val: 'linear-gradient(90deg, #00e5ff, #a855f7)' },
+        { id: 'color_volcanic_flame', name: 'Fuego Volcánico', val: 'linear-gradient(90deg, #ff3366, #ffb300)' },
+        { id: 'color_amber', name: 'Ámbar Volcánico', val: '#f59e0b' },
+        { id: 'color_amethyst', name: 'Púrpura Amatista', val: '#a855f7' },
+        { id: 'color_emerald', name: 'Verde Esmeralda', val: '#10b981' },
+        { id: 'color_cyan', name: 'Cian Neón', val: '#06b6d4' },
+        { id: 'color_magma', name: 'Rojo Magma', val: '#ef4444' }
+      ];
+      unlockedCosmeticColors = VAULT_COLORS.filter(vc => vData.cosmetics && vData.cosmetics[vc.id]);
+    }
+  } catch {}
+
+  const vaultColorSwatches = unlockedCosmeticColors.length > 0 ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;' },
+    unlockedCosmeticColors.map(vc => h('button', {
+      style: `background:${vc.val};color:#fff;border:1.5px solid ${color === vc.val ? '#fff' : 'rgba(255,255,255,0.3)'};padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);text-shadow:0 1px 2px rgba(0,0,0,0.8);`,
+      onclick: () => {
+        color = vc.val;
+        pv.style.backgroundColor = vc.val.startsWith('linear') ? '#1e293b' : vc.val;
+        localStorage.setItem('epickast.equipped_color', vc.val);
+        toast(`Color equipado: ${vc.name}`);
+      }
+    }, '★ ' + vc.name))
+  ) : null;
   const BANNER_PRESETS = [
     { name: '💜 Púrpura Imperial', val: 'linear-gradient(135deg, #7c5cff, #4f46e5)' },
     { name: '🌊 Océano Cyan', val: 'linear-gradient(135deg, #06b6d4, #2563eb)' },
@@ -3298,7 +3309,8 @@ function modalProfile() {
   const autoChk = h('input', { type: 'checkbox', style: 'width:auto', checked: settings.autoGameDetect !== false });
   modal('Mi perfil y actividad',
     h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('button', { onclick: () => file.click() }, '📷 Subir foto'), h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'), file)),
-    h('label', null, 'Color del avatar y nombre', sws),
+    h('label', null, 'Color del avatar y nombre (Paleta Base)', sws),
+    vaultColorSwatches ? h('label', null, '✨ Colores y Gradientes Desbloqueados en la Bóveda', vaultColorSwatches) : null,
     h('label', null, 'Banner de perfil estilo Discord', bannerPreview, bannerSelect),
     h('label', null, 'Estado / Biografía', bio),
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
