@@ -181,36 +181,76 @@ function modalVault() {
   m.classList.remove('hidden');
   m.replaceChildren();
 
-  // Cargar datos locales de llaves del jugador y cosméticos
-  let dData = { coins: 50, keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 }, founderFrameUnlocked: false, cosmetics: {} };
+  // Cargar datos locales de llaves del jugador, cosméticos, polvo y piedad
+  let dData = {
+    coins: 50,
+    keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 },
+    dust: 0,
+    pity: { withoutEpic: 0, withoutLegendary: 0 },
+    dailyExchange: { date: new Date().toISOString().slice(0, 10), copper: 0, silver: 0 },
+    founderFrameUnlocked: false,
+    cosmetics: {}
+  };
+
   try {
     const raw = localStorage.getItem('epickast.dungeon.v1');
-    if (raw) dData = JSON.parse(raw);
-    if (!dData.cosmetics) dData.cosmetics = {};
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      dData = { ...dData, ...parsed };
+      if (!dData.cosmetics) dData.cosmetics = {};
+      if (!dData.pity) dData.pity = { withoutEpic: 0, withoutLegendary: 0 };
+      if (!dData.keys) dData.keys = { copper: 1, silver: 0, gold: 0, obsidian: 0 };
+    }
   } catch {}
 
-  // CATÁLOGO DE 8 COSMÉTICOS EXCLUSIVOS DE PERFIL (TEMPORADA 1)
+  const today = new Date().toISOString().slice(0, 10);
+  if (!dData.dailyExchange || dData.dailyExchange.date !== today) {
+    dData.dailyExchange = { date: today, copper: 0, silver: 0 };
+  }
+
+  // CATÁLOGO DE 26 COSMÉTICOS (REWARDS v2)
   const PROFILE_COSMETICS = [
-    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', rarity: 'gold', color: '#38bdf8', desc: 'Marco Azul Neón con insignia "FUNDADOR" para llamadas, chat y perfil.' },
-    { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#10b981', rarity: 'milspec', color: '#10b981', desc: 'Tu nombre y perfil resplandecen en verde esmeralda del Núcleo.' },
-    { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#a855f7', rarity: 'milspec', color: '#a855f7', desc: 'Tu nombre y perfil resplandecen en púrpura amatista místico.' },
-    { id: 'color_magma', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'milspec', color: '#f59e0b', desc: 'Tu nombre y perfil resplandecen en ámbar volcánico ardiente.' },
-    { id: 'banner_mines', name: 'Banner: Minas de Magma', type: 'banner', val: 'linear-gradient(135deg, #451a03, #b45309, #78350f)', rarity: 'restricted', color: '#8847ff', desc: 'Estandarte panorámico de magma y basalto para tu tarjeta de perfil.' },
-    { id: 'banner_amethyst', name: 'Banner: Galerías de Amatista', type: 'banner', val: 'linear-gradient(135deg, #2e1065, #7e22ce, #3b0764)', rarity: 'restricted', color: '#8847ff', desc: 'Estandarte de geodas púrpuras brillantes para tu tarjeta de perfil.' },
-    { id: 'banner_bridges', name: 'Banner: Puentes de Lava', type: 'banner', val: 'linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d)', rarity: 'classified', color: '#d32ce6', desc: 'Estandarte de los puentes de piedra sobre el abismo volcánico.' },
-    { id: 'banner_sanctum', name: 'Banner: Sagrario del Gólem', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'covert', color: '#ef4444', desc: 'Estandarte majestuoso del Santuario Central del Coloso de Obsidiana.' }
+    // Común (10)
+    { id: 'color_amber', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'common', desc: 'Tinte ígneo de magma ardiente para tu nombre y perfil.' },
+    { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#a855f7', rarity: 'common', desc: 'Resplandor amatista para tu nombre en la lista de miembros.' },
+    { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#10b981', rarity: 'common', desc: 'Tinte resplandeciente esmeralda del Núcleo.' },
+    { id: 'color_cyan', name: 'Color: Cian Neón', type: 'color', val: '#00e5ff', rarity: 'common', desc: 'Destello ciberpunk cian brillante para tu nombre.' },
+    { id: 'color_crimson', name: 'Color: Rojo Magma', type: 'color', val: '#ff3366', rarity: 'common', desc: 'Tono carmesí ardiente de roca fundida.' },
+    { id: 'banner_mines', name: 'Banner: Minas de Magma', type: 'banner', val: 'linear-gradient(135deg, #451a03, #b45309, #78350f)', rarity: 'common', desc: 'Estandarte de magma y basalto para tu tarjeta de perfil.' },
+    { id: 'banner_amethyst', name: 'Banner: Galerías de Amatista', type: 'banner', val: 'linear-gradient(135deg, #2e1065, #7e22ce, #3b0764)', rarity: 'common', desc: 'Estandarte de geodas púrpuras brillantes para tu tarjeta de perfil.' },
+    { id: 'banner_crypt', name: 'Banner: Cripta Ancestral', type: 'banner', val: 'linear-gradient(135deg, #09090b, #1e293b, #334155)', rarity: 'common', desc: 'Muros de piedra antigua y niebla espectral.' },
+    { id: 'banner_bridges', name: 'Banner: Puentes de Lava', type: 'banner', val: 'linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d)', rarity: 'common', desc: 'Puentes de piedra sobre el abismo volcánico.' },
+    { id: 'banner_sanctum', name: 'Banner: Sagrario del Núcleo', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'common', desc: 'Santuario central de obsidiana del Núcleo.' },
+    // Raro (7)
+    { id: 'frame_copper', name: 'Marco: Cobre Forjado', type: 'frame', val: 'frame-copper', rarity: 'rare', desc: 'Bisel de cobre bruñido para tu avatar.' },
+    { id: 'frame_silver', name: 'Marco: Plata Rúnica', type: 'frame', val: 'frame-silver', rarity: 'rare', desc: 'Bisel plateado brillante con runas grabadas.' },
+    { id: 'frame_amethyst', name: 'Marco: Geoda Amatista', type: 'frame', val: 'frame-amethyst', rarity: 'rare', desc: 'Cristales de amatista facetados que rodean tu avatar.' },
+    { id: 'title_explorer', name: 'Título: Explorador del Núcleo', type: 'title', val: 'Explorador del Núcleo', rarity: 'rare', desc: 'Distintivo para quienes descienden a las profundidades.' },
+    { id: 'title_smith', name: 'Título: Herrero de Magma', type: 'title', val: 'Herrero de Magma', rarity: 'rare', desc: 'Insignia rúnica de maestro forjador de reliquias.' },
+    { id: 'title_shadow', name: 'Título: Cazador de Sombras', type: 'title', val: 'Cazador de Sombras', rarity: 'rare', desc: 'Otorgado a quienes purgan las galerías oscuras.' },
+    { id: 'title_pioneer', name: 'Título: Pionero', type: 'title', val: 'Pionero', rarity: 'rare', desc: 'Título honorable para los primeros aventureros.' },
+    // Épico (5)
+    { id: 'color_aurora', name: 'Color: Aurora Boreal', type: 'color', val: 'linear-gradient(90deg, #00e5ff, #a855f7)', rarity: 'epic', desc: 'Gradiente animado estilo aurora boreal para tu nombre.' },
+    { id: 'color_volcanic_flame', name: 'Color: Fuego Volcánico', type: 'color', val: 'linear-gradient(90deg, #ff3366, #ffb300)', rarity: 'epic', desc: 'Gradiente ardiente en movimiento continuo.' },
+    { id: 'banner_fluid_lava', name: 'Banner: Lava Fluida', type: 'banner', val: 'linear-gradient(135deg, #7f1d1d, #ea580c, #f59e0b, #991b1b)', rarity: 'epic', desc: 'Banner con ondulación fluida de lava fundida.' },
+    { id: 'banner_rune_storm', name: 'Banner: Tormenta Rúnica', type: 'banner', val: 'linear-gradient(135deg, #1e1b4b, #6366f1, #a855f7, #312e81)', rarity: 'epic', desc: 'Estandarte cósmico con rayos de energía púrpura.' },
+    { id: 'frame_runic', name: 'Marco: Partículas Rúnicas', type: 'frame', val: 'frame-runic', rarity: 'epic', desc: 'Marco pulsante con chispas mágicas alrededor de tu avatar.' },
+    // Legendario (4)
+    { id: 'frame_colossus_legend', name: 'Marco: Núcleo del Coloso', type: 'frame', val: 'frame-colossus-legend', rarity: 'legendary', desc: 'Doble halo dorado y cian con rotación continua.' },
+    { id: 'banner_golem_animated', name: 'Banner: Despertar del Gólem', type: 'banner', val: 'linear-gradient(135deg, #18181b, #701a75, #b91c1c, #450a0a)', rarity: 'legendary', desc: 'Estandarte animado del coloso de obsidiana despertando.' },
+    { id: 'title_colossus_slayer', name: 'Título: Coloso Caído', type: 'title', val: 'Coloso Caído', rarity: 'legendary', desc: 'Título resplandeciente reservado para quienes derriban al Gólem.' },
+    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia \"FUNDADOR\" para llamadas, chat y perfil (Prestigio Edición 1).' }
   ];
 
-  const CHEST_REWARDS = {
-    copper: PROFILE_COSMETICS.filter(c => c.type === 'color'),
-    silver: PROFILE_COSMETICS.filter(c => c.type === 'color' || c.id === 'banner_mines' || c.id === 'banner_amethyst'),
-    gold: PROFILE_COSMETICS.filter(c => c.type === 'color' || c.type === 'banner'),
-    obsidian: PROFILE_COSMETICS
+  const RARITY_COLORS = { common: '#4b69ff', rare: '#8847ff', epic: '#d32ce6', legendary: '#fbbf24' };
+  const CHEST_ODDS = {
+    copper: { common: 0.80, rare: 0.17, epic: 0.03, legendary: 0.00 },
+    silver: { common: 0.55, rare: 0.33, epic: 0.11, legendary: 0.01 },
+    gold: { common: 0.25, rare: 0.45, epic: 0.25, legendary: 0.05 },
+    obsidian: { common: 0.00, rare: 0.40, epic: 0.45, legendary: 0.15 }
   };
-
-  const RARITY_COLORS = {
-    milspec: '#4b69ff', restricted: '#8847ff', classified: '#d32ce6', covert: '#ef4444', gold: '#fbbf24'
-  };
+  const DUST_DUPLICATE = { common: 2, rare: 8, epic: 20, legendary: 50 };
+  const DUST_CRAFT = { common: 40, rare: 120, epic: 300, legendary: 800 };
 
   let selectedTier = 'copper';
   if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
@@ -219,21 +259,30 @@ function modalVault() {
 
   let isSpinning = false;
 
-  // DIÁLOGO RESPONSIVE CON MAX-WIDTH Y OVERFLOW SUAVE
   const wrap = h('div', {
     class: 'cd-crate-dialog',
-    style: 'box-sizing:border-box;background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:16px;width:min(780px, 94vw);max-height:88vh;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;'
+    style: 'box-sizing:border-box;background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:16px;width:min(800px, 95vw);max-height:88vh;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;'
   });
   m.appendChild(wrap);
+
+  const saveState = () => {
+    try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+  };
 
   const equipCosmeticItem = (item) => {
     if (!item) return;
     if (item.type === 'frame') {
-      localStorage.setItem('epickast.equipped_frame', 'founder_blue');
+      localStorage.setItem('epickast.equipped_frame', item.val);
+      rpc('profile.set', { frame: item.val }).catch(() => {});
+      if (S.me) S.me.frame = item.val;
       document.querySelectorAll('.avatar').forEach(a => {
-        if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder');
+        if (Number(a.dataset.uid) === S.me?.id) {
+          a.className = a.className.replace(/\bframe-\S+/g, '').trim();
+          if (item.val === 'founder_blue') a.classList.add('frame-founder');
+          else a.classList.add(item.val);
+        }
       });
-      toast('✨ Marco de Avatar FUNDADOR equipado');
+      toast(`✨ Marco equipado: ${item.name}`);
     } else if (item.type === 'color') {
       localStorage.setItem('epickast.equipped_color', item.val);
       rpc('profile.set', { color: item.val }).catch(() => {});
@@ -244,6 +293,11 @@ function modalVault() {
       rpc('profile.set', { banner: item.val }).catch(() => {});
       if (S.me) S.me.banner = item.val;
       toast(`✨ Banner equipado: ${item.name}`);
+    } else if (item.type === 'title') {
+      localStorage.setItem('epickast.equipped_title', item.val);
+      rpc('profile.set', { title: item.val }).catch(() => {});
+      if (S.me) S.me.title = item.val;
+      toast(`✨ Título equipado: ${item.name}`);
     }
     renderMe();
     renderMembers();
@@ -251,18 +305,79 @@ function modalVault() {
     renderCosmeticsGrid();
   };
 
+  // Roll de rareza con sistema de piedad integrado
+  const rollRarity = (tierKey) => {
+    const odds = { ...CHEST_ODDS[tierKey] };
+
+    // 1. Piedad dura Legendario (60)
+    if ((dData.pity.withoutLegendary || 0) >= 59) {
+      return 'legendary';
+    }
+
+    // 2. Piedad suave Legendario (desde 35)
+    if ((dData.pity.withoutLegendary || 0) >= 35) {
+      const extra = (dData.pity.withoutLegendary - 34) * 0.015;
+      odds.legendary = Math.min(1.0, odds.legendary + extra);
+      let rem = extra;
+      if (odds.common >= rem) { odds.common -= rem; rem = 0; }
+      else { rem -= odds.common; odds.common = 0; odds.rare = Math.max(0, odds.rare - rem); }
+    }
+
+    // 3. Garantía de Épico (10)
+    if ((dData.pity.withoutEpic || 0) >= 9) {
+      const r = Math.random();
+      if (r < odds.legendary) return 'legendary';
+      return 'epic';
+    }
+
+    const r = Math.random();
+    let acc = 0;
+    for (const rar of ['common', 'rare', 'epic', 'legendary']) {
+      acc += odds[rar] || 0;
+      if (r <= acc) return rar;
+    }
+    return 'legendary';
+  };
+
   const renderContent = () => {
+    const curOdds = CHEST_ODDS[selectedTier] || CHEST_ODDS.copper;
+    const oddsText = `Común ${(curOdds.common*100).toFixed(0)}% • Raro ${(curOdds.rare*100).toFixed(0)}% • Épico ${(curOdds.epic*100).toFixed(0)}% • Legendario ${(curOdds.legendary*100).toFixed(0)}%`;
+
     wrap.innerHTML = `
-      <!-- Cabecera Compacta -->
+      <!-- Cabecera Compacta con Métricas de Piedad y Polvo -->
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;">
         <div style="min-width:0;padding-right:8px;">
           <h2 style="color:#fbbf24;font-size:16px;font-weight:900;letter-spacing:0.5px;margin:0 0 2px 0;">🏛️ BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
-          <p style="color:#94a3b8;font-size:11px;margin:0;">Abre cofres con llaves ganadas en las mazmorras (Temporada 1 • Rotación Mensual).</p>
+          <p style="color:#94a3b8;font-size:11px;margin:0;">
+            Abre cofres con llaves de mazmorra (Temporada 1 • Rotación Mensual).
+          </p>
         </div>
-        <button id="vCloseBtn" class="cd-btn" style="flex-shrink:0;background:#334155;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-size:11.5px;font-weight:700;">✕ Cerrar</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <button id="vCloseBtn" class="cd-btn" style="background:#334155;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-size:11.5px;font-weight:700;">✕ Cerrar</button>
+        </div>
       </div>
 
-      <!-- Pestañas de Selección de Cofre Responsivas (4 Columnas) -->
+      <!-- Barra de Estado: Polvo de Reliquia, Monedas y Piedad -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#0d0918;border:1px solid #2d1d44;padding:8px 12px;border-radius:8px;flex-shrink:0;font-size:11px;">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span>🪙 Monedas: <b style="color:#fbbf24;" id="vCoinCount">${dData.coins || 0}</b></span>
+          <span>✨ Polvo de Reliquia: <b style="color:#a855f7;" id="vDustCount">${dData.dust || 0}</b></span>
+          <span title="Garantía de Épico cada 10 aperturas y Legendario a las 60 aperturas">
+            🛡️ Piedad: <b style="color:#38bdf8;">${dData.pity?.withoutLegendary || 0}/60</b> sin Legendario
+          </span>
+        </div>
+        <!-- Canje de Monedas con Límite Diario -->
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button id="vBtnBuyCopper" style="background:#78350f;border:1px solid #d97706;color:#fde047;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;">
+            🪙 Canjear Cobre (150 Monedas) [${3 - (dData.dailyExchange.copper || 0)}/3 hoy]
+          </button>
+          <button id="vBtnBuySilver" style="background:#1e293b;border:1px solid #cbd5e1;color:#f1f5f9;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;">
+            🪙 Canjear Plata (500 Monedas) [${1 - (dData.dailyExchange.silver || 0)}/1 hoy]
+          </button>
+        </div>
+      </div>
+
+      <!-- Pestañas de Selección de Cofre (4 Columnas) -->
       <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;flex-shrink:0;width:100%;">
         <button class="vTabBtn" data-tier="copper" style="box-sizing:border-box;background:${selectedTier==='copper'?'#2e1f0e':'#130e1d'};border:2px solid ${selectedTier==='copper'?'#d97706':'#33224b'};color:#fde047;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
           🥉 Cobre<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></span>
@@ -274,11 +389,16 @@ function modalVault() {
           🥇 Oro<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></span>
         </button>
         <button class="vTabBtn" data-tier="obsidian" style="box-sizing:border-box;background:${selectedTier==='obsidian'?'#27123d':'#130e1d'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#33224b'};color:#c084fc;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
-          💎 Núcleo<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
+          💎 Obsidiana<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
         </button>
       </div>
 
-      <!-- Ruleta Horizontal con flex-shrink:0 y min-height garantizado -->
+      <!-- Banner de Probabilidades del Cofre Seleccionado -->
+      <div style="font-size:10px;color:#94a3b8;text-align:center;flex-shrink:0;background:rgba(0,0,0,0.3);padding:3px;border-radius:4px;">
+        📊 <b>Probabilidades del Cofre:</b> ${oddsText}
+      </div>
+
+      <!-- Ruleta Horizontal con min-height:130px asegurado -->
       <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:130px;min-height:130px;flex-shrink:0;background:#08050e;border:2px solid #ca8a04;border-radius:8px;overflow:hidden;box-shadow:inset 0 0 24px #000;box-sizing:border-box;">
         <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:22px;z-index:20;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9));">▼</div>
         <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(to bottom, #fbbf24, rgba(251,191,36,0.15));transform:translateX(-50%);z-index:15;pointer-events:none;"></div>
@@ -292,18 +412,22 @@ function modalVault() {
         </button>
       </div>
 
-      <!-- Área de Ganador Desbloqueado -->
+      <!-- Área de Ganador Desbloqueado o Duplicado Reciclado en Polvo -->
       <div id="vWinnerArea" style="display:none;flex-shrink:0;padding:12px;background:#181126;border:2px solid #38bdf8;border-radius:8px;text-align:center;box-shadow:0 0 25px rgba(56,189,248,0.25);"></div>
 
       <!-- Catálogo de Cosméticos Responsivo -->
       <div style="border-top:1px solid #291b3b;padding-top:10px;flex-shrink:0;">
-        <h3 style="color:#e2e8f0;font-size:12px;font-weight:800;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.8px;">
-          🎨 Mis Cosméticos de Perfil (Temporada 1 • Minas de Magma)
-        </h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <h3 style="color:#e2e8f0;font-size:12px;font-weight:800;margin:0;text-transform:uppercase;letter-spacing:0.8px;">
+            🎨 Catálogo de Cosméticos (Temporada 1 • 26 Objetos)
+          </h3>
+          <span style="font-size:10.5px;color:#94a3b8;">Desbloquea con llaves o fabrica con Polvo de Reliquia</span>
+        </div>
         <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(145px, 1fr));gap:8px;width:100%;box-sizing:border-box;"></div>
       </div>
     `;
 
+    // Cerrar modal
     wrap.querySelector('#vCloseBtn').onclick = () => {
       if (!isSpinning) {
         m.classList.add('hidden');
@@ -311,18 +435,64 @@ function modalVault() {
       }
     };
 
+    // Canjes de monedas
+    const buyCopBtn = wrap.querySelector('#vBtnBuyCopper');
+    if (buyCopBtn) {
+      buyCopBtn.onclick = () => {
+        if ((dData.dailyExchange.copper || 0) >= 3) {
+          toast('Has alcanzado el límite diario de canjes de Cobre (3/3)');
+          return;
+        }
+        if ((dData.coins || 0) < 150) {
+          toast('Necesitas 150 monedas para este canje');
+          return;
+        }
+        dData.coins -= 150;
+        dData.keys.copper = (dData.keys.copper || 0) + 1;
+        dData.dailyExchange.copper = (dData.dailyExchange.copper || 0) + 1;
+        saveState();
+        ringer.beep([600, 800], 0.05, 0.1);
+        toast('✓ 1 Llave de Cobre canjeada');
+        renderContent();
+        populatePreview();
+      };
+    }
+
+    const buySilBtn = wrap.querySelector('#vBtnBuySilver');
+    if (buySilBtn) {
+      buySilBtn.onclick = () => {
+        if ((dData.dailyExchange.silver || 0) >= 1) {
+          toast('Has alcanzado el límite diario de canjes de Plata (1/1)');
+          return;
+        }
+        if ((dData.coins || 0) < 500) {
+          toast('Necesitas 500 monedas para este canje');
+          return;
+        }
+        dData.coins -= 500;
+        dData.keys.silver = (dData.keys.silver || 0) + 1;
+        dData.dailyExchange.silver = (dData.dailyExchange.silver || 0) + 1;
+        saveState();
+        ringer.beep([700, 950], 0.05, 0.1);
+        toast('✓ 1 Llave de Plata canjeada');
+        renderContent();
+        populatePreview();
+      };
+    }
+
+    // Pestañas de cofres
     wrap.querySelectorAll('.vTabBtn').forEach(btn => {
       btn.onclick = () => {
         if (isSpinning) return;
         selectedTier = btn.dataset.tier;
         renderContent();
         populatePreview();
-        renderCosmeticsGrid();
       };
     });
 
     renderCosmeticsGrid();
 
+    // Lógica de apertura
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
       spinBtn.onclick = () => {
@@ -331,29 +501,64 @@ function modalVault() {
         spinBtn.disabled = true;
         wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
 
+        // Consumir llave
         dData.keys[selectedTier]--;
-        try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+
+        // Determinar rareza ganadora con sistema de piedad
+        const wonRarity = rollRarity(selectedTier);
+
+        // Actualizar contadores de piedad
+        if (wonRarity === 'legendary') {
+          dData.pity.withoutLegendary = 0;
+          dData.pity.withoutEpic = 0;
+        } else if (wonRarity === 'epic') {
+          dData.pity.withoutEpic = 0;
+          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+        } else {
+          dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
+          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+        }
+
+        // Selección de item dentro de la rareza
+        const candidates = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
+        const unowned = candidates.filter(c => !dData.cosmetics?.[c.id] && !(c.id === 'founder_frame' && dData.founderFrameUnlocked));
+        
+        let winner;
+        let isDuplicate = false;
+        if (unowned.length > 0) {
+          winner = unowned[Math.floor(Math.random() * unowned.length)];
+        } else {
+          // Ya tiene todos los de esa rareza -> otorgar duplicado convertido en Polvo
+          winner = candidates[Math.floor(Math.random() * candidates.length)];
+          isDuplicate = true;
+        }
+
+        saveState();
 
         const cntEl = wrap.querySelector(`#keyCnt${selectedTier[0].toUpperCase() + selectedTier.slice(1)}`);
         if (cntEl) cntEl.textContent = dData.keys[selectedTier] || 0;
 
-        const pool = CHEST_REWARDS[selectedTier] || CHEST_REWARDS.copper;
-        let winner;
-        if (selectedTier === 'obsidian') {
-          winner = !dData.founderFrameUnlocked 
-            ? pool.find(i => i.id === 'founder_frame') || pool[0]
-            : pool[Math.floor(Math.random() * pool.length)];
-        } else if (selectedTier === 'gold') {
-          winner = pool[Math.floor(Math.random() * pool.length)];
-        } else {
-          winner = pool[Math.floor(Math.random() * pool.length)];
-        }
-
+        // Construcción de la ruleta con 50 cartas generadas con las probabilidades REALES del cofre
         const totalCards = 50;
         const winnerIndex = 40;
         const cards = [];
+        const chestOdds = CHEST_ODDS[selectedTier];
+
         for (let i = 0; i < totalCards; i++) {
-          cards.push(i === winnerIndex ? winner : pool[Math.floor(Math.random() * pool.length)]);
+          if (i === winnerIndex) {
+            cards.push(winner);
+          } else {
+            // Sorteo de carta de la cinta según probabilidades reales del cofre
+            const r = Math.random();
+            let chosenRar = 'common';
+            let acc = 0;
+            for (const rar of ['common', 'rare', 'epic', 'legendary']) {
+              acc += chestOdds[rar] || 0;
+              if (r <= acc) { chosenRar = rar; break; }
+            }
+            const pool = PROFILE_COSMETICS.filter(c => c.rarity === chosenRar);
+            cards.push(pool.length ? pool[Math.floor(Math.random() * pool.length)] : candidates[0]);
+          }
         }
 
         const track = wrap.querySelector('#vTrack');
@@ -361,9 +566,11 @@ function modalVault() {
           const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
           let visualPreview = '';
           if (c.type === 'frame') {
-            visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin:2px 0;">★</div>';
+            visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 6px ' + rColor + ';display:grid;place-items:center;font-size:9px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
           } else if (c.type === 'color') {
             visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${c.val};box-shadow:0 0 8px ${c.val};margin:2px 0;"></div>`;
+          } else if (c.type === 'title') {
+            visualPreview = `<div style="font-size:9px;font-weight:800;color:${rColor};padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
           } else {
             visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${c.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
           }
@@ -376,7 +583,7 @@ function modalVault() {
           `;
         }).join('');
 
-        const cardWidth = 123; // 115px + 8px gap
+        const cardWidth = 123;
         const viewportWidth = wrap.querySelector('#vRouletteViewport')?.clientWidth || 720;
         const jitter = (Math.random() - 0.5) * 30;
         const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + jitter;
@@ -385,38 +592,45 @@ function modalVault() {
         track.style.transform = 'translateX(0px)';
         track.offsetHeight;
 
-        const duration = 5200;
+        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const duration = prefersReduced ? 400 : 5200;
         const startTime = performance.now();
         let lastTick = -1;
 
-        const tickInt = setInterval(() => {
-          const elap = performance.now() - startTime;
-          if (elap >= duration) { clearInterval(tickInt); return; }
-          const p = 1 - Math.pow(1 - (elap / duration), 3);
-          const curX = p * targetOffset;
-          const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
-          if (curCard !== lastTick && curCard < totalCards) {
-            lastTick = curCard;
-            ringer.beep([950], 0.035, 0.08);
-          }
-        }, 25);
+        let tickInt = null;
+        if (!prefersReduced) {
+          tickInt = setInterval(() => {
+            const elap = performance.now() - startTime;
+            if (elap >= duration) { clearInterval(tickInt); return; }
+            const p = 1 - Math.pow(1 - (elap / duration), 3);
+            const curX = p * targetOffset;
+            const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
+            if (curCard !== lastTick && curCard < totalCards) {
+              lastTick = curCard;
+              ringer.beep([950], 0.035, 0.08);
+            }
+          }, 25);
+        }
 
         track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
         track.style.transform = `translateX(-${targetOffset}px)`;
 
         setTimeout(() => {
+          if (tickInt) clearInterval(tickInt);
           isSpinning = false;
           wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
           ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
 
-          if (!dData.cosmetics) dData.cosmetics = {};
-          dData.cosmetics[winner.id] = true;
-
-          if (winner.id === 'founder_frame') {
-            dData.founderFrameUnlocked = true;
+          if (!isDuplicate) {
+            if (!dData.cosmetics) dData.cosmetics = {};
+            dData.cosmetics[winner.id] = true;
+            if (winner.id === 'founder_frame') dData.founderFrameUnlocked = true;
+          } else {
+            const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
+            dData.dust = (dData.dust || 0) + dustAward;
           }
 
-          try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+          saveState();
 
           const winnerArea = wrap.querySelector('#vWinnerArea');
           const rColor = RARITY_COLORS[winner.rarity] || '#4b69ff';
@@ -428,30 +642,52 @@ function modalVault() {
             previewHtml = `<div style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${winner.val};box-shadow:0 0 10px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
           } else if (winner.type === 'banner') {
             previewHtml = `<div style="display:inline-block;width:64px;height:20px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
+          } else if (winner.type === 'title') {
+            previewHtml = `<span style="font-size:18px;vertical-align:middle;margin-right:8px;">👑</span>`;
           } else {
-            previewHtml = '<span style="font-size:20px;vertical-align:middle;margin-right:8px;">👑</span>';
+            previewHtml = '<span style="font-size:20px;vertical-align:middle;margin-right:8px;">⭐</span>';
           }
 
-          winnerArea.innerHTML = `
-            <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🎉 ¡RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})</div>
-            <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
-              ${previewHtml} <span>${winner.name}</span>
-            </div>
-            <div style="font-size:11px;color:#cbd5e1;max-width:540px;margin:0 auto 10px auto;">${winner.desc}</div>
-            <div>
-              <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.4);letter-spacing:0.5px;">
-                ✨ EQUIPAR AHORA MISMO
-              </button>
-            </div>
-          `;
+          if (isDuplicate) {
+            const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
+            winnerArea.innerHTML = `
+              <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+                ♻️ ¡COSMÉTICO REPETIDO! (${winner.rarity.toUpperCase()})
+              </div>
+              <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
+                ${previewHtml} <span>${winner.name}</span>
+              </div>
+              <div style="font-size:12px;color:#c084fc;font-weight:700;margin-bottom:6px;">
+                ✨ Convertido automáticamente en +${dustAward} Polvo de Reliquia (Total: ${dData.dust})
+              </div>
+              <div style="font-size:11px;color:#94a3b8;max-width:540px;margin:0 auto 10px auto;">
+                Usa tu Polvo de Reliquia para fabricar cualquier cosmético bloqueado en el catálogo inferior.
+              </div>
+            `;
+          } else {
+            winnerArea.innerHTML = `
+              <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+                🎉 ¡NUEVA RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})
+              </div>
+              <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
+                ${previewHtml} <span>${winner.name}</span>
+              </div>
+              <div style="font-size:11px;color:#cbd5e1;max-width:540px;margin:0 auto 10px auto;">${winner.desc}</div>
+              <div>
+                <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.4);letter-spacing:0.5px;">
+                  ✨ EQUIPAR AHORA MISMO
+                </button>
+              </div>
+            `;
 
-          const equipBtn = winnerArea.querySelector('#vBtnEquipWinner');
-          if (equipBtn) {
-            equipBtn.onclick = () => {
-              equipCosmeticItem(winner);
-              equipBtn.textContent = '✓ ¡EQUIPADO EN TU PERFIL!';
-              equipBtn.style.background = '#047857';
-            };
+            const equipBtn = winnerArea.querySelector('#vBtnEquipWinner');
+            if (equipBtn) {
+              equipBtn.onclick = () => {
+                equipCosmeticItem(winner);
+                equipBtn.textContent = '✓ ¡EQUIPADO EN TU PERFIL!';
+                equipBtn.style.background = '#047857';
+              };
+            }
           }
 
           spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
@@ -461,8 +697,11 @@ function modalVault() {
             ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})`
             : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`;
 
+          const dCountEl = wrap.querySelector('#vDustCount');
+          if (dCountEl) dCountEl.textContent = dData.dust || 0;
+
           renderCosmeticsGrid();
-        }, duration + 200);
+        }, duration + 150);
       };
     }
   };
@@ -475,24 +714,42 @@ function modalVault() {
     const eqFrame = localStorage.getItem('epickast.equipped_frame');
     const eqColor = localStorage.getItem('epickast.equipped_color') || S.me?.color;
     const eqBanner = localStorage.getItem('epickast.equipped_banner') || S.me?.banner;
+    const eqTitle = localStorage.getItem('epickast.equipped_title') || S.me?.title;
 
     PROFILE_COSMETICS.forEach(c => {
       const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
-      const isEquipped = (c.type === 'frame' && eqFrame === 'founder_blue') ||
+      const isEquipped = (c.type === 'frame' && eqFrame === c.val) ||
                          (c.type === 'color' && eqColor === c.val) ||
-                         (c.type === 'banner' && eqBanner === c.val);
+                         (c.type === 'banner' && eqBanner === c.val) ||
+                         (c.type === 'title' && eqTitle === c.val);
 
       const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
+      const craftCost = DUST_CRAFT[c.rarity] || 40;
+      const canCraft = !isUnlocked && (dData.dust || 0) >= craftCost;
+
       const card = document.createElement('div');
-      card.style.cssText = `box-sizing:border-box;background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;opacity:${isUnlocked ? '1' : '0.45'};`;
+      card.style.cssText = `box-sizing:border-box;background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;opacity:${isUnlocked ? '1' : '0.75'};position:relative;`;
 
       let preview = '';
       if (c.type === 'frame') {
-        preview = '<div style="font-size:10px;color:#38bdf8;font-weight:700;">⭐ Marco Azul Animado</div>';
+        preview = `<div style="font-size:10px;color:${rColor};font-weight:700;">★ Marco ${c.name.split(':')[1]||c.name}</div>`;
       } else if (c.type === 'color') {
-        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:10px;color:${c.val};font-weight:700;">Muestra</span></div>`;
+        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:10px;color:#cbd5e1;font-weight:700;">Muestra</span></div>`;
+      } else if (c.type === 'title') {
+        preview = `<div style="font-size:9.5px;color:${rColor};font-weight:800;background:rgba(255,255,255,0.06);padding:2px 4px;border-radius:3px;">👑 ${c.val}</div>`;
       } else {
         preview = `<div style="height:16px;border-radius:3px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>`;
+      }
+
+      let actionHtml = '';
+      if (isEquipped) {
+        actionHtml = '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:default;">✓ Equipado</button>';
+      } else if (isUnlocked) {
+        actionHtml = '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;">Equipar</button>';
+      } else if (canCraft) {
+        actionHtml = `<button class="vCraftBtn" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;" title="Fabricar este cosmético permanente usando Polvo de Reliquia">🔨 Fabricar (${craftCost} ✨)</button>`;
+      } else {
+        actionHtml = `<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:9.5px;font-weight:700;padding:4px;border-radius:4px;cursor:not-allowed;" title="Desbloquea abriendo cofres o consigue ${craftCost} Polvo de Reliquia">🔒 Bloqueado (${craftCost} ✨)</button>`;
       }
 
       card.innerHTML = `
@@ -500,17 +757,30 @@ function modalVault() {
         <div style="font-size:10.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
         ${preview}
         <div style="margin-top:auto;padding-top:2px;">
-          ${isEquipped 
-            ? '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:default;">✓ Equipado</button>'
-            : isUnlocked 
-              ? '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;">Equipar</button>'
-              : '<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:9.5px;font-weight:700;padding:4px;border-radius:4px;cursor:not-allowed;">🔒 Bloqueado</button>'}
+          ${actionHtml}
         </div>
       `;
 
       const eqBtn = card.querySelector('.vEqBtn');
       if (eqBtn) {
         eqBtn.onclick = () => equipCosmeticItem(c);
+      }
+
+      const craftBtn = card.querySelector('.vCraftBtn');
+      if (craftBtn) {
+        craftBtn.onclick = () => {
+          if ((dData.dust || 0) < craftCost) return;
+          dData.dust -= craftCost;
+          if (!dData.cosmetics) dData.cosmetics = {};
+          dData.cosmetics[c.id] = true;
+          if (c.id === 'founder_frame') dData.founderFrameUnlocked = true;
+          saveState();
+          ringer.beep([523, 659, 784], 0.06, 0.12);
+          toast(`✨ ¡Has fabricado: ${c.name}!`);
+          equipCosmeticItem(c);
+          renderContent();
+          populatePreview();
+        };
       }
 
       grid.appendChild(card);
@@ -522,15 +792,16 @@ function modalVault() {
     if (!track) return;
     track.style.transition = 'none';
     track.style.transform = 'translateX(0px)';
-    const pool = CHEST_REWARDS[selectedTier] || CHEST_REWARDS.copper;
-    const sample = pool.concat(pool).concat(pool);
+    const sample = PROFILE_COSMETICS.slice(0, 16);
     track.innerHTML = sample.map(item => {
       const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
       let visualPreview = '';
       if (item.type === 'frame') {
-        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin:2px 0;">★</div>';
+        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 6px ' + rColor + ';display:grid;place-items:center;font-size:9px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
       } else if (item.type === 'color') {
         visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${item.val};box-shadow:0 0 8px ${item.val};margin:2px 0;"></div>`;
+      } else if (item.type === 'title') {
+        visualPreview = `<div style="font-size:9px;font-weight:800;color:${rColor};padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
       } else {
         visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${item.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
       }
@@ -694,26 +965,55 @@ function renderGuideContent(chKey) {
           </ul>
         </div>
 
-        <!-- Llaves y Bóveda -->
+        <!-- Llaves y Bóveda v2 -->
         <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;">🔑 Llaves Criptográficas y Bóveda de Reliquias</h2>
-          <p style="font-size:13px;color:#cbd5e1;margin:0 0 8px 0;">
-            Las llaves tienen una <b>probabilidad reducida de aparición</b> porque desbloquean cosméticos permanentes para tu perfil en la app:
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;">🔑 Sistema de Recompensas v2 y Probabilidades Reales</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            EpicKast garantiza <b>cero apuestas con dinero real</b>. Todas las llaves se ganan jugando. La ruleta se rige por probabilidades matemáticas transparentes y verificadas:
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
-            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #78350f;color:#d97706;">
-              🥉 <b>Llave de Cobre:</b> Abre Cofres Rústicos.
-            </div>
-            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #475569;color:#cbd5e1;">
-              🥈 <b>Llave de Plata:</b> Abre Sagrarios de Plata.
-            </div>
-            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #ca8a04;color:#fbbf24;">
-              🥇 <b>Llave de Oro:</b> Abre Cofres Reales Dorados.
-            </div>
-            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #7e22ce;color:#c084fc;">
-              💎 <b>Llave de Obsidiana:</b> Otorga garantizado el Marco de Fundador.
-            </div>
+          <div style="overflow-x:auto;margin-bottom:12px;">
+            <table style="width:100%;font-size:11.5px;border-collapse:collapse;text-align:center;background:#090611;border-radius:6px;overflow:hidden;">
+              <thead>
+                <tr style="background:#1a1329;color:#e2e8f0;font-weight:800;">
+                  <th style="padding:6px;text-align:left;">Cofre / Llave</th>
+                  <th style="padding:6px;color:#4b69ff;">Común</th>
+                  <th style="padding:6px;color:#8847ff;">Raro</th>
+                  <th style="padding:6px;color:#d32ce6;">Épico</th>
+                  <th style="padding:6px;color:#fbbf24;">Legendario</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-top:1px solid #221736;">
+                  <td style="padding:6px;text-align:left;color:#d97706;font-weight:700;">🥉 Cobre</td>
+                  <td>80%</td><td>17%</td><td>3%</td><td>0%</td>
+                </tr>
+                <tr style="border-top:1px solid #221736;">
+                  <td style="padding:6px;text-align:left;color:#cbd5e1;font-weight:700;">🥈 Plata</td>
+                  <td>55%</td><td>33%</td><td>11%</td><td>1%</td>
+                </tr>
+                <tr style="border-top:1px solid #221736;">
+                  <td style="padding:6px;text-align:left;color:#fbbf24;font-weight:700;">🥇 Oro</td>
+                  <td>25%</td><td>45%</td><td>25%</td><td>5%</td>
+                </tr>
+                <tr style="border-top:1px solid #221736;">
+                  <td style="padding:6px;text-align:left;color:#c084fc;font-weight:700;">💎 Obsidiana</td>
+                  <td>0%</td><td>40%</td><td>45%</td><td>15%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
+
+          <h3 style="color:#38bdf8;font-size:13px;font-weight:800;margin:10px 0 6px 0;">🛡️ Garantía de Piedad (Protección Anti-Mala Suerte)</h3>
+          <ul style="font-size:12px;color:#94a3b8;padding-left:18px;margin:0 0 10px 0;">
+            <li><b>Garantía de Épico:</b> Cada 10 aperturas seguidas sin Épico ni Legendario, la siguiente es garantizada de calidad Épica o superior.</li>
+            <li><b>Piedad Suave Legendaria:</b> Desde la apertura 35 sin Legendario, la probabilidad aumenta progresivamente (+1.5% por apertura).</li>
+            <li><b>Piedad Dura Legendaria:</b> En la apertura 60 sin Legendario, ¡el siguiente cosmético es Legendario 100% asegurado!</li>
+          </ul>
+
+          <h3 style="color:#a855f7;font-size:13px;font-weight:800;margin:10px 0 6px 0;">✨ Polvo de Reliquia (Cero Duplicados Inútiles)</h3>
+          <p style="font-size:12px;color:#cbd5e1;margin:0 0 6px 0;">
+            Si obtienes un cosmético que ya posees en tu colección, se desintegra automáticamente en <b>Polvo de Reliquia</b> (+2 Común, +8 Raro, +20 Épico, +50 Legendario). Puedes usar este polvo para fabricar cualquier cosmético bloqueado que elijas.
+          </p>
         </div>
 
         <!-- Catálogo de Cosméticos de Temporada 1 -->
@@ -898,8 +1198,11 @@ const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
 const avCache = new Map(); const avWait = new Set();
 function avatar(u, size = 32, online) {
   const isMe = u && S.me && (u.id === S.me.id);
-  const hasFounder = (isMe && localStorage.getItem('epickast.equipped_frame') === 'founder_blue') || u?.frame === 'founder_blue';
-  const el = h('div', { class: 'avatar' + (hasFounder ? ' frame-founder' : ''), style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
+  const myFrame = isMe ? localStorage.getItem('epickast.equipped_frame') : u?.frame;
+  let frameClass = '';
+  if (myFrame === 'founder_blue') frameClass = ' frame-founder';
+  else if (myFrame && myFrame.startsWith('frame-')) frameClass = ' ' + myFrame;
+  const el = h('div', { class: 'avatar' + frameClass, style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
   if (online !== undefined) el.append(h('span', { class: 'st' + (online ? ' on' : '') }));
   paintAvatar(el); return el;
 }
@@ -1994,7 +2297,7 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.8';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.9';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -2703,6 +3006,8 @@ function modalProfile() {
     h('label', null, 'Estado / Biografía', bio),
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
     h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
+    h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-4px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).'),
+    h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-4px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).'),
     h('button', { class: 'primary', onclick: async () => {
       settings.customActivity = customAct.value.trim();
       settings.autoGameDetect = autoChk.checked;
@@ -3330,7 +3635,8 @@ async function modalSettings() {
     accVideo,
     accShortcuts,
     accVisual,
-    accAccount
+    accAccount,
+    accAbout
   );
 }
 

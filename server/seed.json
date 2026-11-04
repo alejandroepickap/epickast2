@@ -1,5 +1,5 @@
 {
-  "ts": 1793739787278,
+  "ts": 1793816586212,
   "users": [
     {
       "id": 1,
@@ -11,6 +11,8 @@
       "banner": null,
       "bio": "probando",
       "av": 1793656492215,
+      "frame": null,
+      "title": null,
       "created": 1793651836586
     },
     {
@@ -23,6 +25,8 @@
       "banner": null,
       "bio": null,
       "av": 0,
+      "frame": null,
+      "title": null,
       "created": 1793652086214
     },
     {
@@ -35,6 +39,8 @@
       "banner": null,
       "bio": null,
       "av": 0,
+      "frame": null,
+      "title": null,
       "created": 1793670866078
     },
     {
@@ -47,79 +53,9 @@
       "banner": null,
       "bio": null,
       "av": 0,
+      "frame": null,
+      "title": null,
       "created": 1793675891094
-    },
-    {
-      "id": 5,
-      "name": "ana_1793737587856",
-      "salt": "a19d2e28131a3aaa0c62149c4496f04a",
-      "hash": "ce21b3a1c5292f997a0c7b6d7692982cdd4774504f66eb438a677cc57beb8f78",
-      "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
-      "color": "#ff8800",
-      "banner": null,
-      "bio": "hola",
-      "av": 1793737588156,
-      "created": 1793737587886
-    },
-    {
-      "id": 6,
-      "name": "beto_1793737587856",
-      "salt": "64741773b1f569a0e1dc6a6bf1e10a37",
-      "hash": "d04e1cfe8c3aefbd505aa11a02485c69aa594d46025ce11098347a2be6e713b9",
-      "avatar": null,
-      "color": null,
-      "banner": null,
-      "bio": null,
-      "av": 0,
-      "created": 1793737587929
-    },
-    {
-      "id": 7,
-      "name": "ana_1793738561001",
-      "salt": "d24c15e2f392747a515d81c1a08de6e4",
-      "hash": "2e280246124cff9f7422c7268823c87c65158d39480a53fc746ca71db7ad8987",
-      "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
-      "color": "#ff8800",
-      "banner": null,
-      "bio": "hola",
-      "av": 1793738561288,
-      "created": 1793738561030
-    },
-    {
-      "id": 8,
-      "name": "beto_1793738561001",
-      "salt": "47b0579f52f9bee601eb548f55065987",
-      "hash": "a8fbcc1964ca11aeeaadd46fafbc4d5556521cb84f9fa49d92a874c33558e99a",
-      "avatar": null,
-      "color": null,
-      "banner": null,
-      "bio": null,
-      "av": 0,
-      "created": 1793738561064
-    },
-    {
-      "id": 9,
-      "name": "ana_1793739786681",
-      "salt": "a63adeea7cfc4a673fd165f6778d586b",
-      "hash": "bc82d34c8924b5ba4fcdec757ed0529d3b4d1372ae9d8853a2723e7177f5bd7d",
-      "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==",
-      "color": "#ff8800",
-      "banner": null,
-      "bio": "hola",
-      "av": 1793739786967,
-      "created": 1793739786711
-    },
-    {
-      "id": 10,
-      "name": "beto_1793739786681",
-      "salt": "5ceeaf2ebe681631efe6d526dbbc4093",
-      "hash": "e6b18745308962b1ad4debf4f9e302d00494d0b0bfdd559edace6a141571a97c",
-      "avatar": null,
-      "color": null,
-      "banner": null,
-      "bio": null,
-      "av": 0,
-      "created": 1793739786742
     }
   ],
   "friends": [
@@ -136,21 +72,6 @@
     {
       "a": 1,
       "b": 4,
-      "status": "accepted"
-    },
-    {
-      "a": 5,
-      "b": 6,
-      "status": "accepted"
-    },
-    {
-      "a": 7,
-      "b": 8,
-      "status": "accepted"
-    },
-    {
-      "a": 9,
-      "b": 10,
       "status": "accepted"
     }
   ],
@@ -175,27 +96,6 @@
       "owner": 4,
       "invite": "2c98b697eb",
       "created": 1793677128557
-    },
-    {
-      "id": 4,
-      "name": "Mi Server",
-      "owner": 5,
-      "invite": "3ba89800d5",
-      "created": 1793737588265
-    },
-    {
-      "id": 5,
-      "name": "Mi Server",
-      "owner": 7,
-      "invite": "050e8542ba",
-      "created": 1793738561380
-    },
-    {
-      "id": 6,
-      "name": "Mi Server",
-      "owner": 9,
-      "invite": "ef5783e071",
-      "created": 1793739787059
     }
   ],
   "members": [
@@ -223,36 +123,6 @@
       "server_id": 3,
       "user_id": 4,
       "role": "owner"
-    },
-    {
-      "server_id": 4,
-      "user_id": 5,
-      "role": "owner"
-    },
-    {
-      "server_id": 4,
-      "user_id": 6,
-      "role": "admin"
-    },
-    {
-      "server_id": 5,
-      "user_id": 7,
-      "role": "owner"
-    },
-    {
-      "server_id": 5,
-      "user_id": 8,
-      "role": "admin"
-    },
-    {
-      "server_id": 6,
-      "user_id": 9,
-      "role": "owner"
-    },
-    {
-      "server_id": 6,
-      "user_id": 10,
-      "role": "admin"
     }
   ],
   "channels": [
@@ -339,132 +209,6 @@
       "name": "🎵 Música & YouTube",
       "type": "voice",
       "user_limit": 0
-    },
-    {
-      "id": 13,
-      "server_id": 4,
-      "name": "general",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 14,
-      "server_id": 4,
-      "name": "multimedia-y-links",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 15,
-      "server_id": 4,
-      "name": "🔊 Sala General",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 16,
-      "server_id": 4,
-      "name": "🎮 Gaming Squad",
-      "type": "voice",
-      "user_limit": 5
-    },
-    {
-      "id": 17,
-      "server_id": 4,
-      "name": "🎵 Música & YouTube",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 18,
-      "server_id": 4,
-      "name": "🔒 Sala Duo",
-      "type": "voice",
-      "user_limit": 2
-    },
-    {
-      "id": 19,
-      "server_id": 5,
-      "name": "general",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 20,
-      "server_id": 5,
-      "name": "multimedia-y-links",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 21,
-      "server_id": 5,
-      "name": "🔊 Sala General",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 22,
-      "server_id": 5,
-      "name": "🎮 Gaming Squad",
-      "type": "voice",
-      "user_limit": 5
-    },
-    {
-      "id": 23,
-      "server_id": 5,
-      "name": "🎵 Música & YouTube",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 24,
-      "server_id": 5,
-      "name": "🔒 Sala Duo",
-      "type": "voice",
-      "user_limit": 2
-    },
-    {
-      "id": 25,
-      "server_id": 6,
-      "name": "general",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 26,
-      "server_id": 6,
-      "name": "multimedia-y-links",
-      "type": "text",
-      "user_limit": 0
-    },
-    {
-      "id": 27,
-      "server_id": 6,
-      "name": "🔊 Sala General",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 28,
-      "server_id": 6,
-      "name": "🎮 Gaming Squad",
-      "type": "voice",
-      "user_limit": 5
-    },
-    {
-      "id": 29,
-      "server_id": 6,
-      "name": "🎵 Música & YouTube",
-      "type": "voice",
-      "user_limit": 0
-    },
-    {
-      "id": 30,
-      "server_id": 6,
-      "name": "🔒 Sala Duo",
-      "type": "voice",
-      "user_limit": 2
     }
   ],
   "bans": []

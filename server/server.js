@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS file_ch ON files(channel,id);
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, channel TEXT, user_id INTEGER, text TEXT, ts INTEGER, file_id INTEGER);
 CREATE INDEX IF NOT EXISTS msg_ch ON messages(channel,id);
 `);
-for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
@@ -48,7 +48,7 @@ const SEED_FILE = path.join(__dirname, 'seed.json');
 
 function saveBackup() {
   try {
-    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,created FROM users');
+    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created FROM users');
     const friends = all('SELECT a,b,status FROM friends');
     const servers = all('SELECT id,name,owner,invite,created FROM servers');
     const members = all('SELECT server_id,user_id,role FROM members');
@@ -76,8 +76,8 @@ function restoreBackup() {
       const data = JSON.parse(fs.readFileSync(target, 'utf8'));
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
-          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
-            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.created || Date.now());
+          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.frame || null, u.title || null, u.created || Date.now());
         }
         if (Array.isArray(data.bans)) {
           for (const b of data.bans) {
@@ -164,8 +164,8 @@ function presenceAudience(uid) {
   return [...s, ...friendIds(uid)];
 }
 
-const selfView = (id) => ({ ...get('SELECT id,name,color,banner,bio,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
-const profileOf = (id) => ({ ...(get('SELECT color,banner,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
+const selfView = (id) => ({ ...get('SELECT id,name,color,banner,bio,frame,title,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
+const profileOf = (id) => ({ ...(get('SELECT color,banner,frame,title,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
 function roomUsers(key) {
   const r = rooms.get(key);
   return r ? [...r.entries()].map(([id, v]) => ({ id, name: v.name, state: v.state, ...profileOf(id) })) : [];
@@ -742,24 +742,26 @@ const H = {
   },
   'call.decline': (ws, d) => { const r = rings.get(d.key); if (r && r.to === ws.user.id) stopRing(d.key, 'declined'); },
   'profile.set': (ws, d) => {
-    const cur = get('SELECT avatar,color,banner,bio,av FROM users WHERE id=?', ws.user.id);
+    const cur = get('SELECT avatar,color,banner,bio,frame,title,av FROM users WHERE id=?', ws.user.id);
     let { avatar, av } = cur;
     if (d.avatar !== undefined) {
       if (d.avatar === null || d.avatar === '') { avatar = null; av = Date.now(); }
       else if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(d.avatar)) && d.avatar.length <= 60000) { avatar = d.avatar; av = Date.now(); }
       else fail('Imagen inválida o demasiado grande');
     }
-    const color = d.color !== undefined ? (/^#[0-9a-f]{6}$/i.test(d.color) ? d.color : fail('Color inválido')) : cur.color;
+    const color = d.color !== undefined ? ((/^#[0-9a-f]{6}$/i.test(d.color) || /^linear-gradient\([^;]+\)$/i.test(d.color)) ? clean(d.color, 140) : fail('Color inválido')) : cur.color;
     const banner = d.banner !== undefined ? (d.banner ? clean(d.banner, 160) : null) : (cur.banner || null);
     const bio = d.bio !== undefined ? clean(d.bio, 120) : cur.bio;
-    run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,av=? WHERE id=?', avatar, color, banner, bio, av, ws.user.id);
-    const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, av: avatar ? av : 0 };
+    const frame = d.frame !== undefined ? (d.frame ? clean(d.frame, 40) : null) : (cur.frame || null);
+    const title = d.title !== undefined ? (d.title ? clean(d.title, 60) : null) : (cur.title || null);
+    run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,frame=?,title=?,av=? WHERE id=?', avatar, color, banner, bio, frame, title, av, ws.user.id);
+    const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, frame, title, av: avatar ? av : 0 };
     toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'profile.changed', profile: pub });
     return pub;
   },
   'profile.get': (ws, d) => {
-    const u = get('SELECT id,name,color,banner,bio,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
-    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, av: u.avatar ? u.av : 0 };
+    const u = get('SELECT id,name,color,banner,bio,frame,title,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
+    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, frame: u.frame || null, title: u.title || null, av: u.avatar ? u.av : 0 };
   },
   'profile.avatar': (ws, d) => ({ avatar: get('SELECT avatar FROM users WHERE id=?', Number(d.id))?.avatar || null }),
   'voice.leave': (ws) => leaveRoom(ws),
@@ -849,6 +851,7 @@ function releaseInfo() {
   const ghExe = directExe || `https://github.com/alejandroepickap/epickast2/releases/download/v${version}/EpicKast-Instalador.exe`;
   return {
     version,
+    min_client_version: '1.7.0',
     file: file || `EpicKast-v${version}-Amigos.zip`,
     exeFile: exeFile || 'EpicKast-Instalador.exe',
     downloadPath: '/download/latest',
@@ -1100,6 +1103,7 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
       'content-length': f.size,
       'cache-control': 'public, max-age=31536000, immutable',
       'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(f.name)}"`,
+      'x-content-type-options': 'nosniff',
     });
     return fs.createReadStream(fp).pipe(res);
   }

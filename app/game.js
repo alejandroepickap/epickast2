@@ -1,4 +1,4 @@
-// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (Beta v1.7.6 Pro)
+// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (Beta v1.7.9 Pro)
 // Action-RPG de Mazmorras Cooperativo con 5 Niveles y Navegación entre Plantas:
 // - Nivel 1: Entrada de las Minas de Magma (Mineros Zombi, llaves de cobre)
 // - Nivel 2: Galerías de Amatista (Zombis + Arqueros Esqueléticos, llaves de plata)
@@ -450,7 +450,7 @@
               <span style="font-size:24px;">🌋</span>
               <div>
                 <strong id="dFloorTitle" style="color:#f8fafc; font-size:15px; letter-spacing:0.5px;">Dungeons of the Core • Nivel 1</strong>
-                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">BETA v1.7.8</span>
+                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">BETA v1.7.9</span>
               </div>
             </div>
 
@@ -1405,6 +1405,63 @@
         const pX = (this.floor === 3 ? 660 : (this.floor === 4 || this.floor === 5 ? 384 : 620));
         this.portal = { x: pX, y: 240, active: true };
         AudioFX.portalOpen();
+
+        // Recompensa de Monedas por Despejar Planta
+        const floorCoins = [20, 30, 45, 60, 100][this.floor - 1] || 25;
+        this.data.coins += floorCoins;
+        this.spawnFloatingText(this.player.x, this.player.y - 28, `🪙 +${floorCoins} Monedas (Planta ${this.floor})`, '#fde047', 14);
+
+        // Sistema de Llaves Criptográficas (Drop por Planta con Tope Diario de 20)
+        const todayStr = new Date().toISOString().slice(0, 10);
+        if (!this.data.dailyKeys || this.data.dailyKeys.date !== todayStr) {
+          this.data.dailyKeys = { date: todayStr, count: 0 };
+        }
+
+        const dropKeyIfUnderCap = (tierKey, label) => {
+          if ((this.data.dailyKeys.count || 0) >= 20) {
+            this.data.coins += 25;
+            this.spawnFloatingText(this.player.x, this.player.y - 42, 'Tope diario de llaves (20/20) +25 🪙', '#fde047', 12);
+            return;
+          }
+          this.data.dailyKeys.count = (this.data.dailyKeys.count || 0) + 1;
+          this.droppedKeys.push({ x: pX + (Math.random() - 0.5) * 40, y: 240 + (Math.random() - 0.5) * 40, tier: tierKey, bob: 0 });
+          this.spawnFloatingText(this.player.x, this.player.y - 45, `🔑 ¡Llave de ${label}!`, KEY_TIERS[tierKey].color, 14);
+        };
+
+        const rKey = Math.random();
+        if (this.floor === 1) {
+          if (rKey < 0.60) dropKeyIfUnderCap('copper', 'Cobre');
+        } else if (this.floor === 2) {
+          if (rKey < 0.10) dropKeyIfUnderCap('silver', 'Plata');
+          else if (rKey < 0.90) dropKeyIfUnderCap('copper', 'Cobre');
+        } else if (this.floor === 3) {
+          if (rKey < 0.25) dropKeyIfUnderCap('silver', 'Plata');
+          dropKeyIfUnderCap('copper', 'Cobre');
+        } else if (this.floor === 4) {
+          if (rKey < 0.10) dropKeyIfUnderCap('gold', 'Oro');
+          else if (rKey < 0.70) dropKeyIfUnderCap('silver', 'Plata');
+        } else if (this.floor === 5) {
+          dropKeyIfUnderCap('silver', 'Plata');
+          if (rKey < 0.10) dropKeyIfUnderCap('obsidian', 'Obsidiana');
+          else if (rKey < 0.40) dropKeyIfUnderCap('gold', 'Oro');
+
+          // Bono semanal del Gólem
+          const dNow = new Date();
+          dNow.setHours(0,0,0,0);
+          dNow.setDate(dNow.getDate() + 4 - (dNow.getDay() || 7));
+          const yStart = new Date(dNow.getFullYear(), 0, 1);
+          const curWeek = `${dNow.getFullYear()}-W${Math.ceil((((dNow - yStart) / 86400000) + 1) / 7)}`;
+
+          if (!this.data.weeklyGolem || this.data.weeklyGolem.week !== curWeek) {
+            this.data.weeklyGolem = { week: curWeek, killed: true };
+            this.droppedKeys.push({ x: pX + 25, y: 240, tier: 'obsidian', bob: 0 });
+            this.spawnFloatingText(this.player.x, this.player.y - 60, '💎 ¡BONO SEMANAL: LLAVE DE OBSIDIANA GARANTIZADA!', '#c084fc', 15);
+          }
+        }
+
+        saveDungeonData(this.data);
+        this.updateUi();
+
         this.promptEl.style.display = 'block';
         if (this.floor < this.maxFloors) {
           this.promptEl.innerHTML = `🌀 <b>¡Planta ${this.floor} Despejada!</b> Entra al Portal para descender a <b>Nivel ${this.floor + 1}</b>`;
@@ -1440,7 +1497,9 @@
     }
 
     handleEnemyDeath(en) {
-      this.data.coins += (en.type === 'golem_boss' ? 300 : 25);
+      const coinDrop = en.type === 'golem_boss' ? 150 : (en.type === 'skeleton_archer' ? 5 : 2);
+      this.data.coins += coinDrop;
+      this.spawnFloatingText(en.x, en.y - 16, `+${coinDrop} 🪙`, '#fde047', 12);
       AudioFX.hitEnemy();
 
       for (let i = 0; i < 10; i++) {

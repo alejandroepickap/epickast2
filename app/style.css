@@ -389,6 +389,61 @@ body.mini-mode .party-tile .yt-direct{width:100%!important;height:100%!important
   pointer-events: none;
   z-index: 5;
 }
+.avatar.frame-copper {
+  box-shadow: 0 0 0 2px #d97706, 0 0 8px rgba(217, 119, 6, 0.6) !important;
+}
+.avatar.frame-silver {
+  box-shadow: 0 0 0 2px #cbd5e1, 0 0 8px rgba(203, 213, 225, 0.7) !important;
+}
+.avatar.frame-amethyst {
+  box-shadow: 0 0 0 2px #a855f7, 0 0 10px rgba(168, 85, 247, 0.7) !important;
+}
+.avatar.frame-runic {
+  box-shadow: 0 0 0 2px #ec4899, 0 0 12px rgba(236, 72, 153, 0.8) !important;
+  animation: pulse-runic-glow 2s infinite alternate;
+}
+.avatar.frame-colossus-legend {
+  box-shadow: 0 0 0 2.5px #fbbf24, 0 0 16px rgba(251, 191, 36, 0.9) !important;
+  animation: pulse-legend-glow 2s infinite alternate;
+}
+@keyframes pulse-runic-glow {
+  0% { box-shadow: 0 0 0 2px #ec4899, 0 0 6px rgba(236, 72, 153, 0.5); }
+  100% { box-shadow: 0 0 0 2.5px #f43f5e, 0 0 14px rgba(244, 63, 94, 0.95); }
+}
+@keyframes pulse-legend-glow {
+  0% { box-shadow: 0 0 0 2px #fbbf24, 0 0 8px rgba(251, 191, 36, 0.5); }
+  100% { box-shadow: 0 0 0 3px #fde047, 0 0 18px rgba(253, 224, 71, 0.95); }
+}
+.user-title-badge {
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-left: 6px;
+  background: rgba(124, 92, 255, 0.2);
+  border: 1px solid #7c5cff;
+  color: #c084fc;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+.user-title-badge.legendary {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: #fbbf24;
+  color: #fde047;
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .roulette-track {
+    transition: none !important;
+  }
+}
 @keyframes pulse-founder-glow {
   0% { box-shadow: 0 0 0 2px #0284c7, 0 0 6px rgba(56, 189, 248, 0.5); }
   100% { box-shadow: 0 0 0 2.5px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.95); }

@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.7.8",
+  "version": "1.7.9",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": {
     "name": "EpicKap",
@@ -27,6 +27,7 @@
     "asar": true,
     "files": [
       "app/**/*",
+      "rewards.config.json",
       "package.json",
       "!node_modules/**/*"
     ],
