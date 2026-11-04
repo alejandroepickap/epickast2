@@ -11,3 +11,5 @@ docs/rea-evidence/*.evidence.json
 docs/rea-evidence/epickast_app_analysis.json
 
 !Desinstalar-EpicKast.bat
+
+instalador/
