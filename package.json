@@ -3,7 +3,10 @@
   "productName": "EpicKast",
   "version": "1.7.8",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
-  "author": "EpicKap",
+  "author": {
+    "name": "EpicKap",
+    "email": "soporte@epickap.com"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/alejandroepickap/epickast2.git"
@@ -15,7 +18,8 @@
     "server": "node server/server.js",
     "test": "node tools/smoke-test.js",
     "pack:friends": "electron-builder --win nsis zip --x64",
-    "pack:store": "electron-builder --win appx --x64"
+    "pack:store": "electron-builder --win appx --x64",
+    "pack:linux": "electron-builder --linux tar.gz deb --x64"
   },
   "build": {
     "appId": "com.epickap.epickast",
@@ -69,6 +73,19 @@
         "es",
         "en-US"
       ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Network;Chat",
+      "target": [
+        "tar.gz",
+        "deb"
+      ],
+      "maintainer": "EpicKap <soporte@epickap.com>"
+    },
+    "deb": {
+      "packageCategory": "net",
+      "priority": "optional"
     }
   },
   "dependencies": {
