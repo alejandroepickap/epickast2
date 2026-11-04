@@ -17,10 +17,28 @@ const UPLOADS = path.join(DATA, 'uploads');
 const MAX_ROOM = Number(process.env.EPICKAST_MAX_ROOM) || 8; // malla P2P: cada par extra cuesta una codificación de video
 const MAX_UPLOAD = 25 * 1024 * 1024; // 25 MB por archivo
 
-const rewardsConfigPath = path.join(__dirname, '..', 'rewards.config.json');
+const rewardCandidatePaths = [
+  path.join(__dirname, '..', 'rewards.config.json'),
+  path.join(__dirname, 'rewards.config.json'),
+  path.join(process.cwd(), 'rewards.config.json'),
+  '/app/rewards.config.json',
+  '/app/server/rewards.config.json'
+];
 let rewardsConfig = {};
-try { rewardsConfig = JSON.parse(fs.readFileSync(rewardsConfigPath, 'utf8')); }
-catch (e) { console.error('[server] Error cargando rewards.config.json:', e); }
+for (const p of rewardCandidatePaths) {
+  if (fs.existsSync(p)) {
+    try {
+      rewardsConfig = JSON.parse(fs.readFileSync(p, 'utf8'));
+      console.log(`[server] Configuración de recompensas cargada desde ${p}`);
+      break;
+    } catch (e) {
+      console.error(`[server] Error parseando ${p}:`, e.message);
+    }
+  }
+}
+if (!rewardsConfig.chests) {
+  console.warn('[server] Advertencia: rewards.config.json no encontrado en rutas candidatas.');
+}
 
 fs.mkdirSync(UPLOADS, { recursive: true });
 
@@ -90,49 +108,46 @@ async function restoreBackup() {
       data = JSON.parse(fs.readFileSync(target, 'utf8'));
     }
     if (data) {
-      try {
-        db.exec("DELETE FROM users WHERE name LIKE 'ana_%' OR name LIKE 'beto_%'");
-        db.exec("DELETE FROM servers WHERE name = 'Mi Server'");
-      } catch {}
+// clean restore
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
           run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.frame || null, u.title || null, u.created || Date.now(),
-            u.coins || 0, u.dust || 0, u.keys_copper || 0, u.keys_silver || 0, u.keys_gold || 0, u.keys_obsidian || 0,
-            u.pity_epic || 0, u.pity_legendary || 0, u.daily_keys_date || '', u.daily_keys_count || 0,
-            u.daily_exchange_date || '', u.daily_exchange_copper || 0, u.daily_exchange_silver || 0,
-            u.unlocked_cosmetics || '[]', u.weekly_boss_claimed_week || 0
+            u.id ?? null, u.name ?? '', u.salt ?? '', u.hash ?? '', u.avatar ?? null, u.color ?? null, u.banner ?? null, u.bio ?? null, u.av ?? 0, u.frame ?? null, u.title ?? null, u.created ?? Date.now(),
+            u.coins ?? 0, u.dust ?? 0, u.keys_copper ?? 0, u.keys_silver ?? 0, u.keys_gold ?? 0, u.keys_obsidian ?? 0,
+            u.pity_epic ?? 0, u.pity_legendary ?? 0, u.daily_keys_date ?? '', u.daily_keys_count ?? 0,
+            u.daily_exchange_date ?? '', u.daily_exchange_copper ?? 0, u.daily_exchange_silver ?? 0,
+            u.unlocked_cosmetics ?? '[]', u.weekly_boss_claimed_week ?? 0
           );
         }
       }
       if (Array.isArray(data.bans)) {
         for (const b of data.bans) {
-          run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id, b.user_id, b.reason || '', b.banned_by || null, b.created || Date.now());
+          run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id ?? null, b.user_id ?? null, b.reason ?? '', b.banned_by ?? null, b.created ?? Date.now());
         }
       }
       if (Array.isArray(data.friends)) {
         for (const f of data.friends) {
-          run('INSERT OR IGNORE INTO friends(a,b,status) VALUES(?,?,?)', f.a, f.b, f.status);
+          run('INSERT OR IGNORE INTO friends(a,b,status) VALUES(?,?,?)', f.a ?? null, f.b ?? null, f.status ?? 'accepted');
         }
       }
       if (Array.isArray(data.servers)) {
         for (const s of data.servers) {
-          run('INSERT OR IGNORE INTO servers(id,name,owner,invite,created) VALUES(?,?,?,?,?)', s.id, s.name, s.owner, s.invite, s.created || Date.now());
+          run('INSERT OR IGNORE INTO servers(id,name,owner,invite,created) VALUES(?,?,?,?,?)', s.id ?? null, s.name ?? '', s.owner ?? null, s.invite ?? '', s.created ?? Date.now());
         }
       }
       if (Array.isArray(data.members)) {
         for (const m of data.members) {
-          run('INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,?)', m.server_id, m.user_id, m.role || 'member');
+          run('INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,?)', m.server_id ?? null, m.user_id ?? null, m.role ?? 'member');
         }
       }
       if (Array.isArray(data.channels)) {
         for (const c of data.channels) {
-          run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id, c.server_id, c.name, c.type, c.user_limit || 0);
+          run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id ?? null, c.server_id ?? null, c.name ?? '', c.type ?? 'text', c.user_limit ?? 0);
         }
       }
       if (Array.isArray(data.blocks)) {
         for (const blk of data.blocks) {
-          run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id, blk.blocked_id, blk.ts || Date.now());
+          run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id ?? null, blk.blocked_id ?? null, blk.ts ?? Date.now());
         }
       }
       console.log(`[backup] Restaurados ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores.`);
