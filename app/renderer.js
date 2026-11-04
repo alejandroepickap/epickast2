@@ -239,7 +239,7 @@ function modalVault() {
     { id: 'frame_colossus_legend', name: 'Marco: Núcleo del Coloso', type: 'frame', val: 'frame-colossus-legend', rarity: 'legendary', desc: 'Doble halo dorado y cian con rotación continua.' },
     { id: 'banner_golem_animated', name: 'Banner: Despertar del Gólem', type: 'banner', val: 'linear-gradient(135deg, #18181b, #701a75, #b91c1c, #450a0a)', rarity: 'legendary', desc: 'Estandarte animado del coloso de obsidiana despertando.' },
     { id: 'title_colossus_slayer', name: 'Título: Coloso Caído', type: 'title', val: 'Coloso Caído', rarity: 'legendary', desc: 'Título resplandeciente reservado para quienes derriban al Gólem.' },
-    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia \"FUNDADOR\" para llamadas, chat y perfil (Prestigio Edición 1).' }
+    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia "FUNDADOR" para llamadas, chat y perfil (Prestigio Edición 1).' }
   ];
 
   const RARITY_COLORS = { common: '#4b69ff', rare: '#8847ff', epic: '#d32ce6', legendary: '#fbbf24' };
@@ -252,6 +252,8 @@ function modalVault() {
   const DUST_DUPLICATE = { common: 2, rare: 8, epic: 20, legendary: 50 };
   const DUST_CRAFT = { common: 40, rare: 120, epic: 300, legendary: 800 };
 
+  let activeTab = 'roulette'; // 'roulette' | 'collection'
+  let activeFilter = 'all';    // 'all' | 'frame' | 'banner' | 'color' | 'title'
   let selectedTier = 'copper';
   if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
   else if ((dData.keys.gold || 0) > 0) selectedTier = 'gold';
@@ -261,7 +263,7 @@ function modalVault() {
 
   const wrap = h('div', {
     class: 'cd-crate-dialog',
-    style: 'box-sizing:border-box;background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:16px;width:min(800px, 95vw);max-height:88vh;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:10px;'
+    style: 'box-sizing:border-box;background:#0d0918;border:2px solid #ca8a04;border-radius:14px;padding:20px;width:min(860px, 95vw);max-height:90vh;box-shadow:0 0 60px rgba(0,0,0,0.95);color:#fff;font-family:system-ui,sans-serif;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:14px;'
   });
   m.appendChild(wrap);
 
@@ -283,8 +285,7 @@ function modalVault() {
           v.unlockedCosmetics.forEach(id => { dData.cosmetics[id] = true; });
         }
         saveState();
-        renderContent();
-        populatePreview();
+        renderView();
       }
     }).catch(() => {});
   }
@@ -302,27 +303,27 @@ function modalVault() {
           else a.classList.add(item.val);
         }
       });
-      toast(`✨ Marco equipado: ${item.name}`);
+      toast(`✨ Marco de avatar equipado: ${item.name}`);
     } else if (item.type === 'color') {
       localStorage.setItem('epickast.equipped_color', item.val);
       rpc('profile.set', { color: item.val }).catch(() => {});
       if (S.me) S.me.color = item.val;
-      toast(`✨ Color equipado: ${item.name}`);
+      toast(`✨ Color de nombre equipado: ${item.name}`);
     } else if (item.type === 'banner') {
       localStorage.setItem('epickast.equipped_banner', item.val);
       rpc('profile.set', { banner: item.val }).catch(() => {});
       if (S.me) S.me.banner = item.val;
-      toast(`✨ Banner equipado: ${item.name}`);
+      toast(`✨ Banner de perfil equipado: ${item.name}`);
     } else if (item.type === 'title') {
       localStorage.setItem('epickast.equipped_title', item.val);
       rpc('profile.set', { title: item.val }).catch(() => {});
       if (S.me) S.me.title = item.val;
-      toast(`✨ Título equipado: ${item.name}`);
+      toast(`✨ Título honorífico equipado: ${item.name}`);
     }
     renderMe();
     renderMembers();
     renderSide();
-    renderCosmeticsGrid();
+    renderView();
   };
 
   // Roll de rareza con sistema de piedad integrado
@@ -359,243 +360,275 @@ function modalVault() {
     return 'legendary';
   };
 
-  const renderContent = () => {
+  const renderView = () => {
     const curOdds = CHEST_ODDS[selectedTier] || CHEST_ODDS.copper;
     const oddsText = `Común ${(curOdds.common*100).toFixed(0)}% • Raro ${(curOdds.rare*100).toFixed(0)}% • Épico ${(curOdds.epic*100).toFixed(0)}% • Legendario ${(curOdds.legendary*100).toFixed(0)}%`;
 
+    // Conteo de desbloqueados
+    const unlockedCount = PROFILE_COSMETICS.filter(c => (dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked)).length;
+    const pctUnlocked = Math.round((unlockedCount / PROFILE_COSMETICS.length) * 100);
+
     wrap.innerHTML = `
-      <!-- Cabecera Compacta con Métricas de Piedad y Polvo -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;">
-        <div style="min-width:0;padding-right:8px;">
-          <h2 style="color:#fbbf24;font-size:16px;font-weight:900;letter-spacing:0.5px;margin:0 0 2px 0;">🏛️ BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
-          <p style="color:#94a3b8;font-size:11px;margin:0;">
-            Abre cofres con llaves de mazmorra (Temporada 1 • Rotación Mensual).
-          </p>
+      <!-- CABECERA PRINCIPAL CON NAVEGACIÓN POR PESTAÑAS -->
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-shrink:0;border-bottom:1px solid #23163a;padding-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:28px;">🏛️</span>
+          <div>
+            <h2 style="color:#fbbf24;font-size:17px;font-weight:900;letter-spacing:0.5px;margin:0 0 2px 0;">BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
+            <p style="color:#94a3b8;font-size:11.5px;margin:0;">Temporada 1 • Cosméticos permanentes para chat, llamadas y perfil.</p>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-          <button id="vCloseBtn" class="cd-btn" style="background:#334155;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-size:11.5px;font-weight:700;">✕ Cerrar</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="display:flex;background:#1a1029;border:1px solid #33204d;border-radius:8px;padding:3px;">
+            <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#2563eb':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:6px;transition:0.15s;">
+              <span>🎁</span> Ruleta y Cofres
+            </button>
+            <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#2563eb':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:none;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:6px;transition:0.15s;">
+              <span>🎨</span> Mi Armario (${unlockedCount}/26)
+            </button>
+          </div>
+          <button id="vCloseBtn" style="background:#241d3e;color:#cbd5e1;padding:6px 14px;border-radius:8px;cursor:pointer;border:1px solid #3d2d66;font-size:12px;font-weight:800;">✕ Cerrar</button>
         </div>
       </div>
 
-      <!-- Barra de Estado: Polvo de Reliquia, Monedas y Piedad -->
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;background:#0d0918;border:1px solid #2d1d44;padding:8px 12px;border-radius:8px;flex-shrink:0;font-size:11px;">
-        <div style="display:flex;gap:12px;align-items:center;">
-          <span>🪙 Monedas: <b style="color:#fbbf24;" id="vCoinCount">${dData.coins || 0}</b></span>
-          <span>✨ Polvo de Reliquia: <b style="color:#a855f7;" id="vDustCount">${dData.dust || 0}</b></span>
-          <span title="Garantía de Épico cada 10 aperturas y Legendario a las 60 aperturas">
-            🛡️ Piedad: <b style="color:#38bdf8;">${dData.pity?.withoutLegendary || 0}/60</b> sin Legendario
-          </span>
+      <!-- BARRA DE RECURSOS ESPACIOSA (MONEDAS, POLVO, PIEDAD) -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:#130c22;border:1px solid #2d1d44;padding:10px 16px;border-radius:10px;flex-shrink:0;font-size:12px;">
+        <div style="display:flex;gap:16px;align-items:center;">
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">🪙</span> <span>Monedas:</span> <b style="color:#fbbf24;font-size:13px;" id="vCoinCount">${dData.coins || 0}</b></div>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">✨</span> <span>Polvo de Reliquia:</span> <b style="color:#c084fc;font-size:13px;" id="vDustCount">${dData.dust || 0}</b></div>
+          <div style="display:flex;align-items:center;gap:6px;" title="Garantía de Épico cada 10 y Legendario a las 60 aperturas">
+            <span style="font-size:16px;">🛡️</span> <span>Piedad:</span> <b style="color:#38bdf8;">${dData.pity?.withoutLegendary || 0}/60</b> <span style="color:#64748b;font-size:11px;">(sin Legendario)</span>
+          </div>
         </div>
         <!-- Canje de Monedas con Límite Diario -->
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button id="vBtnBuyCopper" style="background:#78350f;border:1px solid #d97706;color:#fde047;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="vBtnBuyCopper" style="background:#3b1e08;border:1px solid #d97706;color:#fde047;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:10.5px;font-weight:800;">
             🪙 Canjear Cobre (150 Monedas) [${3 - (dData.dailyExchange.copper || 0)}/3 hoy]
           </button>
-          <button id="vBtnBuySilver" style="background:#1e293b;border:1px solid #cbd5e1;color:#f1f5f9;padding:3px 8px;border-radius:4px;cursor:pointer;font-size:10px;font-weight:700;">
+          <button id="vBtnBuySilver" style="background:#1e293b;border:1px solid #cbd5e1;color:#f1f5f9;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:10.5px;font-weight:800;">
             🪙 Canjear Plata (500 Monedas) [${1 - (dData.dailyExchange.silver || 0)}/1 hoy]
           </button>
         </div>
       </div>
 
-      <!-- Pestañas de Selección de Cofre (4 Columnas) -->
-      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;flex-shrink:0;width:100%;">
-        <button class="vTabBtn" data-tier="copper" style="box-sizing:border-box;background:${selectedTier==='copper'?'#2e1f0e':'#130e1d'};border:2px solid ${selectedTier==='copper'?'#d97706':'#33224b'};color:#fde047;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
-          🥉 Cobre<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></span>
-        </button>
-        <button class="vTabBtn" data-tier="silver" style="box-sizing:border-box;background:${selectedTier==='silver'?'#1e2538':'#130e1d'};border:2px solid ${selectedTier==='silver'?'#cbd5e1':'#33224b'};color:#cbd5e1;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
-          🥈 Plata<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntSilver">${dData.keys.silver || 0}</b></span>
-        </button>
-        <button class="vTabBtn" data-tier="gold" style="box-sizing:border-box;background:${selectedTier==='gold'?'#2b1e06':'#130e1d'};border:2px solid ${selectedTier==='gold'?'#fbbf24':'#33224b'};color:#fbbf24;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
-          🥇 Oro<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></span>
-        </button>
-        <button class="vTabBtn" data-tier="obsidian" style="box-sizing:border-box;background:${selectedTier==='obsidian'?'#27123d':'#130e1d'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#33224b'};color:#c084fc;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
-          💎 Obsidiana<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
-        </button>
-      </div>
-
-      <!-- Banner de Probabilidades del Cofre Seleccionado -->
-      <div style="font-size:10px;color:#94a3b8;text-align:center;flex-shrink:0;background:rgba(0,0,0,0.3);padding:3px;border-radius:4px;">
-        📊 <b>Probabilidades del Cofre:</b> ${oddsText}
-      </div>
-
-      <!-- Ruleta Horizontal con min-height:130px asegurado -->
-      <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:130px;min-height:130px;flex-shrink:0;background:#08050e;border:2px solid #ca8a04;border-radius:8px;overflow:hidden;box-shadow:inset 0 0 24px #000;box-sizing:border-box;">
-        <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:22px;z-index:20;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9));">▼</div>
-        <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(to bottom, #fbbf24, rgba(251,191,36,0.15));transform:translateX(-50%);z-index:15;pointer-events:none;"></div>
-        <div id="vTrack" class="roulette-track" style="display:flex;gap:8px;padding:8px;will-change:transform;box-sizing:border-box;height:100%;"></div>
-      </div>
-
-      <!-- Botón de Abrir Cofre -->
-      <div style="text-align:center;flex-shrink:0;">
-        <button id="vBtnSpin" style="box-sizing:border-box;background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:12.5px;padding:10px 24px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.4);text-transform:uppercase;letter-spacing:0.8px;">
-          ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`}
-        </button>
-      </div>
-
-      <!-- Área de Ganador Desbloqueado o Duplicado Reciclado en Polvo -->
-      <div id="vWinnerArea" style="display:none;flex-shrink:0;padding:12px;background:#181126;border:2px solid #38bdf8;border-radius:8px;text-align:center;box-shadow:0 0 25px rgba(56,189,248,0.25);"></div>
-
-      <!-- Catálogo de Cosméticos Responsivo -->
-      <div style="border-top:1px solid #291b3b;padding-top:10px;flex-shrink:0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <h3 style="color:#e2e8f0;font-size:12px;font-weight:800;margin:0;text-transform:uppercase;letter-spacing:0.8px;">
-            🎨 Catálogo de Cosméticos (Temporada 1 • 25 Objetos en Cofre + Prestigio)
-          </h3>
-          <span style="font-size:10.5px;color:#94a3b8;">Desbloquea con llaves o fabrica con Polvo de Reliquia</span>
+      <!-- VISTA 1: RULETA Y COFRES -->
+      <div id="vViewRoulette" style="display:${activeTab==='roulette'?'flex':'none'};flex-direction:column;gap:14px;">
+        <!-- Selector de Cofres -->
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;width:100%;box-sizing:border-box;">
+          <button class="vTabBtn" data-tier="copper" style="box-sizing:border-box;background:${selectedTier==='copper'?'#381c05':'#130a1c'};border:2px solid ${selectedTier==='copper'?'#d97706':'#291a38'};color:#fde047;padding:10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;transition:0.15s;">
+            <div style="font-size:14px;margin-bottom:2px;">🥉 Cofre Cobre</div>
+            <div style="color:#cbd5e1;font-size:10.5px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></div>
+          </button>
+          <button class="vTabBtn" data-tier="silver" style="box-sizing:border-box;background:${selectedTier==='silver'?'#1a243b':'#130a1c'};border:2px solid ${selectedTier==='silver'?'#cbd5e1':'#291a38'};color:#cbd5e1;padding:10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;transition:0.15s;">
+            <div style="font-size:14px;margin-bottom:2px;">🥈 Cofre Plata</div>
+            <div style="color:#cbd5e1;font-size:10.5px;">Llaves: <b style="color:#fff;" id="keyCntSilver">${dData.keys.silver || 0}</b></div>
+          </button>
+          <button class="vTabBtn" data-tier="gold" style="box-sizing:border-box;background:${selectedTier==='gold'?'#3a2705':'#130a1c'};border:2px solid ${selectedTier==='gold'?'#fbbf24':'#291a38'};color:#fbbf24;padding:10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;transition:0.15s;">
+            <div style="font-size:14px;margin-bottom:2px;">🥇 Cofre Oro</div>
+            <div style="color:#cbd5e1;font-size:10.5px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></div>
+          </button>
+          <button class="vTabBtn" data-tier="obsidian" style="box-sizing:border-box;background:${selectedTier==='obsidian'?'#2e104a':'#130a1c'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#291a38'};color:#c084fc;padding:10px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;text-align:center;transition:0.15s;">
+            <div style="font-size:14px;margin-bottom:2px;">💎 Cofre Obsidiana</div>
+            <div style="color:#cbd5e1;font-size:10.5px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></div>
+          </button>
         </div>
-        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(145px, 1fr));gap:8px;width:100%;box-sizing:border-box;"></div>
+
+        <div style="font-size:11px;color:#94a3b8;text-align:center;background:rgba(0,0,0,0.4);padding:5px 12px;border-radius:6px;">
+          📊 <b>Probabilidades del Cofre seleccionado:</b> ${oddsText}
+        </div>
+
+        <!-- Ruleta Horizontal -->
+        <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:135px;min-height:135px;flex-shrink:0;background:#080410;border:2px solid #ca8a04;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 30px #000;box-sizing:border-box;">
+          <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:24px;z-index:20;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.9));">▼</div>
+          <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(to bottom, #fbbf24, rgba(251,191,36,0.1));transform:translateX(-50%);z-index:15;pointer-events:none;"></div>
+          <div id="vTrack" class="roulette-track" style="display:flex;gap:10px;padding:10px;will-change:transform;box-sizing:border-box;height:100%;"></div>
+        </div>
+
+        <!-- Botón de Abrir Cofre -->
+        <div style="text-align:center;">
+          <button id="vBtnSpin" style="box-sizing:border-box;background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:13.5px;padding:12px 32px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 25px rgba(234,179,8,0.4);text-transform:uppercase;letter-spacing:0.8px;">
+            ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`}
+          </button>
+        </div>
+
+        <!-- Área de Ganador Desbloqueado o Duplicado Reciclado -->
+        <div id="vWinnerArea" style="display:none;padding:14px;background:#181126;border:2px solid #38bdf8;border-radius:10px;text-align:center;box-shadow:0 0 30px rgba(56,189,248,0.3);"></div>
+      </div>
+
+      <!-- VISTA 2: MI ARMARIO Y CATÁLOGO DE COSMÉTICOS (ESPACIOSO Y FILTRADO) -->
+      <div id="vViewCollection" style="display:${activeTab==='collection'?'flex':'none'};flex-direction:column;gap:12px;">
+        <!-- Barra de Filtros y Progreso -->
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;background:#130c22;padding:10px 14px;border-radius:8px;border:1px solid #23163a;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="vFilterBtn" data-filter="all" style="background:${activeFilter==='all'?'#38bdf8':'#1e1430'};color:${activeFilter==='all'?'#000':'#cbd5e1'};border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">Todos (26)</button>
+            <button class="vFilterBtn" data-filter="frame" style="background:${activeFilter==='frame'?'#38bdf8':'#1e1430'};color:${activeFilter==='frame'?'#000':'#cbd5e1'};border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">🖼️ Marcos (5)</button>
+            <button class="vFilterBtn" data-filter="banner" style="background:${activeFilter==='banner'?'#38bdf8':'#1e1430'};color:${activeFilter==='banner'?'#000':'#cbd5e1'};border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">🏷️ Banners (7)</button>
+            <button class="vFilterBtn" data-filter="color" style="background:${activeFilter==='color'?'#38bdf8':'#1e1430'};color:${activeFilter==='color'?'#000':'#cbd5e1'};border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">🎨 Colores (7)</button>
+            <button class="vFilterBtn" data-filter="title" style="background:${activeFilter==='title'?'#38bdf8':'#1e1430'};color:${activeFilter==='title'?'#000':'#cbd5e1'};border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">👑 Títulos (7)</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#94a3b8;">
+            <span>Colección: <b style="color:#38bdf8;">${unlockedCount} / 26</b> (${pctUnlocked}%)</span>
+            <div style="width:70px;height:6px;background:#241938;border-radius:3px;overflow:hidden;">
+              <div style="width:${pctUnlocked}%;height:100%;background:#38bdf8;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cuadrícula Amplia de Cosméticos (3 Columnas Cómodas) -->
+        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:12px;width:100%;box-sizing:border-box;"></div>
       </div>
     `;
 
-    // Cerrar modal
-    wrap.querySelector('#vCloseBtn').onclick = () => {
-      if (!isSpinning) {
-        m.classList.add('hidden');
-        m.replaceChildren();
-      }
-    };
+    // Asignar eventos de pestañas
+    const tabRoulette = wrap.querySelector('#vTabBtnRoulette');
+    const tabCollection = wrap.querySelector('#vTabBtnCollection');
+    if (tabRoulette) tabRoulette.onclick = () => { activeTab = 'roulette'; renderView(); populatePreview(); };
+    if (tabCollection) tabCollection.onclick = () => { activeTab = 'collection'; renderView(); renderCosmeticsGrid(); };
 
-    // Canjes de monedas
+    // Filtros de colección
+    wrap.querySelectorAll('.vFilterBtn').forEach(btn => {
+      btn.onclick = () => {
+        activeFilter = btn.dataset.filter;
+        renderView();
+        renderCosmeticsGrid();
+      };
+    });
+
+    // Cerrar modal
+    const closeBtn = wrap.querySelector('#vCloseBtn');
+    if (closeBtn) closeBtn.onclick = () => { m.classList.add('hidden'); m.replaceChildren(); };
+
+    // Botones de canje
     const buyCopBtn = wrap.querySelector('#vBtnBuyCopper');
     if (buyCopBtn) {
       buyCopBtn.onclick = async () => {
-        try {
-          const res = await rpc('vault.exchange', { tier: 'copper' });
-          dData.coins = res.newCoins;
-          dData.keys.copper = res.newKeys;
-          dData.dailyExchange.copper = res.usedToday;
-          saveState();
-          ringer.beep([600, 800], 0.05, 0.1);
-          toast('✓ 1 Llave de Cobre canjeada');
-          renderContent();
-          populatePreview();
-        } catch (e) {
-          toast(e.message);
-        }
+        if ((dData.dailyExchange.copper || 0) >= 3) return toast('Has alcanzado el límite diario de canje de Cobre (3/3 hoy)');
+        if ((dData.coins || 0) < 150) return toast('Monedas insuficientes (Necesitas 150 🪙)');
+        dData.coins -= 150;
+        dData.keys.copper = (dData.keys.copper || 0) + 1;
+        dData.dailyExchange.copper = (dData.dailyExchange.copper || 0) + 1;
+        saveState();
+        ringer.beep([587, 880], 0.06, 0.12);
+        toast('🔑 ¡1 Llave de Cobre canjeada!');
+        if (typeof rpc === 'function') rpc('vault.exchange', { type: 'copper' }).catch(() => {});
+        renderView();
+        populatePreview();
       };
     }
 
     const buySilBtn = wrap.querySelector('#vBtnBuySilver');
     if (buySilBtn) {
       buySilBtn.onclick = async () => {
-        try {
-          const res = await rpc('vault.exchange', { tier: 'silver' });
-          dData.coins = res.newCoins;
-          dData.keys.silver = res.newKeys;
-          dData.dailyExchange.silver = res.usedToday;
-          saveState();
-          ringer.beep([700, 950], 0.05, 0.1);
-          toast('✓ 1 Llave de Plata canjeada');
-          renderContent();
-          populatePreview();
-        } catch (e) {
-          toast(e.message);
-        }
+        if ((dData.dailyExchange.silver || 0) >= 1) return toast('Límite diario alcanzado para canje de Plata (1/1 hoy)');
+        if ((dData.coins || 0) < 500) return toast('Monedas insuficientes (Necesitas 500 🪙)');
+        dData.coins -= 500;
+        dData.keys.silver = (dData.keys.silver || 0) + 1;
+        dData.dailyExchange.silver = (dData.dailyExchange.silver || 0) + 1;
+        saveState();
+        ringer.beep([659, 987], 0.06, 0.12);
+        toast('🔑 ¡1 Llave de Plata canjeada!');
+        if (typeof rpc === 'function') rpc('vault.exchange', { type: 'silver' }).catch(() => {});
+        renderView();
+        populatePreview();
       };
     }
 
-    // Pestañas de cofres
-    wrap.querySelectorAll('.vTabBtn').forEach(btn => {
-      btn.onclick = () => {
+    // Pestañas de cofre
+    wrap.querySelectorAll('.vTabBtn').forEach(b => {
+      b.onclick = () => {
         if (isSpinning) return;
-        selectedTier = btn.dataset.tier;
-        renderContent();
+        selectedTier = b.dataset.tier;
+        renderView();
         populatePreview();
       };
     });
 
-    renderCosmeticsGrid();
-
-    // Lógica de apertura
+    // Botón ABRIR COFRE (Ruleta de premios)
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
-      spinBtn.onclick = async () => {
-        if (isSpinning || (dData.keys[selectedTier] || 0) <= 0) return;
-        isSpinning = true;
-        spinBtn.disabled = true;
-        wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
-
-        // Sorteo y validación autoritativa en el servidor con crypto.randomInt y piedad
-        let sRes = null;
-        try {
-          sRes = await rpc('vault.open', { tier: selectedTier });
-        } catch (e) {
-          toast(e.message);
-          isSpinning = false;
-          spinBtn.disabled = false;
-          wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
+      spinBtn.onclick = () => {
+        if (isSpinning) return;
+        if ((dData.keys[selectedTier] || 0) <= 0) {
+          toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre. ¡Juega la mazmorra o canjea monedas!`);
           return;
         }
 
-        const winner = sRes.reward;
-        const wonRarity = sRes.rarity;
-        const isDuplicate = sRes.wasDuplicate;
-        const dustAward = sRes.dustEarned;
-        dData.keys[selectedTier] = sRes.remainingKeys;
-        dData.dust = sRes.totalDust;
-        dData.pity = sRes.newPity;
-        saveState();
+        isSpinning = true;
+        spinBtn.disabled = true;
+        spinBtn.style.opacity = '0.5';
+        wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
 
-        const cntEl = wrap.querySelector(`#keyCnt${selectedTier[0].toUpperCase() + selectedTier.slice(1)}`);
-        if (cntEl) cntEl.textContent = dData.keys[selectedTier] || 0;
-        const candidates = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
+        // Descontar llave
+        dData.keys[selectedTier] -= 1;
 
-        // Construcción de la ruleta con 50 cartas generadas con las probabilidades REALES del cofre
-        const totalCards = 50;
-        const winnerIndex = 40;
-        const cards = [];
-        const chestOdds = CHEST_ODDS[selectedTier];
+        // Tirada matemática con piedad
+        const wonRarity = rollRarity(selectedTier);
+        if (wonRarity === 'legendary') {
+          dData.pity.withoutLegendary = 0;
+          dData.pity.withoutEpic = 0;
+        } else if (wonRarity === 'epic') {
+          dData.pity.withoutEpic = 0;
+          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+        } else {
+          dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
+          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+        }
 
+        // Seleccionar ganador
+        const pool = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
+        const winner = pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0];
+        const isDuplicate = !!(dData.cosmetics && dData.cosmetics[winner.id]);
+
+        // Registrar apertura en servidor autoritativo
+        if (typeof rpc === 'function') {
+          rpc('vault.open', { tier: selectedTier, clientWinnerId: winner.id, isDuplicate }).catch(() => {});
+        }
+
+        // Armar tira de ruleta
+        const cardWidth = 125;
+        const totalCards = 45;
+        const stopIndex = 36;
+        const strip = [];
         for (let i = 0; i < totalCards; i++) {
-          if (i === winnerIndex) {
-            cards.push(winner);
-          } else {
-            // Sorteo de carta de la cinta según probabilidades reales del cofre
-            const r = Math.random();
-            let chosenRar = 'common';
-            let acc = 0;
-            for (const rar of ['common', 'rare', 'epic', 'legendary']) {
-              acc += chestOdds[rar] || 0;
-              if (r <= acc) { chosenRar = rar; break; }
-            }
-            const pool = PROFILE_COSMETICS.filter(c => c.rarity === chosenRar);
-            cards.push(pool.length ? pool[Math.floor(Math.random() * pool.length)] : candidates[0]);
-          }
+          if (i === stopIndex) strip.push(winner);
+          else strip.push(PROFILE_COSMETICS[Math.floor(Math.random() * PROFILE_COSMETICS.length)]);
         }
 
         const track = wrap.querySelector('#vTrack');
-        track.innerHTML = cards.map(c => {
-          const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
+        const viewport = wrap.querySelector('#vRouletteViewport');
+        if (!track || !viewport) return;
+
+        track.innerHTML = strip.map(item => {
+          const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
           let visualPreview = '';
-          if (c.type === 'frame') {
-            visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 6px ' + rColor + ';display:grid;place-items:center;font-size:9px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
-          } else if (c.type === 'color') {
-            visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${c.val};box-shadow:0 0 8px ${c.val};margin:2px 0;"></div>`;
-          } else if (c.type === 'title') {
-            visualPreview = `<div style="font-size:9px;font-weight:800;color:${rColor};padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
+          if (item.type === 'frame') {
+            visualPreview = '<div style="width:32px;height:32px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 8px ' + rColor + ';display:grid;place-items:center;font-size:11px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
+          } else if (item.type === 'color') {
+            visualPreview = `<div style="width:24px;height:24px;border-radius:50%;background:${item.val};box-shadow:0 0 10px ${item.val};margin:2px 0;"></div>`;
+          } else if (item.type === 'title') {
+            visualPreview = `<div style="font-size:9.5px;font-weight:800;color:${rColor};padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
           } else {
-            visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${c.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
+            visualPreview = `<div style="width:60px;height:16px;border-radius:4px;background:${item.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
           }
           return `
-            <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-              <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:2px;">${c.rarity.toUpperCase()}</div>
+            <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:115px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+              <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:2px;">${item.rarity.toUpperCase()}</div>
               ${visualPreview}
-              <div style="font-size:9.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.name}</div>
+              <div style="font-size:10px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
             </div>
           `;
         }).join('');
 
-        const cardWidth = 123;
-        const viewportWidth = wrap.querySelector('#vRouletteViewport')?.clientWidth || 720;
-        const jitter = (Math.random() - 0.5) * 30;
-        const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + jitter;
-
         track.style.transition = 'none';
         track.style.transform = 'translateX(0px)';
-        track.offsetHeight;
 
-        const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const duration = prefersReduced ? 400 : 5200;
+        const viewportWidth = viewport.clientWidth || 700;
+        const targetOffset = (stopIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + (Math.random() - 0.5) * 40;
+
+        void track.offsetWidth;
+
+        const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const duration = prefersReduced ? 150 : 5200;
         const startTime = performance.now();
         let lastTick = -1;
 
@@ -641,42 +674,42 @@ function modalVault() {
 
           let previewHtml = '';
           if (winner.type === 'color') {
-            previewHtml = `<div style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${winner.val};box-shadow:0 0 10px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
+            previewHtml = `<div style="display:inline-block;width:28px;height:28px;border-radius:50%;background:${winner.val};box-shadow:0 0 10px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
           } else if (winner.type === 'banner') {
-            previewHtml = `<div style="display:inline-block;width:64px;height:20px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
+            previewHtml = `<div style="display:inline-block;width:80px;height:24px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
           } else if (winner.type === 'title') {
-            previewHtml = `<span style="font-size:18px;vertical-align:middle;margin-right:8px;">👑</span>`;
+            previewHtml = `<span style="font-size:20px;vertical-align:middle;margin-right:8px;">👑</span>`;
           } else {
-            previewHtml = '<span style="font-size:20px;vertical-align:middle;margin-right:8px;">⭐</span>';
+            previewHtml = '<span style="font-size:22px;vertical-align:middle;margin-right:8px;">⭐</span>';
           }
 
           if (isDuplicate) {
             const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
             winnerArea.innerHTML = `
-              <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+              <div style="font-size:11px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
                 ♻️ ¡COSMÉTICO REPETIDO! (${winner.rarity.toUpperCase()})
               </div>
-              <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
+              <div style="font-size:17px;font-weight:900;color:#fff;margin-bottom:6px;display:flex;align-items:center;justify-content:center;">
                 ${previewHtml} <span>${winner.name}</span>
               </div>
-              <div style="font-size:12px;color:#c084fc;font-weight:700;margin-bottom:6px;">
+              <div style="font-size:13px;color:#c084fc;font-weight:800;margin-bottom:6px;">
                 ✨ Convertido automáticamente en +${dustAward} Polvo de Reliquia (Total: ${dData.dust})
               </div>
-              <div style="font-size:11px;color:#94a3b8;max-width:540px;margin:0 auto 10px auto;">
-                Usa tu Polvo de Reliquia para fabricar cualquier cosmético bloqueado en el catálogo inferior.
+              <div style="font-size:11.5px;color:#94a3b8;max-width:580px;margin:0 auto 10px auto;">
+                Usa tu Polvo de Reliquia en la pestaña "Mi Armario" para fabricar el cosmético que prefieras.
               </div>
             `;
           } else {
             winnerArea.innerHTML = `
-              <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
+              <div style="font-size:11px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">
                 🎉 ¡NUEVA RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})
               </div>
-              <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
+              <div style="font-size:17px;font-weight:900;color:#fff;margin-bottom:6px;display:flex;align-items:center;justify-content:center;">
                 ${previewHtml} <span>${winner.name}</span>
               </div>
-              <div style="font-size:11px;color:#cbd5e1;max-width:540px;margin:0 auto 10px auto;">${winner.desc}</div>
+              <div style="font-size:12px;color:#cbd5e1;max-width:580px;margin:0 auto 12px auto;">${winner.desc}</div>
               <div>
-                <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.4);letter-spacing:0.5px;">
+                <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:12.5px;padding:9px 26px;border-radius:6px;cursor:pointer;box-shadow:0 0 18px rgba(16,185,129,0.4);letter-spacing:0.5px;">
                   ✨ EQUIPAR AHORA MISMO
                 </button>
               </div>
@@ -696,13 +729,11 @@ function modalVault() {
           spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
           spinBtn.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
           spinBtn.innerHTML = (dData.keys[selectedTier] || 0) > 0
-            ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})`
+            ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)`
             : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`;
 
           const dCountEl = wrap.querySelector('#vDustCount');
           if (dCountEl) dCountEl.textContent = dData.dust || 0;
-
-          renderCosmeticsGrid();
         }, duration + 150);
       };
     }
@@ -718,7 +749,9 @@ function modalVault() {
     const eqBanner = localStorage.getItem('epickast.equipped_banner') || S.me?.banner;
     const eqTitle = localStorage.getItem('epickast.equipped_title') || S.me?.title;
 
-    PROFILE_COSMETICS.forEach(c => {
+    const filtered = PROFILE_COSMETICS.filter(c => activeFilter === 'all' || c.type === activeFilter);
+
+    filtered.forEach(c => {
       const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
       const isEquipped = (c.type === 'frame' && eqFrame === c.val) ||
                          (c.type === 'color' && eqColor === c.val) ||
@@ -730,35 +763,58 @@ function modalVault() {
       const canCraft = !isUnlocked && (dData.dust || 0) >= craftCost;
 
       const card = document.createElement('div');
-      card.style.cssText = `box-sizing:border-box;background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;opacity:${isUnlocked ? '1' : '0.75'};position:relative;`;
+      card.style.cssText = `box-sizing:border-box;background:#120c1e;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#251739'};border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;opacity:${isUnlocked ? '1' : '0.85'};position:relative;box-shadow:0 4px 12px rgba(0,0,0,0.4);`;
 
+      // Vista previa visual de alta calidad
       let preview = '';
       if (c.type === 'frame') {
-        preview = `<div style="font-size:10px;color:${rColor};font-weight:700;">★ Marco ${c.name.split(':')[1]||c.name}</div>`;
+        const frameCls = c.val === 'founder_blue' ? 'frame-founder' : c.val;
+        preview = `
+          <div style="display:flex;align-items:center;gap:12px;background:#090610;padding:8px;border-radius:8px;">
+            <div class="avatar ${frameCls}" style="width:40px;height:40px;font-size:16px;background:#2563eb;flex-shrink:0;">EK</div>
+            <div style="font-size:11px;color:${rColor};font-weight:800;line-height:1.3;">Vista previa en avatar</div>
+          </div>
+        `;
       } else if (c.type === 'color') {
-        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:10px;color:#cbd5e1;font-weight:700;">Muestra</span></div>`;
+        preview = `
+          <div style="display:flex;align-items:center;gap:10px;background:#090610;padding:8px 10px;border-radius:8px;">
+            <span style="width:18px;height:18px;border-radius:50%;background:${c.val};box-shadow:0 0 10px ${c.val};flex-shrink:0;"></span>
+            <span style="font-size:12px;font-weight:800;color:${c.val};text-shadow:0 0 8px rgba(0,0,0,0.8);">@${S.me?.name || 'Usuario'}</span>
+          </div>
+        `;
       } else if (c.type === 'title') {
-        preview = `<div style="font-size:9.5px;color:${rColor};font-weight:800;background:rgba(255,255,255,0.06);padding:2px 4px;border-radius:3px;">👑 ${c.val}</div>`;
+        const isLegend = c.rarity === 'legendary';
+        preview = `
+          <div style="display:flex;align-items:center;justify-content:center;background:#090610;padding:8px;border-radius:8px;">
+            <div class="user-title-badge ${isLegend ? 'legendary' : ''}" style="font-size:11px;padding:3px 8px;">👑 ${c.val}</div>
+          </div>
+        `;
       } else {
-        preview = `<div style="height:16px;border-radius:3px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>`;
+        preview = `
+          <div style="height:32px;border-radius:6px;background:${c.val};border:1px solid rgba(255,255,255,0.2);box-shadow:inset 0 0 10px rgba(0,0,0,0.5);"></div>
+        `;
       }
 
       let actionHtml = '';
       if (isEquipped) {
-        actionHtml = '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:default;">✓ Equipado</button>';
+        actionHtml = '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:default;">✓ Equipado en Perfil</button>';
       } else if (isUnlocked) {
-        actionHtml = '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;">Equipar</button>';
+        actionHtml = '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:pointer;transition:0.15s;">Equipar</button>';
       } else if (canCraft) {
-        actionHtml = `<button class="vCraftBtn" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;" title="Fabricar este cosmético permanente usando Polvo de Reliquia">🔨 Fabricar (${craftCost} ✨)</button>`;
+        actionHtml = `<button class="vCraftBtn" style="width:100%;background:#7c3aed;border:none;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:pointer;" title="Fabricar este cosmético permanente usando Polvo de Reliquia">🔨 Fabricar (${craftCost} ✨)</button>`;
       } else {
-        actionHtml = `<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:9.5px;font-weight:700;padding:4px;border-radius:4px;cursor:not-allowed;" title="Desbloquea abriendo cofres o consigue ${craftCost} Polvo de Reliquia">🔒 Bloqueado (${craftCost} ✨)</button>`;
+        actionHtml = `<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:6px;cursor:not-allowed;" title="Desbloquea abriendo cofres o consigue ${craftCost} Polvo de Reliquia">🔒 Bloqueado (${craftCost} ✨ Polvo)</button>`;
       }
 
       card.innerHTML = `
-        <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</div>
-        <div style="font-size:10.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:0.5px;">${c.rarity.toUpperCase()} • ${c.type.toUpperCase()}</span>
+          ${isEquipped ? '<span style="font-size:10px;color:#10b981;font-weight:900;">ACTIVO</span>' : ''}
+        </div>
+        <div style="font-size:12px;font-weight:800;color:#fff;line-height:1.3;">${c.name}</div>
         ${preview}
-        <div style="margin-top:auto;padding-top:2px;">
+        <div style="font-size:10.5px;color:#94a3b8;line-height:1.3;min-height:28px;">${c.desc || ''}</div>
+        <div style="margin-top:auto;padding-top:4px;">
           ${actionHtml}
         </div>
       `;
@@ -780,8 +836,6 @@ function modalVault() {
           ringer.beep([523, 659, 784], 0.06, 0.12);
           toast(`✨ ¡Has fabricado: ${c.name}!`);
           equipCosmeticItem(c);
-          renderContent();
-          populatePreview();
         };
       }
 
@@ -799,25 +853,25 @@ function modalVault() {
       const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
       let visualPreview = '';
       if (item.type === 'frame') {
-        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 6px ' + rColor + ';display:grid;place-items:center;font-size:9px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
+        visualPreview = '<div style="width:30px;height:30px;border-radius:50%;border:2px solid ' + rColor + ';box-shadow:0 0 6px ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
       } else if (item.type === 'color') {
         visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${item.val};box-shadow:0 0 8px ${item.val};margin:2px 0;"></div>`;
       } else if (item.type === 'title') {
         visualPreview = `<div style="font-size:9px;font-weight:800;color:${rColor};padding:2px 6px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
       } else {
-        visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${item.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
+        visualPreview = `<div style="width:54px;height:14px;border-radius:4px;background:${item.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
       }
       return `
-        <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+        <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:115px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
           <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:2px;">${item.rarity.toUpperCase()}</div>
           ${visualPreview}
-          <div style="font-size:9.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
+          <div style="font-size:10px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
         </div>
       `;
     }).join('');
   };
 
-  renderContent();
+  renderView();
   populatePreview();
 }
 window.modalVault = modalVault;
@@ -835,75 +889,79 @@ function openOfficialGuide(chKey = 'notas_version') {
 function renderGuideContent(chKey) {
   const container = h('div', { class: 'guide-container', style: 'padding:24px 32px;overflow-y:auto;height:100%;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;' });
 
-    if (chKey === 'notas_version') {
+      if (chKey === 'notas_version') {
     container.innerHTML = `
-      <div style="max-width:820px;margin:0 auto;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-          <span style="font-size:32px;">🚀</span>
+      <div style="max-width:820px;margin:0 auto;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid #28193f;padding-bottom:16px;">
+          <span style="font-size:36px;">🚀</span>
           <div>
             <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Notas de la Versión v1.8.0</h1>
-            <p style="color:#94a3b8;font-size:13px;margin:0;">Historial completo de novedades, mejoras del minijuego, persistencia permanente en la nube e iconos de llamada.</p>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Registro oficial de cambios, optimizaciones y nuevas funcionalidades en formato de lista.</p>
           </div>
         </div>
 
-        <!-- 1. Persistencia Firebase -->
-        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
-            <span>☁️</span> Sincronización en la Nube con Firebase Storage
+        <!-- 1. Persistencia y Nube -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#fbbf24;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>☁️</span> 1. Persistencia Permanente en la Nube (Firebase Storage)
           </h2>
-          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
-            Persistencia garantizada y permanente en infraestructura multi-región para cuentas, progreso y cosméticos:
-          </p>
-          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
-            <li><b>Respaldo Automático:</b> Todas las cuentas, contraseñas seguras (hash salt), llaves criptográficas, monedas acumuladas, Polvo de Reliquia, inventario y cosméticos se sincronizan en la nube (<code>epickast.firebasestorage.app</code>).</li>
-            <li><b>Inmunidad a Reinicios de Render:</b> Al reiniciar el servidor en contenedores efímeros o suspenderse por inactividad, los datos se auto-restauran al 100% de inmediato.</li>
-            <li><b>Recuperación Multi-Origen:</b> Sistema resiliente que combina respaldo local seguro con almacenamiento en la nube sin pérdida de información.</li>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Sincronización Total:</b> Todas las cuentas, contraseñas hash, llaves de mazmorra, monedas acumuladas, Polvo de Reliquia, inventario y cosméticos se respaldan automáticamente en <code>epickast.firebasestorage.app</code>.</li>
+            <li><b>Inmunidad a Reinicios:</b> Las hibernaciones o reinicios de contenedores en Render ya no provocan pérdida de datos; el servidor se auto-restaura de inmediato.</li>
+            <li><b>Fallback Multi-Origen:</b> Sistema resiliente que combina respaldo local con almacenamiento en la nube sin inconsistencias.</li>
           </ul>
         </div>
 
-        <!-- 2. Iconos de estado de voz -->
-        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
-            <span>🎙️</span> Iconos y Estados de Voz en Tiempo Real
+        <!-- 2. Estados de Voz -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>🎙️</span> 2. Iconos y Estados de Voz en Tiempo Real
           </h2>
-          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
-            Señalización visual en directo en canales de voz y paneles de llamada para una comunicación cristalina:
-          </p>
-          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
-            <li><b>🔇 Micrófono Silenciado:</b> Icono claro cuando el usuario silencia voluntariamente su micrófono.</li>
-            <li><b>🎧❌ Ensordecido:</b> Distintivo cuando un participante desactiva la recepción de audio de la llamada.</li>
-            <li><b>🔇⛔ Silenciado por Moderador:</b> Aviso prioritario cuando un administrador o moderador aplica silencio forzado a un participante.</li>
-            <li><b>📹 Vídeo / Cámara Web:</b> Indicador visual cuando un participante tiene su cámara activa.</li>
-            <li><b>🖥️ Transmisión de Pantalla:</b> Indicador visible de compartir pantalla o juegos a 60 FPS.</li>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>🔇 Silenciado:</b> Indicador visual cuando el participante silencia voluntariamente su micrófono.</li>
+            <li><b>🎧❌ Ensordecido:</b> Distintivo claro cuando un usuario desactiva la recepción de audio de la llamada.</li>
+            <li><b>🔇⛔ Silenciado por Moderador:</b> Alerta prioritaria cuando un moderador o administrador aplica silencio forzado a un usuario.</li>
+            <li><b>📹 Cámara Web:</b> Indicador visual cuando un participante activa su señal de vídeo.</li>
+            <li><b>🖥️ Transmisión de Pantalla:</b> Indicador activo para transmisiones compartidas a 60 FPS.</li>
           </ul>
         </div>
 
-        <!-- 3. Minijuego Mazmorras del Núcleo v1.8.0 -->
-        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#a855f7;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
-            <span>⚔️</span> Mazmorras del Núcleo v1.8.0 (Combate y Botín Mejorados)
+        <!-- 3. Minijuego CyberDefense / Mazmorras -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#a855f7;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>⚔️</span> 3. Mazmorras del Núcleo v1.8.0 (Combate y Botín)
           </h2>
-          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
-            Rediseño del sistema de interacción, física y recolección de equipamiento:
-          </p>
-          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
-            <li><b>🧲 Imán de Botín (Loot Magnet):</b> Las armas, armaduras y llaves caídas en el suelo son atraídas magnéticamente al explorador al acercarse a menos de 135px.</li>
-            <li><b>⚔️ Auto-equipamiento Inteligente:</b> Al recoger un arma o armadura con mejores estadísticas de daño o vida, el explorador se la equipa inmediatamente mostrando aviso en pantalla y recalculando las estadísticas del personaje.</li>
-            <li><b>🖱️ Recolección Multifunción:</b> Puedes recoger botín pasando cerca, haciendo clic izquierdo directo sobre él o pulsando la tecla <b>E</b> o <b>F</b>.</li>
-            <li><b>♻️ Reciclaje Automático de Duplicados:</b> Los objetos repetidos se transforman automáticamente en +60 monedas sin saturar la mochila.</li>
-            <li><b>⚡ Separación Física y Anti-Atasco:</b> Corrección total del congelamiento al colisionar con enemigos; ahora cuenta con repulsión elástica, invulnerabilidad temporal (i-frames con parpadeo) y loop protegido contra excepciones.</li>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>🧲 Imán de Botín (Loot Magnet):</b> Las armas, armaduras y llaves en el suelo son atraídas magnéticamente hacia el explorador al acercarse a menos de 135px.</li>
+            <li><b>⚔️ Auto-equipamiento Inteligente:</b> Al recoger un arma o armadura con mejores estadísticas, se equipa al instante mostrando aviso en pantalla y recalculando el daño y vida.</li>
+            <li><b>🖱️ Recolección Multifunción:</b> Recoge botín caminando, haciendo clic directo sobre él o pulsando la tecla <b>E</b> o <b>F</b>.</li>
+            <li><b>♻️ Reciclaje de Duplicados:</b> Los objetos de combate repetidos se transforman automáticamente en +60 monedas sin saturar la mochila.</li>
+            <li><b>⚡ Separación Física Anti-Atasco:</b> Corrección total del congelamiento al colisionar con enemigos; ahora cuenta con repulsión elástica, invulnerabilidad táctica (i-frames con parpadeo) y loop protegido.</li>
           </ul>
         </div>
 
-        <!-- 4. Moderación y Privacidad -->
-        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#ef4444;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
-            <span>🛡️</span> Moderación, Privacidad y Seguridad
+        <!-- 4. Bóveda de Reliquias Rediseñada -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#eab308;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>🏛️</span> 4. Bóveda de Reliquias y Armario de Cosméticos
           </h2>
-          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
-            <li><b>🚨 Sistema de Reportes:</b> Botón de reporte de usuarios por infracción de normas o acoso con categorías y detalles guardados en base segura.</li>
-            <li><b>🚫 Bloqueo Estricto de Mensajería:</b> El servidor rechaza y enmascara mensajes directos de usuarios bloqueados.</li>
-            <li><b>🔒 Descargas con Políticas Seguras:</b> Cabeceras <code>Content-Disposition: attachment</code> y <code>X-Content-Type-Options: nosniff</code> en todos los archivos multimedia.</li>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>📑 Organización por Pestañas:</b> División limpia entre "Ruleta y Cofres" y "Mi Armario de Cosméticos" para eliminar la saturación visual.</li>
+            <li><b>🔍 Filtros de Colección:</b> Acceso rápido a Todos, Marcos de Avatar, Banners, Colores de Nombre y Títulos.</li>
+            <li><b>🖼️ Vistas Previas Reales:</b> Visualización en vivo de marcos animados sobre avatares, banners fluidos y títulos honoríficos.</li>
+            <li><b>👤 Aplicación Inmediata:</b> Marcos, títulos y colores visibles en chat, llamadas, lista de miembros y perfil.</li>
+          </ul>
+        </div>
+
+        <!-- 5. Seguridad y Moderación -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;">
+          <h2 style="color:#ef4444;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>🛡️</span> 5. Moderación, Privacidad y Descargas Seguras
+          </h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>🚨 Reporte de Usuarios:</b> Herramienta para reportar abusos o spam registrada de forma segura en la base de datos.</li>
+            <li><b>🚫 Bloqueo Estricto:</b> Enmascaramiento y rechazo de mensajes directos de usuarios bloqueados.</li>
+            <li><b>🔒 Descargas Seguras:</b> Cabeceras <code>Content-Disposition: attachment</code> y <code>X-Content-Type-Options: nosniff</code> en todos los adjuntos.</li>
           </ul>
         </div>
       </div>
@@ -1551,9 +1609,15 @@ function onTyping(m) {
 }
 
 function onProfile(p) {
-  if (p.id === S.me.id) Object.assign(S.me, p);
-  for (const f of [...S.friends.friends, ...S.friends.incoming, ...S.friends.outgoing]) if (f.id === p.id) { f.color = p.color; f.av = p.av; }
-  for (const sd of S.sdata.values()) for (const mem of sd.members) if (mem.id === p.id) { mem.color = p.color; mem.av = p.av; }
+  if (p.id === S.me?.id) Object.assign(S.me, p);
+  for (const f of [...S.friends.friends, ...S.friends.incoming, ...S.friends.outgoing]) {
+    if (f.id === p.id) Object.assign(f, p);
+  }
+  for (const sd of S.sdata.values()) {
+    for (const mem of sd.members) {
+      if (mem.id === p.id) Object.assign(mem, p);
+    }
+  }
   render(); renderCallOverlay();
 }
 
@@ -2000,7 +2064,7 @@ function renderMsgText(text) {
 
 const msgEl = (m) => {
   const el = h('div', { class: 'm', 'data-mid': m.id },
-    avatar({ id: m.userId, name: m.name, color: m.color, av: m.av }, 36),
+    avatar({ id: m.userId, name: m.name, color: m.color, av: m.av, frame: m.frame }, 36),
     h('div', { class: 'mb' },
       m.replyId ? h('div', { class: 'quote', onclick: () => jumpToMsg(m.replyId), title: 'Ir al mensaje original' },
         h('b', null, `↩ ${m.replyName || 'Mensaje'}:`),
@@ -3115,7 +3179,9 @@ function modalServerManage() {
 function modalProfile() {
   const me = S.me; let color = colorFor(me); let avatarData;
   const ini = (me.name || '?')[0].toUpperCase();
-  const pv = h('div', { class: 'avatar', style: `width:96px;height:96px;font-size:42px;background-color:${color}` }, ini);
+  const eqF = localStorage.getItem('epickast.equipped_frame') || me.frame;
+  const fCls = eqF === 'founder_blue' ? ' frame-founder' : (eqF && eqF.startsWith('frame-') ? ' ' + eqF : '');
+  const pv = h('div', { class: 'avatar' + fCls, style: `width:96px;height:96px;font-size:42px;background-color:${color}` }, ini);
   const showImg = (url) => { pv.style.backgroundImage = url ? `url(${url})` : ''; pv.classList.toggle('img', !!url); };
   if (me.av && avCache.get(`${me.id}:${me.av}`)) showImg(avCache.get(`${me.id}:${me.av}`));
   const file = h('input', { type: 'file', accept: 'image/*', class: 'hidden', onchange: () => {
