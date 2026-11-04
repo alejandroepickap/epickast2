@@ -2300,7 +2300,7 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.9';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.8.0';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -2380,7 +2380,29 @@ function renderSide() {
       if (type === 'voice') {
         const pt = S.partyTracks.get(c.key);
         if (pt) L.append(h('div', { class: 'sub party-sub' }, `🎵 ${pt}`));
-        for (const u of rUsers) L.append(h('div', { class: 'sub' }, avatar(u, 16, true), u.name));
+        for (const u of rUsers) {
+          const st = u.state || {};
+          const badges = [];
+          if (st.serverMuted) {
+            badges.push(h('span', { class: 'voice-badge s-muted', title: 'Silenciado por un Administrador' }, '🔇⛔'));
+          } else if (st.muted) {
+            badges.push(h('span', { class: 'voice-badge muted', title: 'Micrófono silenciado' }, '🔇'));
+          }
+          if (st.deaf) {
+            badges.push(h('span', { class: 'voice-badge deaf', title: 'Ensordecido (auriculares silenciados)' }, '🎧❌'));
+          }
+          if (st.cam) {
+            badges.push(h('span', { class: 'voice-badge cam', title: 'Cámara activada' }, '📹'));
+          }
+          if (st.screen) {
+            badges.push(h('span', { class: 'voice-badge screen', title: 'Transmitiendo pantalla' }, '🖥️'));
+          }
+          L.append(h('div', { class: 'sub voice-user-row' },
+            avatar(u, 16, true),
+            h('span', { class: 'sub-nm' }, u.name),
+            badges.length ? h('span', { class: 'voice-badges-stack' }, ...badges) : null
+          ));
+        }
       }
     }
   }
@@ -4595,8 +4617,26 @@ function tile(key, label, user, withVol = false) {
       } });
       volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt);
     }
-    const el = h('div', { class: 'tile', 'data-tile': key }, video, av, nm, stat, volWrap, tbtns);
-    $('stage').append(el); t = { key, el, video, nm, av, stat, tbtns, pinBtn, fitBtn, uid: withVol ? user?.id : 0, hasVideo: false, avKey: `${user?.id}:${user?.av}:${user?.color}` }; tiles.set(key, t);
+    const badgeOverlay = h('div', { class: 'tile-badges' });
+    const el = h('div', { class: 'tile', 'data-tile': key }, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
+    $('stage').append(el);
+    t = {
+      key, el, video, nm, av, stat, tbtns, pinBtn, fitBtn, badgeOverlay,
+      uid: withVol ? user?.id : 0, hasVideo: false,
+      avKey: `${user?.id}:${user?.av}:${user?.color}`,
+      updateBadges: (st = {}) => {
+        badgeOverlay.replaceChildren();
+        if (st.serverMuted) {
+          badgeOverlay.append(h('span', { class: 'tile-badge server-muted', title: 'Silenciado por un Administrador' }, '🔇 Admin Muted'));
+        } else if (st.muted) {
+          badgeOverlay.append(h('span', { class: 'tile-badge muted', title: 'Micrófono apagado' }, '🔇 Mute'));
+        }
+        if (st.deaf) {
+          badgeOverlay.append(h('span', { class: 'tile-badge deaf', title: 'Ensordecido' }, '🎧 Sordo'));
+        }
+      }
+    };
+    tiles.set(key, t);
   }
   const k = `${user?.id}:${user?.av}:${user?.color}`;
   if (t.avKey !== k) { t.avKey = k; t.av.replaceChildren(avatar(user, 72)); }
@@ -4960,7 +5000,10 @@ function renderStage() {
     ensurePartyTile();
     keep.add('party');
   }
-  const me = tile('me', 'Tú' + (c.muted ? ' 🔇' : ''), S.me, false); keep.add('me'); setStream(me, c.main, !!c.camTrack, true);
+  const me = tile('me', 'Tú' + (c.serverMuted ? ' (Silenciado por Admin)' : (c.muted ? ' 🔇' : '')), S.me, false);
+  keep.add('me');
+  setStream(me, c.main, !!c.camTrack, true);
+  me.updateBadges?.({ muted: c.muted, deaf: c.deaf, serverMuted: c.serverMuted, cam: !!c.camTrack });
   if (c.screenStream) {
     const liveTracks = c.screenStream.getVideoTracks().filter((t) => t.readyState !== 'ended');
     if (liveTracks.length > 0) {
@@ -4972,9 +5015,12 @@ function renderStage() {
   for (const p of c.peers.values()) {
     const user = { id: p.id, name: p.name, color: p.user?.color, av: p.user?.av };
     const friend = friendByDm(S.callKey)?.id === p.id ? friendByDm(S.callKey) : null; if (friend) { user.color = friend.color; user.av = friend.av; }
-    const label = p.name + (p.state?.muted ? ' 🔇' : '');
+    const pSt = p.state || {};
+    const label = p.name + (pSt.serverMuted ? ' (Silenciado por Admin)' : (pSt.muted ? ' 🔇' : ''));
     const k = 'p' + p.id; keep.add(k);
-    setStream(tile(k, label, user, true), p.streams.get(p.mainId) || null, !!p.state?.cam, false);
+    const peerTile = tile(k, label, user, true);
+    setStream(peerTile, p.streams.get(p.mainId) || null, !!pSt.cam, false);
+    peerTile.updateBadges?.(pSt);
     if (p.state?.screen) {
       for (const [sid, st] of p.streams) {
         if (sid === p.mainId) continue;

@@ -1,4 +1,5 @@
 'use strict';
+process.env.EPICKAST_TEST = '1';
 /**
  * Test de integración para las nuevas capacidades del servidor EpicKast v1.7.9:
  * 1. Bóveda y Recompensas (vault.get, vault.open, vault.exchange, vault.craft, dungeon.sync).

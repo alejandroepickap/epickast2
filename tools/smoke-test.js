@@ -1,6 +1,7 @@
 'use strict';
 // Prueba de humo end-to-end del servidor (usa una BD temporal).
 const os = require('node:os'), path = require('node:path'), fs = require('node:fs');
+process.env.EPICKAST_TEST = '1';
 process.env.EPICKAST_DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'epickast-'));
 const { httpServer, wss } = require('../server/server.js');
 const WebSocket = require('ws');

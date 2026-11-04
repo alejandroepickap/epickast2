@@ -90,7 +90,7 @@ function saveBackup() {
     const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
     // Sincronizar en la nube con Firebase (sin almacenar hashes en git)
-    firebaseAdapter.syncDatabaseToFirebase(DATA, state).catch(() => {});
+    if (!process.env.EPICKAST_TEST) { firebaseAdapter.syncDatabaseToFirebase(DATA, state).catch(() => {}); }
   } catch (e) {
     console.error('[backup] Error al guardar respaldo:', e);
   }
@@ -102,12 +102,10 @@ async function restoreBackup() {
     let cloudState = null;
     try { cloudState = await firebaseAdapter.restoreDatabaseFromFirebase(DATA); } catch {}
 
-    const target = fs.existsSync(BACKUP_FILE) ? BACKUP_FILE : (fs.existsSync(SEED_FILE) ? SEED_FILE : null);
-    let data = cloudState;
-    if (!data && target) {
-      data = JSON.parse(fs.readFileSync(target, 'utf8'));
-    }
-    if (data) {
+    const seedData = fs.existsSync(SEED_FILE) ? JSON.parse(fs.readFileSync(SEED_FILE, "utf8")) : null;
+    const localBackup = fs.existsSync(BACKUP_FILE) ? JSON.parse(fs.readFileSync(BACKUP_FILE, "utf8")) : null;
+    const sources = [cloudState, localBackup, seedData].filter(Boolean);
+    for (const data of sources) {
 // clean restore
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
@@ -150,7 +148,7 @@ async function restoreBackup() {
           run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id ?? null, blk.blocked_id ?? null, blk.ts ?? Date.now());
         }
       }
-      console.log(`[backup] Restaurados ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores.`);
+      console.log(`[backup] Origen procesado: ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores.`);
     }
   } catch (e) {
     console.error('[backup] Error al restaurar respaldo:', e);

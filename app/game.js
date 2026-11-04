@@ -1,4 +1,4 @@
-// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (Beta v1.7.9 Pro)
+// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (v1.8.0 Pro)
 // Action-RPG de Mazmorras Cooperativo con 5 Niveles y Navegación entre Plantas:
 // - Nivel 1: Entrada de las Minas de Magma (Mineros Zombi, llaves de cobre)
 // - Nivel 2: Galerías de Amatista (Zombis + Arqueros Esqueléticos, llaves de plata)
@@ -385,7 +385,10 @@
         isAttacking: false,
         attackAngle: 0,
         attackTimer: 0,
-        walkCycle: 0
+        walkCycle: 0,
+        knockX: 0,
+        knockY: 0,
+        invulnTimer: 0
       };
 
       this.recalculatePlayerStats();
@@ -450,7 +453,7 @@
               <span style="font-size:24px;">🌋</span>
               <div>
                 <strong id="dFloorTitle" style="color:#f8fafc; font-size:15px; letter-spacing:0.5px;">Dungeons of the Core • Nivel 1</strong>
-                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">BETA v1.7.9</span>
+                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">v1.8.0 PRO</span>
               </div>
             </div>
 
@@ -1190,22 +1193,42 @@
 
       const loop = (now) => {
         if (!this.running) return;
-        const dt = Math.min((now - lastTime) / 1000, 0.1);
-        lastTime = now;
+        try {
+          const dt = Math.min((now - lastTime) / 1000, 0.1);
+          lastTime = now;
 
-        this.update(dt, now);
-        this.render(now);
-
-        this.animId = requestAnimationFrame(loop);
+          this.update(dt, now);
+          this.render(now);
+        } catch (err) {
+          console.error('[CyberDefenseGame] Error en el bucle del juego:', err);
+        } finally {
+          this.animId = requestAnimationFrame(loop);
+        }
       };
 
       this.animId = requestAnimationFrame(loop);
+    }
+
+    damagePlayer(dmg, fromAng) {
+      if (this.player.invulnTimer > 0 || this.gameState !== 'play') return;
+      this.player.invulnTimer = 0.65; // 650ms de inmunidad tras golpe para reaccionar
+      this.player.hp -= dmg;
+      this.shakeIntensity = Math.min(10, Math.max(4, dmg * 0.28));
+      AudioFX.playerHurt();
+      this.spawnFloatingText(this.player.x, this.player.y - 12, `-${dmg}`, '#ef4444', 15);
+
+      if (fromAng != null) {
+        const kb = 140;
+        this.player.knockX = Math.cos(fromAng) * kb;
+        this.player.knockY = Math.sin(fromAng) * kb;
+      }
     }
 
     update(dt, now) {
       if (this.gameState !== 'play') return;
 
       if (this.player.attackCooldown > 0) this.player.attackCooldown -= dt;
+      if (this.player.invulnTimer > 0) this.player.invulnTimer -= dt;
 
       // Movimiento jugador
       let dx = 0; let dy = 0;
@@ -1275,16 +1298,25 @@
         const dist = Math.hypot(toPlayerX, toPlayerY);
         const ang = Math.atan2(toPlayerY, toPlayerX);
 
+        // Separación física suave (anti-atasco): si el enemigo y el jugador colisionan, se separan elásticamente
+        const minBodyDist = en.radius + this.player.radius;
+        if (dist < minBodyDist && dist > 0.001) {
+          const overlap = minBodyDist - dist;
+          en.x -= Math.cos(ang) * overlap * 0.55;
+          en.y -= Math.sin(ang) * overlap * 0.55;
+          this.player.x += Math.cos(ang) * overlap * 0.45;
+          this.player.y += Math.sin(ang) * overlap * 0.45;
+        }
+
         if (en.type === 'zombie_miner') {
-          this.moveEntity(en, Math.cos(ang) * en.speed, Math.sin(ang) * en.speed, dt);
-          if (dist < en.radius + this.player.radius + 4) {
+          if (dist > minBodyDist - 2) {
+            this.moveEntity(en, Math.cos(ang) * en.speed, Math.sin(ang) * en.speed, dt);
+          }
+          if (dist < minBodyDist + 6) {
             en.attackCooldown = (en.attackCooldown || 0) + dt;
-            if (en.attackCooldown > 0.8) {
+            if (en.attackCooldown > 0.75) {
               en.attackCooldown = 0;
-              this.player.hp -= 18;
-              this.shakeIntensity = 5;
-              AudioFX.playerHurt();
-              this.spawnFloatingText(this.player.x, this.player.y - 12, '-18', '#ef4444', 14);
+              this.damagePlayer(18, ang);
             }
           }
         } else if (en.type === 'skeleton_archer') {
@@ -1306,15 +1338,14 @@
             AudioFX.bowShot();
           }
         } else if (en.type === 'golem_boss') {
-          this.moveEntity(en, Math.cos(ang) * en.speed, Math.sin(ang) * en.speed, dt);
-          if (dist < en.radius + this.player.radius + 8) {
+          if (dist > minBodyDist - 4) {
+            this.moveEntity(en, Math.cos(ang) * en.speed, Math.sin(ang) * en.speed, dt);
+          }
+          if (dist < minBodyDist + 10) {
             en.attackCooldown = (en.attackCooldown || 0) + dt;
-            if (en.attackCooldown > 1.1) {
+            if (en.attackCooldown > 1.0) {
               en.attackCooldown = 0;
-              this.player.hp -= 34;
-              this.shakeIntensity = 8;
-              AudioFX.playerHurt();
-              this.spawnFloatingText(this.player.x, this.player.y - 12, '-34', '#ef4444', 16);
+              this.damagePlayer(34, ang);
             }
           }
         }
@@ -1348,10 +1379,8 @@
           }
         } else {
           if (Math.hypot(p.x - this.player.x, p.y - this.player.y) < this.player.radius + p.radius) {
-            this.player.hp -= p.dmg;
-            AudioFX.playerHurt();
-            this.shakeIntensity = 4;
-            this.spawnFloatingText(this.player.x, this.player.y - 12, `-${p.dmg}`, '#ef4444', 14);
+            const pAng = Math.atan2(p.vy, p.vx);
+            this.damagePlayer(p.dmg, pAng);
             this.projectiles.splice(i, 1);
           }
         }
@@ -1973,6 +2002,10 @@
       });
 
       // 10. EL JUGADOR (Explorador del Núcleo HD con Armadura y Armas Dinámicas)
+      // Si está en tiempo de invulnerabilidad, parpadea visualmente
+      if (this.player.invulnTimer > 0 && Math.floor(now / 80) % 2 === 0) {
+        ctx.globalAlpha = 0.45;
+      }
       ctx.save();
       ctx.translate(this.player.x, this.player.y);
 
@@ -2065,6 +2098,7 @@
       }
 
       ctx.restore();
+      ctx.globalAlpha = 1.0;
 
       // Animación de Tajo Melee (Arco de Energía Luminosa)
       if (this.player.isAttacking) {
