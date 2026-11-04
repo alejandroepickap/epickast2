@@ -160,18 +160,29 @@
   }
 
   function loadInventory() {
+    let inv = null;
     try {
       const raw = localStorage.getItem(INV_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) inv = JSON.parse(raw);
     } catch {}
-    return {
-      equippedWeapon: { id: 'iron_sword', name: 'Espada de Hierro', type: 'weapon', bonusDmg: 0, desc: 'Espada inicial forjada en la superficie' },
-      equippedBow: { id: 'hunting_bow', name: 'Ballesta de Caza', type: 'bow', bonusDmg: 0, desc: 'Ballesta estándar de explorador' },
-      equippedArmor: { id: 'leather_armor', name: 'Túnica de Explorador', type: 'armor', bonusHp: 0, desc: 'Túnica de cuero resistente' },
-      items: [
-        { id: 'iron_sword', name: 'Espada de Hierro', type: 'weapon', bonusDmg: 0, desc: 'Espada inicial forjada' }
-      ]
-    };
+    if (!inv) {
+      inv = {
+        equippedWeapon: { id: 'iron_sword', name: 'Espada de Hierro', type: 'weapon', bonusDmg: 0, desc: 'Espada inicial forjada en la superficie' },
+        equippedBow: { id: 'hunting_bow', name: 'Ballesta de Caza', type: 'bow', bonusDmg: 0, desc: 'Ballesta estándar de explorador' },
+        equippedArmor: { id: 'leather_armor', name: 'Túnica de Explorador', type: 'armor', bonusHp: 0, desc: 'Túnica de cuero resistente' },
+        items: [
+          { id: 'iron_sword', name: 'Espada de Hierro', type: 'weapon', bonusDmg: 0, desc: 'Espada inicial forjada' }
+        ]
+      };
+    }
+    // Filtrar objetos repetidos en el guardado existente
+    const seen = new Set();
+    inv.items = (inv.items || []).filter(item => {
+      if (!item || !item.id || seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+    return inv;
   }
 
   function saveInventory(inv) {
@@ -439,7 +450,7 @@
               <span style="font-size:24px;">🌋</span>
               <div>
                 <strong id="dFloorTitle" style="color:#f8fafc; font-size:15px; letter-spacing:0.5px;">Dungeons of the Core • Nivel 1</strong>
-                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">BETA v1.7.6</span>
+                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">BETA v1.7.8</span>
               </div>
             </div>
 
@@ -647,24 +658,32 @@
       if (!listEl) return;
       listEl.innerHTML = '';
 
+      // Garantizar lista sin duplicados
+      const seen = new Set();
+      this.inventory.items = (this.inventory.items || []).filter(it => {
+        if (!it || !it.id || seen.has(it.id)) return false;
+        seen.add(it.id);
+        return true;
+      });
+
       if (!this.inventory.items || this.inventory.items.length === 0) {
         listEl.innerHTML = '<div style="color:#64748b; font-size:11px; padding:8px; text-align:center;">Derrota enemigos en la mazmorra para obtener botín de combate.</div>';
         return;
       }
 
-      this.inventory.items.forEach((item, idx) => {
+      this.inventory.items.forEach((item) => {
         const isEquipped = (item.type === 'weapon' && this.inventory.equippedWeapon?.id === item.id) ||
                            (item.type === 'bow' && this.inventory.equippedBow?.id === item.id) ||
                            (item.type === 'armor' && this.inventory.equippedArmor?.id === item.id);
 
         const card = document.createElement('div');
-        card.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:6px 8px; border-radius:6px; border:1px solid ${isEquipped ? '#10b981' : '#33204d'};`;
+        card.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:6px 10px; border-radius:6px; border:1px solid ${isEquipped ? '#10b981' : '#33204d'}; margin-bottom:4px;`;
         card.innerHTML = `
-          <div>
-            <div style="font-size:11px; font-weight:700; color:#fff;">${item.name}</div>
-            <div style="font-size:10px; color:#94a3b8;">${item.desc || ''}</div>
+          <div style="min-width:0; flex:1; padding-right:8px;">
+            <div style="font-size:11px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.name}</div>
+            <div style="font-size:9.5px; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.desc || ''}</div>
           </div>
-          <button style="background:${isEquipped ? '#059669' : '#2563eb'}; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:700; cursor:${isEquipped ? 'default' : 'pointer'};">
+          <button style="flex-shrink:0; background:${isEquipped ? '#059669' : '#2563eb'}; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px; font-weight:700; cursor:${isEquipped ? 'default' : 'pointer'};">
             ${isEquipped ? '✓ Equipado' : 'Equipar'}
           </button>
         `;
@@ -1343,12 +1362,26 @@
         const item = this.droppedLoot[i];
         item.bob = (item.bob || 0) + dt * 4;
         if (Math.hypot(this.player.x - item.x, this.player.y - item.y) < this.player.radius + 16) {
-          this.inventory.items.push(item.data);
-          saveInventory(this.inventory);
-          AudioFX.itemPickup();
-          this.spawnFloatingText(item.x, item.y - 20, `✨ ¡${item.data.name}!`, '#38bdf8', 14);
+          const alreadyHas = (this.inventory.items || []).some(it => it.id === item.data.id) ||
+                            this.inventory.equippedWeapon?.id === item.data.id ||
+                            this.inventory.equippedBow?.id === item.data.id ||
+                            this.inventory.equippedArmor?.id === item.data.id;
+          if (alreadyHas) {
+            // Objeto repetido: reciclaje por monedas para evitar botones duplicados
+            const scrapBonus = 60;
+            this.data.coins += scrapBonus;
+            saveDungeonData(this.data);
+            AudioFX.coinPickup();
+            this.spawnFloatingText(item.x, item.y - 20, `♻️ ¡${item.data.name} repetido! (+ ${scrapBonus} Monedas)`, '#fde047', 13);
+            this.updateUi();
+          } else {
+            this.inventory.items.push(item.data);
+            saveInventory(this.inventory);
+            AudioFX.itemPickup();
+            this.spawnFloatingText(item.x, item.y - 20, `✨ ¡${item.data.name}!`, '#38bdf8', 14);
+            this.renderInventoryList();
+          }
           this.droppedLoot.splice(i, 1);
-          this.renderInventoryList();
         }
       }
 

@@ -219,10 +219,13 @@ function modalVault() {
 
   let isSpinning = false;
 
-  const wrap = h('div', { class: 'cd-crate-dialog', style: 'background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:22px;max-width:840px;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;max-height:90vh;overflow-y:auto;' });
+  // DIÁLOGO RESPONSIVE CON MAX-WIDTH Y OVERFLOW SUAVE
+  const wrap = h('div', {
+    class: 'cd-crate-dialog',
+    style: 'box-sizing:border-box;background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:16px;width:min(780px, 94vw);max-height:88vh;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;'
+  });
   m.appendChild(wrap);
 
-  // Función universal para equipar cualquier cosmético
   const equipCosmeticItem = (item) => {
     if (!item) return;
     if (item.type === 'frame') {
@@ -230,7 +233,7 @@ function modalVault() {
       document.querySelectorAll('.avatar').forEach(a => {
         if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder');
       });
-      toast('✨ Marco de Avatar FUNDADOR equipado con éxito');
+      toast('✨ Marco de Avatar FUNDADOR equipado');
     } else if (item.type === 'color') {
       localStorage.setItem('epickast.equipped_color', item.val);
       rpc('profile.set', { color: item.val }).catch(() => {});
@@ -250,57 +253,57 @@ function modalVault() {
 
   const renderContent = () => {
     wrap.innerHTML = `
-      <div class="crate-top" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-        <div>
-          <h2 style="color:#fbbf24;font-size:18px;font-weight:900;letter-spacing:0.5px;margin:0 0 4px 0;">🏛️ BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
-          <p style="color:#94a3b8;font-size:12px;margin:0;">Abre cofres con llaves ganadas en las mazmorras para desbloquear cosméticos de perfil (Temporada 1 • Rotación Mensual).</p>
+      <!-- Cabecera Compacta -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0;">
+        <div style="min-width:0;padding-right:8px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:900;letter-spacing:0.5px;margin:0 0 2px 0;">🏛️ BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
+          <p style="color:#94a3b8;font-size:11px;margin:0;">Abre cofres con llaves ganadas en las mazmorras (Temporada 1 • Rotación Mensual).</p>
         </div>
-        <button id="vCloseBtn" class="cd-btn" style="background:#334155;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;border:none;font-weight:700;">✕ Cerrar Bóveda</button>
+        <button id="vCloseBtn" class="cd-btn" style="flex-shrink:0;background:#334155;color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;border:none;font-size:11.5px;font-weight:700;">✕ Cerrar</button>
       </div>
 
-      <!-- Pestañas de Selección de Cofre -->
-      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:14px;">
-        <button class="vTabBtn" data-tier="copper" style="background:${selectedTier==='copper'?'#2e1f0e':'#130e1d'};border:2px solid ${selectedTier==='copper'?'#d97706':'#33224b'};color:#fde047;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥉 Cofre Cobre<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></span>
+      <!-- Pestañas de Selección de Cofre Responsivas (4 Columnas) -->
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:6px;flex-shrink:0;width:100%;">
+        <button class="vTabBtn" data-tier="copper" style="box-sizing:border-box;background:${selectedTier==='copper'?'#2e1f0e':'#130e1d'};border:2px solid ${selectedTier==='copper'?'#d97706':'#33224b'};color:#fde047;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
+          🥉 Cobre<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntCopper">${dData.keys.copper || 0}</b></span>
         </button>
-        <button class="vTabBtn" data-tier="silver" style="background:${selectedTier==='silver'?'#1e2538':'#130e1d'};border:2px solid ${selectedTier==='silver'?'#cbd5e1':'#33224b'};color:#cbd5e1;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥈 Sagrario Plata<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntSilver">${dData.keys.silver || 0}</b></span>
+        <button class="vTabBtn" data-tier="silver" style="box-sizing:border-box;background:${selectedTier==='silver'?'#1e2538':'#130e1d'};border:2px solid ${selectedTier==='silver'?'#cbd5e1':'#33224b'};color:#cbd5e1;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
+          🥈 Plata<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntSilver">${dData.keys.silver || 0}</b></span>
         </button>
-        <button class="vTabBtn" data-tier="gold" style="background:${selectedTier==='gold'?'#2b1e06':'#130e1d'};border:2px solid ${selectedTier==='gold'?'#fbbf24':'#33224b'};color:#fbbf24;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          🥇 Cofre Oro<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></span>
+        <button class="vTabBtn" data-tier="gold" style="box-sizing:border-box;background:${selectedTier==='gold'?'#2b1e06':'#130e1d'};border:2px solid ${selectedTier==='gold'?'#fbbf24':'#33224b'};color:#fbbf24;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
+          🥇 Oro<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntGold">${dData.keys.gold || 0}</b></span>
         </button>
-        <button class="vTabBtn" data-tier="obsidian" style="background:${selectedTier==='obsidian'?'#27123d':'#130e1d'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#33224b'};color:#c084fc;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">
-          💎 Ancestral Núcleo<br><span style="color:#94a3b8;font-size:10px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
+        <button class="vTabBtn" data-tier="obsidian" style="box-sizing:border-box;background:${selectedTier==='obsidian'?'#27123d':'#130e1d'};border:2px solid ${selectedTier==='obsidian'?'#c084fc':'#33224b'};color:#c084fc;padding:7px 2px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;line-height:1.2;text-align:center;">
+          💎 Núcleo<br><span style="color:#94a3b8;font-size:9.5px;">Llaves: <b style="color:#fff;" id="keyCntObsidian">${dData.keys.obsidian || 0}</b></span>
         </button>
       </div>
 
-      <!-- Ruleta Horizontal Visible Estilo CS:GO -->
-      <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:140px;background:#08050e;border:2px solid #ca8a04;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 24px #000;margin-bottom:14px;">
-        <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:24px;z-index:20;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9));">▼</div>
+      <!-- Ruleta Horizontal con flex-shrink:0 y min-height garantizado -->
+      <div id="vRouletteViewport" class="roulette-viewport" style="position:relative;width:100%;height:130px;min-height:130px;flex-shrink:0;background:#08050e;border:2px solid #ca8a04;border-radius:8px;overflow:hidden;box-shadow:inset 0 0 24px #000;box-sizing:border-box;">
+        <div class="roulette-marker" style="position:absolute;top:0;left:50%;transform:translateX(-50%);color:#fbbf24;font-size:22px;z-index:20;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9));">▼</div>
         <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:linear-gradient(to bottom, #fbbf24, rgba(251,191,36,0.15));transform:translateX(-50%);z-index:15;pointer-events:none;"></div>
-        <div id="vTrack" class="roulette-track" style="display:flex;gap:8px;padding:12px 10px;will-change:transform;"></div>
+        <div id="vTrack" class="roulette-track" style="display:flex;gap:8px;padding:8px;will-change:transform;box-sizing:border-box;height:100%;"></div>
       </div>
 
       <!-- Botón de Abrir Cofre -->
-      <div style="text-align:center;margin-bottom:16px;">
-        <button id="vBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:13px;padding:12px 34px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.5);text-transform:uppercase;letter-spacing:0.8px;">
+      <div style="text-align:center;flex-shrink:0;">
+        <button id="vBtnSpin" style="box-sizing:border-box;background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:12.5px;padding:10px 24px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.4);text-transform:uppercase;letter-spacing:0.8px;">
           ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`}
         </button>
       </div>
 
       <!-- Área de Ganador Desbloqueado -->
-      <div id="vWinnerArea" style="display:none;margin-bottom:18px;padding:16px;background:#181126;border:2px solid #38bdf8;border-radius:10px;text-align:center;box-shadow:0 0 30px rgba(56,189,248,0.3);"></div>
+      <div id="vWinnerArea" style="display:none;flex-shrink:0;padding:12px;background:#181126;border:2px solid #38bdf8;border-radius:8px;text-align:center;box-shadow:0 0 25px rgba(56,189,248,0.25);"></div>
 
-      <!-- Catálogo de Cosméticos Desbloqueados -->
-      <div style="border-top:1px solid #291b3b;padding-top:14px;">
-        <h3 style="color:#e2e8f0;font-size:13px;font-weight:800;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.8px;">
+      <!-- Catálogo de Cosméticos Responsivo -->
+      <div style="border-top:1px solid #291b3b;padding-top:10px;flex-shrink:0;">
+        <h3 style="color:#e2e8f0;font-size:12px;font-weight:800;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.8px;">
           🎨 Mis Cosméticos de Perfil (Temporada 1 • Minas de Magma)
         </h3>
-        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(185px, 1fr));gap:10px;"></div>
+        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(145px, 1fr));gap:8px;width:100%;box-sizing:border-box;"></div>
       </div>
     `;
 
-    // Cerrar
     wrap.querySelector('#vCloseBtn').onclick = () => {
       if (!isSpinning) {
         m.classList.add('hidden');
@@ -308,7 +311,6 @@ function modalVault() {
       }
     };
 
-    // Pestañas
     wrap.querySelectorAll('.vTabBtn').forEach(btn => {
       btn.onclick = () => {
         if (isSpinning) return;
@@ -319,10 +321,8 @@ function modalVault() {
       };
     });
 
-    // Renderizar Cosméticos
     renderCosmeticsGrid();
 
-    // Girar Ruleta
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
       spinBtn.onclick = () => {
@@ -331,11 +331,9 @@ function modalVault() {
         spinBtn.disabled = true;
         wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
 
-        // Descontar llave
         dData.keys[selectedTier]--;
         try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
 
-        // Actualizar etiqueta de llave
         const cntEl = wrap.querySelector(`#keyCnt${selectedTier[0].toUpperCase() + selectedTier.slice(1)}`);
         if (cntEl) cntEl.textContent = dData.keys[selectedTier] || 0;
 
@@ -363,24 +361,24 @@ function modalVault() {
           const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
           let visualPreview = '';
           if (c.type === 'frame') {
-            visualPreview = '<div style="width:34px;height:34px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 8px #38bdf8;display:grid;place-items:center;font-size:10px;font-weight:900;color:#38bdf8;margin-bottom:4px;">★</div>';
+            visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin:2px 0;">★</div>';
           } else if (c.type === 'color') {
-            visualPreview = `<div style="width:28px;height:28px;border-radius:50%;background:${c.val};box-shadow:0 0 10px ${c.val};margin-bottom:4px;"></div>`;
+            visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${c.val};box-shadow:0 0 8px ${c.val};margin:2px 0;"></div>`;
           } else {
-            visualPreview = `<div style="width:58px;height:16px;border-radius:4px;background:${c.val};margin-bottom:4px;border:1px solid rgba(255,255,255,0.2);"></div>`;
+            visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${c.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
           }
           return `
-            <div class="roulette-card" style="width:120px;height:112px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-              <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:3px;letter-spacing:0.5px;">${c.rarity.toUpperCase()}</div>
+            <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+              <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:2px;">${c.rarity.toUpperCase()}</div>
               ${visualPreview}
-              <div style="font-size:10.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.name}</div>
+              <div style="font-size:9.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.name}</div>
             </div>
           `;
         }).join('');
 
-        const cardWidth = 128; // 120px + 8px gap
-        const viewportWidth = wrap.querySelector('#vRouletteViewport')?.clientWidth || 760;
-        const jitter = (Math.random() - 0.5) * 35;
+        const cardWidth = 123; // 115px + 8px gap
+        const viewportWidth = wrap.querySelector('#vRouletteViewport')?.clientWidth || 720;
+        const jitter = (Math.random() - 0.5) * 30;
         const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + jitter;
 
         track.style.transition = 'none';
@@ -411,7 +409,6 @@ function modalVault() {
           wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
           ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
 
-          // Guardar cosmético desbloqueado
           if (!dData.cosmetics) dData.cosmetics = {};
           dData.cosmetics[winner.id] = true;
 
@@ -421,7 +418,6 @@ function modalVault() {
 
           try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
 
-          // Mostrar tarjeta de victoria sin sobreescribir la ruleta
           const winnerArea = wrap.querySelector('#vWinnerArea');
           const rColor = RARITY_COLORS[winner.rarity] || '#4b69ff';
           winnerArea.style.display = 'block';
@@ -429,21 +425,21 @@ function modalVault() {
 
           let previewHtml = '';
           if (winner.type === 'color') {
-            previewHtml = `<div style="display:inline-block;width:32px;height:32px;border-radius:50%;background:${winner.val};box-shadow:0 0 12px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
+            previewHtml = `<div style="display:inline-block;width:26px;height:26px;border-radius:50%;background:${winner.val};box-shadow:0 0 10px ${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
           } else if (winner.type === 'banner') {
-            previewHtml = `<div style="display:inline-block;width:80px;height:24px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
+            previewHtml = `<div style="display:inline-block;width:64px;height:20px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
           } else {
-            previewHtml = '<span style="font-size:24px;vertical-align:middle;margin-right:8px;">👑</span>';
+            previewHtml = '<span style="font-size:20px;vertical-align:middle;margin-right:8px;">👑</span>';
           }
 
           winnerArea.innerHTML = `
-            <div style="font-size:11px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🎉 ¡RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})</div>
-            <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:6px;display:flex;align-items:center;justify-content:center;">
+            <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">🎉 ¡RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})</div>
+            <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
               ${previewHtml} <span>${winner.name}</span>
             </div>
-            <div style="font-size:12px;color:#cbd5e1;max-width:540px;margin:0 auto 12px auto;">${winner.desc}</div>
+            <div style="font-size:11px;color:#cbd5e1;max-width:540px;margin:0 auto 10px auto;">${winner.desc}</div>
             <div>
-              <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:13px;padding:10px 26px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.5);letter-spacing:0.5px;">
+              <button id="vBtnEquipWinner" style="background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 0 16px rgba(16,185,129,0.4);letter-spacing:0.5px;">
                 ✨ EQUIPAR AHORA MISMO
               </button>
             </div>
@@ -458,7 +454,6 @@ function modalVault() {
             };
           }
 
-          // Actualizar botón de girar y grid
           spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
           spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
           spinBtn.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
@@ -489,27 +484,27 @@ function modalVault() {
 
       const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
       const card = document.createElement('div');
-      card.style.cssText = `background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;opacity:${isUnlocked ? '1' : '0.45'};`;
+      card.style.cssText = `box-sizing:border-box;background:#0e0a17;border:1.5px solid ${isEquipped ? '#10b981' : isUnlocked ? rColor : '#221535'};border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:4px;opacity:${isUnlocked ? '1' : '0.45'};`;
 
       let preview = '';
       if (c.type === 'frame') {
-        preview = '<div style="font-size:11px;color:#38bdf8;font-weight:700;">⭐ Marco Azul Animado</div>';
+        preview = '<div style="font-size:10px;color:#38bdf8;font-weight:700;">⭐ Marco Azul Animado</div>';
       } else if (c.type === 'color') {
-        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:11px;color:${c.val};font-weight:700;">Muestra de Nombre</span></div>`;
+        preview = `<div style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="font-size:10px;color:${c.val};font-weight:700;">Muestra</span></div>`;
       } else {
-        preview = `<div style="height:20px;border-radius:4px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>`;
+        preview = `<div style="height:16px;border-radius:3px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>`;
       }
 
       card.innerHTML = `
-        <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</div>
-        <div style="font-size:11px;font-weight:700;color:#fff;">${c.name}</div>
+        <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</div>
+        <div style="font-size:10.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.name}</div>
         ${preview}
-        <div style="margin-top:auto;padding-top:4px;">
+        <div style="margin-top:auto;padding-top:2px;">
           ${isEquipped 
-            ? '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:10.5px;font-weight:800;padding:5px;border-radius:4px;cursor:default;">✓ Equipado</button>'
+            ? '<button style="width:100%;background:#065f46;border:1px solid #10b981;color:#a7f3d0;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:default;">✓ Equipado</button>'
             : isUnlocked 
-              ? '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:10.5px;font-weight:800;padding:5px;border-radius:4px;cursor:pointer;">Equipar</button>'
-              : '<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:10.5px;font-weight:700;padding:5px;border-radius:4px;cursor:not-allowed;">🔒 Bloqueado</button>'}
+              ? '<button class="vEqBtn" style="width:100%;background:#2563eb;border:none;color:#fff;font-size:9.5px;font-weight:800;padding:4px;border-radius:4px;cursor:pointer;">Equipar</button>'
+              : '<button disabled style="width:100%;background:#1e172a;border:1px solid #332349;color:#64748b;font-size:9.5px;font-weight:700;padding:4px;border-radius:4px;cursor:not-allowed;">🔒 Bloqueado</button>'}
         </div>
       `;
 
@@ -533,17 +528,17 @@ function modalVault() {
       const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
       let visualPreview = '';
       if (item.type === 'frame') {
-        visualPreview = '<div style="width:30px;height:30px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin-bottom:3px;">★</div>';
+        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid #38bdf8;box-shadow:0 0 6px #38bdf8;display:grid;place-items:center;font-size:9px;font-weight:900;color:#38bdf8;margin:2px 0;">★</div>';
       } else if (item.type === 'color') {
-        visualPreview = `<div style="width:24px;height:24px;border-radius:50%;background:${item.val};box-shadow:0 0 8px ${item.val};margin-bottom:3px;"></div>`;
+        visualPreview = `<div style="width:22px;height:22px;border-radius:50%;background:${item.val};box-shadow:0 0 8px ${item.val};margin:2px 0;"></div>`;
       } else {
-        visualPreview = `<div style="width:50px;height:14px;border-radius:4px;background:${item.val};margin-bottom:3px;border:1px solid rgba(255,255,255,0.2);"></div>`;
+        visualPreview = `<div style="width:52px;height:14px;border-radius:4px;background:${item.val};margin:2px 0;border:1px solid rgba(255,255,255,0.2);"></div>`;
       }
       return `
-        <div class="roulette-card" style="width:120px;height:112px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-          <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:3px;">${item.rarity.toUpperCase()}</div>
+        <div class="roulette-card" style="box-sizing:border-box;width:115px;min-width:115px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+          <div style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;margin-bottom:2px;">${item.rarity.toUpperCase()}</div>
           ${visualPreview}
-          <div style="font-size:10.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
+          <div style="font-size:9.5px;font-weight:800;color:#fff;line-height:1.2;text-align:center;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${item.name}</div>
         </div>
       `;
     }).join('');
@@ -557,9 +552,7 @@ window.modalVault = modalVault;
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
 function openOfficialGuide(chKey = 'como_funciona') {
-  const curSid = (S.view.kind === 'server' || S.view.kind === 'guide') ? (S.view.sid && S.sdata.has(S.view.sid) ? S.view.sid : S.servers[0]?.id) : S.servers[0]?.id;
-  S.lastServerId = curSid;
-  S.view = { kind: 'guide', sid: curSid || 'official_guide' };
+  S.view = { kind: 'guide' };
   S.guideChannel = chKey;
   S.chan = null;
   S.chanType = 'guide';
@@ -2001,7 +1994,7 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.6';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.8';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -2022,6 +2015,28 @@ function userItem(u, onclick, extra) {
 }
 function renderSide() {
   const L = $('sideList'); L.replaceChildren();
+
+  // MODO 1: GUÍAS OFICIALES (Activado desde el botón especial 📘 del riel)
+  if (S.view.kind === 'guide') {
+    $('sideTitle').replaceChildren(h('span', { style: 'font-weight:800;color:#c7d2fe;display:flex;align-items:center;gap:6px;' }, '📘 Guías Oficiales'));
+    const sGuides = [
+      { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, streaming, bot DJ y controles' },
+      { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, roles y permisos' },
+      { key: 'mazmorras', name: '⚔️-mazmorras-y-recompensas', title: 'Minijuego 5 pisos, llaves y skins mensuales' }
+    ];
+    sGuides.forEach(g => {
+      const isSel = S.guideChannel === g.key;
+      L.append(h('div', {
+        class: 'item' + (isSel ? ' sel' : ''),
+        style: isSel ? 'background:#241d3e;border-left:3px solid #818cf8;color:#fff;font-weight:700;' : 'color:#c7d2fe;font-size:13px;',
+        title: g.title,
+        onclick: () => openOfficialGuide(g.key)
+      }, h('span', { class: 'nm' }, '# ' + g.name)));
+    });
+    return;
+  }
+
+  // MODO 2: INICIO / AMIGOS
   if (S.view.kind === 'home') {
     $('sideTitle').replaceChildren(h('span', null, 'Mensajes directos'));
     for (const f of S.friends.friends) {
@@ -2032,6 +2047,8 @@ function renderSide() {
     if (!S.friends.friends.length) L.append(h('div', { class: 'item' }, 'Aún no tienes amigos'));
     return;
   }
+
+  // MODO 3: SERVIDOR (Exclusivamente canales de texto y voz normales, sin guías adentro)
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
   const myRank = ROLES[sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member')]?.rank ?? 0;
   $('sideTitle').replaceChildren(
@@ -2039,43 +2056,6 @@ function renderSide() {
     h('button', { class: 'btn-ico', onclick: () => modalInviteFriends(sd.id), title: 'Invitar amigos directamente a este servidor' }, '👥'),
     h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, canales y rangos' }, '⋯')
   );
-  // SECCIÓN OFICIAL DE GUÍAS E INSTRUCCIONES (PLEGABLE / OCULTABLE)
-  const guidesHidden = !!settings.hideServerGuides;
-  L.append(h('div', { class: 'sect', style: 'display:flex;align-items:center;justify-content:space-between;cursor:pointer;' },
-    h('span', {
-      onclick: () => {
-        settings.hideServerGuides = !guidesHidden;
-        saveSettings();
-        renderSide();
-      }
-    }, (guidesHidden ? '▶' : '▼') + ' 📖 Guías e Información'),
-    h('button', {
-      title: guidesHidden ? 'Mostrar canales de instrucciones' : 'Ocultar canales de instrucciones',
-      style: 'background:none;border:none;color:#94a3b8;font-size:11px;cursor:pointer;padding:2px 4px;',
-      onclick: () => {
-        settings.hideServerGuides = !guidesHidden;
-        saveSettings();
-        renderSide();
-      }
-    }, guidesHidden ? '👁️ Ver' : '✕ Ocultar')
-  ));
-
-  if (!guidesHidden) {
-    const sGuides = [
-      { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, transmisión y controles' },
-      { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Servidores, canales y roles' },
-      { key: 'mazmorras', name: '⚔️-mazmorras-y-recompensas', title: 'Minijuego, skins y recompensas' }
-    ];
-    sGuides.forEach(g => {
-      const isSel = S.view.kind === 'guide' && S.guideChannel === g.key;
-      L.append(h('div', {
-        class: 'item' + (isSel ? ' sel' : ''),
-        style: 'color:#c7d2fe;font-size:12.5px;padding-left:14px;',
-        title: g.title,
-        onclick: () => openOfficialGuide(g.key)
-      }, h('span', { class: 'nm', style: 'color:#a5b4fc;font-weight:600;' }, '# ' + g.name)));
-    });
-  }
 
   for (const type of ['text', 'voice']) {
     L.append(h('div', { class: 'sect' }, type === 'text' ? 'Canales de texto' : 'Canales de voz',
@@ -2088,19 +2068,13 @@ function renderSide() {
         : null;
       const prefix = type === 'text' ? '# ' : (/^[\p{Emoji}\u200d]+/u.test(c.name) ? '' : '🔊 ');
       L.append(h('div', { class: 'item' + (sel ? ' sel' : ''), onclick: () => (type === 'voice' ? joinCall(c.key, c.name) : openChannel(c.key, 'text', c.name)) },
-        h('span', { class: 'nm' }, prefix + c.name, S.unread.has(c.key) ? ' ●' : ''),
+        h('span', { class: 'l' }, prefix, h('span', { class: 'nm' }, c.name)),
         countBadge
       ));
       if (type === 'voice') {
         const pt = S.partyTracks.get(c.key);
-        if (pt) L.append(h('div', { class: 'sub party-sub', title: `Sonando en ${c.name}: ${pt}` }, `🎵 ${pt}`));
-        for (const u of rUsers) {
-          L.append(h('div', { class: 'sub' },
-            avatar(u, 18),
-            h('span', { class: 'sub-nm' }, (u.state?.screen ? '🖥️ ' : u.state?.cam ? '📷 ' : '') + u.name + (u.state?.muted ? ' 🔇' : '')),
-            u.activity?.name ? h('span', { class: 'sub-game', title: `Jugando a ${u.activity.name}` }, `🎮 ${u.activity.name}`) : null
-          ));
-        }
+        if (pt) L.append(h('div', { class: 'sub party-sub' }, `🎵 ${pt}`));
+        for (const u of rUsers) L.append(h('div', { class: 'sub' }, avatar(u, 16, true), u.name));
       }
     }
   }
@@ -2289,8 +2263,10 @@ function applyPanelsLayout() {
 function renderCenter() {
   applyPanelsLayout();
   const dm = S.chan && S.chan[0] === 'd';
-  const showChat = !!S.chan && S.chanType !== 'voice';
+  const isGuide = S.view.kind === 'guide';
+  const showChat = !!S.chan && S.chanType !== 'voice' && !isGuide;
   const isServer = S.view.kind === 'server';
+
   const toggleSideBtn = h('button', {
     class: 'btn-ico' + (settings.hideSide ? ' on-pane' : ''),
     title: settings.hideSide ? 'Mostrar lista de contactos y canales' : 'Ocultar lista de contactos y canales (mantiene los servidores visibles)',
@@ -2308,15 +2284,38 @@ function renderCenter() {
       onclick: () => { settings.hideMembers = !settings.hideMembers; saveSettings(); renderCenter(); }
     }, icoSvg('users', 14), 'Miembros') : null
   );
+
+  const guideTitles = {
+    como_funciona: '📖-como-funciona',
+    servidores: '🏰-guia-de-servidores',
+    mazmorras: '⚔️-mazmorras-y-recompensas'
+  };
+
+  const centerTitleText = isGuide 
+    ? ('# ' + (guideTitles[S.guideChannel] || 'guia-oficial'))
+    : S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '';
+
   $('chTitle').replaceChildren(
     h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
       toggleSideBtn,
-      h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '')
+      h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;' }, centerTitleText),
+      isGuide ? h('span', { style: 'background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #4338ca;' }, 'Canal Informativo Oficial') : null
     ),
     rightBtns
   );
-  $('msgs').classList.toggle('hidden', !showChat); $('composer').classList.toggle('hidden', !showChat);
-  $('home').classList.toggle('hidden', showChat || S.view.kind !== 'home');
+
+  // Visibilidad de paneles en section#center
+  $('msgs').classList.toggle('hidden', !showChat);
+  $('composer').classList.toggle('hidden', !showChat);
+  $('home').classList.toggle('hidden', isGuide || showChat || S.view.kind !== 'home');
+
+  const gView = $('guideView');
+  if (gView) {
+    gView.classList.toggle('hidden', !isGuide);
+    if (isGuide) {
+      gView.replaceChildren(renderGuideContent(S.guideChannel || 'como_funciona'));
+    }
+  }
 }
 function renderHome() {
   const H = $('home'); if (H.classList.contains('hidden') && S.view.kind !== 'home') return;
