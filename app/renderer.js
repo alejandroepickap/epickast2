@@ -824,7 +824,7 @@ window.modalVault = modalVault;
 
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
-function openOfficialGuide(chKey = 'como_funciona') {
+function openOfficialGuide(chKey = 'notas_version') {
   S.view = { kind: 'guide' };
   S.guideChannel = chKey;
   S.chan = null;
@@ -835,7 +835,80 @@ function openOfficialGuide(chKey = 'como_funciona') {
 function renderGuideContent(chKey) {
   const container = h('div', { class: 'guide-container', style: 'padding:24px 32px;overflow-y:auto;height:100%;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;' });
 
-  if (chKey === 'como_funciona') {
+    if (chKey === 'notas_version') {
+    container.innerHTML = `
+      <div style="max-width:820px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:32px;">🚀</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Notas de la Versión v1.8.0</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Historial completo de novedades, mejoras del minijuego, persistencia permanente en la nube e iconos de llamada.</p>
+          </div>
+        </div>
+
+        <!-- 1. Persistencia Firebase -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>☁️</span> Sincronización en la Nube con Firebase Storage
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Persistencia garantizada y permanente en infraestructura multi-región para cuentas, progreso y cosméticos:
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>Respaldo Automático:</b> Todas las cuentas, contraseñas seguras (hash salt), llaves criptográficas, monedas acumuladas, Polvo de Reliquia, inventario y cosméticos se sincronizan en la nube (<code>epickast.firebasestorage.app</code>).</li>
+            <li><b>Inmunidad a Reinicios de Render:</b> Al reiniciar el servidor en contenedores efímeros o suspenderse por inactividad, los datos se auto-restauran al 100% de inmediato.</li>
+            <li><b>Recuperación Multi-Origen:</b> Sistema resiliente que combina respaldo local seguro con almacenamiento en la nube sin pérdida de información.</li>
+          </ul>
+        </div>
+
+        <!-- 2. Iconos de estado de voz -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🎙️</span> Iconos y Estados de Voz en Tiempo Real
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Señalización visual en directo en canales de voz y paneles de llamada para una comunicación cristalina:
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>🔇 Micrófono Silenciado:</b> Icono claro cuando el usuario silencia voluntariamente su micrófono.</li>
+            <li><b>🎧❌ Ensordecido:</b> Distintivo cuando un participante desactiva la recepción de audio de la llamada.</li>
+            <li><b>🔇⛔ Silenciado por Moderador:</b> Aviso prioritario cuando un administrador o moderador aplica silencio forzado a un participante.</li>
+            <li><b>📹 Vídeo / Cámara Web:</b> Indicador visual cuando un participante tiene su cámara activa.</li>
+            <li><b>🖥️ Transmisión de Pantalla:</b> Indicador visible de compartir pantalla o juegos a 60 FPS.</li>
+          </ul>
+        </div>
+
+        <!-- 3. Minijuego Mazmorras del Núcleo v1.8.0 -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#a855f7;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>⚔️</span> Mazmorras del Núcleo v1.8.0 (Combate y Botín Mejorados)
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Rediseño del sistema de interacción, física y recolección de equipamiento:
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>🧲 Imán de Botín (Loot Magnet):</b> Las armas, armaduras y llaves caídas en el suelo son atraídas magnéticamente al explorador al acercarse a menos de 135px.</li>
+            <li><b>⚔️ Auto-equipamiento Inteligente:</b> Al recoger un arma o armadura con mejores estadísticas de daño o vida, el explorador se la equipa inmediatamente mostrando aviso en pantalla y recalculando las estadísticas del personaje.</li>
+            <li><b>🖱️ Recolección Multifunción:</b> Puedes recoger botín pasando cerca, haciendo clic izquierdo directo sobre él o pulsando la tecla <b>E</b> o <b>F</b>.</li>
+            <li><b>♻️ Reciclaje Automático de Duplicados:</b> Los objetos repetidos se transforman automáticamente en +60 monedas sin saturar la mochila.</li>
+            <li><b>⚡ Separación Física y Anti-Atasco:</b> Corrección total del congelamiento al colisionar con enemigos; ahora cuenta con repulsión elástica, invulnerabilidad temporal (i-frames con parpadeo) y loop protegido contra excepciones.</li>
+          </ul>
+        </div>
+
+        <!-- 4. Moderación y Privacidad -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#ef4444;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🛡️</span> Moderación, Privacidad y Seguridad
+          </h2>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>🚨 Sistema de Reportes:</b> Botón de reporte de usuarios por infracción de normas o acoso con categorías y detalles guardados en base segura.</li>
+            <li><b>🚫 Bloqueo Estricto de Mensajería:</b> El servidor rechaza y enmascara mensajes directos de usuarios bloqueados.</li>
+            <li><b>🔒 Descargas con Políticas Seguras:</b> Cabeceras <code>Content-Disposition: attachment</code> y <code>X-Content-Type-Options: nosniff</code> en todos los archivos multimedia.</li>
+          </ul>
+        </div>
+      </div>
+    `;
+  } else if (chKey === 'como_funciona') {
     container.innerHTML = `
       <div style="max-width:820px;margin:0 auto;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
@@ -857,6 +930,24 @@ function renderGuideContent(chKey) {
           <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0 0 10px 0;">
             <li><b>Detección de Voz (VAD):</b> Transmite de forma fluida cuando hablas sin necesidad de pulsar teclas.</li>
             <li><b>Pulsar para Hablar (PTT):</b> Mantén pulsada una tecla para abrir tu micrófono. Configurable en Ajustes.</li>
+          </ul>
+        </div>
+
+        
+        <!-- Sección 1b: Iconos de estado de voz y llamada -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🎙️</span> Estados de Voz y Moderación en Tiempo Real
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            En cualquier sala de voz y llamada, los avatares y listas muestran el estado exacto de cada participante:
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0 0 10px 0;">
+            <li><b>🔇 Silenciado:</b> El usuario silenció voluntariamente su micrófono.</li>
+            <li><b>🎧❌ Ensordecido:</b> El usuario desactivó el audio de la aplicación para no oír a los demás.</li>
+            <li><b>🔇⛔ Silenciado por Admin:</b> Un moderador o administrador aplicó un silencio forzado al participante.</li>
+            <li><b>📹 Cámara Web:</b> Indicador de vídeo en directo encendido.</li>
+            <li><b>🖥️ Pantalla:</b> Indicador de que el usuario está transmitiendo su pantalla o juego.</li>
           </ul>
         </div>
 
@@ -2280,7 +2371,7 @@ function renderRail() {
     class: 'ico guide-ico' + (S.view.kind === 'guide' ? ' sel' : ''),
     title: 'Centro de Información y Guías Oficiales de EpicKast',
     style: 'background:linear-gradient(135deg, #1e1b4b, #4338ca);color:#c7d2fe;border:1px solid #6366f1;font-weight:900;font-size:15px;',
-    onclick: () => openOfficialGuide('como_funciona')
+    onclick: () => openOfficialGuide('notas_version')
   }, '📘'));
   for (const s of S.servers) {
     const isMuted = (settings.mutedServers || []).includes(s.id);
@@ -2326,6 +2417,7 @@ function renderSide() {
   if (S.view.kind === 'guide') {
     $('sideTitle').replaceChildren(h('span', { style: 'font-weight:800;color:#c7d2fe;display:flex;align-items:center;gap:6px;' }, '📘 Guías Oficiales'));
     const sGuides = [
+      { key: 'notas_version', name: '🚀-notas-de-la-version-v180', title: 'Lista completa de novedades y cambios v1.8.0' },
       { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, streaming, bot DJ y controles' },
       { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, roles y permisos' },
       { key: 'mazmorras', name: '⚔️-mazmorras-y-recompensas', title: 'Minijuego 5 pisos, llaves y skins mensuales' }

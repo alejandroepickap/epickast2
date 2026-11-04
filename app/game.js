@@ -579,10 +579,11 @@
                 <!-- Controles -->
                 <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px; font-size:11px; color:#cbd5e1; line-height:1.5;">
                   <strong style="color:#fff; display:block; margin-bottom:4px;">⚔️ COMBATE Y CONTROLES</strong>
-                  <div>🗡️ <b>Clic Izq / Espacio:</b> Espadazo melee con empuje.</div>
-                  <div>🏹 <b>Clic Der / Tecla E:</b> Flecha de ballesta rúnica.</div>
-                  <div>🏃 <b>WASD:</b> Movimiento con deslizamiento en muros.</div>
-                  <div>🌀 <b>Portal:</b> Despeja la sala para abrirlo y descender.</div>
+                  <div>🗡️ <b>Clic Izq / Espacio:</b> Espadazo melee (o clic en botín/portal).</div>
+                  <div>🏹 <b>Clic Der:</b> Flecha de ballesta rúnica a distancia.</div>
+                  <div>🧲 <b>Botín e Imán:</b> Acércate para absorberlo, o pulsa <b>E / F / Clic</b> para recoger y auto-equipar.</div>
+                  <div>🏃 <b>WASD:</b> Movimiento con deslizamiento suave en muros.</div>
+                  <div>🌀 <b>Portal:</b> Despeja la sala para descender y curarte (+35 HP).</div>
                 </div>
               </div>
 
@@ -731,7 +732,32 @@
           this.keys[e.code] = true;
           e.preventDefault();
         }
-        if (e.code === 'KeyE') this.shootCrossbow();
+        // Tecla E o F: Recoger botín/llaves cercanas prioritariamente, o disparar ballesta
+        if (e.code === 'KeyF' || e.code === 'KeyE') {
+          let picked = false;
+          // Buscar botín a menos de 90px
+          for (let i = this.droppedLoot.length - 1; i >= 0; i--) {
+            const item = this.droppedLoot[i];
+            if (Math.hypot(this.player.x - item.x, this.player.y - item.y) < 90) {
+              this.pickupDroppedLoot(item, i);
+              picked = true;
+              break;
+            }
+          }
+          if (!picked) {
+            for (let i = this.droppedKeys.length - 1; i >= 0; i--) {
+              const k = this.droppedKeys[i];
+              if (Math.hypot(this.player.x - k.x, this.player.y - k.y) < 90) {
+                this.pickupDroppedKey(k, i);
+                picked = true;
+                break;
+              }
+            }
+          }
+          if (!picked && e.code === 'KeyE') {
+            this.shootCrossbow();
+          }
+        }
         if (e.code === 'Space') {
           if (!this.checkPortalEnter()) this.attackSword();
         }
@@ -758,7 +784,12 @@
         }
         if (e.button === 0) {
           this.mouse.isDown = true;
-          if (!this.checkPortalEnter()) this.attackSword();
+          // 1. Si hace clic sobre un arma o llave tirada en el suelo, recogerla al instante
+          if (this.checkLootPickup(this.mouse.x, this.mouse.y)) return;
+          // 2. Si hace clic sobre el portal activo, entrar
+          if (this.checkPortalEnter()) return;
+          // 3. De lo contrario, atacar con espada
+          this.attackSword();
         } else if (e.button === 2) {
           e.preventDefault();
           this.mouse.rightDown = true;
@@ -960,6 +991,101 @@
         return true;
       }
       return false;
+    }
+
+    checkLootPickup(mouseX, mouseY) {
+      // 1. Clic sobre botín de combate tirado en el suelo
+      for (let i = this.droppedLoot.length - 1; i >= 0; i--) {
+        const item = this.droppedLoot[i];
+        if (Math.hypot(mouseX - item.x, mouseY - item.y) < 40) {
+          this.pickupDroppedLoot(item, i);
+          return true;
+        }
+      }
+      // 2. Clic sobre llaves de perfil tiradas en el suelo
+      for (let i = this.droppedKeys.length - 1; i >= 0; i--) {
+        const k = this.droppedKeys[i];
+        if (Math.hypot(mouseX - k.x, mouseY - k.y) < 40) {
+          this.pickupDroppedKey(k, i);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    pickupDroppedLoot(item, index) {
+      if (!item || !item.data) return;
+      const isWeapon = item.data.type === 'weapon';
+      const isBow = item.data.type === 'bow';
+      const isArmor = item.data.type === 'armor';
+
+      const alreadyHas = (this.inventory.items || []).some(it => it.id === item.data.id) ||
+                         this.inventory.equippedWeapon?.id === item.data.id ||
+                         this.inventory.equippedBow?.id === item.data.id ||
+                         this.inventory.equippedArmor?.id === item.data.id;
+
+      if (alreadyHas) {
+        const scrapBonus = 60;
+        this.data.coins += scrapBonus;
+        saveDungeonData(this.data);
+        AudioFX.coinPickup();
+        this.spawnFloatingText(item.x, item.y - 20, `♻️ ¡${item.data.name} reciclado! (+${scrapBonus} 🪙)`, '#fde047', 13);
+        this.updateUi();
+      } else {
+        let shouldAutoEquip = false;
+        if (isWeapon) {
+          const curBonus = this.inventory.equippedWeapon?.bonusDmg || 0;
+          if ((item.data.bonusDmg || 0) > curBonus) shouldAutoEquip = true;
+        } else if (isBow) {
+          const curBonus = this.inventory.equippedBow?.bonusDmg || 0;
+          if ((item.data.bonusDmg || 0) > curBonus) shouldAutoEquip = true;
+        } else if (isArmor) {
+          const curBonus = this.inventory.equippedArmor?.bonusHp || 0;
+          if ((item.data.bonusHp || 0) > curBonus) shouldAutoEquip = true;
+        }
+
+        if (shouldAutoEquip) {
+          if (isWeapon) this.inventory.equippedWeapon = item.data;
+          else if (isBow) this.inventory.equippedBow = item.data;
+          else if (isArmor) this.inventory.equippedArmor = item.data;
+
+          if (!(this.inventory.items || []).some(it => it.id === item.data.id)) {
+            this.inventory.items.push(item.data);
+          }
+          saveInventory(this.inventory);
+          this.recalculatePlayerStats();
+          AudioFX.itemPickup();
+          const bonusText = isArmor ? `+${item.data.bonusHp} Salud` : `+${item.data.bonusDmg} Daño`;
+          this.spawnFloatingText(this.player.x, this.player.y - 28, `⚔️ ¡${item.data.name} EQUIPADA! (${bonusText})`, '#38bdf8', 14);
+        } else {
+          this.inventory.items.push(item.data);
+          saveInventory(this.inventory);
+          AudioFX.itemPickup();
+          this.spawnFloatingText(this.player.x, this.player.y - 24, `📦 ¡${item.data.name} en Mochila!`, '#a855f7', 13);
+        }
+
+        this.updateInventoryUi();
+        this.renderInventoryList();
+        this.updateUi();
+      }
+
+      if (typeof index === 'number' && index >= 0) {
+        this.droppedLoot.splice(index, 1);
+      }
+    }
+
+    pickupDroppedKey(k, index) {
+      if (!k || !k.tier) return;
+      this.data.keys[k.tier] = (this.data.keys[k.tier] || 0) + 1;
+      saveDungeonData(this.data);
+      AudioFX.itemPickup();
+      const color = KEY_TIERS[k.tier]?.color || '#fbbf24';
+      this.spawnFloatingText(k.x, k.y - 20, `🔑 ¡Llave de ${k.tier.toUpperCase()} recogida!`, color, 14);
+      if (typeof index === 'number' && index >= 0) {
+        this.droppedKeys.splice(index, 1);
+      }
+      this.updateUi();
+      this.renderKeyIcons();
     }
 
     showVictoryModal() {
@@ -1386,45 +1512,41 @@
         }
       }
 
-      // Recolección de botín de combate (armas y armaduras)
+      // Recolección y atracción magnética de botín de combate (armas y armaduras)
       for (let i = this.droppedLoot.length - 1; i >= 0; i--) {
         const item = this.droppedLoot[i];
         item.bob = (item.bob || 0) + dt * 4;
-        if (Math.hypot(this.player.x - item.x, this.player.y - item.y) < this.player.radius + 16) {
-          const alreadyHas = (this.inventory.items || []).some(it => it.id === item.data.id) ||
-                            this.inventory.equippedWeapon?.id === item.data.id ||
-                            this.inventory.equippedBow?.id === item.data.id ||
-                            this.inventory.equippedArmor?.id === item.data.id;
-          if (alreadyHas) {
-            // Objeto repetido: reciclaje por monedas para evitar botones duplicados
-            const scrapBonus = 60;
-            this.data.coins += scrapBonus;
-            saveDungeonData(this.data);
-            AudioFX.coinPickup();
-            this.spawnFloatingText(item.x, item.y - 20, `♻️ ¡${item.data.name} repetido! (+ ${scrapBonus} Monedas)`, '#fde047', 13);
-            this.updateUi();
-          } else {
-            this.inventory.items.push(item.data);
-            saveInventory(this.inventory);
-            AudioFX.itemPickup();
-            this.spawnFloatingText(item.x, item.y - 20, `✨ ¡${item.data.name}!`, '#38bdf8', 14);
-            this.renderInventoryList();
-          }
-          this.droppedLoot.splice(i, 1);
+        const d = Math.hypot(this.player.x - item.x, this.player.y - item.y);
+
+        // Imán de botín: a menos de 135px el arma o armadura vuela hacia el explorador
+        if (d < 135 && d > 1) {
+          const pullSpeed = Math.min(320, 160 + (135 - d) * 2.5);
+          item.x += ((this.player.x - item.x) / d) * pullSpeed * dt;
+          item.y += ((this.player.y - item.y) / d) * pullSpeed * dt;
+        }
+
+        // Absorción física por contacto (radio ampliado a 44px)
+        if (d < this.player.radius + 32) {
+          this.pickupDroppedLoot(item, i);
         }
       }
 
-      // Recolección de llaves de perfil (con ratio reducido)
+      // Recolección y atracción magnética de llaves de perfil
       for (let i = this.droppedKeys.length - 1; i >= 0; i--) {
         const k = this.droppedKeys[i];
         k.bob = (k.bob || 0) + dt * 4;
-        if (Math.hypot(this.player.x - k.x, this.player.y - k.y) < this.player.radius + 16) {
-          this.data.keys[k.tier] = (this.data.keys[k.tier] || 0) + 1;
-          saveDungeonData(this.data);
-          AudioFX.itemPickup();
-          this.spawnFloatingText(k.x, k.y - 20, `🔑 ¡Llave de ${k.tier.toUpperCase()}!`, KEY_TIERS[k.tier].color, 14);
-          this.droppedKeys.splice(i, 1);
-          this.updateUi();
+        const d = Math.hypot(this.player.x - k.x, this.player.y - k.y);
+
+        // Imán de llaves a menos de 135px
+        if (d < 135 && d > 1) {
+          const pullSpeed = Math.min(320, 160 + (135 - d) * 2.5);
+          k.x += ((this.player.x - k.x) / d) * pullSpeed * dt;
+          k.y += ((this.player.y - k.y) / d) * pullSpeed * dt;
+        }
+
+        // Absorción física por contacto
+        if (d < this.player.radius + 32) {
+          this.pickupDroppedKey(k, i);
         }
       }
 
@@ -1794,13 +1916,21 @@
 
       // 6. BOTÍN EN EL SUELO (Armas, armaduras y pociones de combate)
       this.droppedLoot.forEach(item => {
-        const bobY = Math.sin(item.bob) * 3;
+        const bobY = Math.sin(item.bob || 0) * 4;
+        const pulse = 1 + Math.sin((item.bob || 0) * 2) * 0.15;
         ctx.save();
         ctx.translate(item.x, item.y + bobY);
 
-        // Sombra y resplandor
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-        ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
+        // Sombra en suelo
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath(); ctx.ellipse(0, 10, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+        // Resplandor pulsante
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.beginPath(); ctx.arc(0, 0, 16 * pulse, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(0, 0, 12 * pulse, 0, Math.PI * 2); ctx.stroke();
 
         if (item.data.type === 'weapon') {
           // Espada brillante
@@ -1827,10 +1957,18 @@
           ctx.fillRect(-5, -5, 10, 10);
         }
 
-        ctx.fillStyle = '#38bdf8';
+        // Etiqueta flotante oscura con borde neón
         ctx.font = 'bold 9px monospace';
+        const txtW = ctx.measureText(item.data.name).width;
+        ctx.fillStyle = 'rgba(10, 6, 20, 0.85)';
+        ctx.fillRect(-txtW / 2 - 4, -22, txtW + 8, 12);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(-txtW / 2 - 4, -22, txtW + 8, 12);
+
+        ctx.fillStyle = '#38bdf8';
         ctx.textAlign = 'center';
-        ctx.fillText(item.data.name, 0, -14);
+        ctx.fillText(item.data.name, 0, -13);
         ctx.restore();
       });
 
