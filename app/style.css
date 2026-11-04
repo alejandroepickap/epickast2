@@ -996,3 +996,20 @@ details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-directio
   color: #fff;
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
 }
+
+/* Centro de Guías Oficial y Cosméticos v1.7.6 */
+.guide-container::-webkit-scrollbar {
+  width: 6px;
+}
+.guide-container::-webkit-scrollbar-thumb {
+  background: #33204d;
+  border-radius: 4px;
+}
+.guide-ico:hover {
+  filter: brightness(1.2);
+  transform: scale(1.05);
+}
+.vault-ico:hover {
+  filter: brightness(1.2);
+  transform: scale(1.05);
+}

@@ -181,45 +181,36 @@ function modalVault() {
   m.classList.remove('hidden');
   m.replaceChildren();
 
-  // Cargar datos locales de llaves del jugador
-  let dData = { coins: 50, keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 }, founderFrameUnlocked: false };
+  // Cargar datos locales de llaves del jugador y cosméticos
+  let dData = { coins: 50, keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 }, founderFrameUnlocked: false, cosmetics: {} };
   try {
     const raw = localStorage.getItem('epickast.dungeon.v1');
     if (raw) dData = JSON.parse(raw);
+    if (!dData.cosmetics) dData.cosmetics = {};
   } catch {}
 
+  // CATÁLOGO DE 8 COSMÉTICOS EXCLUSIVOS DE PERFIL (TEMPORADA 1)
+  const PROFILE_COSMETICS = [
+    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', rarity: 'gold', color: '#38bdf8', desc: 'Marco Azul Neón de Primera Edición con placa oficial "FUNDADOR" para llamadas, chat y perfil.' },
+    { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#10b981', rarity: 'milspec', color: '#10b981', desc: 'Tu nombre y perfil resplandecen en verde esmeralda del Núcleo.' },
+    { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#a855f7', rarity: 'milspec', color: '#a855f7', desc: 'Tu nombre y perfil resplandecen en púrpura amatista místico.' },
+    { id: 'color_magma', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'milspec', color: '#f59e0b', desc: 'Tu nombre y perfil resplandecen en ámbar volcánico ardiente.' },
+    { id: 'banner_mines', name: 'Banner: Minas de Magma', type: 'banner', val: 'linear-gradient(135deg, #451a03, #b45309, #78350f)', rarity: 'restricted', color: '#8847ff', desc: 'Estandarte panorámico de magma y basalto para tu tarjeta de perfil.' },
+    { id: 'banner_amethyst', name: 'Banner: Galerías de Amatista', type: 'banner', val: 'linear-gradient(135deg, #2e1065, #7e22ce, #3b0764)', rarity: 'restricted', color: '#8847ff', desc: 'Estandarte de geodas púrpuras brillantes para tu tarjeta de perfil.' },
+    { id: 'banner_bridges', name: 'Banner: Puentes de Lava', type: 'banner', val: 'linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d)', rarity: 'classified', color: '#d32ce6', desc: 'Estandarte de los puentes de piedra sobre el abismo volcánico.' },
+    { id: 'banner_sanctum', name: 'Banner: Sagrario del Gólem', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'covert', color: '#ef4444', desc: 'Estandarte majestuoso del Santuario Central del Coloso de Obsidiana.' }
+  ];
+
+  // Configuración de cofres según llaves
   const CHEST_REWARDS = {
-    copper: [
-      { id: 'coins_50', name: 'Bolsa de 50 Monedas', type: 'Monedas', rarity: 'milspec', color: '#60a5fa', desc: '+50 Monedas para la tienda' },
-      { id: 'potion_heal', name: 'Poción de Salud', type: 'Consumible', rarity: 'milspec', color: '#4ade80', desc: '+35 Salud inmediata' },
-      { id: 'dagger_copper', name: 'Daga Rústica de Cobre', type: 'Arma', rarity: 'milspec', color: '#93c5fd', desc: '+15% Velocidad de ataque' },
-      { id: 'shield_wood', name: 'Escudo Táctico de Roble', type: 'Defensa', rarity: 'restricted', color: '#c084fc', desc: 'Reduce daño recibido un 10%' },
-      { id: 'badge_copper', name: 'Insignia: Minero Novato', type: 'Prestigio', rarity: 'classified', color: '#f472b6', desc: 'Distintivo al lado de tu nombre' }
-    ],
-    silver: [
-      { id: 'coins_150', name: 'Cofrecillo de 150 Monedas', type: 'Monedas', rarity: 'milspec', color: '#60a5fa', desc: '+150 Monedas' },
-      { id: 'crossbow_silver', name: 'Ballesta Rúnica de Plata', type: 'Arma', rarity: 'restricted', color: '#c084fc', desc: '+30 Daño a distancia' },
-      { id: 'shield_silver', name: 'Escudo de Plata Pulida', type: 'Defensa', rarity: 'restricted', color: '#a78bfa', desc: 'Reduce daño recibido un 20%' },
-      { id: 'mail_magma', name: 'Cota de Malla Volcánica', type: 'Armadura', rarity: 'classified', color: '#f472b6', desc: '+40 Salud Máxima' },
-      { id: 'badge_silver', name: 'Insignia: Explorador de Plata', type: 'Prestigio', rarity: 'covert', color: '#ef4444', desc: 'Insignia brillante en chat' }
-    ],
-    gold: [
-      { id: 'coins_300', name: 'Saco de 300 Monedas Reales', type: 'Monedas', rarity: 'restricted', color: '#c084fc', desc: '+300 Monedas' },
-      { id: 'sword_fire', name: 'Espada Flamígera Real', type: 'Arma', rarity: 'classified', color: '#f472b6', desc: 'Corte ígneo con quemadura' },
-      { id: 'armor_heavy', name: 'Armadura Pesada de Magma', type: 'Armadura', rarity: 'covert', color: '#ef4444', desc: '+60 Salud Máxima' },
-      { id: 'nick_glow_gold', name: '★ Nombre Dorado Brillante ★', type: 'Cosmético', rarity: 'gold', color: '#fbbf24', desc: 'Tu nombre resplandece en oro' },
-      { id: 'founder_frame', name: '★ MARCO DE AVATAR: FUNDADOR ★', type: 'Gran Premio', rarity: 'gold', color: '#38bdf8', desc: 'El Marco Azul Oficial para tu perfil' }
-    ],
-    obsidian: [
-      { id: 'sword_core', name: 'Espada Devastadora del Núcleo', type: 'Arma Mítica', rarity: 'covert', color: '#ef4444', desc: 'Corte sísmico con 75 daño' },
-      { id: 'crossbow_void', name: 'Ballesta Titánica de Vacío', type: 'Arma Mítica', rarity: 'covert', color: '#ec4899', desc: 'Proyectil penetrante masivo' },
-      { id: 'armor_colossus', name: 'Armadura del Gólem Coloso', type: 'Armadura Mítica', rarity: 'covert', color: '#f43f5e', desc: '+80 Salud Máxima y Resistencia' },
-      { id: 'founder_frame', name: '★ MARCO DE AVATAR: FUNDADOR ★', type: 'GRAN PREMIO', rarity: 'gold', color: '#38bdf8', desc: '¡El Marco Azul de Primera Edición para tu Perfil!' }
-    ]
+    copper: PROFILE_COSMETICS.filter(c => c.type === 'color'),
+    silver: PROFILE_COSMETICS.filter(c => c.type === 'color' || c.id === 'banner_mines' || c.id === 'banner_amethyst'),
+    gold: PROFILE_COSMETICS.filter(c => c.type === 'color' || c.type === 'banner'),
+    obsidian: PROFILE_COSMETICS
   };
 
   const RARITY_COLORS = {
-    milspec: '#4b69ff', restricted: '#8847ff', classified: '#d32ce6', covert: '#eb4b4b', gold: '#fbbf24'
+    milspec: '#4b69ff', restricted: '#8847ff', classified: '#d32ce6', covert: '#ef4444', gold: '#fbbf24'
   };
 
   let selectedTier = 'copper';
@@ -229,7 +220,7 @@ function modalVault() {
 
   let isSpinning = false;
 
-  const wrap = h('div', { class: 'cd-crate-dialog', style: 'background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:22px;max-width:820px;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;' });
+  const wrap = h('div', { class: 'cd-crate-dialog', style: 'background:#130e20;border:2px solid #ca8a04;border-radius:12px;padding:22px;max-width:840px;box-shadow:0 0 50px rgba(0,0,0,0.9);color:#fff;font-family:system-ui,sans-serif;max-height:90vh;overflow-y:auto;' });
   m.appendChild(wrap);
 
   const renderContent = () => {
@@ -237,7 +228,7 @@ function modalVault() {
       <div class="crate-top" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
         <div>
           <h2 style="color:#fbbf24;font-size:18px;font-weight:900;letter-spacing:0.5px;margin:0 0 4px 0;">🏛️ BÓVEDA DE RELIQUIAS DEL NÚCLEO</h2>
-          <p style="color:#94a3b8;font-size:12px;margin:0;">Abre cofres ancestrales utilizando las llaves conseguidas en las mazmorras de EpicKast.</p>
+          <p style="color:#94a3b8;font-size:12px;margin:0;">Abre cofres con llaves ganadas en las mazmorras para desbloquear cosméticos de perfil (Temporada 1 • Rotación Mensual).</p>
         </div>
         <button id="vCloseBtn" class="cd-btn" style="background:#334155;color:#fff;padding:6px 14px;border-radius:6px;cursor:pointer;border:none;font-weight:700;">✕ Cerrar Bóveda</button>
       </div>
@@ -265,14 +256,22 @@ function modalVault() {
       </div>
 
       <!-- Botón Girar -->
-      <div style="text-align:center;margin-top:16px;">
-        <button id="vBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:14px;padding:12px 36px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.5);text-transform:uppercase;letter-spacing:0.8px;">
+      <div style="text-align:center;margin-top:14px;">
+        <button id="vBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04);border:none;color:#0b0813;font-weight:900;font-size:13px;padding:12px 32px;border-radius:8px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};opacity:${(dData.keys[selectedTier]||0)>0?'1':'0.5'};box-shadow:0 0 20px rgba(234,179,8,0.5);text-transform:uppercase;letter-spacing:0.8px;">
           ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE (Consume 1 Llave de ${selectedTier.toUpperCase()})` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega la Mazmorra)`}
         </button>
       </div>
 
       <!-- Área de Ganador -->
       <div id="vWinnerArea" style="display:none;margin-top:14px;padding:12px;background:#1c142b;border:2px solid #38bdf8;border-radius:8px;text-align:center;"></div>
+
+      <!-- Catálogo de Cosméticos Desbloqueados -->
+      <div style="margin-top:20px;border-top:1px solid #291b3b;padding-top:14px;">
+        <h3 style="color:#e2e8f0;font-size:13px;font-weight:800;margin:0 0 10px 0;text-transform:uppercase;letter-spacing:0.8px;">
+          🎨 Mis Cosméticos de Perfil (Temporada 1 • Minas de Magma)
+        </h3>
+        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(185px, 1fr));gap:10px;"></div>
+      </div>
     `;
 
     // Cerrar
@@ -290,8 +289,12 @@ function modalVault() {
         selectedTier = btn.dataset.tier;
         renderContent();
         populatePreview();
+        renderCosmeticsGrid();
       };
     });
+
+    // Renderizar Cuadrícula de Cosméticos
+    renderCosmeticsGrid();
 
     // Girar
     const spinBtn = wrap.querySelector('#vBtnSpin');
@@ -313,7 +316,7 @@ function modalVault() {
         } else if (selectedTier === 'gold') {
           winner = pool[Math.floor(Math.random() * pool.length)];
         } else {
-          winner = pool[Math.floor(Math.random() * (pool.length - 1))];
+          winner = pool[Math.floor(Math.random() * pool.length)];
         }
 
         const totalCards = 50;
@@ -328,7 +331,7 @@ function modalVault() {
           const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
           return `
             <div class="roulette-card" style="width:120px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-              <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${c.type}</div>
+              <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${c.type.toUpperCase()}</div>
               <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;text-align:center;">${c.name}</div>
             </div>
           `;
@@ -366,11 +369,13 @@ function modalVault() {
           isSpinning = false;
           ringer.beep([440, 554, 659, 880], 0.06, 0.12);
 
-          // Si ganó el Marco de Fundador
+          // Guardar cosmético desbloqueado
+          if (!dData.cosmetics) dData.cosmetics = {};
+          dData.cosmetics[winner.id] = true;
+
           if (winner.id === 'founder_frame') {
             dData.founderFrameUnlocked = true;
             try {
-              localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData));
               localStorage.setItem('epickast.equipped_frame', 'founder_blue');
             } catch {}
             document.querySelectorAll('.avatar').forEach(a => {
@@ -379,14 +384,16 @@ function modalVault() {
             toast('🎉 ¡FELICIDADES! Marco de Avatar FUNDADOR desbloqueado y equipado.');
           }
 
+          try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+
           const winnerArea = wrap.querySelector('#vWinnerArea');
           const rColor = RARITY_COLORS[winner.rarity] || '#4b69ff';
           winnerArea.style.display = 'block';
           winnerArea.style.borderColor = rColor;
           winnerArea.innerHTML = `
             <div style="font-size:10px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">¡HAS OBTENIDO!</div>
-            <div style="font-size:18px;font-weight:900;color:#fff;margin-bottom:6px;">${winner.name}</div>
-            <div style="font-size:12px;color:#cbd5e1;">${winner.desc}</div>
+            <div style="font-size:16px;font-weight:900;color:#fff;margin-bottom:6px;">${winner.name}</div>
+            <div style="font-size:11px;color:#cbd5e1;">${winner.desc}</div>
           `;
 
           renderContent();
@@ -394,6 +401,81 @@ function modalVault() {
         }, duration + 200);
       };
     }
+  };
+
+  const renderCosmeticsGrid = () => {
+    const grid = wrap.querySelector('#vCosmeticsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const eqFrame = localStorage.getItem('epickast.equipped_frame');
+    const eqColor = localStorage.getItem('epickast.equipped_color');
+    const eqBanner = localStorage.getItem('epickast.equipped_banner');
+
+    PROFILE_COSMETICS.forEach(c => {
+      const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
+      const isEquipped = (c.type === 'frame' && eqFrame === 'founder_blue') ||
+                         (c.type === 'color' && eqColor === c.val) ||
+                         (c.type === 'banner' && eqBanner === c.val);
+
+      const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
+      const card = document.createElement('div');
+      card.style.cssText = `background:#0e0817;border:2px solid ${isUnlocked ? rColor : '#291b3b'};border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;opacity:${isUnlocked ? '1' : '0.6'};`;
+
+      let previewHtml = '';
+      if (c.type === 'color') {
+        previewHtml = `<div style="display:flex;align-items:center;gap:6px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${c.val};box-shadow:0 0 6px ${c.val};"></span><span style="color:${c.val};font-weight:800;font-size:11px;">Muestra de Nombre</span></div>`;
+      } else if (c.type === 'banner') {
+        previewHtml = `<div style="height:28px;border-radius:4px;background:${c.val};border:1px solid rgba(255,255,255,0.2);"></div>`;
+      } else {
+        previewHtml = `<div style="font-size:10px;color:#38bdf8;font-weight:900;">⭐ Marco Azul Animado</div>`;
+      }
+
+      card.innerHTML = `
+        <div style="font-size:8.5px;font-weight:900;color:${rColor};text-transform:uppercase;">${c.rarity.toUpperCase()} • ${c.type.toUpperCase()}</div>
+        <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;">${c.name}</div>
+        ${previewHtml}
+        <button class="vEqBtn" style="margin-top:auto;background:${!isUnlocked ? '#1e142e' : isEquipped ? '#059669' : '#2563eb'};color:#fff;border:none;padding:5px 8px;border-radius:4px;font-size:10px;font-weight:700;cursor:${isUnlocked ? 'pointer' : 'not-allowed'};">
+          ${!isUnlocked ? '🔒 Bloqueado' : isEquipped ? '✓ Equipado' : 'Equipar'}
+        </button>
+      `;
+
+      if (isUnlocked) {
+        card.querySelector('.vEqBtn').onclick = () => {
+          if (c.type === 'frame') {
+            if (isEquipped) {
+              localStorage.removeItem('epickast.equipped_frame');
+              document.querySelectorAll('.avatar').forEach(a => { if (Number(a.dataset.uid) === S.me?.id) a.classList.remove('frame-founder'); });
+              toast('Marco desequipado');
+            } else {
+              localStorage.setItem('epickast.equipped_frame', 'founder_blue');
+              document.querySelectorAll('.avatar').forEach(a => { if (Number(a.dataset.uid) === S.me?.id) a.classList.add('frame-founder'); });
+              toast('★ Marco de Fundador equipado');
+            }
+          } else if (c.type === 'color') {
+            if (isEquipped) {
+              localStorage.removeItem('epickast.equipped_color');
+              toast('Color restaurado al por defecto');
+            } else {
+              localStorage.setItem('epickast.equipped_color', c.val);
+              toast(`Color ${c.name} equipado`);
+            }
+            renderMembers();
+          } else if (c.type === 'banner') {
+            if (isEquipped) {
+              localStorage.removeItem('epickast.equipped_banner');
+              toast('Banner restaurado');
+            } else {
+              localStorage.setItem('epickast.equipped_banner', c.val);
+              toast(`${c.name} equipado para tu perfil`);
+            }
+          }
+          renderCosmeticsGrid();
+        };
+      }
+
+      grid.appendChild(card);
+    });
   };
 
   const populatePreview = () => {
@@ -406,7 +488,7 @@ function modalVault() {
       const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
       return `
         <div class="roulette-card" style="width:120px;height:108px;flex-shrink:0;background:#110c1c;border:2px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
-          <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${item.type}</div>
+          <div style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:4px;">${item.type.toUpperCase()}</div>
           <div style="font-size:11px;font-weight:800;color:#fff;line-height:1.2;text-align:center;">${item.name}</div>
         </div>
       `;
@@ -416,8 +498,250 @@ function modalVault() {
   renderContent();
   populatePreview();
 }
-
 window.modalVault = modalVault;
+
+
+// ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
+function openOfficialGuide(chKey = 'como_funciona') {
+  S.view = { kind: 'guide', sid: 'official_guide' };
+  S.guideChannel = chKey;
+  S.chan = null;
+  S.chanType = 'guide';
+  render();
+}
+
+function renderGuideContent(chKey) {
+  const container = h('div', { class: 'guide-container', style: 'padding:24px 32px;overflow-y:auto;height:100%;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;' });
+
+  if (chKey === 'como_funciona') {
+    container.innerHTML = `
+      <div style="max-width:820px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:32px;">📘</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Cómo Funciona EpicKast</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Guía rápida de comunicación personal, llamadas de voz, streaming y controles de audio.</p>
+          </div>
+        </div>
+
+        <!-- Sección 1: Llamadas de voz -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🔊</span> Llamadas de Voz Ultra-Baja Latencia
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            EpicKast utiliza el códec adaptativo <b>Opus 48 kHz</b> con supresión de eco y reducción de ruido integrada. Puedes elegir entre:
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0 0 10px 0;">
+            <li><b>Detección de Voz (VAD):</b> Transmite de forma fluida cuando hablas sin necesidad de pulsar teclas.</li>
+            <li><b>Pulsar para Hablar (PTT):</b> Mantén pulsada una tecla para abrir tu micrófono. Configurable en Ajustes.</li>
+          </ul>
+        </div>
+
+        <!-- Sección 2: Transmisión de pantalla -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#a855f7;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🖥️</span> Transmisión de Pantalla 60 FPS
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Comparte tus partidas o ventanas de trabajo con aceleración de hardware por GPU (DirectX / NVENC) a 1080p y 60 FPS con mínimo impacto en rendimiento.
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>Ventana de Aplicación:</b> Comparte únicamente el juego o ventana deseada protegiendo tu privacidad.</li>
+            <li><b>Pantalla Completa:</b> Comparte todo el monitor con audio sincronizado.</li>
+            <li><b>Modo Mini (Picture-in-Picture):</b> Ventana flotante siempre visible para seguir la llamada mientras juegas.</li>
+          </ul>
+        </div>
+
+        <!-- Sección 3: Bot DJ / YouTube -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>🎵</span> Bot DJ / Música de YouTube Sincronizada
+          </h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            En cualquier canal de voz activo, haz clic en el botón superior <b>🎵 Bot DJ</b> para buscar canciones o pegar enlaces de YouTube. Todos los oyentes en la sala escucharán la música sincronizada al milisegundo.
+          </p>
+        </div>
+
+        <!-- Sección 4: Botones y Configuración -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;">
+          <h2 style="color:#4ade80;font-size:16px;font-weight:800;margin:0 0 8px 0;display:flex;align-items:center;gap:8px;">
+            <span>⚙️</span> Barra Inferior y Botones de Configuración
+          </h2>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>🎤 Micrófono:</b> Clic para silenciar/activar con aviso visual.</li>
+            <li><b>🎧 Auriculares:</b> Ensordecer audio completo de la app.</li>
+            <li><b>⚙️ Ajustes:</b> Calibración de sensibilidad de micrófono, volumen maestro y dispositivos.</li>
+          </ul>
+        </div>
+      </div>
+    `;
+  } else if (chKey === 'servidores') {
+    container.innerHTML = `
+      <div style="max-width:820px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:32px;">🏰</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Guía de Servidores y Amigos</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Crea tus propios espacios comunitarios, administra canales y organiza a tus grupos.</p>
+          </div>
+        </div>
+
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;">➕ Crear tu Propio Servidor</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Pulsa el botón <b>+</b> en el riel lateral izquierdo. Elige un nombre, personaliza el icono y tu servidor estará listo al instante con canales preconfigurados.
+          </p>
+        </div>
+
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#c084fc;font-size:16px;font-weight:800;margin:0 0 8px 0;">📢 Canales de Texto y Salas de Voz</h2>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b># Canales de Texto:</b> Para compartir capturas de pantalla, notas de voz, enlaces y mensajes fijados.</li>
+            <li><b>🔊 Salas de Voz:</b> Haz clic en cualquier canal de voz para conectarte al instante y compartir pantalla o escuchar música con amigos.</li>
+          </ul>
+        </div>
+
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;">🛡️ Sistema de Rangos y Permisos</h2>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-top:8px;">
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #78350f;">
+              <b style="color:#fde047;">👑 Dueño:</b> Control total de administración.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #2563eb;">
+              <b style="color:#60a5fa;">🛡️ Administrador:</b> Crear canales y moderación.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #16a34a;">
+              <b style="color:#4ade80;">⚔️ Moderador:</b> Silenciar y mover usuarios.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #475569;">
+              <b style="color:#cbd5e1;">👤 Miembro:</b> Acceso estándar a salas y chat.
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (chKey === 'mazmorras') {
+    container.innerHTML = `
+      <div style="max-width:820px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="font-size:32px;">⚔️</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Dungeons of the Core • Temporada 1</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Minijuego de 5 pisos, armas de combate, llaves criptográficas y catálogo mensual de skins.</p>
+          </div>
+        </div>
+
+        <!-- Cómo funciona -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;">🌋 Mecánicas y Navegación</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
+            Avanza a través de <b>5 plantas temáticas</b>: Minas de Magma, Galerías de Amatista, Puentes de Lava, Cripta de Basalto y el Sagrario del Núcleo.
+          </p>
+          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
+            <li><b>Combate:</b> Clic Izquierdo (Espada melee con empuje) y Clic Derecho (Ballesta a distancia).</li>
+            <li><b>Portal Místico (🌀):</b> Al derrotar a todos los enemigos de la sala, camina hacia el portal para descender y curarte (+35 HP).</li>
+            <li><b>Inventario del Juego:</b> Los enemigos sueltan armas y armaduras para el juego que puedes equipar en la pestaña 🎒 Inventario.</li>
+          </ul>
+        </div>
+
+        <!-- Llaves y Bóveda -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:800;margin:0 0 8px 0;">🔑 Llaves Criptográficas y Bóveda de Reliquias</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 8px 0;">
+            Las llaves tienen una <b>probabilidad reducida de aparición</b> porque desbloquean cosméticos permanentes para tu perfil en la app:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #78350f;color:#d97706;">
+              🥉 <b>Llave de Cobre:</b> Abre Cofres Rústicos.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #475569;color:#cbd5e1;">
+              🥈 <b>Llave de Plata:</b> Abre Sagrarios de Plata.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #ca8a04;color:#fbbf24;">
+              🥇 <b>Llave de Oro:</b> Abre Cofres Reales Dorados.
+            </div>
+            <div style="background:#0a0614;padding:8px;border-radius:6px;border:1px solid #7e22ce;color:#c084fc;">
+              💎 <b>Llave de Obsidiana:</b> Otorga garantizado el Marco de Fundador.
+            </div>
+          </div>
+        </div>
+
+        <!-- Catálogo de Cosméticos de Temporada 1 -->
+        <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;">
+          <h2 style="color:#e879f9;font-size:16px;font-weight:800;margin:0 0 4px 0;">🎨 Catálogo de Skins Temporada 1 (Rotación Mensual)</h2>
+          <p style="font-size:12.5px;color:#94a3b8;margin:0 0 14px 0;">
+            Cada mes aproximadamente se cambiará la temática de la mazmorra y su catálogo de recompensas. ¡Consíguelas en la Bóveda (botón 🎁) antes de que termine el mes!
+          </p>
+
+          <!-- Tarjetas Visuales -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;">
+            <!-- Skin Legendaria -->
+            <div style="grid-column: 1 / -1; background:#0c0919;border:2px solid #38bdf8;border-radius:8px;padding:14px;box-shadow:0 0 20px rgba(56,189,248,0.25);">
+              <div style="font-size:10px;font-weight:900;color:#38bdf8;text-transform:uppercase;letter-spacing:1px;">⭐ SKIN LEGENDARIA EXCLUSIVA (1ER MES)</div>
+              <div style="font-size:16px;font-weight:900;color:#fff;margin:4px 0;">★ Marco de Avatar: FUNDADOR ★</div>
+              <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">Marco animado azul neón con placa de primera edición "FUNDADOR", visible en llamadas, chat y perfil.</div>
+              <div style="display:inline-block;padding:2px 8px;border-radius:4px;background:#0284c7;color:#fff;font-size:11px;font-weight:800;">Obtenible en Cofre de Obsidiana</div>
+            </div>
+
+            <!-- 3 Colores Comunes -->
+            <div style="background:#0c0919;border:2px solid #10b981;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#10b981;text-transform:uppercase;">COMÚN • COLOR DE PERFIL</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Verde Esmeralda del Núcleo</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Tinte resplandeciente esmeralda para tu nombre y cabecera de perfil.</div>
+              <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:#10b981;box-shadow:0 0 8px #10b981;"></span><span style="color:#10b981;font-weight:800;font-size:11px;">#10b981</span></div>
+            </div>
+
+            <div style="background:#0c0919;border:2px solid #a855f7;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#a855f7;text-transform:uppercase;">COMÚN • COLOR DE PERFIL</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Púrpura Amatista Místico</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Resplandor amatista para tu nombre en la lista de miembros y perfil.</div>
+              <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:#a855f7;box-shadow:0 0 8px #a855f7;"></span><span style="color:#a855f7;font-weight:800;font-size:11px;">#a855f7</span></div>
+            </div>
+
+            <div style="background:#0c0919;border:2px solid #f59e0b;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#f59e0b;text-transform:uppercase;">COMÚN • COLOR DE PERFIL</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Ámbar Volcánico Radiante</div>
+              <div style="font-size:11px;color:#94a3b8;margin-bottom:8px;">Tinte ámbar ígneo de magma ardiente para tu nombre en la app.</div>
+              <div style="display:flex;align-items:center;gap:6px;"><span style="width:14px;height:14px;border-radius:50%;background:#f59e0b;box-shadow:0 0 8px #f59e0b;"></span><span style="color:#f59e0b;font-weight:800;font-size:11px;">#f59e0b</span></div>
+            </div>
+
+            <!-- 4 Banners de Perfil -->
+            <div style="background:#0c0919;border:2px solid #8847ff;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#8847ff;text-transform:uppercase;">ESPECIAL • BANNER</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Estandarte: Minas de Magma</div>
+              <div style="height:26px;border-radius:4px;background:linear-gradient(135deg, #451a03, #b45309, #78350f);margin:8px 0;border:1px solid rgba(255,255,255,0.2);"></div>
+              <div style="font-size:11px;color:#94a3b8;">Fondo volcánico para la cabecera de tu tarjeta de perfil.</div>
+            </div>
+
+            <div style="background:#0c0919;border:2px solid #8847ff;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#8847ff;text-transform:uppercase;">ESPECIAL • BANNER</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Estandarte: Galerías Amatista</div>
+              <div style="height:26px;border-radius:4px;background:linear-gradient(135deg, #2e1065, #7e22ce, #3b0764);margin:8px 0;border:1px solid rgba(255,255,255,0.2);"></div>
+              <div style="font-size:11px;color:#94a3b8;">Fondo de geodas de cristal para tu perfil.</div>
+            </div>
+
+            <div style="background:#0c0919;border:2px solid #d32ce6;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#d32ce6;text-transform:uppercase;">RARO • BANNER</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Estandarte: Puentes de Lava</div>
+              <div style="height:26px;border-radius:4px;background:linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d);margin:8px 0;border:1px solid rgba(255,255,255,0.2);"></div>
+              <div style="font-size:11px;color:#94a3b8;">Pasos de piedra sobre abismos volcánicos.</div>
+            </div>
+
+            <div style="background:#0c0919;border:2px solid #ef4444;border-radius:8px;padding:12px;">
+              <div style="font-size:9px;font-weight:800;color:#ef4444;text-transform:uppercase;">MÍTICO • BANNER</div>
+              <div style="font-size:13px;font-weight:800;color:#fff;margin:4px 0;">Estandarte: Sagrario del Coloso</div>
+              <div style="height:26px;border-radius:4px;background:linear-gradient(135deg, #09090b, #581c87, #dc2626);margin:8px 0;border:1px solid rgba(255,255,255,0.2);"></div>
+              <div style="font-size:11px;color:#94a3b8;">Cámara sagrada del Gólem de Obsidiana.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  return container;
+}
 
 function modalMinigame() {
   const m = $('modal');
@@ -1597,6 +1921,12 @@ function renderRail() {
   const r = $('rail'); r.replaceChildren();
   const dmUnread = [...S.unread].some((k) => k[0] === 'd');
   r.append(h('div', { class: 'ico' + (S.view.kind === 'home' ? ' sel' : ''), title: 'Inicio / Amigos', onclick: goHome }, dmUnread ? '🔴' : h('img', { src: 'logo.svg', alt: 'EK' })));
+  r.append(h('div', {
+    class: 'ico guide-ico' + (S.view.kind === 'guide' ? ' sel' : ''),
+    title: 'Centro de Información y Guías Oficiales de EpicKast',
+    style: 'background:linear-gradient(135deg, #1e1b4b, #4338ca);color:#c7d2fe;border:1px solid #6366f1;font-weight:900;font-size:15px;',
+    onclick: () => openOfficialGuide('como_funciona')
+  }, '📘'));
   for (const s of S.servers) {
     const isMuted = (settings.mutedServers || []).includes(s.id);
     const content = s.icon
@@ -1615,7 +1945,7 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.4';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.7.6';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -1767,7 +2097,7 @@ function modalMemberCard(sd, m) {
     h('option', { value: 'c' + ch.id }, `🔊 ${ch.name}`)
   )) : null;
 
-  const bannerBg = m.banner || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)';
+  const bannerBg = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_banner')) ? localStorage.getItem('epickast.equipped_banner') : (m.banner || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)');
 
   const card = h('div', { class: 'prof-card' },
     h('div', { class: 'prof-banner', style: `background:${bannerBg}` }),
