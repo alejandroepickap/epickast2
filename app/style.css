@@ -364,6 +364,35 @@ body.mini-mode .party-tile .yt-direct{width:100%!important;height:100%!important
 /* ---- avatares y llamadas ---- */
 .avatar{border-radius:50%;display:inline-grid;place-items:center;font-weight:700;color:#fff;background-size:cover;background-position:center;flex:none;position:relative;user-select:none}
 .avatar.img{color:transparent}
+/* Marco de Avatar Azul Neón de Primera Edición: FUNDADOR (Obtenido en Dungeons of the Core) */
+.avatar.frame-founder {
+  box-shadow: 0 0 0 2px #0284c7, 0 0 10px rgba(56, 189, 248, 0.8) !important;
+  animation: pulse-founder-glow 2.5s ease-in-out infinite alternate;
+}
+.avatar.frame-founder::after {
+  content: "FUNDADOR";
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.68);
+  transform-origin: center bottom;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid #38bdf8;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  pointer-events: none;
+  z-index: 5;
+}
+@keyframes pulse-founder-glow {
+  0% { box-shadow: 0 0 0 2px #0284c7, 0 0 6px rgba(56, 189, 248, 0.5); }
+  100% { box-shadow: 0 0 0 2.5px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.95); }
+}
 .item .l{display:flex;align-items:center;gap:9px;min-width:0}
 .item .l .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .avatar .st{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:#555;border:2px solid var(--bg2)}

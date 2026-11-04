@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.7.3",
+  "version": "1.7.5",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": "EpicKap",
   "repository": {
@@ -62,7 +62,13 @@
       "publisherDisplayName": "epickap",
       "applicationId": "epickap.EpicKast",
       "backgroundColor": "#151821",
-      "artifactName": "EpicKast-Store.appx"
+      "artifactName": "EpicKast-Store.appx",
+      "languages": [
+        "es-ES",
+        "es-MX",
+        "es",
+        "en-US"
+      ]
     }
   },
   "dependencies": {

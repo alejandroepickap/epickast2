@@ -280,7 +280,9 @@ const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd
 const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
 const avCache = new Map(); const avWait = new Set();
 function avatar(u, size = 32, online) {
-  const el = h('div', { class: 'avatar', style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
+  const isMe = u && S.me && (u.id === S.me.id);
+  const hasFounder = (isMe && localStorage.getItem('epickast.equipped_frame') === 'founder_blue') || u?.frame === 'founder_blue';
+  const el = h('div', { class: 'avatar' + (hasFounder ? ' frame-founder' : ''), style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
   if (online !== undefined) el.append(h('span', { class: 'st' + (online ? ' on' : '') }));
   paintAvatar(el); return el;
 }
