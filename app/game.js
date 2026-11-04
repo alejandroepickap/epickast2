@@ -1,13 +1,19 @@
-// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (Beta v1.7.5 Overhaul)
-// Action-RPG cooperativo con estética 2.5D / Pseudo-Isométrica estilo Minecraft Dungeons:
-// - Muros con elevación 2.5D (bloques de obsidiana con cara superior, frontal y sombras).
-// - Suelo de adoquines basálticos con textura y variación de tono.
-// - Río de magma animado con oleaje térmico, orillas calcinadas y chispas de lava flotantes.
-// - Iluminación atmosférica con antorchas dinámicas y linterna del explorador.
-// - Físicas corregidas: Knockback 100% verificado contra colisiones de muro y bordes (¡sin salir de la pantalla!).
-// - Botón '🔄 Reiniciar' en la barra superior para reiniciar la partida en cualquier momento.
-// - Sprites de personajes detallados: Minero Zombi con linterna, Arquero Calcinado y Gólem Coloso.
-// - Sistema de 4 Llaves limpias sin marco y Marco de Avatar de Prestigio 'FUNDADOR'.
+// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (Beta v1.7.5 Pro)
+// Action-RPG de Mazmorras con:
+// 1. Motor Visual 2.5D Isométrico Voxel estilo Minecraft Dungeons:
+//    - Bloques de obsidiana 3D con cara superior iluminada, bisel lateral y frontal de mampostería con sombras.
+//    - Suelo de adoquines con losas individuales y mortero.
+//    - Río de magma animado con oleaje térmico, vapor y brasas ardientes flotantes.
+//    - Cono de linterna direccional del explorador y antorchas con resplandor cálido.
+// 2. Sistema Completo de Apertura de Cofres Estilo CS:GO:
+//    - Ruleta horizontal animada con >40 cartas de ítems pasando a alta velocidad.
+//    - Sonido táctil 'tick' en cada carta al pasar el marcador central '▼'.
+//    - Desaceleración 'cubic-bezier' suave y celebración con fanfarria.
+//    - 4 Cofres asociados a sus 4 Llaves (Cobre, Plata, Oro y Obsidiana).
+//    - El Cofre Ancestral de Obsidiana otorga el codiciado premio dorado ★:
+//      ¡Marco de Avatar Azul 'FUNDADOR' de Primera Edición para tu perfil de EpicKast!
+// 3. Físicas Blindadas: Knockback controlado contra colisiones de muros y candado de bordes.
+// 4. Botón '🔄 Reiniciar' en la barra superior.
 
 (function(global) {
   'use strict';
@@ -25,6 +31,19 @@
         audioCtx.resume().catch(() => {});
       }
       return audioCtx;
+    },
+    tick() {
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        const o = c.createOscillator(); const g = c.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(950, t);
+        g.gain.setValueAtTime(0.08, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.035);
+        o.connect(g); g.connect(c.destination);
+        o.start(t); o.stop(t + 0.04);
+      } catch {}
     },
     swordSlash() {
       const c = this.getCtx(); if (!c) return;
@@ -141,6 +160,7 @@
       keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 },
       chestsOpened: { copper: false, silver: false, gold: false, core: false },
       founderFrameUnlocked: false,
+      unlockedItems: ['dagger_copper', 'potion_heal'],
       highWave: 1
     };
   }
@@ -153,6 +173,45 @@
       }
     } catch {}
   }
+
+  // --- Catálogo de Ítems de la Ruleta CS:GO por Cofre ---
+  const CHEST_REWARDS = {
+    copper: [
+      { id: 'coins_50', name: 'Bolsa de 50 Monedas', type: 'Monedas', rarity: 'milspec', color: '#60a5fa', desc: '+50 Monedas para la tienda' },
+      { id: 'potion_heal', name: 'Poción de Salud', type: 'Consumible', rarity: 'milspec', color: '#4ade80', desc: '+35 Salud inmediata' },
+      { id: 'dagger_copper', name: 'Daga Rústica de Cobre', type: 'Arma', rarity: 'milspec', color: '#93c5fd', desc: '+15% Velocidad de ataque' },
+      { id: 'shield_wood', name: 'Escudo Táctico de Roble', type: 'Defensa', rarity: 'restricted', color: '#c084fc', desc: 'Reduce daño recibido un 10%' },
+      { id: 'badge_copper', name: 'Insignia: Minero Novato', type: 'Prestigio', rarity: 'classified', color: '#f472b6', desc: 'Distintivo al lado de tu nombre' }
+    ],
+    silver: [
+      { id: 'coins_150', name: 'Cofrecillo de 150 Monedas', type: 'Monedas', rarity: 'milspec', color: '#60a5fa', desc: '+150 Monedas' },
+      { id: 'crossbow_silver', name: 'Ballesta Rúnica de Plata', type: 'Arma', rarity: 'restricted', color: '#c084fc', desc: '+30 Daño a distancia' },
+      { id: 'shield_silver', name: 'Escudo de Plata Pulida', type: 'Defensa', rarity: 'restricted', color: '#a78bfa', desc: 'Reduce daño recibido un 20%' },
+      { id: 'mail_magma', name: 'Cota de Malla Volcánica', type: 'Armadura', rarity: 'classified', color: '#f472b6', desc: '+40 Salud Máxima' },
+      { id: 'badge_silver', name: 'Insignia: Explorador de Plata', type: 'Prestigio', rarity: 'covert', color: '#ef4444', desc: 'Insignia brillante en chat' }
+    ],
+    gold: [
+      { id: 'coins_300', name: 'Saco de 300 Monedas Reales', type: 'Monedas', rarity: 'restricted', color: '#c084fc', desc: '+300 Monedas' },
+      { id: 'sword_fire', name: 'Espada Flamígera Real', type: 'Arma', rarity: 'classified', color: '#f472b6', desc: 'Corte ígneo con quemadura' },
+      { id: 'armor_heavy', name: 'Armadura Pesada de Magma', type: 'Armadura', rarity: 'covert', color: '#ef4444', desc: '+60 Salud Máxima' },
+      { id: 'nick_glow_gold', name: '★ Nombre Dorado Brillante ★', type: 'Cosmético', rarity: 'gold', color: '#fbbf24', desc: 'Tu nombre resplandece en oro' },
+      { id: 'founder_frame', name: '★ MARCO DE AVATAR: FUNDADOR ★', type: 'Gran Premio', rarity: 'gold', color: '#38bdf8', desc: 'El Marco Azul Oficial para tu perfil' }
+    ],
+    obsidian: [
+      { id: 'sword_core', name: 'Espada Devastadora del Núcleo', type: 'Arma Mítica', rarity: 'covert', color: '#ef4444', desc: 'Corte sísmico con 75 daño' },
+      { id: 'crossbow_void', name: 'Ballesta Titánica de Vacío', type: 'Arma Mítica', rarity: 'covert', color: '#ec4899', desc: 'Proyectil penetrante masivo' },
+      { id: 'armor_colossus', name: 'Armadura del Gólem Coloso', type: 'Armadura Mítica', rarity: 'covert', color: '#f43f5e', desc: '+80 Salud Máxima y Resistencia' },
+      { id: 'founder_frame', name: '★ MARCO DE AVATAR: FUNDADOR ★', type: 'GRAN PREMIO', rarity: 'gold', color: '#38bdf8', desc: '¡El Marco Azul de Primera Edición para tu Perfil!' }
+    ]
+  };
+
+  const RARITY_COLORS = {
+    milspec: '#4b69ff',    // Azul Común
+    restricted: '#8847ff', // Púrpura Raro
+    classified: '#d32ce6', // Fucsia Épico
+    covert: '#eb4b4b',     // Rojo Legendario
+    gold: '#fbbf24'        // Dorado Especial Extraordinario
+  };
 
   // --- Catálogo de Llaves (Sprites Limpios sin marco) ---
   const KEY_TIERS = {
@@ -243,12 +302,6 @@
   };
 
   // --- MAPA 24x15 (Baldosas 32x32) ---
-  // 1: Muro de Obsidiana (2.5D con cara superior y frontal)
-  // 0: Adoquín volcánico transitable
-  // 2: Lava ardiente (abismo infranqueable)
-  // 3: Puente de piedra reforzada
-  // 4: Vagoneta minera
-  // 5: Cristal de amatista con luz
   const COLS = 24;
   const ROWS = 15;
   const TILE_SZ = 32;
@@ -310,7 +363,7 @@
       this.floatingTexts = [];
       this.teammates = new Map();
 
-      // Cofres
+      // Cofres en la arena
       this.chests = [
         { id: 'copper', x: 80, y: 80, tier: 'copper', opened: !!this.data.chestsOpened.copper, name: 'Cofre Rústico' },
         { id: 'silver', x: 688, y: 80, tier: 'silver', opened: !!this.data.chestsOpened.silver, name: 'Sagrario de Plata' },
@@ -342,9 +395,9 @@
 
     initDom() {
       this.container.innerHTML = `
-        <div class="cd-wrap" style="width: 1040px; max-width: 98vw; background:#0b0813; border:1px solid #36224d; border-radius:12px; overflow:hidden; box-shadow:0 16px 50px rgba(0,0,0,0.9); font-family:system-ui, -apple-system, sans-serif;">
+        <div class="cd-wrap" style="position:relative; width: 1040px; max-width: 98vw; background:#0b0813; border:1px solid #36224d; border-radius:12px; overflow:hidden; box-shadow:0 16px 50px rgba(0,0,0,0.9); font-family:system-ui, -apple-system, sans-serif;">
           
-          <!-- Encabezado con Botón Reiniciar -->
+          <!-- Encabezado con Botones de Acción -->
           <div class="cd-header" style="background:#150f24; border-bottom:1px solid #2d1d44; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="font-size:24px;">🌋</span>
@@ -354,14 +407,14 @@
               </div>
             </div>
 
-            <div style="display:flex; align-items:center; gap:18px;">
+            <div style="display:flex; align-items:center; gap:16px;">
               <div style="color:#fca5a5; font-size:12px; font-weight:700;">❤️ Salud: <b id="dHp" style="color:#fff;">140/140</b></div>
               <div style="color:#fde047; font-size:12px; font-weight:700;">💰 Monedas: <b id="dCoins" style="color:#fff;">${this.data.coins}</b></div>
               <div style="color:#c084fc; font-size:12px; font-weight:700;">⚔️ Oleada: <b id="dWave" style="color:#fff;">1/3</b></div>
             </div>
 
             <div style="display:flex; gap:8px;">
-              <button id="dBtnRestart" class="cd-btn" style="background:#ca8a04; border-color:#eab308; color:#fff; font-weight:700; padding:6px 14px; border-radius:6px; cursor:pointer;" title="Reiniciar la mazmorra">🔄 Reiniciar</button>
+              <button id="dBtnRestart" class="cd-btn" style="background:#ca8a04; border-color:#eab308; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;" title="Reiniciar la mazmorra">🔄 Reiniciar</button>
               <button id="dBtnInvite" class="cd-btn" style="background:#059669; border-color:#10b981; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;" title="Invitar a los miembros de la llamada">📢 Invitar</button>
               <button id="dBtnBot" class="cd-btn" style="background:#2563eb; border-color:#3b82f6; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;">🤖 +Aliado</button>
               <button id="dBtnClose" class="cd-btn" style="background:#334155; border-color:#475569; color:#fff; padding:6px 12px; border-radius:6px; cursor:pointer;">✕ Salir</button>
@@ -374,18 +427,24 @@
               <canvas id="dCanvas" width="768" height="480" style="display:block; image-rendering:pixelated; cursor:crosshair;"></canvas>
               
               <div id="dChestPrompt" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(18, 12, 28, 0.94); border:1px solid #c084fc; padding:8px 18px; border-radius:8px; color:#f8fafc; font-size:12px; font-weight:700; box-shadow:0 4px 18px rgba(0,0,0,0.8); pointer-events:none;">
-                Presiona <b style="color:#38bdf8;">ESPACIO</b> o haz <b style="color:#38bdf8;">CLIC</b> para abrir
+                Presiona <b style="color:#38bdf8;">ESPACIO</b> o haz <b style="color:#38bdf8;">CLIC</b> para abrir la Ruleta
               </div>
             </div>
 
-            <div style="flex:1; background:#110c1c; border-left:1px solid #291b3b; padding:14px; display:flex; flex-direction:column; gap:14px; overflow-y:auto; max-height:480px;">
+            <!-- Panel Lateral de Llaves & Ruleta CS:GO -->
+            <div style="flex:1; background:#110c1c; border-left:1px solid #291b3b; padding:14px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; max-height:480px;">
               
-              <!-- 1. LLAVES CRIPTOGRÁFICAS (Sprites Limpios) -->
+              <!-- Botón Gigante: Abrir Ruleta CS:GO -->
+              <button id="dBtnOpenRoulette" style="width:100%; font-size:12px; font-weight:900; background:linear-gradient(135deg, #d97706, #b45309); border:1px solid #fbbf24; color:#fff; padding:12px 10px; border-radius:8px; cursor:pointer; box-shadow:0 4px 16px rgba(245,158,11,0.35); text-transform:uppercase; letter-spacing:0.5px;">
+                🎁 ABRIR COFRES (RULETA CS:GO)
+              </button>
+
+              <!-- LLAVES CRIPTOGRÁFICAS (Clickables para abrir cofre) -->
               <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px;">
-                <h4 style="margin:0 0 8px 0; color:#e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">🔑 Llaves Criptográficas</h4>
+                <h4 style="margin:0 0 8px 0; color:#e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">🔑 Tus Llaves (Clic para abrir)</h4>
                 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                  <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px;">
+                  <div id="dKeyCardCopper" style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; cursor:pointer; border:1px solid #78350f;">
                     <canvas id="keyCopperIco" width="22" height="24"></canvas>
                     <div>
                       <div style="color:#d97706; font-size:11px; font-weight:700;">Cobre</div>
@@ -393,7 +452,7 @@
                     </div>
                   </div>
 
-                  <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px;">
+                  <div id="dKeyCardSilver" style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; cursor:pointer; border:1px solid #475569;">
                     <canvas id="keySilverIco" width="22" height="24"></canvas>
                     <div>
                       <div style="color:#cbd5e1; font-size:11px; font-weight:700;">Plata</div>
@@ -401,7 +460,7 @@
                     </div>
                   </div>
 
-                  <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px;">
+                  <div id="dKeyCardGold" style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; cursor:pointer; border:1px solid #ca8a04;">
                     <canvas id="keyGoldIco" width="22" height="24"></canvas>
                     <div>
                       <div style="color:#fbbf24; font-size:11px; font-weight:700;">Oro</div>
@@ -409,7 +468,7 @@
                     </div>
                   </div>
 
-                  <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; border:1px solid rgba(192,132,252,0.4);">
+                  <div id="dKeyCardObsidian" style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; cursor:pointer; border:1px solid rgba(192,132,252,0.6); box-shadow:0 0 8px rgba(192,132,252,0.2);">
                     <canvas id="keyObsidianIco" width="22" height="24"></canvas>
                     <div>
                       <div style="color:#c084fc; font-size:11px; font-weight:700;">Obsidiana</div>
@@ -419,7 +478,7 @@
                 </div>
               </div>
 
-              <!-- 2. CONTROLES Y COMBATE -->
+              <!-- CONTROLES -->
               <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px;">
                 <h4 style="margin:0 0 6px 0; color:#e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">⚔️ Combate (Estilo Dungeons)</h4>
                 <div style="font-size:11px; color:#cbd5e1; line-height:1.5;">
@@ -429,42 +488,92 @@
                 </div>
               </div>
 
-              <!-- 3. MARCO DE AVATAR FUNDADOR -->
-              <div id="dFounderCard" style="background:#141726; border:1px solid ${this.data.founderFrameUnlocked ? '#38bdf8' : '#334155'}; border-radius:8px; padding:12px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                  <span style="font-size:11px; font-weight:800; color:#38bdf8; letter-spacing:0.5px;">💎 RECOMPENSA DE PRESTIGIO</span>
+              <!-- PRESTIGIO: MARCO FUNDADOR -->
+              <div id="dFounderCard" style="background:#141726; border:1px solid ${this.data.founderFrameUnlocked ? '#38bdf8' : '#334155'}; border-radius:8px; padding:10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                  <span style="font-size:10px; font-weight:800; color:#38bdf8; letter-spacing:0.5px;">💎 RECOMPENSA DE PRESTIGIO</span>
                   <span id="dFounderBadge" style="font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px; ${this.data.founderFrameUnlocked ? 'background:#0284c7;color:#fff;' : 'background:#334155;color:#94a3b8;'}">
                     ${this.data.founderFrameUnlocked ? '✓ DESBLOQUEADO' : '🔒 BLOQUEADO'}
                   </span>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:12px;">
-                  <div style="position:relative; width:44px; height:44px; flex:none;">
-                    <div style="width:40px; height:40px; border-radius:50%; background:#0284c7; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:16px; box-shadow:0 0 0 2px #0284c7, 0 0 10px rgba(56, 189, 248, 0.75);">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="position:relative; width:40px; height:40px; flex:none;">
+                    <div style="width:36px; height:36px; border-radius:50%; background:#0284c7; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:15px; box-shadow:0 0 0 2px #0284c7, 0 0 10px rgba(56, 189, 248, 0.75);">
                       ${(this.currentUser.name || 'T')[0].toUpperCase()}
                     </div>
-                    <div style="position:absolute; bottom:-3px; left:50%; transform:translateX(-50%) scale(0.75); background:linear-gradient(135deg, #0284c7, #2563eb); color:#fff; font-size:8px; font-weight:900; letter-spacing:0.5px; padding:1px 4px; border-radius:3px; border:1px solid #38bdf8; white-space:nowrap;">
+                    <div style="position:absolute; bottom:-3px; left:50%; transform:translateX(-50%) scale(0.72); background:linear-gradient(135deg, #0284c7, #2563eb); color:#fff; font-size:8px; font-weight:900; letter-spacing:0.5px; padding:1px 4px; border-radius:3px; border:1px solid #38bdf8; white-space:nowrap;">
                       FUNDADOR
                     </div>
                   </div>
 
                   <div style="font-size:11px; color:#cbd5e1;">
-                    <strong style="color:#fff; display:block;">Marco de Avatar Azul 'FUNDADOR'</strong>
-                    <span style="color:#94a3b8; font-size:10px;">Visible en llamadas y chat. Se obtiene al abrir el Cofre Ancestral con la Llave de Obsidiana del Gólem.</span>
+                    <strong style="color:#fff; display:block;">Marco de Avatar 'FUNDADOR'</strong>
+                    <span style="color:#94a3b8; font-size:10px;">Obtenible en la ruleta del Cofre Ancestral de Obsidiana.</span>
                   </div>
                 </div>
               </div>
 
             </div>
           </div>
+
+          <!-- MODAL DE RULETA CS:GO (Oculto por defecto) -->
+          <div id="dRouletteOverlay" style="display:none; position:absolute; inset:0; z-index:999; background:rgba(7,5,12,0.94); backdrop-filter:blur(6px); padding:20px; flex-direction:column; justify-content:center; align-items:center;">
+            <div class="cd-crate-dialog" style="background:#130e20; border:2px solid #ca8a04; border-radius:12px; padding:20px; box-shadow:0 0 40px rgba(202,138,4,0.3);">
+              
+              <div class="crate-top" style="margin-bottom:12px;">
+                <h2 id="rModalTitle" style="color:#fbbf24; font-size:18px; font-weight:900; letter-spacing:0.5px;">🎁 APERTURA DE COFRE • RULETA ESTILO CS:GO</h2>
+                <button id="rBtnClose" class="cd-btn" style="background:#334155; color:#fff; padding:6px 14px; border-radius:6px; cursor:pointer;">✕ Volver</button>
+              </div>
+
+              <!-- Selector de Cofre / Llave -->
+              <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px;">
+                <button class="rTabBtn" data-tier="copper" style="background:#1e140a; border:2px solid #d97706; color:#fde047; padding:8px 4px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;">
+                  🥉 Cofre Cobre<br><span style="color:#94a3b8; font-size:10px;">Llaves: <b id="rKeyCopper">${this.data.keys.copper}</b></span>
+                </button>
+                <button class="rTabBtn" data-tier="silver" style="background:#111827; border:1px solid #475569; color:#cbd5e1; padding:8px 4px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;">
+                  🥈 Sagrario Plata<br><span style="color:#94a3b8; font-size:10px;">Llaves: <b id="rKeySilver">${this.data.keys.silver}</b></span>
+                </button>
+                <button class="rTabBtn" data-tier="gold" style="background:#1c1305; border:1px solid #78350f; color:#fbbf24; padding:8px 4px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;">
+                  🥇 Cofre Oro<br><span style="color:#94a3b8; font-size:10px;">Llaves: <b id="rKeyGold">${this.data.keys.gold}</b></span>
+                </button>
+                <button class="rTabBtn" data-tier="obsidian" style="background:#170a24; border:1px solid #581c87; color:#c084fc; padding:8px 4px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:700;">
+                  💎 Ancestral Núcleo<br><span style="color:#94a3b8; font-size:10px;">Llaves: <b id="rKeyObsidian">${this.data.keys.obsidian}</b></span>
+                </button>
+              </div>
+
+              <!-- Ruleta Horizontal -->
+              <div class="roulette-viewport" style="position:relative; width:100%; height:135px; background:#08050e; border:2px solid #ca8a04; border-radius:10px; overflow:hidden; box-shadow:inset 0 0 20px #000;">
+                <div class="roulette-marker" style="position:absolute; top:0; left:50%; transform:translateX(-50%); color:#fbbf24; font-size:20px; z-index:10;">▼</div>
+                <div id="rTrack" class="roulette-track" style="display:flex; gap:8px; padding:12px 10px; will-change:transform;"></div>
+              </div>
+
+              <!-- Botón Girar Ruleta -->
+              <div style="text-align:center; margin-top:14px;">
+                <button id="rBtnSpin" style="background:linear-gradient(135deg, #eab308, #ca8a04); border:none; color:#0b0813; font-weight:900; font-size:14px; padding:12px 36px; border-radius:8px; cursor:pointer; box-shadow:0 0 20px rgba(234,179,8,0.5); text-transform:uppercase; letter-spacing:0.8px;">
+                  🔓 DESBLOQUEAR Y GIRAR RULETA (1 LLAVE)
+                </button>
+              </div>
+
+              <!-- Área de Ganador -->
+              <div id="rWinnerArea" style="display:none; margin-top:14px; padding:12px; background:#1c142b; border:2px solid #38bdf8; border-radius:8px; text-align:center;"></div>
+
+            </div>
+          </div>
+
         </div>
       `;
 
       this.canvas = this.container.querySelector('#dCanvas');
       this.ctx = this.canvas.getContext('2d');
       this.promptEl = this.container.querySelector('#dChestPrompt');
+      this.rouletteOverlay = this.container.querySelector('#dRouletteOverlay');
+
+      this.currentSelectedTier = 'copper';
+      this.isSpinning = false;
 
       this.renderKeyIcons();
+      this.initRouletteEvents();
     }
 
     renderKeyIcons() {
@@ -476,6 +585,253 @@
           KEY_TIERS[k].draw(ctx, 11, 11, 16);
         }
       });
+    }
+
+    // --- Sistema de Ruleta CS:GO ---
+    initRouletteEvents() {
+      // Botón principal del sidebar
+      const btnOpen = this.container.querySelector('#dBtnOpenRoulette');
+      if (btnOpen) {
+        btnOpen.onclick = () => this.openRouletteModal(this.getBestAvailableTier());
+      }
+
+      // Clics en las tarjetas de llaves del sidebar
+      ['copper', 'silver', 'gold', 'obsidian'].forEach(tier => {
+        const card = this.container.querySelector(`#dKeyCard${tier[0].toUpperCase() + tier.slice(1)}`);
+        if (card) {
+          card.onclick = () => this.openRouletteModal(tier);
+        }
+      });
+
+      // Botón cerrar ruleta
+      const btnClose = this.container.querySelector('#rBtnClose');
+      if (btnClose) {
+        btnClose.onclick = () => {
+          if (!this.isSpinning) this.rouletteOverlay.style.display = 'none';
+        };
+      }
+
+      // Pestañas de cofres en el modal
+      this.container.querySelectorAll('.rTabBtn').forEach(btn => {
+        btn.onclick = () => {
+          if (this.isSpinning) return;
+          this.selectRouletteTier(btn.dataset.tier);
+        };
+      });
+
+      // Botón de girar
+      const btnSpin = this.container.querySelector('#rBtnSpin');
+      if (btnSpin) {
+        btnSpin.onclick = () => this.spinRoulette();
+      }
+    }
+
+    getBestAvailableTier() {
+      if (this.data.keys.obsidian > 0) return 'obsidian';
+      if (this.data.keys.gold > 0) return 'gold';
+      if (this.data.keys.silver > 0) return 'silver';
+      return 'copper';
+    }
+
+    openRouletteModal(tier = 'copper') {
+      this.selectRouletteTier(tier);
+      this.rouletteOverlay.style.display = 'flex';
+      this.container.querySelector('#rWinnerArea').style.display = 'none';
+    }
+
+    selectRouletteTier(tier) {
+      this.currentSelectedTier = tier;
+      const title = this.container.querySelector('#rModalTitle');
+      const names = {
+        copper: '🥉 COFRE RÚSTICO DE COBRE • RULETA CS',
+        silver: '🥈 SAGRARIO DE PLATA • RULETA CS',
+        gold: '🥇 COFRE REAL DORADO • RULETA CS',
+        obsidian: '💎 COFRE ANCESTRAL DEL NÚCLEO • RULETA CS'
+      };
+      if (title) title.textContent = names[tier] || names.copper;
+
+      // Actualizar bordes de pestañas
+      this.container.querySelectorAll('.rTabBtn').forEach(b => {
+        if (b.dataset.tier === tier) {
+          b.style.borderColor = '#fbbf24';
+          b.style.boxShadow = '0 0 10px rgba(251,191,36,0.3)';
+        } else {
+          b.style.borderColor = '#334155';
+          b.style.boxShadow = 'none';
+        }
+      });
+
+      // Actualizar botón de girar según llaves disponibles
+      const hasKey = (this.data.keys[tier] || 0) > 0;
+      const btnSpin = this.container.querySelector('#rBtnSpin');
+      if (btnSpin) {
+        btnSpin.disabled = !hasKey;
+        btnSpin.style.opacity = hasKey ? '1' : '0.5';
+        btnSpin.style.cursor = hasKey ? 'pointer' : 'not-allowed';
+        btnSpin.innerHTML = hasKey 
+          ? `🔓 ABRIR ${tier.toUpperCase()} (Consume 1 Llave de ${KEY_TIERS[tier].name})`
+          : `🔒 NECESITAS 1 ${KEY_TIERS[tier].name.toUpperCase()} (Obtenla derrotando enemigos)`;
+      }
+
+      this.populateRouletteTrackPreview(tier);
+    }
+
+    populateRouletteTrackPreview(tier) {
+      const track = this.container.querySelector('#rTrack');
+      if (!track) return;
+      track.style.transition = 'none';
+      track.style.transform = 'translateX(0px)';
+
+      const pool = CHEST_REWARDS[tier] || CHEST_REWARDS.copper;
+      let html = '';
+      for (let i = 0; i < 20; i++) {
+        const item = pool[i % pool.length];
+        const rColor = RARITY_COLORS[item.rarity] || '#4b69ff';
+        html += `
+          <div class="roulette-card" style="width:120px; height:108px; flex-shrink:0; background:#110c1c; border:2px solid ${rColor}; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px; box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+            <div style="font-size:9px; font-weight:800; color:${rColor}; text-transform:uppercase; margin-bottom:4px;">${item.type}</div>
+            <div style="font-size:11px; font-weight:800; color:#fff; line-height:1.2; text-align:center;">${item.name}</div>
+          </div>
+        `;
+      }
+      track.innerHTML = html;
+    }
+
+    spinRoulette() {
+      const tier = this.currentSelectedTier;
+      if (this.isSpinning || (this.data.keys[tier] || 0) <= 0) return;
+
+      this.isSpinning = true;
+      this.data.keys[tier]--;
+      saveDungeonData(this.data);
+      this.updateUi();
+
+      const btnSpin = this.container.querySelector('#rBtnSpin');
+      if (btnSpin) btnSpin.disabled = true;
+
+      const track = this.container.querySelector('#rTrack');
+      const winnerArea = this.container.querySelector('#rWinnerArea');
+      winnerArea.style.display = 'none';
+
+      const pool = CHEST_REWARDS[tier] || CHEST_REWARDS.copper;
+
+      // Decidir el ganador según el tipo de cofre
+      let winner;
+      if (tier === 'obsidian') {
+        // En el cofre de obsidiana, el Marco Fundador tiene 75% o si no lo tiene, lo gana!
+        winner = !this.data.founderFrameUnlocked 
+          ? pool.find(i => i.id === 'founder_frame') || pool[0]
+          : pool[Math.floor(Math.random() * pool.length)];
+      } else if (tier === 'gold') {
+        winner = pool[Math.floor(Math.random() * pool.length)];
+      } else {
+        winner = pool[Math.floor(Math.random() * (pool.length - 1))]; // Comunes/Raros
+      }
+
+      // Generar carril de 50 cartas con el ganador en el índice 40
+      const totalCards = 50;
+      const winnerIndex = 40;
+      const cards = [];
+
+      for (let i = 0; i < totalCards; i++) {
+        cards.push(i === winnerIndex ? winner : pool[Math.floor(Math.random() * pool.length)]);
+      }
+
+      track.innerHTML = cards.map(c => {
+        const rColor = RARITY_COLORS[c.rarity] || '#4b69ff';
+        return `
+          <div class="roulette-card" style="width:120px; height:108px; flex-shrink:0; background:#110c1c; border:2px solid ${rColor}; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px; box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+            <div style="font-size:9px; font-weight:800; color:${rColor}; text-transform:uppercase; margin-bottom:4px;">${c.type}</div>
+            <div style="font-size:11px; font-weight:800; color:#fff; line-height:1.2; text-align:center;">${c.name}</div>
+          </div>
+        `;
+      }).join('');
+
+      // Calcular el desplazamiento exacto para centrar la carta ganadora
+      const cardWidth = 128; // 120px + 8px gap
+      const viewportWidth = 720;
+      const jitter = (Math.random() - 0.5) * 50; // variación aleatoria suave dentro de la carta
+      const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + jitter;
+
+      track.style.transition = 'none';
+      track.style.transform = 'translateX(0px)';
+      track.offsetHeight; // forzar reflow
+
+      // Audio de ticks mientras pasa cada carta
+      const duration = 5200; // 5.2 segundos
+      const startTime = performance.now();
+      let lastCardTick = -1;
+
+      const tickInterval = setInterval(() => {
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= duration) {
+          clearInterval(tickInterval);
+          return;
+        }
+        // Progreso con desaceleración cúbica
+        const p = 1 - Math.pow(1 - (elapsed / duration), 3);
+        const currentX = p * targetOffset;
+        const currentCard = Math.floor((currentX + (viewportWidth / 2)) / cardWidth);
+
+        if (currentCard !== lastCardTick && currentCard < totalCards) {
+          lastCardTick = currentCard;
+          AudioFX.tick();
+        }
+      }, 25);
+
+      // Deslizar con animación física
+      track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
+      track.style.transform = `translateX(-${targetOffset}px)`;
+
+      // Al terminar de girar
+      setTimeout(() => {
+        this.isSpinning = false;
+        AudioFX.chestOpen();
+
+        // Aplicar recompensa del ganador
+        this.grantReward(winner);
+
+        // Mostrar ganador en el modal
+        const rColor = RARITY_COLORS[winner.rarity] || '#4b69ff';
+        winnerArea.style.display = 'block';
+        winnerArea.style.borderColor = rColor;
+        winnerArea.innerHTML = `
+          <div style="font-size:10px; font-weight:900; color:${rColor}; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">¡HAS OBTENIDO!</div>
+          <div style="font-size:18px; font-weight:900; color:#fff; margin-bottom:6px;">${winner.name}</div>
+          <div style="font-size:12px; color:#cbd5e1;">${winner.desc}</div>
+        `;
+
+        this.selectRouletteTier(this.currentSelectedTier);
+      }, duration + 200);
+    }
+
+    grantReward(item) {
+      if (item.id.startsWith('coins_')) {
+        const amount = parseInt(item.id.split('_')[1]) || 50;
+        this.data.coins += amount;
+        this.spawnFloatingText(this.player.x, this.player.y - 20, `+${amount} Monedas`, '#fde047', 15);
+      } else if (item.id === 'potion_heal') {
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + 40);
+        this.spawnFloatingText(this.player.x, this.player.y - 20, '+40 Salud', '#4ade80', 14);
+      } else if (item.id === 'founder_frame') {
+        this.data.founderFrameUnlocked = true;
+        saveDungeonData(this.data);
+        AudioFX.founderUnlocked();
+
+        localStorage.setItem('epickast.equipped_frame', 'founder_blue');
+        document.querySelectorAll(`.avatar[data-uid="${this.currentUser.id}"]`).forEach(n => n.classList.add('frame-founder'));
+
+        this.showFounderUnlockedModal();
+      } else {
+        if (!this.data.unlockedItems) this.data.unlockedItems = [];
+        if (!this.data.unlockedItems.includes(item.id)) {
+          this.data.unlockedItems.push(item.id);
+        }
+        this.spawnFloatingText(this.player.x, this.player.y - 20, `¡${item.name} Desbloqueado!`, item.color, 14);
+      }
+
+      saveDungeonData(this.data);
+      this.updateUi();
     }
 
     bindInputs() {
@@ -619,7 +975,7 @@
       AudioFX.swordSlash();
 
       const slashRange = 56;
-      const slashArc = Math.PI * 0.75; // ~135 grados
+      const slashArc = Math.PI * 0.75;
 
       this.enemies.forEach(en => {
         const dx = en.x - this.player.x;
@@ -637,8 +993,7 @@
             AudioFX.hitEnemy();
             this.spawnFloatingText(en.x, en.y, `-${dmg}`, '#fde047');
 
-            // KNOCKBACK RIGUROSO: Impulso que se integrará en moveEntity() con colisiones
-            const kbDist = 18; // Distancia segura que no atraviesa muros
+            const kbDist = 18;
             en.knockX = Math.cos(this.player.attackAngle) * kbDist;
             en.knockY = Math.sin(this.player.attackAngle) * kbDist;
 
@@ -689,51 +1044,9 @@
       const ch = this.getNearChest();
       if (!ch) return false;
 
-      if (ch.opened) {
-        this.spawnFloatingText(ch.x, ch.y, 'Cofre ya vacío', '#94a3b8');
-        return true;
-      }
-
-      if (this.data.keys[ch.tier] > 0) {
-        this.data.keys[ch.tier]--;
-        ch.opened = true;
-        this.data.chestsOpened[ch.id] = true;
-
-        AudioFX.chestOpen();
-        this.spawnFloatingText(ch.x, ch.y - 10, `¡${ch.name} Abierto!`, KEY_TIERS[ch.tier].color, 14);
-
-        if (ch.id === 'copper') {
-          this.data.coins += 100;
-          this.player.hp = Math.min(this.player.maxHp, this.player.hp + 40);
-          this.spawnFloatingText(this.player.x, this.player.y - 20, '+100 Monedas & +40 Salud', '#10b981');
-        } else if (ch.id === 'silver') {
-          this.data.coins += 200;
-          this.spawnFloatingText(this.player.x, this.player.y - 20, '🏹 ¡Ballesta Rúnica Mejorada!', '#cbd5e1');
-        } else if (ch.id === 'gold') {
-          this.data.coins += 350;
-          this.player.maxHp = 180;
-          this.player.hp = 180;
-          this.spawnFloatingText(this.player.x, this.player.y - 20, '🔥 ¡Espada de Magma + Salud Máx!', '#fbbf24');
-        } else if (ch.id === 'core') {
-          this.data.founderFrameUnlocked = true;
-          saveDungeonData(this.data);
-          AudioFX.founderUnlocked();
-
-          localStorage.setItem('epickast.equipped_frame', 'founder_blue');
-          document.querySelectorAll(`.avatar[data-uid="${this.currentUser.id}"]`).forEach(n => n.classList.add('frame-founder'));
-
-          this.updateUi();
-          this.showFounderUnlockedModal();
-        }
-
-        saveDungeonData(this.data);
-        this.updateUi();
-        return true;
-      } else {
-        AudioFX.hitEnemy();
-        this.spawnFloatingText(ch.x, ch.y - 10, `Requiere ${KEY_TIERS[ch.tier].name}`, '#ef4444');
-        return true;
-      }
+      // ¡Al interactuar con el cofre en el mundo, abre directamente la Ruleta CS:GO de ese cofre!
+      this.openRouletteModal(ch.tier);
+      return true;
     }
 
     showFounderUnlockedModal() {
@@ -744,7 +1057,7 @@
           <div style="font-size:42px; margin-bottom:8px;">💎</div>
           <h2 style="color:#38bdf8; margin:0 0 6px 0; font-size:20px; font-weight:800; letter-spacing:0.5px;">¡RECOMPENSA DE PRESTIGIO DESBLOQUEADA!</h2>
           <p style="color:#e2e8f0; font-size:13px; line-height:1.5; margin:0 0 16px 0;">
-            Has abierto el Cofre Ancestral del Núcleo y reclamado la distinción de Primera Edición:
+            Has abierto el Cofre Ancestral del Núcleo y ganado la distinción oficial de Primera Edición:
           </p>
           
           <div style="display:inline-block; padding:12px 20px; background:#162035; border:1px solid #0284c7; border-radius:10px; margin-bottom:18px;">
@@ -769,43 +1082,37 @@
       modal.querySelector('#dCloseModal').onclick = () => modal.remove();
     }
 
-    // --- Colisión y Deslizamiento (Blindado contra atravesar muros) ---
     isWall(x, y) {
       const col = Math.floor(x / TILE_SZ);
       const row = Math.floor(y / TILE_SZ);
       if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
       const tile = LEVEL_MAP[row][col];
-      return tile === 1 || tile === 2; // Muro o Lava profunda
+      return tile === 1 || tile === 2;
     }
 
     moveEntity(ent, vx, vy, dt) {
       const r = ent.radius || 12;
 
-      // Integrar velocidad base + knockback (TODO verificado con colisiones)
       const totalDx = vx * dt + (ent.knockX || 0);
       const totalDy = vy * dt + (ent.knockY || 0);
 
-      // Reducir knockback exponencialmente
       ent.knockX = (ent.knockX || 0) * 0.72;
       ent.knockY = (ent.knockY || 0) * 0.72;
       if (Math.abs(ent.knockX) < 0.4) ent.knockX = 0;
       if (Math.abs(ent.knockY) < 0.4) ent.knockY = 0;
 
-      // 1. Moverse en X y comprobar colisión de muro
       ent.x += totalDx;
       if (this.isWall(ent.x - r, ent.y) || this.isWall(ent.x + r, ent.y)) {
         ent.x -= totalDx;
-        ent.knockX = 0; // Detener knockback si choca con muro
+        ent.knockX = 0;
       }
 
-      // 2. Moverse en Y y comprobar colisión de muro independientemente
       ent.y += totalDy;
       if (this.isWall(ent.x, ent.y - r) || this.isWall(ent.x, ent.y + r)) {
         ent.y -= totalDy;
-        ent.knockY = 0; // Detener knockback si choca con muro
+        ent.knockY = 0;
       }
 
-      // 3. CANDADO RIGUROSO DE BORDES: Nunca salir de la pantalla
       const minX = TILE_SZ + r + 2;
       const maxX = this.width - TILE_SZ - r - 2;
       const minY = TILE_SZ + r + 2;
@@ -814,7 +1121,6 @@
       ent.x = Math.max(minX, Math.min(maxX, ent.x));
       ent.y = Math.max(minY, Math.min(maxY, ent.y));
 
-      // 4. Mecanismo de desatasco (Si alguna vez queda atrapado dentro de un muro, empujar hacia afuera)
       if (this.isWall(ent.x, ent.y)) {
         ent.x += (ent.x < this.width / 2 ? 8 : -8);
         ent.y += (ent.y < this.height / 2 ? 8 : -8);
@@ -827,12 +1133,10 @@
       this.droppedKeys = [];
 
       if (num === 1) {
-        // Oleada 1: 6 Mineros Zombi
         for (let i = 0; i < 6; i++) {
           this.spawnEnemy('zombie_miner', 460 + (i % 3) * 60, 110 + Math.floor(i / 3) * 90);
         }
       } else if (num === 2) {
-        // Oleada 2: 5 Mineros Zombi + 3 Arqueros Esqueléticos
         for (let i = 0; i < 5; i++) {
           this.spawnEnemy('zombie_miner', 480 + (i % 2) * 80, 130 + Math.floor(i / 2) * 90);
         }
@@ -840,7 +1144,6 @@
           this.spawnEnemy('skeleton_archer', 590, 120 + i * 90);
         }
       } else if (num === 3) {
-        // Oleada 3: EL JEFE GÓLEM DE OBSIDIANA + Escoltas
         this.spawnEnemy('golem_boss', 580, 240);
         this.spawnEnemy('skeleton_archer', 610, 140);
         this.spawnEnemy('skeleton_archer', 610, 340);
@@ -884,7 +1187,6 @@
     update(dt) {
       if (this.gameState !== 'play') return;
 
-      // 1. Movimiento del Jugador
       let dx = 0, dy = 0;
       if (this.keys.KeyW || this.keys.ArrowUp) dy -= 1;
       if (this.keys.KeyS || this.keys.ArrowDown) dy += 1;
@@ -899,7 +1201,7 @@
         if (this.player.attackTimer <= 0) this.player.isAttacking = false;
       }
 
-      // 2. Bots Aliados
+      // Bots
       this.teammates.forEach(tm => {
         if (!tm.isBot) return;
         const dist = Math.hypot(this.player.x - tm.x, this.player.y - tm.y);
@@ -928,7 +1230,7 @@
         }
       });
 
-      // 3. IA de Enemigos
+      // Enemigos
       for (let i = this.enemies.length - 1; i >= 0; i--) {
         const en = this.enemies[i];
 
@@ -990,7 +1292,7 @@
         }
       }
 
-      // 4. Proyectiles
+      // Proyectiles
       for (let i = this.projectiles.length - 1; i >= 0; i--) {
         const p = this.projectiles[i];
         p.x += p.vx * dt;
@@ -1027,7 +1329,7 @@
         }
       }
 
-      // 5. Recoger Llaves
+      // Llaves caídas
       for (let i = this.droppedKeys.length - 1; i >= 0; i--) {
         const k = this.droppedKeys[i];
         k.bob = (k.bob || 0) + dt * 4;
@@ -1041,16 +1343,16 @@
         }
       }
 
-      // 6. Indicador de cofre cercano
+      // Prompt cofre
       const nearCh = this.getNearChest();
-      if (nearCh && !nearCh.opened) {
+      if (nearCh) {
         this.promptEl.style.display = 'block';
-        this.promptEl.innerHTML = `Presiona <b style="color:#38bdf8;">ESPACIO</b> para abrir <b>${nearCh.name}</b>`;
+        this.promptEl.innerHTML = `Presiona <b style="color:#fbbf24;">ESPACIO</b> para abrir Ruleta de <b>${nearCh.name}</b>`;
       } else {
         this.promptEl.style.display = 'none';
       }
 
-      // 7. Partículas y Textos
+      // Partículas y Textos
       this.particles.forEach(pt => {
         pt.x += pt.vx * dt;
         pt.y += pt.vy * dt;
@@ -1066,7 +1368,6 @@
 
       if (this.shakeIntensity > 0) this.shakeIntensity *= 0.88;
 
-      // 8. Condiciones de juego
       if (this.player.hp <= 0) {
         this.player.hp = 0;
         this.gameState = 'gameover';
@@ -1122,10 +1423,12 @@
       ['copper', 'silver', 'gold', 'obsidian'].forEach(k => {
         const el = this.container.querySelector(`#kCount${k[0].toUpperCase() + k.slice(1)}`);
         if (el) el.textContent = this.data.keys[k] || 0;
+        const rEl = this.container.querySelector(`#rKey${k[0].toUpperCase() + k.slice(1)}`);
+        if (rEl) rEl.textContent = this.data.keys[k] || 0;
       });
     }
 
-    // --- RENDERIZADO 2.5D CON ELEVACIÓN, LAVA REALISTA E ILUMINACIÓN ---
+    // --- RENDERIZADO 2.5D ISOMÉTRICO VOXEL ---
     render() {
       const ctx = this.ctx;
       const w = this.width;
@@ -1139,7 +1442,7 @@
         ctx.translate((Math.random() - 0.5) * this.shakeIntensity, (Math.random() - 0.5) * this.shakeIntensity);
       }
 
-      // 1. CAPA DE SUELO & ADOQUINES BASÁLTICOS (Textura detallada)
+      // 1. SUELO DE ADOQUINES BASÁLTICOS
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const tile = LEVEL_MAP[r][c];
@@ -1147,33 +1450,27 @@
           const ty = r * TILE_SZ;
 
           if (tile === 0 || tile === 4 || tile === 5) {
-            // Adoquines basálticos con variedad de tonos y juntas
             const hash = ((c * 17) + (r * 31)) % 4;
             const floorColors = ['#161022', '#1a1329', '#1e1630', '#181125'];
             ctx.fillStyle = floorColors[hash];
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
 
-            // Juntas de mortero de piedra
             ctx.strokeStyle = '#251b3d';
             ctx.lineWidth = 1;
             ctx.strokeRect(tx, ty, TILE_SZ, TILE_SZ);
 
-            // Detalles de baldosas individuales
             ctx.fillStyle = '#2b2046';
             ctx.fillRect(tx + 4, ty + 4, 10, 8);
             ctx.fillRect(tx + 16, ty + 14, 12, 12);
 
             if (tile === 4) {
-              // Rieles de mina con traviesas de madera carbonizada
               ctx.fillStyle = '#3f2c1d';
               ctx.fillRect(tx + 2, ty + 4, 28, 4);
               ctx.fillRect(tx + 2, ty + 20, 28, 4);
-              // Rieles metálicos plateados con brillo
               ctx.fillStyle = '#94a3b8';
               ctx.fillRect(tx + 6, ty, 3, TILE_SZ);
               ctx.fillRect(tx + 22, ty, 3, TILE_SZ);
             } else if (tile === 5) {
-              // Cristal de amatista prismático con resplandor
               ctx.fillStyle = 'rgba(192, 132, 252, 0.3)';
               ctx.beginPath();
               ctx.arc(tx + 16, ty + 16, 12, 0, Math.PI * 2);
@@ -1189,7 +1486,7 @@
         }
       }
 
-      // 2. RÍO DE MAGMA CON OLEAJE Y ORILLAS CALCINADAS
+      // 2. RÍO DE LAVA CON OLEAJE Y ORILLAS
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const tile = LEVEL_MAP[r][c];
@@ -1197,31 +1494,25 @@
           const ty = r * TILE_SZ;
 
           if (tile === 2) {
-            // Orilla calcinada
             ctx.fillStyle = '#3a1608';
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
 
-            // Magma fundido dinámico
             const wave = Math.sin(now * 0.003 + c * 0.4 + r * 0.4);
             const wave2 = Math.cos(now * 0.004 + r * 0.6);
             ctx.fillStyle = wave > 0.2 ? '#c2410c' : '#ea580c';
             ctx.fillRect(tx + 2, ty + 2, TILE_SZ - 4, TILE_SZ - 4);
 
-            // Corrientes térmicas brillantes
             ctx.fillStyle = '#f97316';
             ctx.fillRect(tx + 6 + wave * 3, ty + 6, 12, 10);
             ctx.fillStyle = '#fef08a';
             ctx.fillRect(tx + 8 + wave2 * 2, ty + 8, 6, 6);
           } else if (tile === 3) {
-            // Puente de piedra reforzada sobre la lava
             ctx.fillStyle = '#261b36';
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
-            // Tablas de piedra con remaches
             ctx.fillStyle = '#3a2a52';
             ctx.fillRect(tx + 2, ty + 2, TILE_SZ - 4, 6);
             ctx.fillRect(tx + 2, ty + 11, TILE_SZ - 4, 8);
             ctx.fillRect(tx + 2, ty + 22, TILE_SZ - 4, 7);
-            // Remaches de hierro
             ctx.fillStyle = '#cbd5e1';
             ctx.fillRect(tx + 4, ty + 4, 2, 2);
             ctx.fillRect(tx + TILE_SZ - 6, ty + 4, 2, 2);
@@ -1229,51 +1520,45 @@
         }
       }
 
-      // 3. MUROS CON ELEVACIÓN 2.5D (Parte superior biselada + cara frontal con sombra)
+      // 3. MUROS 3D VOXEL (Cara superior 14px + cara frontal 18px con ladrillos)
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           if (LEVEL_MAP[r][c] === 1) {
             const tx = c * TILE_SZ;
             const ty = r * TILE_SZ;
 
-            // CARA SUPERIOR DEL BLOQUE (Roof Slab): Altura 14px
+            // Techo de losa de obsidiana
             ctx.fillStyle = '#1e142e';
             ctx.fillRect(tx, ty, TILE_SZ, 14);
 
-            // Borde biselado superior con reflejo morado
             ctx.fillStyle = '#4c3175';
             ctx.fillRect(tx, ty, TILE_SZ, 2);
             ctx.fillRect(tx, ty, 2, 14);
 
-            // Remache místico en la losa
             ctx.fillStyle = '#7c3aed';
             ctx.fillRect(tx + 6, ty + 5, 3, 3);
             ctx.fillRect(tx + TILE_SZ - 9, ty + 5, 3, 3);
 
-            // CARA FRONTAL DEL MURO (Front Masonry Face): Altura 18px
+            // Frontal de mampostería con sombra
             ctx.fillStyle = '#100b1a';
             ctx.fillRect(tx, ty + 14, TILE_SZ, 18);
 
-            // Ladrillos esculpidos en el muro
             ctx.fillStyle = '#191128';
             ctx.fillRect(tx + 2, ty + 15, 12, 7);
             ctx.fillRect(tx + 16, ty + 15, 14, 7);
             ctx.fillRect(tx + 2, ty + 23, 14, 7);
             ctx.fillRect(tx + 18, ty + 23, 12, 7);
 
-            // Sombra proyectada en la base inferior
             ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
             ctx.fillRect(tx, ty + 30, TILE_SZ, 2);
           }
         }
       }
 
-      // 4. ANTORCHAS CON RESPLANDOR DINÁMICO
+      // 4. ANTORCHAS
       this.torches.forEach(tc => {
-        // Pedestal de piedra
         ctx.fillStyle = '#332347';
         ctx.fillRect(tc.x - 3, tc.y - 4, 6, 12);
-        // Llama de fuego titilante
         const flk = (Math.sin(now * 0.012 + tc.x) + 1) * 0.5;
         ctx.fillStyle = '#ea580c';
         ctx.fillRect(tc.x - 3, tc.y - 10 - flk * 2, 6, 6 + flk * 2);
@@ -1281,40 +1566,29 @@
         ctx.fillRect(tc.x - 1, tc.y - 8 - flk * 2, 2, 3);
       });
 
-      // 5. COFRES EN EL MAPA (Diseño 3D Isométrico con tapa)
+      // 5. COFRES
       this.chests.forEach(ch => {
         ctx.save();
         ctx.translate(ch.x, ch.y);
 
-        if (ch.opened) {
-          ctx.fillStyle = '#1c1917';
-          ctx.fillRect(-12, -4, 24, 16);
-          ctx.fillStyle = '#44403c';
-          ctx.fillRect(-14, -12, 28, 8);
-        } else {
-          const col = KEY_TIERS[ch.tier].color;
-          // Cuerpo del cofre de madera oscura
-          ctx.fillStyle = '#1e140a';
-          ctx.fillRect(-14, -8, 28, 20);
-          // Tapa abovedada
-          ctx.fillStyle = '#291b0f';
-          ctx.fillRect(-15, -14, 30, 8);
-          // Flejes metálicos dorados/prismáticos
-          ctx.fillStyle = col;
-          ctx.fillRect(-12, -14, 4, 26);
-          ctx.fillRect(8, -14, 4, 26);
-          // Cerradura ornamental
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(-3, -4, 6, 6);
-          ctx.fillStyle = col;
-          ctx.fillRect(-2, -3, 4, 4);
+        const col = KEY_TIERS[ch.tier].color;
+        ctx.fillStyle = '#1e140a';
+        ctx.fillRect(-14, -8, 28, 20);
+        ctx.fillStyle = '#291b0f';
+        ctx.fillRect(-15, -14, 30, 8);
+        ctx.fillStyle = col;
+        ctx.fillRect(-12, -14, 4, 26);
+        ctx.fillRect(8, -14, 4, 26);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-3, -4, 6, 6);
+        ctx.fillStyle = col;
+        ctx.fillRect(-2, -3, 4, 4);
 
-          if (ch.tier === 'obsidian') {
-            const aura = (Math.sin(now * 0.008) + 1) * 0.5;
-            ctx.strokeStyle = `rgba(192, 132, 252, ${0.45 + aura * 0.45})`;
-            ctx.lineWidth = 2.5;
-            ctx.strokeRect(-18, -18, 36, 34);
-          }
+        if (ch.tier === 'obsidian') {
+          const aura = (Math.sin(now * 0.008) + 1) * 0.5;
+          ctx.strokeStyle = `rgba(192, 132, 252, ${0.45 + aura * 0.45})`;
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(-18, -18, 36, 34);
         }
 
         ctx.fillStyle = KEY_TIERS[ch.tier].color;
@@ -1324,68 +1598,57 @@
         ctx.restore();
       });
 
-      // 6. LLAVES EN EL SUELO (Sprite limpio sin marco con levitación)
+      // 6. LLAVES EN EL SUELO
       this.droppedKeys.forEach(k => {
         const bobY = Math.sin(k.bob) * 3;
         KEY_TIERS[k.tier].draw(ctx, k.x, k.y + bobY, 18);
       });
 
-      // 7. ENEMIGOS (Sprites Detallados)
+      // 7. ENEMIGOS
       this.enemies.forEach(en => {
         ctx.save();
         ctx.translate(en.x, en.y);
 
         if (en.type === 'zombie_miner') {
-          // MINERO ZOMBI: Casco amarillo con haz de luz, mono azul desgarrado, piel verde, pico
-          // Mono de minero
           ctx.fillStyle = '#1e3a8a';
           ctx.fillRect(-7, -4, 14, 16);
           ctx.fillStyle = '#1d4ed8';
           ctx.fillRect(-5, -2, 10, 10);
-          // Brazos y cabeza verde zombi
           ctx.fillStyle = '#15803d';
           ctx.fillRect(-6, -14, 12, 10);
           ctx.fillRect(-10, -2, 3, 10);
           ctx.fillRect(7, -2, 3, 10);
-          // Casco minero amarillo con linterna
           ctx.fillStyle = '#eab308';
           ctx.fillRect(-8, -18, 16, 5);
           ctx.fillStyle = '#fef08a';
           ctx.fillRect(-3, -16, 6, 4);
-          // Pico minero de hierro
           ctx.fillStyle = '#94a3b8';
           ctx.fillRect(8, -6, 4, 14);
           ctx.fillRect(6, -10, 10, 4);
         } else if (en.type === 'skeleton_archer') {
-          // ARQUERO ESQUELETO CALCINADO: Costillas negras, cráneo con ojos de fuego, arco recurvo
           ctx.fillStyle = '#1c1917';
           ctx.fillRect(-5, -5, 10, 14);
           ctx.fillStyle = '#292524';
           ctx.fillRect(-4, -14, 8, 9);
-          // Ojos de fuego naranja
           const fEye = (Math.sin(now * 0.02) + 1) * 0.5;
           ctx.fillStyle = fEye > 0.3 ? '#f97316' : '#ea580c';
           ctx.fillRect(-3, -11, 2, 2);
           ctx.fillRect(1, -11, 2, 2);
-          // Arco de madera curvado
           ctx.strokeStyle = '#ca8a04';
           ctx.lineWidth = 2.5;
           ctx.beginPath();
           ctx.arc(8, 0, 9, -Math.PI / 2, Math.PI / 2);
           ctx.stroke();
         } else if (en.type === 'golem_boss') {
-          // GÓLEM COLOSO DE OBSIDIANA (56x56 Titán)
           ctx.fillStyle = '#0a0612';
           ctx.fillRect(-26, -26, 52, 52);
           ctx.fillStyle = '#1c122e';
           ctx.fillRect(-22, -22, 44, 44);
-          // Grietas de magma ardiente
           const heart = (Math.sin(now * 0.007) + 1) * 0.5;
           ctx.fillStyle = heart > 0.4 ? '#f97316' : '#ea580c';
           ctx.fillRect(-12, -12, 24, 6);
           ctx.fillRect(-4, -6, 8, 20);
           ctx.fillRect(-14, 8, 28, 5);
-          // Ojos de amatista
           ctx.fillStyle = '#c084fc';
           ctx.fillRect(-14, -18, 7, 4);
           ctx.fillRect(7, -18, 7, 4);
@@ -1393,7 +1656,6 @@
 
         ctx.restore();
 
-        // Barra de salud
         const hpPct = Math.max(0, en.hp / en.maxHp);
         ctx.fillStyle = '#090511';
         ctx.fillRect(en.x - 16, en.y - en.radius - 10, 32, 4);
@@ -1401,7 +1663,7 @@
         ctx.fillRect(en.x - 16, en.y - en.radius - 10, Math.round(32 * hpPct), 4);
       });
 
-      // 8. BOTS ALIADOS
+      // 8. BOTS
       this.teammates.forEach(tm => {
         ctx.save();
         ctx.translate(tm.x, tm.y);
@@ -1418,22 +1680,19 @@
         ctx.fillText(tm.name, tm.x, tm.y - 16);
       });
 
-      // 9. EL JUGADOR (Vanguardia con Armadura de Obsidiana)
+      // 9. JUGADOR
       ctx.save();
       ctx.translate(this.player.x, this.player.y);
       ctx.rotate(this.player.angle);
 
-      // Armadura de placas azul y acero
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(-10, -10, 20, 20);
       ctx.fillStyle = '#0284c7';
       ctx.fillRect(-7, -7, 14, 14);
-      // Casco con visor cibernético
       ctx.fillStyle = '#38bdf8';
       ctx.fillRect(2, -3, 5, 6);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(4, -2, 2, 4);
-      // Espada en mano
       ctx.fillStyle = '#64748b';
       ctx.fillRect(8, 2, 14, 4);
       ctx.fillStyle = '#38bdf8';
@@ -1441,7 +1700,6 @@
 
       ctx.restore();
 
-      // Corte en abanico Melee
       if (this.player.isAttacking) {
         ctx.save();
         ctx.translate(this.player.x, this.player.y);
@@ -1454,7 +1712,6 @@
         ctx.restore();
       }
 
-      // Nombre y vida del jugador
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
@@ -1488,19 +1745,16 @@
         ctx.fillText(ft.text, Math.round(ft.x), Math.round(ft.y));
       });
 
-      // 13. ILUMINACIÓN AMBIENTAL (Vignette & Luces de Antorchas / Linterna)
-      // Capa de penumbra con orificios de luz radial
+      // 13. ILUMINACIÓN AMBIENTAL
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       
-      // Luz de linterna del jugador
       const pGrad = ctx.createRadialGradient(this.player.x, this.player.y, 10, this.player.x, this.player.y, 140);
       pGrad.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
       pGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
       ctx.fillStyle = pGrad;
       ctx.fillRect(0, 0, w, h);
 
-      // Luz de las antorchas
       this.torches.forEach(tc => {
         const tGrad = ctx.createRadialGradient(tc.x, tc.y, 8, tc.x, tc.y, 90);
         tGrad.addColorStop(0, 'rgba(249, 115, 22, 0.22)');
