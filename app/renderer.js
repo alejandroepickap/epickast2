@@ -273,16 +273,16 @@ function modalVault() {
     const pLeg = dData.pity.withoutLegendary || 0;
     const pEpic = dData.pity.withoutEpic || 0;
 
-    // Piedad dura legendaria apertura 60
+    // Sintonía dura legendaria apertura 60
     if (pLeg >= 59 && tier !== 'copper') return 'legendary';
 
-    // Piedad suave legendaria desde apertura 35
+    // Sintonía suave legendaria desde apertura 35
     if (pLeg >= 35 && tier !== 'copper') {
       const extra = (pLeg - 34) * 0.015;
       odds.legendary = Math.min(0.90, odds.legendary + extra);
     }
 
-    // Piedad de épico cada 10 aperturas
+    // Sintonía de épico cada 10 aperturas
     if (pEpic >= 9) {
       if (odds.legendary > 0) {
         odds.epic = 1.0 - odds.legendary;
@@ -339,17 +339,17 @@ function modalVault() {
 
     wrap.innerHTML = `
       <!-- Cabecera Discreta y Navegación Modular por Pestañas -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222938;padding-bottom:14px;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-        <div style="display:flex;align-items:center;gap:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222938;padding-bottom:14px;margin-bottom:14px;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
-          <div>
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;">BÓVEDA DE RELIQUIAS · v1.8.1</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;">Cosméticos permanentes para perfil, chat y llamadas · Minijuego de Cartas</p>
+          <div style="min-width:0;">
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.2</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
           </div>
         </div>
 
         <!-- 3 Pestañas Modulares tipo Pill -->
-        <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;">
+        <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;margin-left:auto;">
           <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;transition:0.15s;">
             🎁 Ruleta y Cofres
           </button>
@@ -357,11 +357,12 @@ function modalVault() {
             🎨 Mi Armario (${unlockedCount}/26)
           </button>
           <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;transition:0.15s;">
-            🃏 Dojo Elemental
+            🥋 Dojo Elemental
           </button>
         </div>
 
-        <button id="vCloseBtn" style="background:#1a202c;border:1px solid #2d3748;color:#cbd5e1;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">✕ Cerrar</button>
+        <!-- Botón de Cerrar formal en la esquina derecha -->
+        <button id="vCloseBtn" style="background:#1e2433;border:1px solid #3b4660;color:#f8fafc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;transition:0.15s;flex-shrink:0;" title="Cerrar Bóveda (o presiona ESC)">✕ Cerrar</button>
       </div>
 
       <!-- Barra de Recursos Compacta y Sobria -->
@@ -369,9 +370,9 @@ function modalVault() {
         <div style="display:flex;gap:14px;align-items:center;">
           <span>🪙 <b>${dData.coins || 0}</b> Monedas</span>
           <span style="color:#334155;">|</span>
-          <span>✨ <b id="vDustCount">${dData.dust || 0}</b> Polvo</span>
+          <span>✨ <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
           <span style="color:#334155;">|</span>
-          <span style="color:#94a3b8;">🛡️ Piedad: <b>${dData.pity.withoutLegendary || 0}/60</b></span>
+          <span style="color:#94a3b8;">⭐ Sintonía: <b>${dData.pity.withoutLegendary || 0}/60</b></span>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
           <button id="vBtnBuyCopper" style="background:#1e2433;border:1px solid #2e384d;color:#cbd5e1;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;" title="Límite 3 canjes por día">
@@ -663,7 +664,7 @@ function modalVault() {
                 ${previewHtml} <span>${winner.name}</span>
               </div>
               <div style="font-size:12px;color:#c084fc;font-weight:700;margin-bottom:4px;">
-                ✨ Convertido automáticamente en +${dustAward} Polvo de Reliquia (Total: ${dData.dust})
+                ✨ Convertido automáticamente en +${dustAward} Esencia Arcana (Total: ${dData.dust})
               </div>
               <div style="font-size:11px;color:#94a3b8;">
                 Usa tu polvo en \"Mi Armario\" para forjar cualquier cosmético que te falte.
@@ -883,7 +884,66 @@ function openOfficialGuide(chKey = 'notas_version') {
 function renderGuideContent(chKey) {
   const container = h('div', { class: 'guide-container', style: 'padding:24px 32px;overflow-y:auto;height:100%;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;' });
 
-      if (chKey === 'notas_version') {
+      if (chKey === 'notas_version_182') {
+    container.innerHTML = `
+      <div style="max-width:820px;margin:0 auto;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid #28193f;padding-bottom:16px;">
+          <span style="font-size:36px;">🚀</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Notas de la Versión v1.8.2</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Registro oficial de cambios, optimizaciones y nuevas funcionalidades en formato de lista por puntos.</p>
+          </div>
+        </div>
+
+        <!-- 1. Dojo Elemental y Animaciones -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>🥋</span> 1. Dojo Elemental: Animaciones, Diálogos y Personajes
+          </h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Animaciones de Destrucción Elemental:</b> Efectos visuales de choque donde el Fuego calcina a la Nieve con llamas y humo, la Nieve congela y fragmenta al Agua en esquirlas, y el Agua apaga al Fuego con vapor.</li>
+            <li><b>Personajes con Contexto y Trasfondo:</b> Cada piso cuenta con un guardián con avatar, rango de cinturón, descripción y frases de combate contextuales que reaccionan a tus jugadas.</li>
+            <li><b>Temporizador de Turno (15s):</b> Contador regresivo con barra de color dinámica para mantener la agilidad del combate y evitar pausas infinitas.</li>
+            <li><b>Anuncios de Ronda Claros:</b> Cartel central prominente que explica claramente el motivo de la victoria, derrota o empate en cada mano.</li>
+            <li><b>Guía Visual "¿Cómo Jugar?":</b> Desplegable con el triángulo elemental, reglas de desempate por números y condiciones de victoria por Trío o Monolito.</li>
+          </ul>
+        </div>
+
+        <!-- 2. Nueva Terminología Inmersiva -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#f59e0b;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>✨</span> 2. Terminología Prémium: Esencia Arcana y Sintonía Legendaria
+          </h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Esencia Arcana:</b> Sustituye el término "Polvo", representando los fragmentos arcanos obtenidos al recibir cosméticos duplicados para forjar piezas directamente.</li>
+            <li><b>Sintonía Legendaria:</b> Sustituye la traducción literal "Piedad", indicando el progreso matemático de sintonización hacia la obtención de cosméticos Épicos (cada 10) y Legendarios garantizados (apertura 60).</li>
+          </ul>
+        </div>
+
+        <!-- 3. Experiencia de Usuario en la Bóveda -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#10b981;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>🏛️</span> 3. Bóveda: Botón de Cierre y Tecla ESC
+          </h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Alineación Simétrica:</b> El botón de cierre ahora reside de forma fija y limpia en la esquina superior derecha del encabezado.</li>
+            <li><b>Salida con ESC:</b> Presionar la tecla <code>Escape</code> en cualquier momento cierra la Bóveda de inmediato sin necesidad del mouse.</li>
+          </ul>
+        </div>
+
+        <!-- 4. Mensajes Directos y Duelos desde Servidores -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#a855f7;font-size:15px;font-weight:800;margin:0 0 10px 0;display:flex;align-items:center;gap:8px;">
+            <span>💬</span> 4. DMs y Duelos PvP desde Perfiles de Servidor (Estilo Discord)
+          </h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Mensaje Directo Instantáneo:</b> Botón "Enviar Mensaje Directo" disponible al hacer clic en el perfil de cualquier miembro de un servidor compartido.</li>
+            <li><b>Desafío a Card-Jitsu 1v1:</b> Reta a amigos o miembros directamente a un combate en el Dojo.</li>
+            <li><b>Menciones @ y Resalte:</b> Botón para citar y mencionar autores con notificación sonoro-visual y resalte ámbar en el chat.</li>
+          </ul>
+        </div>
+      </div>`;
+  } else if (chKey === 'notas_version') {
     container.innerHTML = `
       <div style="max-width:820px;margin:0 auto;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;line-height:1.6;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;border-bottom:1px solid #28193f;padding-bottom:16px;">
@@ -900,7 +960,7 @@ function renderGuideContent(chKey) {
             <span>☁️</span> 1. Persistencia Permanente en la Nube (Firebase Storage)
           </h2>
           <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:6px;">
-            <li><b>Sincronización Total:</b> Todas las cuentas, contraseñas hash, llaves de mazmorra, monedas acumuladas, Polvo de Reliquia, inventario y cosméticos se respaldan automáticamente en <code>epickast.firebasestorage.app</code>.</li>
+            <li><b>Sincronización Total:</b> Todas las cuentas, contraseñas hash, llaves de mazmorra, monedas acumuladas, Esencia Arcana, inventario y cosméticos se respaldan automáticamente en <code>epickast.firebasestorage.app</code>.</li>
             <li><b>Inmunidad a Reinicios:</b> Las hibernaciones o reinicios de contenedores en Render ya no provocan pérdida de datos; el servidor se auto-restaura de inmediato.</li>
             <li><b>Fallback Multi-Origen:</b> Sistema resiliente que combina respaldo local con almacenamiento en la nube sin inconsistencias.</li>
           </ul>
@@ -1148,16 +1208,16 @@ function renderGuideContent(chKey) {
             </table>
           </div>
 
-          <h3 style="color:#38bdf8;font-size:13px;font-weight:800;margin:10px 0 6px 0;">🛡️ Garantía de Piedad (Protección Anti-Mala Suerte)</h3>
+          <h3 style="color:#38bdf8;font-size:13px;font-weight:800;margin:10px 0 6px 0;">🛡️ Garantía de Sintonía (Protección Anti-Mala Suerte)</h3>
           <ul style="font-size:12px;color:#94a3b8;padding-left:18px;margin:0 0 10px 0;">
             <li><b>Garantía de Épico:</b> Cada 10 aperturas seguidas sin Épico ni Legendario, la siguiente es garantizada de calidad Épica o superior.</li>
-            <li><b>Piedad Suave Legendaria:</b> Desde la apertura 35 sin Legendario, la probabilidad aumenta progresivamente (+1.5% por apertura).</li>
-            <li><b>Piedad Dura Legendaria:</b> En la apertura 60 sin Legendario, ¡el siguiente cosmético es Legendario 100% asegurado!</li>
+            <li><b>Sintonía Progresiva Legendaria:</b> Desde la apertura 35 sin Legendario, la probabilidad aumenta progresivamente (+1.5% por apertura).</li>
+            <li><b>Sintonía Garantizada Legendaria:</b> En la apertura 60 sin Legendario, ¡el siguiente cosmético es Legendario 100% asegurado!</li>
           </ul>
 
-          <h3 style="color:#a855f7;font-size:13px;font-weight:800;margin:10px 0 6px 0;">✨ Polvo de Reliquia (Cero Duplicados Inútiles)</h3>
+          <h3 style="color:#a855f7;font-size:13px;font-weight:800;margin:10px 0 6px 0;">✨ Esencia Arcana (Cero Duplicados Inútiles)</h3>
           <p style="font-size:12px;color:#cbd5e1;margin:0 0 6px 0;">
-            Si obtienes un cosmético que ya posees en tu colección, se desintegra automáticamente en <b>Polvo de Reliquia</b> (+2 Común, +8 Raro, +20 Épico, +50 Legendario). Puedes usar este polvo para fabricar cualquier cosmético bloqueado que elijas.
+            Si obtienes un cosmético que ya posees en tu colección, se desintegra automáticamente en <b>Esencia Arcana</b> (+2 Común, +8 Raro, +20 Épico, +50 Legendario). Puedes usar este polvo para fabricar cualquier cosmético bloqueado que elijas.
           </p>
         </div>
 
@@ -1279,7 +1339,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.1', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.8.2', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -2057,7 +2117,8 @@ function renderMsgText(text) {
 }
 
 const msgEl = (m) => {
-  const el = h('div', { class: 'm', 'data-mid': m.id },
+  const isMentioned = (m.mentions && m.mentions.includes(S.me?.id)) || (m.text && m.text.includes('@' + S.me?.name)) || m.highlight;
+  const el = h('div', { class: 'm' + (isMentioned ? ' mention-highlight' : ''), style: isMentioned ? 'background:rgba(245,158,11,0.08);border-left:3px solid #f59e0b;' : '', 'data-mid': m.id },
     avatar({ id: m.userId, name: m.name, color: m.color, av: m.av, frame: m.frame }, 36),
     h('div', { class: 'mb' },
       m.replyId ? h('div', { class: 'quote', onclick: () => jumpToMsg(m.replyId), title: 'Ir al mensaje original' },
@@ -2475,7 +2536,8 @@ function renderSide() {
   if (S.view.kind === 'guide') {
     $('sideTitle').replaceChildren(h('span', { style: 'font-weight:800;color:#c7d2fe;display:flex;align-items:center;gap:6px;' }, '📘 Guías Oficiales'));
     const sGuides = [
-      { key: 'notas_version_181', name: '🚀-notas-de-la-version-v181', title: 'Lista de novedades y correcciones v1.8.1' },
+      { key: 'notas_version_182', name: '🚀-notas-de-la-version-v182', title: 'Novedades v1.8.2: Dojo con Animaciones, DMs y Menciones' },
+      { key: 'notas_version_181', name: '📜-notas-de-la-version-v181', title: 'Historial de cambios v1.8.1' },
       { key: 'notas_version', name: '📜-notas-de-la-version-v180', title: 'Historial de cambios v1.8.0' },
       { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, streaming, bot DJ y controles' },
       { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, roles y permisos' },
@@ -2730,7 +2792,21 @@ function modalMemberCard(sd, m) {
     )
   );
 
-  modal(`Perfil de ${m.name}`, card);
+    modal(`Perfil de ${m.name}`, card);
+  const btnDm = card.querySelector('#profBtnSendDm');
+  if (btnDm) btnDm.onclick = () => {
+    closeModal();
+    const dmK = dmKey(S.me.id, m.id);
+    goHome();
+    openChannel(dmK, 'dm', m.name);
+  };
+  const btnCj = card.querySelector('#profBtnCardJitsu');
+  if (btnCj) btnCj.onclick = () => {
+    closeModal();
+    modalVault('dojo');
+    toast(`¡Has desafiado a ${m.name} al Dojo!`);
+    safe(rpc('cardjitsu.challenge', { toUserId: m.id }));
+  };
 }
 function applyPanelsLayout() {
   const mainEl = $('main');

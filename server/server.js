@@ -173,6 +173,8 @@ const clean = (s, n) => String(s ?? '').trim().slice(0, n);
 const memberIds = (sid) => all('SELECT user_id u FROM members WHERE server_id=?', sid).map((r) => r.u);
 const friendIds = (uid) => all(`SELECT CASE WHEN a=? THEN b ELSE a END f FROM friends WHERE status='accepted' AND (a=? OR b=?)`, uid, uid, uid).map((r) => r.f);
 const areFriends = (a, b) => !!get(`SELECT 1 x FROM friends WHERE status='accepted' AND ((a=? AND b=?) OR (a=? AND b=?))`, a, b, b, a);
+const shareServer = (a, b) => !!get('SELECT 1 x FROM members m1 JOIN members m2 ON m1.server_id=m2.server_id WHERE m1.user_id=? AND m2.user_id=?', a, b);
+const isBlocked = (a, b) => !!get('SELECT 1 x FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)', a, b, b, a);
 const dmKey = (a, b) => `d${Math.min(a, b)}_${Math.max(a, b)}`;
 const roleOf = (sid, uid) => {
   const s = get('SELECT owner FROM servers WHERE id=?', sid);
@@ -196,7 +198,8 @@ function authorize(key, uid) {
   if (m) {
     const a = Number(m[1]), b = Number(m[2]);
     if (uid !== a && uid !== b) fail('Sin acceso');
-    if (!areFriends(a, b)) fail('Solo entre amigos');
+    if (isBlocked(a, b)) fail('No puedes comunicarte con este usuario');
+    if (!areFriends(a, b) && !shareServer(a, b)) fail('Solo entre amigos o miembros del mismo servidor');
     return { audience: [a, b], type: 'dm', userLimit: 2 };
   }
   return fail('Canal inválido');
@@ -673,7 +676,7 @@ const H = {
     broadcastParty(key);
     return partyView(key);
   },
-  'dm.open': (ws, d) => { const o = Number(d.userId); if (!areFriends(ws.user.id, o)) fail('Solo amigos'); return { key: dmKey(ws.user.id, o) }; },
+  'dm.open': (ws, d) => { const o = Number(d.userId); if (!areFriends(ws.user.id, o) && !shareServer(ws.user.id, o)) fail('Solo amigos o miembros de servidores mutuos'); return { key: dmKey(ws.user.id, o) }; },
   'msg.send': (ws, d) => {
     const a = authorize(d.channel, ws.user.id);
     if (a.type === 'voice') fail('Canal de voz');
@@ -1164,6 +1167,34 @@ const H = {
     run('DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?', ws.user.id, targetId);
     setTimeout(saveBackup, 300);
     return { ok: true, unblockedId: targetId };
+  },
+
+  // Card-Jitsu 1v1 PvP
+  'cardjitsu.challenge': (ws, d) => {
+    const toId = Number(d.toUserId);
+    if (!toId) fail('Usuario inválido');
+    toUser(toId, { t: 'cardjitsu.invite', from: { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) } });
+    return { ok: true };
+  },
+  'cardjitsu.accept': (ws, d) => {
+    const fromId = Number(d.fromUserId);
+    const roomId = 'cj_' + Math.min(ws.user.id, fromId) + '_' + Math.max(ws.user.id, fromId);
+    const myProfile = { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) };
+    const oppUser = get('SELECT id, name FROM users WHERE id=?', fromId);
+    const oppProfile = { id: fromId, name: oppUser ? oppUser.name : 'Rival', ...profileOf(fromId) };
+    toUser(fromId, { t: 'cardjitsu.start', roomId, opponent: myProfile });
+    toUser(ws.user.id, { t: 'cardjitsu.start', roomId, opponent: oppProfile });
+    return { ok: true, roomId };
+  },
+  'cardjitsu.decline': (ws, d) => {
+    const toId = Number(d.toUserId);
+    toUser(toId, { t: 'cardjitsu.declined', fromName: ws.user.name });
+    return { ok: true };
+  },
+  'cardjitsu.play': (ws, d) => {
+    const toId = Number(d.toUserId);
+    toUser(toId, { t: 'cardjitsu.opponentPlay', roomId: d.roomId, card: d.card });
+    return { ok: true };
   },
 
   'block.list': (ws) => {
