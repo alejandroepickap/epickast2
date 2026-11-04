@@ -246,6 +246,10 @@ function modalVault() {
   ];
 
   const RARITY_COLORS = { common: '#60a5fa', rare: '#a78bfa', epic: '#f43f5e', legendary: '#fbbf24' };
+  
+  const KEY_PRICES = { copper: 250, silver: 1000, gold: 4000, obsidian: 15000 };
+  const KEY_PACK_DISCOUNT = 0.90; // 10% descuento al comprar pack x5
+
   const CHEST_ODDS = {
     copper: { common: 0.80, rare: 0.17, epic: 0.03, legendary: 0.00 },
     silver: { common: 0.55, rare: 0.33, epic: 0.11, legendary: 0.01 },
@@ -343,21 +347,24 @@ function modalVault() {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.3</h2>
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.4</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
           </div>
         </div>
 
         <!-- 3 Pestañas Modulares tipo Pill -->
         <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;margin-left:auto;">
-          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;transition:0.15s;">
+          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🎁 Ruleta y Cofres
           </button>
-          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#232a3b':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b4660':'1px solid transparent'};padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;transition:0.15s;">
+          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#232a3b':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🎨 Mi Armario (${unlockedCount}/26)
           </button>
-          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:700;font-size:12px;transition:0.15s;">
+          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🥋 Dojo Elemental
+          </button>
+          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#232a3b':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+            🥷 Mi Ninja
           </button>
         </div>
 
@@ -365,22 +372,37 @@ function modalVault() {
         <button id="vCloseBtn" style="background:#1e2433;border:1px solid #3b4660;color:#f8fafc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;transition:0.15s;flex-shrink:0;" title="Cerrar Bóveda (o presiona ESC)">✕ Cerrar</button>
       </div>
 
-      <!-- Barra de Recursos Compacta y Sobria -->
-      <div style="display:flex;justify-content:space-between;align-items:center;background:#151924;border:1px solid #202636;border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:12px;flex-wrap:wrap;gap:8px;">
-        <div style="display:flex;gap:14px;align-items:center;">
-          <span>🪙 <b>${dData.coins || 0}</b> Monedas</span>
-          <span style="color:#334155;">|</span>
-          <span>✨ <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
-          <span style="color:#334155;">|</span>
-          <span style="color:#94a3b8;">⭐ Sintonía: <b>${dData.pity.withoutLegendary || 0}/60</b></span>
+      <!-- Barra de Recursos y Llaves con Tienda Ilimitada -->
+      <div style="background:#131722;border:1px solid #202636;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <!-- Monedas, Esencia y Sintonía -->
+          <div style="display:flex;gap:14px;align-items:center;font-size:12.5px;">
+            <span>🪙 <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
+            <span style="color:#334155;">|</span>
+            <span>✨ <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
+            <span style="color:#334155;">|</span>
+            <span style="color:#94a3b8;">⭐ Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
+          </div>
+
+          <!-- Botón Directo Tienda de Llaves -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button id="vBtnOpenKeyShop" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;box-shadow:0 2px 8px rgba(37,99,235,0.4);display:flex;align-items:center;gap:6px;">
+              <span>🛒</span> Comprar Llaves con Monedas
+            </button>
+          </div>
         </div>
-        <div style="display:flex;gap:6px;align-items:center;">
-          <button id="vBtnBuyCopper" style="background:#1e2433;border:1px solid #2e384d;color:#cbd5e1;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;" title="Límite 3 canjes por día">
-            🔑 Cobre (150 🪙) [${dData.dailyExchange.copper || 0}/3]
-          </button>
-          <button id="vBtnBuySilver" style="background:#1e2433;border:1px solid #2e384d;color:#cbd5e1;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;" title="Límite 1 canje por día">
-            🔑 Plata (500 🪙) [${dData.dailyExchange.silver || 0}/1]
-          </button>
+
+        <!-- Inventario de Llaves en Posesión -->
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#0a0d14;border:1px solid #1a2233;border-radius:6px;padding:6px 14px;font-size:11.5px;flex-wrap:wrap;gap:8px;">
+          <div style="font-weight:800;color:#94a3b8;display:flex;align-items:center;gap:6px;">
+            <span>🗝️</span> TUS LLAVES DISPONIBLES:
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;font-weight:800;">
+            <span style="color:#d97706;">🟤 Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
+            <span style="color:#cbd5e1;">⚪ Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
+            <span style="color:#fbbf24;">🟡 Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
+            <span style="color:#c084fc;">🟣 Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
+          </div>
         </div>
       </div>
 
@@ -417,10 +439,23 @@ function modalVault() {
           <div id="vTrack" style="display:flex;height:100%;align-items:center;position:absolute;left:0;top:0;will-change:transform;"></div>
         </div>
 
-        <!-- Botón Abrir Cofre -->
-        <div style="text-align:center;margin-top:4px;">
-          <button id="vBtnSpin" ${(dData.keys[selectedTier]||0)<=0?'disabled':''} style="background:${(dData.keys[selectedTier]||0)>0?'#2563eb':'#1e2433'};color:${(dData.keys[selectedTier]||0)>0?'#fff':'#64748b'};border:1px solid ${(dData.keys[selectedTier]||0)>0?'#3b82f6':'#2e384d'};font-size:13px;font-weight:800;padding:10px 28px;border-radius:6px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};letter-spacing:0.5px;transition:0.15s;">
-            ${(dData.keys[selectedTier]||0)>0 ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega en el Dojo)`}
+        <!-- Botones de Apertura: Con Llave o Directo con Monedas -->
+        <div style="display:flex;justify-content:center;gap:12px;margin-top:6px;flex-wrap:wrap;">
+          <!-- Opción A: Abrir con Llave -->
+          <button id="vBtnSpin" ${(dData.keys[selectedTier]||0)<=0?'disabled':''} style="background:${(dData.keys[selectedTier]||0)>0?'#2563eb':'#1e2433'};color:${(dData.keys[selectedTier]||0)>0?'#fff':'#64748b'};border:1px solid ${(dData.keys[selectedTier]||0)>0?'#3b82f6':'#2e384d'};font-size:12.5px;font-weight:800;padding:10px 20px;border-radius:6px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};letter-spacing:0.5px;transition:0.15s;display:flex;align-items:center;gap:8px;">
+            <span>🔓</span>
+            <span>ABRIR CON 1 LLAVE (${dData.keys[selectedTier]||0} disponibles)</span>
+          </button>
+
+          <!-- Opción B: Abrir Directo con Monedas -->
+          <button id="vBtnSpinCoins" style="background:#059669;color:#fff;border:1px solid #10b981;font-size:12.5px;font-weight:800;padding:10px 20px;border-radius:6px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(5,150,105,0.3);display:flex;align-items:center;gap:8px;">
+            <span>🪙</span>
+            <span>ABRIR CON ${(KEY_PRICES[selectedTier]||250).toLocaleString()} MONEDAS</span>
+          </button>
+
+          <!-- Opción C: Comprar Pack -->
+          <button id="vBtnBuy1Key" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;font-size:12px;font-weight:700;padding:10px 14px;border-radius:6px;cursor:pointer;">
+            +1 Llave (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙)
           </button>
         </div>
 
@@ -453,6 +488,9 @@ function modalVault() {
 
       <!-- VISTA 3: DOJO ELEMENTAL (MINIJUEGO) -->
       <div id="vViewDojo" style="display:${activeTab==='dojo'?'block':'none'};width:100%;"></div>
+
+      <!-- VISTA 4: PERSONALIZACIÓN DE NINJA PIXEL ART -->
+      <div id="vViewNinja" style="display:${activeTab==='ninja'?'block':'none'};width:100%;"></div>
     `;
 
     // Asignar eventos de pestañas
@@ -478,37 +516,129 @@ function modalVault() {
     if (closeBtn) closeBtn.onclick = () => { m.classList.add('hidden'); m.replaceChildren(); };
 
     // Botones de canje
-    const buyCopBtn = wrap.querySelector('#vBtnBuyCopper');
-    if (buyCopBtn) {
-      buyCopBtn.onclick = async () => {
-        if ((dData.dailyExchange.copper || 0) >= 3) return toast('Límite diario de Cobre alcanzado (3/3 hoy)');
-        if ((dData.coins || 0) < 150) return toast('Monedas insuficientes (Necesitas 150 🪙)');
-        dData.coins -= 150;
-        dData.keys.copper = (dData.keys.copper || 0) + 1;
-        dData.dailyExchange.copper = (dData.dailyExchange.copper || 0) + 1;
+    // Handlers de la Tienda de Llaves y Apertura con Monedas
+    const openKeyShopModal = () => {
+      const modalWrap = document.createElement('div');
+      modalWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(4px);';
+      
+      const shopBox = document.createElement('div');
+      shopBox.style.cssText = 'background:#111520;border:1.5px solid #2d3748;border-radius:12px;padding:22px;max-width:540px;width:92%;box-shadow:0 12px 36px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;';
+      
+      const renderShop = () => {
+        shopBox.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #222938;padding-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:24px;">🛒</span>
+              <div>
+                <h3 style="margin:0;font-size:16px;font-weight:900;">Tienda de Llaves del Núcleo</h3>
+                <p style="margin:2px 0 0 0;font-size:11.5px;color:#94a3b8;">Canjea tus monedas sin límite diario para abrir cofres en la Bóveda</p>
+              </div>
+            </div>
+            <button id="closeShopBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
+          </div>
+
+          <div style="background:#090d14;border:1px solid #1a2233;border-radius:8px;padding:8px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:12px;color:#94a3b8;">Tus Monedas acumuladas:</span>
+            <span style="font-size:14px;font-weight:900;color:#fbbf24;">🪙 ${(dData.coins || 0).toLocaleString()}</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+            ${['copper','silver','gold','obsidian'].map(tier => {
+              const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
+              const icons = { copper: '🟤', silver: '⚪', gold: '🟡', obsidian: '🟣' };
+              const singlePrice = KEY_PRICES[tier];
+              const packPrice = Math.round(singlePrice * 5 * KEY_PACK_DISCOUNT);
+              return `
+                <div style="background:#161c28;border:1px solid #252e42;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <b style="font-size:13px;">${icons[tier]} Llave de ${names[tier]}</b>
+                    <span style="font-size:11px;color:#94a3b8;">Tienes: <b>${dData.keys[tier] || 0}</b></span>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <button class="shopBuy1Btn" data-tier="${tier}" style="flex:1;background:#2563eb;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;">
+                      1x (${singlePrice.toLocaleString()} 🪙)
+                    </button>
+                    <button class="shopBuy5Btn" data-tier="${tier}" style="flex:1;background:#059669;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;" title="10% de descuento">
+                      5x (${packPrice.toLocaleString()} 🪙)
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+
+        shopBox.querySelector('#closeShopBtn').onclick = () => {
+          document.body.removeChild(modalWrap);
+          renderView();
+          populatePreview();
+        };
+
+        shopBox.querySelectorAll('.shopBuy1Btn').forEach(b => {
+          b.onclick = () => {
+            const tier = b.dataset.tier;
+            const price = KEY_PRICES[tier];
+            if ((dData.coins || 0) < price) return toast('Monedas insuficientes');
+            dData.coins -= price;
+            dData.keys[tier] = (dData.keys[tier] || 0) + 1;
+            saveState();
+            ringer.beep([587, 880], 0.06, 0.12);
+            toast(`🔑 ¡Compraste 1 Llave de ${tier.toUpperCase()}!`);
+            renderShop();
+          };
+        });
+
+        shopBox.querySelectorAll('.shopBuy5Btn').forEach(b => {
+          b.onclick = () => {
+            const tier = b.dataset.tier;
+            const price = Math.round(KEY_PRICES[tier] * 5 * KEY_PACK_DISCOUNT);
+            if ((dData.coins || 0) < price) return toast('Monedas insuficientes para pack de 5');
+            dData.coins -= price;
+            dData.keys[tier] = (dData.keys[tier] || 0) + 5;
+            saveState();
+            ringer.beep([659, 987, 1318], 0.06, 0.16);
+            toast(`🔑 ¡Compraste 5 Llaves de ${tier.toUpperCase()} con 10% dto!`);
+            renderShop();
+          };
+        });
+      };
+
+      renderShop();
+      modalWrap.appendChild(shopBox);
+      document.body.appendChild(modalWrap);
+    };
+
+    const btnOpenShop = wrap.querySelector('#vBtnOpenKeyShop');
+    if (btnOpenShop) btnOpenShop.onclick = openKeyShopModal;
+
+    const btnBuy1 = wrap.querySelector('#vBtnBuy1Key');
+    if (btnBuy1) {
+      btnBuy1.onclick = () => {
+        const price = KEY_PRICES[selectedTier];
+        if ((dData.coins || 0) < price) return toast('Monedas insuficientes');
+        dData.coins -= price;
+        dData.keys[selectedTier] = (dData.keys[selectedTier] || 0) + 1;
         saveState();
         ringer.beep([587, 880], 0.06, 0.12);
-        toast('🔑 ¡1 Llave de Cobre canjeada!');
-        if (typeof rpc === 'function') rpc('vault.exchange', { type: 'copper' }).catch(() => {});
+        toast(`🔑 ¡1 Llave de ${selectedTier.toUpperCase()} comprada!`);
         renderView();
         populatePreview();
       };
     }
 
-    const buySilBtn = wrap.querySelector('#vBtnBuySilver');
-    if (buySilBtn) {
-      buySilBtn.onclick = async () => {
-        if ((dData.dailyExchange.silver || 0) >= 1) return toast('Límite diario de Plata alcanzado (1/1 hoy)');
-        if ((dData.coins || 0) < 500) return toast('Monedas insuficientes (Necesitas 500 🪙)');
-        dData.coins -= 500;
-        dData.keys.silver = (dData.keys.silver || 0) + 1;
-        dData.dailyExchange.silver = (dData.dailyExchange.silver || 0) + 1;
+    const btnSpinCoins = wrap.querySelector('#vBtnSpinCoins');
+    if (btnSpinCoins) {
+      btnSpinCoins.onclick = () => {
+        if (isSpinning) return;
+        const price = KEY_PRICES[selectedTier];
+        if ((dData.coins || 0) < price) return toast(`Necesitas ${price.toLocaleString()} 🪙 Monedas`);
+        dData.coins -= price;
         saveState();
-        ringer.beep([659, 987], 0.06, 0.12);
-        toast('🔑 ¡1 Llave de Plata canjeada!');
-        if (typeof rpc === 'function') rpc('vault.exchange', { type: 'silver' }).catch(() => {});
-        renderView();
-        populatePreview();
+        toast(`🪙 ${price.toLocaleString()} Monedas consumidas para abrir cofre`);
+        // Disparar giro como si tuviera llave
+        dData.keys[selectedTier] = (dData.keys[selectedTier] || 0) + 1;
+        const sBtn = wrap.querySelector('#vBtnSpin');
+        if (sBtn) sBtn.click();
       };
     }
 
@@ -906,57 +1036,82 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.8.3 (ACTUAL) ==================== -->
+                <!-- ==================== VERSIÓN 1.8.4 (ACTUAL) ==================== -->
         <div style="border:2px solid #818cf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#141328;box-shadow:0 8px 24px rgba(99,102,241,0.15);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #2d2b52;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="background:#4f46e5;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
-              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.3</h2>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.4</h2>
             </div>
             <span style="font-size:12px;color:#a5b4fc;font-weight:700;">Lanzamiento Estable</span>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
             <div>
-              <b style="color:#fde047;">🎬 Animaciones Cinemáticas Legendarias (Cartas 10+):</b>
+              <b style="color:#fde047;">🥷 Ninjas Pixel Art en Combate a Gran Escala:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Las cartas de valor 10, 11 y 12 ahora cuentan con sellos dorados de poder y desatan secuencias cinemáticas especiales al ganar rondas (Dragón Ígneo, Ventisca del Cero Absoluto y Tsunami del Leviatán).</li>
-                <li>Ritmo de combate refinado en 3 fases: Revelación simultánea, Choque elemental o cinemático y Veredicto con diálogo del Sensei.</li>
+                <li>Los avatares reducidos se reemplazaron por luchadores Pixel Art de cuerpo completo en posición marcial sobre el tatami del Dojo.</li>
+                <li>Animaciones de postura idle, arremetida de ataque al lanzar cartas y saltos de victoria.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#38bdf8;">🧠 Escalado de Dificultad Táctica por Sensei:</b>
+              <b style="color:#a855f7;">🎨 Estudio de Personalización Ninja:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li><b>Piso 1 (Novicio Ignis):</b> Nivel básico e instintivo para familiarizarse con el juego.</li>
-                <li><b>Piso 2 (Monje de Escarcha):</b> Aprende tus patrones y busca combinaciones de trío.</li>
-                <li><b>Piso 3 (Guardián del Torrente):</b> Bloqueador táctico que lee qué elemento te daría la victoria y juega su counter directo.</li>
-                <li><b>Piso 4 (Campeón de Basalto):</b> Reserva cartas altas de 10+ para castigar empates de elemento.</li>
-                <li><b>Piso 5 (Sensei del Núcleo):</b> Modo Gran Maestro Implacable: cuenta cartas, predice jugadas con árbol minimax y bloquea tus líneas ganadoras.</li>
+                <li>Nueva pestaña y estudio interactivo para personalizar color del Gi (8 variantes), Máscaras (Clásica, Kitsune, Oni, Cyber, Kasa de Maestro), Brillo de Ojos, Cinturones, Armas a la espalda (Katanas, Shuriken, Pergamino, Bastón) y Auras elementales con guardado persistente.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#ec4899;">🎨 Colores y Gradientes de Nombre Visibles Everywhere:</b>
+              <b style="color:#38bdf8;">🏯 Arena con Fondo Pixel Art del Dojo:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Soporte nativo para renderizar gradientes de texto (Aurora Boreal, Fuego Volcánico) y colores cosméticos en la lista de miembros, mensajes de chat y barra de usuario.</li>
+                <li>Fondo de combate ambientado en un dojo elemental retro de 16-bits con tatami central, biombos shoji y antorchas místicas.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#10b981;">🎰 Corrección Definitiva del Bug de Ruleta:</b>
+              <b style="color:#ec4899;">🃏 Rediseño de Cartas Estilo Trading Card:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Limpieza automática del banner de recompensa anterior y reseteo del desplazamiento del reel para permitir giros continuos sin trabas.</li>
+                <li>Ilustración principal amplia en el cuerpo de la carta y placa con número y símbolo elemental en la esquina superior izquierda.</li>
+                <li>Insignias doradas ★ 10, ★ 11 y ★ 12 con animación de brillo para cartas de poder.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#a855f7;">🧵 Unificación del Registro de Versiones:</b>
+              <b style="color:#10b981;">⚖️ Puntuación Elemental Clara (Cero Confusión Agua vs Nieve):</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Todas las notas de versión se integraron en un único hilo continuo cronológico.</li>
+                <li>Diferenciación cromática absoluta: Fuego (Rojo Carmesí 🔥), Agua (Azul Marino Profundo 💧) y Nieve (Blanco Escarcha Diamante ❄️).</li>
+                <li>Tablero de 3 columnas fijas por elemento y alertas tácticas en tiempo real ("¡Al rival le falta 1 Nieve para ganar!").</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#f59e0b;">🪙 Tienda de Llaves Ilimitada y Apertura Directa con Monedas:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Eliminación de topes diarios: ahora puedes canjear tus monedas por llaves individuales o packs de 5 llaves con 10% de descuento en cualquier momento.</li>
+                <li>Botón directo "Abrir con Monedas" en cada cofre para desbloquear cosméticos y alimentar la sintonía sin bloqueos.</li>
+                <li>Contador explícito del inventario de llaves disponibles en la cabecera.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#ef4444;">🧹 Retiro del Minijuego de Mazmorra de Llamadas:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Limpieza completa del lanzador del minijuego antiguo en las llamadas para evitar saturación de controles grupales.</li>
               </ul>
             </div>
           </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.8.3 ==================== -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h3 style="color:#818cf8;font-size:16px;font-weight:800;margin:0 0 10px 0;">Versión 1.8.3</h3>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Animaciones Cinemáticas Legendarias (10+):</b> Pantalla completa con temblor y auras para cartas de nivel 10, 11 y 12.</li>
+            <li><b>Escalado Táctico de IA:</b> 5 niveles de habilidad progresiva hasta el Sensei Gran Maestro.</li>
+            <li><b>Colores y Gradientes de Nombre:</b> Renderizado de gradientes en chat, miembros y dock de perfil.</li>
+            <li><b>Corrección de Ruleta:</b> Reseteo del reel y limpieza de ganadores para aperturas continuas.</li>
+          </ul>
         </div>
 
         <!-- ==================== VERSIÓN 1.8.2 ==================== -->
@@ -1313,7 +1468,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.3', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.8.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -4723,7 +4878,6 @@ $('mMore').onclick = (e) => {
     tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
     tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }),
     tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
-    tileBtn('👾', 'Minijuego Co-op: EpicStrike 2D & Cajas Tácticas', () => { modalMinigame(); menu.classList.add('hidden'); }),
     tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring)
   );
 
