@@ -13,3 +13,13 @@ docs/rea-evidence/epickast_app_analysis.json
 !Desinstalar-EpicKast.bat
 
 instalador/
+
+# Seguridad y Privacidad de Datos de Usuarios y Nube
+server/firebase.config.json
+server/serviceAccount*.json
+server/*.key.json
+server/backup-state.json
+server/seed.json
+server/data/
+*.sqlite
+*.db

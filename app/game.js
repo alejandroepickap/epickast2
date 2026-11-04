@@ -1462,6 +1462,20 @@
         saveDungeonData(this.data);
         this.updateUi();
 
+        // Sincronización autoritativa con el servidor de EpicKast (SQLite + Firebase)
+        if (typeof window !== 'undefined' && window.epicRpc) {
+          const keysDict = {};
+          for (const k of this.droppedKeys) {
+            keysDict[k.tier] = (keysDict[k.tier] || 0) + 1;
+          }
+          window.epicRpc('dungeon.sync', {
+            floor: this.floor,
+            coins: floorCoins,
+            keys: keysDict,
+            bossDefeated: this.floor === 5
+          }).catch((e) => console.warn('[dungeon.sync] offline o error:', e.message));
+        }
+
         this.promptEl.style.display = 'block';
         if (this.floor < this.maxFloors) {
           this.promptEl.innerHTML = `🌀 <b>¡Planta ${this.floor} Despejada!</b> Entra al Portal para descender a <b>Nivel ${this.floor + 1}</b>`;

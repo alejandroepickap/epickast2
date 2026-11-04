@@ -420,7 +420,7 @@ class Call {
   }
   retune() {
     const cp = CAM_PRESETS[this.settings.camPreset] || CAM_PRESETS['720p30'];
-    const sp = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['1080p30'];
+    const sp = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['720p30'];
     for (const p of this.peers.values()) {
       if (p.senders.cam) this.tuneVideo(p.senders.cam, cp, 'cam');
       if (p.senders.screen) this.tuneVideo(p.senders.screen, sp, 'screen');
@@ -460,7 +460,7 @@ class Call {
     this.retune();
   }
   async startScreen(sourceId, withAudio) {
-    const pr = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['1080p30'];
+    const pr = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['720p30'];
     const shareAudio = withAudio !== undefined ? !!withAudio : (this.settings.screenAudio !== false);
     // Si tenía encendido el monitoreo propio (escuchar mi voz), apagarlo para que el micro no se cuele al loopback
     if (this.mic?.monitoring) {

@@ -9,12 +9,19 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { DatabaseSync } = require('node:sqlite');
 const { WebSocketServer } = require('ws');
+const firebaseAdapter = require('./firebase-adapter');
 
 const PORT = Number(process.env.PORT) || 7777;
 const DATA = process.env.EPICKAST_DATA || path.join(__dirname, 'data');
 const UPLOADS = path.join(DATA, 'uploads');
 const MAX_ROOM = Number(process.env.EPICKAST_MAX_ROOM) || 8; // malla P2P: cada par extra cuesta una codificación de video
 const MAX_UPLOAD = 25 * 1024 * 1024; // 25 MB por archivo
+
+const rewardsConfigPath = path.join(__dirname, '..', 'rewards.config.json');
+let rewardsConfig = {};
+try { rewardsConfig = JSON.parse(fs.readFileSync(rewardsConfigPath, 'utf8')); }
+catch (e) { console.error('[server] Error cargando rewards.config.json:', e); }
+
 fs.mkdirSync(UPLOADS, { recursive: true });
 
 const db = new DatabaseSync(path.join(DATA, 'epickast.db'));
@@ -31,8 +38,14 @@ CREATE TABLE IF NOT EXISTS files(id INTEGER PRIMARY KEY, channel TEXT, user_id I
 CREATE INDEX IF NOT EXISTS file_ch ON files(channel,id);
 CREATE TABLE IF NOT EXISTS messages(id INTEGER PRIMARY KEY, channel TEXT, user_id INTEGER, text TEXT, ts INTEGER, file_id INTEGER);
 CREATE INDEX IF NOT EXISTS msg_ch ON messages(channel,id);
+
+CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, reporter_id INTEGER, reported_user_id INTEGER, message_id INTEGER, channel TEXT, reason TEXT, ts INTEGER, status TEXT DEFAULT 'pending');
+CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER, blocked_id INTEGER, ts INTEGER, PRIMARY KEY(blocker_id, blocked_id));
+
 `);
 for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ["coins INTEGER DEFAULT 0","dust INTEGER DEFAULT 0","keys_copper INTEGER DEFAULT 0","keys_silver INTEGER DEFAULT 0","keys_gold INTEGER DEFAULT 0","keys_obsidian INTEGER DEFAULT 0","pity_epic INTEGER DEFAULT 0","pity_legendary INTEGER DEFAULT 0","daily_keys_date TEXT DEFAULT ''","daily_keys_count INTEGER DEFAULT 0","daily_exchange_date TEXT DEFAULT ''","daily_exchange_copper INTEGER DEFAULT 0","daily_exchange_silver INTEGER DEFAULT 0","unlocked_cosmetics TEXT DEFAULT '[]'","weekly_boss_claimed_week INTEGER DEFAULT 0"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
@@ -48,41 +61,53 @@ const SEED_FILE = path.join(__dirname, 'seed.json');
 
 function saveBackup() {
   try {
-    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created FROM users');
+    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week FROM users');
     const friends = all('SELECT a,b,status FROM friends');
     const servers = all('SELECT id,name,owner,invite,created FROM servers');
     const members = all('SELECT server_id,user_id,role FROM members');
     const channels = all('SELECT id,server_id,name,type,user_limit FROM channels');
     const bans = all('SELECT server_id,user_id,reason,banned_by,created FROM bans');
-    const state = { ts: Date.now(), users, friends, servers, members, channels, bans };
+    const blocks = all('SELECT blocker_id,blocked_id,ts FROM blocks');
+    const reports = all('SELECT id,reporter_id,reported_user_id,message_id,channel,reason,ts,status FROM reports');
+    const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
-    if (fs.existsSync(SEED_FILE) || !process.env.RENDER) {
-      try { fs.writeFileSync(SEED_FILE, JSON.stringify(state, null, 2)); } catch {}
-    }
+    // Sincronizar en la nube con Firebase (sin almacenar hashes en git)
+    firebaseAdapter.syncDatabaseToFirebase(DATA, state).catch(() => {});
   } catch (e) {
     console.error('[backup] Error al guardar respaldo:', e);
   }
 }
 
-function restoreBackup() {
+async function restoreBackup() {
   try {
-    // sync always
+    // 1. Intentar restaurar desde Firebase si está disponible
+    let cloudState = null;
+    try { cloudState = await firebaseAdapter.restoreDatabaseFromFirebase(DATA); } catch {}
+
     const target = fs.existsSync(BACKUP_FILE) ? BACKUP_FILE : (fs.existsSync(SEED_FILE) ? SEED_FILE : null);
-    if (target) {
+    let data = cloudState;
+    if (!data && target) {
+      data = JSON.parse(fs.readFileSync(target, 'utf8'));
+    }
+    if (data) {
       try {
         db.exec("DELETE FROM users WHERE name LIKE 'ana_%' OR name LIKE 'beto_%'");
         db.exec("DELETE FROM servers WHERE name = 'Mi Server'");
       } catch {}
-      const data = JSON.parse(fs.readFileSync(target, 'utf8'));
       if (Array.isArray(data.users)) {
         for (const u of data.users) {
-          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
-            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.frame || null, u.title || null, u.created || Date.now());
+          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            u.id, u.name, u.salt, u.hash, u.avatar || null, u.color || null, u.banner || null, u.bio || null, u.av || 0, u.frame || null, u.title || null, u.created || Date.now(),
+            u.coins || 0, u.dust || 0, u.keys_copper || 0, u.keys_silver || 0, u.keys_gold || 0, u.keys_obsidian || 0,
+            u.pity_epic || 0, u.pity_legendary || 0, u.daily_keys_date || '', u.daily_keys_count || 0,
+            u.daily_exchange_date || '', u.daily_exchange_copper || 0, u.daily_exchange_silver || 0,
+            u.unlocked_cosmetics || '[]', u.weekly_boss_claimed_week || 0
+          );
         }
-        if (Array.isArray(data.bans)) {
-          for (const b of data.bans) {
-            run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id, b.user_id, b.reason || '', b.banned_by || null, b.created || Date.now());
-          }
+      }
+      if (Array.isArray(data.bans)) {
+        for (const b of data.bans) {
+          run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id, b.user_id, b.reason || '', b.banned_by || null, b.created || Date.now());
         }
       }
       if (Array.isArray(data.friends)) {
@@ -105,7 +130,12 @@ function restoreBackup() {
           run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id, c.server_id, c.name, c.type, c.user_limit || 0);
         }
       }
-      console.log(`[backup] Restaurados ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores desde el respaldo ${path.basename(target)}.`);
+      if (Array.isArray(data.blocks)) {
+        for (const blk of data.blocks) {
+          run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id, blk.blocked_id, blk.ts || Date.now());
+        }
+      }
+      console.log(`[backup] Restaurados ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores.`);
     }
   } catch (e) {
     console.error('[backup] Error al restaurar respaldo:', e);
@@ -822,6 +852,311 @@ const H = {
     send(to.ws, { t: 'rtc.signal', from: ws.user.id, data: d.data });
   },
   'app.version': () => releaseInfo(),
+
+  // ---- Bóveda de Reliquias (Server Authoritative) ----
+  'vault.get': (ws) => {
+    const u = get('SELECT coins, dust, keys_copper, keys_silver, keys_gold, keys_obsidian, pity_epic, pity_legendary, daily_keys_date, daily_keys_count, daily_exchange_date, daily_exchange_copper, daily_exchange_silver, unlocked_cosmetics, weekly_boss_claimed_week FROM users WHERE id=?', ws.user.id);
+    const today = new Date().toISOString().slice(0, 10);
+    const currentWeek = Math.floor(Date.now() / (7 * 864e5));
+    let unlocked = [];
+    try { unlocked = JSON.parse(u.unlocked_cosmetics || '[]'); } catch {}
+    return {
+      coins: u.coins || 0,
+      dust: u.dust || 0,
+      keys: {
+        copper: u.keys_copper || 0,
+        silver: u.keys_silver || 0,
+        gold: u.keys_gold || 0,
+        obsidian: u.keys_obsidian || 0,
+      },
+      pity: {
+        withoutEpic: u.pity_epic || 0,
+        withoutLegendary: u.pity_legendary || 0,
+      },
+      dailyKeys: {
+        date: today,
+        count: u.daily_keys_date === today ? (u.daily_keys_count || 0) : 0,
+        cap: rewardsConfig.dungeon_drops?.daily_key_cap || 20,
+      },
+      dailyExchange: {
+        copper: u.daily_exchange_date === today ? (u.daily_exchange_copper || 0) : 0,
+        silver: u.daily_exchange_date === today ? (u.daily_exchange_silver || 0) : 0,
+      },
+      weeklyBossClaimed: u.weekly_boss_claimed_week === currentWeek,
+      unlockedCosmetics: unlocked,
+      rewardsConfig: {
+        season: rewardsConfig.season,
+        season_name: rewardsConfig.season_name,
+        rarities: rewardsConfig.rarities,
+        chests: rewardsConfig.chests,
+        pity: rewardsConfig.pity,
+        coin_exchange: rewardsConfig.coin_exchange,
+        cosmetics: rewardsConfig.cosmetics,
+        prestige_cosmetics: rewardsConfig.prestige_cosmetics,
+      }
+    };
+  },
+
+  'vault.open': (ws, d) => {
+    const tier = clean(d.tier, 20);
+    const chest = rewardsConfig.chests?.[tier];
+    if (!chest) fail('Tipo de cofre inválido: ' + tier);
+
+    const u = get('SELECT coins, dust, keys_copper, keys_silver, keys_gold, keys_obsidian, pity_epic, pity_legendary, unlocked_cosmetics FROM users WHERE id=?', ws.user.id);
+    const keyCol = 'keys_' + tier;
+    const currentKeys = u[keyCol] || 0;
+    if (currentKeys < 1) fail('No tienes llaves para abrir este cofre (' + chest.name + ')');
+
+    let unlocked = [];
+    try { unlocked = JSON.parse(u.unlocked_cosmetics || '[]'); } catch {}
+
+    let withoutLegendary = u.pity_legendary || 0;
+    let withoutEpic = u.pity_epic || 0;
+    let rolledRarity = 'common';
+    let pityTriggered = null;
+
+    // 1. Piedad dura Legendario (60 aperturas)
+    if (withoutLegendary >= (rewardsConfig.pity.legendary_hard_pity_threshold - 1)) {
+      rolledRarity = 'legendary';
+      pityTriggered = 'hard_legendary';
+    } else {
+      let odds = { ...chest.odds };
+      // 2. Piedad suave Legendario (desde 35)
+      if (withoutLegendary >= rewardsConfig.pity.legendary_soft_pity_start) {
+        const extra = (withoutLegendary - rewardsConfig.pity.legendary_soft_pity_start + 1) * rewardsConfig.pity.legendary_soft_pity_increment;
+        odds.legendary = Math.min(1.0, odds.legendary + extra);
+        let rem = extra;
+        if (odds.common >= rem) { odds.common -= rem; rem = 0; }
+        else { rem -= odds.common; odds.common = 0; odds.rare = Math.max(0, odds.rare - rem); }
+      }
+      // 3. Garantía Épico (10 aperturas)
+      if (withoutEpic >= (rewardsConfig.pity.epic_guarantee_threshold - 1)) {
+        const rRoll = crypto.randomInt(0, 1000000) / 1000000;
+        if (rRoll < odds.legendary) { rolledRarity = 'legendary'; pityTriggered = 'legendary_in_epic_pity'; }
+        else { rolledRarity = 'epic'; pityTriggered = 'epic_guarantee'; }
+      } else {
+        // Sorteo ponderado con crypto.randomInt seguro en servidor
+        const r = crypto.randomInt(0, 1000000) / 1000000;
+        let acc = 0;
+        for (const rKey of ['common', 'rare', 'epic', 'legendary']) {
+          acc += odds[rKey] || 0;
+          if (r <= acc) { rolledRarity = rKey; break; }
+        }
+      }
+    }
+
+    // Seleccionar cosmético de la reserva de 25 objetos
+    const pool = (rewardsConfig.cosmetics || []).filter(c => c.rarity === rolledRarity);
+    const unowned = pool.filter(c => !unlocked.includes(c.id));
+    let chosen = null;
+    let wasDuplicate = false;
+    let dustEarned = 0;
+
+    if (unowned.length > 0) {
+      chosen = unowned[crypto.randomInt(0, unowned.length)];
+      unlocked.push(chosen.id);
+    } else {
+      // Todo desbloqueado en esta rareza -> Duplicado convertido en Polvo de Reliquia
+      chosen = pool[crypto.randomInt(0, pool.length)];
+      wasDuplicate = true;
+      dustEarned = rewardsConfig.rarities[rolledRarity]?.dust_duplicate || 5;
+    }
+
+    // Actualizar contadores de piedad
+    if (rolledRarity === 'legendary') {
+      withoutLegendary = 0;
+      withoutEpic = 0;
+    } else if (rolledRarity === 'epic') {
+      withoutLegendary++;
+      withoutEpic = 0;
+    } else {
+      withoutLegendary++;
+      withoutEpic++;
+    }
+
+    const newKeys = currentKeys - 1;
+    const newDust = (u.dust || 0) + dustEarned;
+
+    run(`UPDATE users SET ${keyCol}=?, dust=?, pity_epic=?, pity_legendary=?, unlocked_cosmetics=? WHERE id=?`,
+      newKeys, newDust, withoutEpic, withoutLegendary, JSON.stringify(unlocked), ws.user.id);
+
+    setTimeout(saveBackup, 300);
+
+    return {
+      ok: true,
+      reward: chosen,
+      rarity: rolledRarity,
+      wasDuplicate,
+      dustEarned,
+      pityTriggered,
+      newPity: { withoutEpic, withoutLegendary },
+      remainingKeys: newKeys,
+      totalDust: newDust,
+      unlockedCount: unlocked.length,
+    };
+  },
+
+  'vault.exchange': (ws, d) => {
+    const tier = clean(d.tier, 20);
+    const exRules = rewardsConfig.coin_exchange?.[tier];
+    if (!exRules) fail('Intercambio no permitido para: ' + tier);
+
+    const u = get('SELECT coins, keys_copper, keys_silver, daily_exchange_date, daily_exchange_copper, daily_exchange_silver FROM users WHERE id=?', ws.user.id);
+    const today = new Date().toISOString().slice(0, 10);
+    const isToday = u.daily_exchange_date === today;
+    const used = isToday ? (tier === 'copper' ? u.daily_exchange_copper : u.daily_exchange_silver) : 0;
+
+    if (used >= exRules.daily_limit) fail(`Has alcanzado el tope diario de canje (${exRules.daily_limit} al día)`);
+    if ((u.coins || 0) < exRules.cost) fail(`Monedas insuficientes (necesitas ${exRules.cost} monedas)`);
+
+    const newCoins = (u.coins || 0) - exRules.cost;
+    const keyCol = 'keys_' + tier;
+    const newKeys = (u[keyCol] || 0) + 1;
+    const newCopperEx = isToday ? (tier === 'copper' ? u.daily_exchange_copper + 1 : u.daily_exchange_copper) : (tier === 'copper' ? 1 : 0);
+    const newSilverEx = isToday ? (tier === 'silver' ? u.daily_exchange_silver + 1 : u.daily_exchange_silver) : (tier === 'silver' ? 1 : 0);
+
+    run(`UPDATE users SET coins=?, ${keyCol}=?, daily_exchange_date=?, daily_exchange_copper=?, daily_exchange_silver=? WHERE id=?`,
+      newCoins, newKeys, today, newCopperEx, newSilverEx, ws.user.id);
+
+    setTimeout(saveBackup, 300);
+    return { ok: true, newCoins, newKeys, usedToday: used + 1, dailyLimit: exRules.daily_limit };
+  },
+
+  'vault.craft': (ws, d) => {
+    const cosmeticId = clean(d.cosmeticId, 60);
+    const item = (rewardsConfig.cosmetics || []).find(c => c.id === cosmeticId);
+    if (!item) fail('Cosmético inexistente');
+
+    const u = get('SELECT dust, unlocked_cosmetics FROM users WHERE id=?', ws.user.id);
+    let unlocked = [];
+    try { unlocked = JSON.parse(u.unlocked_cosmetics || '[]'); } catch {}
+    if (unlocked.includes(cosmeticId)) fail('Ya posees este cosmético');
+
+    const cost = rewardsConfig.rarities[item.rarity]?.dust_craft || 9999;
+    if ((u.dust || 0) < cost) fail(`Polvo de Reliquia insuficiente (necesitas ${cost} de polvo)`);
+
+    const newDust = (u.dust || 0) - cost;
+    unlocked.push(cosmeticId);
+
+    run('UPDATE users SET dust=?, unlocked_cosmetics=? WHERE id=?', newDust, JSON.stringify(unlocked), ws.user.id);
+    setTimeout(saveBackup, 300);
+    return { ok: true, crafted: item, newDust, unlockedCount: unlocked.length };
+  },
+
+  'dungeon.sync': (ws, d) => {
+    const floor = Math.max(1, Math.min(5, Number(d.floor) || 1));
+    const coinsWon = Math.max(0, Math.min(500, Number(d.coins) || 0));
+    const awardedKeys = d.keys || {}; // { copper: 1, silver: 0, gold: 0, obsidian: 0 }
+    const today = new Date().toISOString().slice(0, 10);
+    const currentWeek = Math.floor(Date.now() / (7 * 864e5));
+
+    const u = get('SELECT coins, keys_copper, keys_silver, keys_gold, keys_obsidian, daily_keys_date, daily_keys_count, weekly_boss_claimed_week FROM users WHERE id=?', ws.user.id);
+    const isToday = u.daily_keys_date === today;
+    let dailyKeysCount = isToday ? (u.daily_keys_count || 0) : 0;
+    const dailyCap = rewardsConfig.dungeon_drops?.daily_key_cap || 20;
+
+    let copperAdd = Math.max(0, Number(awardedKeys.copper) || 0);
+    let silverAdd = Math.max(0, Number(awardedKeys.silver) || 0);
+    let goldAdd = Math.max(0, Number(awardedKeys.gold) || 0);
+    let obsidianAdd = Math.max(0, Number(awardedKeys.obsidian) || 0);
+
+    const totalKeySum = copperAdd + silverAdd + goldAdd + obsidianAdd;
+    if (dailyKeysCount + totalKeySum > dailyCap) {
+      // Ajustar al tope
+      const allow = Math.max(0, dailyCap - dailyKeysCount);
+      copperAdd = Math.min(copperAdd, allow);
+      silverAdd = Math.min(silverAdd, allow - copperAdd);
+      goldAdd = Math.min(goldAdd, allow - copperAdd - silverAdd);
+      obsidianAdd = Math.min(obsidianAdd, allow - copperAdd - silverAdd - goldAdd);
+    }
+    dailyKeysCount += (copperAdd + silverAdd + goldAdd + obsidianAdd);
+
+    let weeklyBonusObsidian = 0;
+    let newWeeklyClaimed = u.weekly_boss_claimed_week || 0;
+    if (floor === 5 && d.bossDefeated && u.weekly_boss_claimed_week !== currentWeek) {
+      weeklyBonusObsidian = 1;
+      newWeeklyClaimed = currentWeek;
+    }
+
+    const newCoins = (u.coins || 0) + coinsWon;
+    const newCopper = (u.keys_copper || 0) + copperAdd;
+    const newSilver = (u.keys_silver || 0) + silverAdd;
+    const newGold = (u.keys_gold || 0) + goldAdd;
+    const newObsidian = (u.keys_obsidian || 0) + obsidianAdd + weeklyBonusObsidian;
+
+    run('UPDATE users SET coins=?, keys_copper=?, keys_silver=?, keys_gold=?, keys_obsidian=?, daily_keys_date=?, daily_keys_count=?, weekly_boss_claimed_week=? WHERE id=?',
+      newCoins, newCopper, newSilver, newGold, newObsidian, today, dailyKeysCount, newWeeklyClaimed, ws.user.id);
+
+    setTimeout(saveBackup, 300);
+    return {
+      ok: true,
+      coins: newCoins,
+      keys: { copper: newCopper, silver: newSilver, gold: newGold, obsidian: newObsidian },
+      dailyKeysCount,
+      dailyCap,
+      weeklyBonusGranted: weeklyBonusObsidian > 0
+    };
+  },
+
+  // ---- Moderación: Reportes y Bloqueos ----
+  'report.create': (ws, d) => {
+    const targetUserId = d.targetUserId ? Number(d.targetUserId) : null;
+    const messageId = d.messageId ? Number(d.messageId) : null;
+    const channel = d.channel ? clean(d.channel, 40) : null;
+    const reason = clean(d.reason || 'Comportamiento inapropiado o spam', 500);
+
+    const reportId = Number(run('INSERT INTO reports(reporter_id, reported_user_id, message_id, channel, reason, ts, status) VALUES(?,?,?,?,?,?,?)',
+      ws.user.id, targetUserId, messageId, channel, reason, Date.now(), 'pending').lastInsertRowid);
+
+    setTimeout(saveBackup, 300);
+    return { ok: true, reportId };
+  },
+
+  'report.list': (ws) => {
+    // Solo admins/dueños de algún servidor pueden ver reportes
+    const isStaff = all('SELECT 1 FROM servers WHERE owner=?', ws.user.id).length > 0 ||
+                    all("SELECT 1 FROM members WHERE user_id=? AND role IN ('admin','owner')", ws.user.id).length > 0;
+    if (!isStaff) fail('Permiso denegado: solo moderadores y administradores');
+
+    return all(`SELECT r.id, r.reporter_id, u1.name reporterName, r.reported_user_id, u2.name reportedName,
+      r.message_id, m.text messageText, r.channel, r.reason, r.ts, r.status
+      FROM reports r
+      LEFT JOIN users u1 ON u1.id=r.reporter_id
+      LEFT JOIN users u2 ON u2.id=r.reported_user_id
+      LEFT JOIN messages m ON m.id=r.message_id
+      ORDER BY r.id DESC LIMIT 50`);
+  },
+
+  'report.resolve': (ws, d) => {
+    const isStaff = all('SELECT 1 FROM servers WHERE owner=?', ws.user.id).length > 0 ||
+                    all("SELECT 1 FROM members WHERE user_id=? AND role IN ('admin','owner')", ws.user.id).length > 0;
+    if (!isStaff) fail('Permiso denegado');
+    const reportId = Number(d.reportId);
+    const status = clean(d.status || 'resolved', 20);
+    run('UPDATE reports SET status=? WHERE id=?', status, reportId);
+    setTimeout(saveBackup, 300);
+    return { ok: true, reportId, status };
+  },
+
+  'block.add': (ws, d) => {
+    const targetId = Number(d.targetId);
+    if (!targetId || targetId === ws.user.id) fail('Usuario inválido para bloquear');
+    run('INSERT OR IGNORE INTO blocks(blocker_id, blocked_id, ts) VALUES(?,?,?)', ws.user.id, targetId, Date.now());
+    setTimeout(saveBackup, 300);
+    return { ok: true, blockedId: targetId };
+  },
+
+  'block.remove': (ws, d) => {
+    const targetId = Number(d.targetId);
+    run('DELETE FROM blocks WHERE blocker_id=? AND blocked_id=?', ws.user.id, targetId);
+    setTimeout(saveBackup, 300);
+    return { ok: true, unblockedId: targetId };
+  },
+
+  'block.list': (ws) => {
+    return all('SELECT b.blocked_id id, u.name, b.ts FROM blocks b JOIN users u ON u.id=b.blocked_id WHERE b.blocker_id=?', ws.user.id);
+  },
+
 };
 
 function releaseInfo() {
@@ -1018,6 +1353,7 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
         'content-type': 'application/octet-stream',
         'content-length': stat.size,
         'content-disposition': `attachment; filename="${info.file}"`,
+        'x-content-type-options': 'nosniff',
       });
       return fs.createReadStream(fp).pipe(res);
     }
@@ -1043,6 +1379,7 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
         'content-type': 'application/vnd.microsoft.portable-executable',
         'content-length': stat.size,
         'content-disposition': `attachment; filename="${info.exeFile}"`,
+        'x-content-type-options': 'nosniff',
       });
       return fs.createReadStream(fp).pipe(res);
     }
@@ -1092,6 +1429,20 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
     req.on('error', () => { aborted = true; wsOut.destroy(); try { fs.unlinkSync(destPath); } catch {} });
     return;
   }
+  function serveFileDisk(res, f, fp, u) {
+  // Prohibir SVG en línea para mitigar vector XSS
+  const isSvg = /svg/i.test(f.mime);
+  const inline = !isSvg && SAFE_MIMES.test(f.mime) && u.searchParams.get('dl') !== '1';
+  res.writeHead(200, {
+    'content-type': (!isSvg && SAFE_MIMES.test(f.mime)) ? f.mime : 'application/octet-stream',
+    'content-length': f.size,
+    'cache-control': 'public, max-age=31536000, immutable',
+    'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(f.name)}"`,
+    'x-content-type-options': 'nosniff',
+  });
+  return fs.createReadStream(fp).pipe(res);
+}
+
   const fm = /^\/files\/(\d+)/.exec(u.pathname);
   if (req.method === 'GET' && fm) {
     const f = get('SELECT id,name,mime,size,disk FROM files WHERE id=?', Number(fm[1]));
@@ -1110,6 +1461,30 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
   res.writeHead(404); res.end();
 });
 const wss = new WebSocketServer({ server: httpServer, maxPayload: 256 * 1024, perMessageDeflate: false });
+
+
+const loginAttempts = new Map(); // key: `${ip}_${name}` -> { count, lockedUntil }
+function checkLoginRateLimit(ip, name) {
+  const k = `${ip}_${name.toLowerCase()}`;
+  const att = loginAttempts.get(k);
+  if (att && att.lockedUntil && att.lockedUntil > Date.now()) {
+    const mins = Math.ceil((att.lockedUntil - Date.now()) / 60000);
+    fail(`Demasiados intentos fallidos. Cuenta temporalmente bloqueada por seguridad. Espera ${mins} minuto(s).`);
+  }
+}
+function recordLoginFailure(ip, name) {
+  const k = `${ip}_${name.toLowerCase()}`;
+  const att = loginAttempts.get(k) || { count: 0, lockedUntil: 0 };
+  att.count++;
+  if (att.count >= 5) {
+    att.lockedUntil = Date.now() + 15 * 60 * 1000; // 15 minutos de bloqueo
+  }
+  loginAttempts.set(k, att);
+}
+function recordLoginSuccess(ip, name) {
+  const k = `${ip}_${name.toLowerCase()}`;
+  loginAttempts.delete(k);
+}
 
 function login(ws, userId, name) {
   ws.user = { id: userId, name };
@@ -1196,7 +1571,7 @@ if (process.env.RENDER_EXTERNAL_URL || process.env.PUBLIC_URL) {
   setInterval(() => fetch(selfUrl).catch(() => {}), 10 * 60 * 1000).unref();
 }
 // limpieza de sesiones viejas (90 días)
-run('DELETE FROM sessions WHERE created<?', Date.now() - 90 * 864e5);
+run('DELETE FROM sessions WHERE created<?', Date.now() - 30 * 864e5);
 
 if (require.main === module) {
   httpServer.listen(PORT, '0.0.0.0', () => console.log(`EpicKast server escuchando en :${PORT}  (datos: ${DATA})`));

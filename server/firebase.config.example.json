@@ -1,0 +1,7 @@
+{
+  "projectId": "epickast-app",
+  "storageBucket": "epickast-app.appspot.com",
+  "databaseURL": "https://epickast-app-default-rtdb.firebaseio.com",
+  "apiKey": "AIzaSy...",
+  "notes": "Para configurar persistencia en Render: agrega estas claves en la variable de entorno FIREBASE_CONFIG o copia este archivo como server/firebase.config.json. Se respalda la base de datos completa y los archivos adjuntos automáticamente."
+}

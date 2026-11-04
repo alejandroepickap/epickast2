@@ -269,6 +269,26 @@ function modalVault() {
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
   };
 
+  // Sincronizar datos autoritativos del servidor al abrir
+  if (typeof rpc === 'function') {
+    rpc('vault.get').then((v) => {
+      if (v) {
+        dData.coins = v.coins ?? dData.coins;
+        dData.dust = v.dust ?? dData.dust;
+        if (v.keys) dData.keys = { ...dData.keys, ...v.keys };
+        if (v.pity) dData.pity = { ...dData.pity, ...v.pity };
+        if (v.dailyExchange) dData.dailyExchange = { ...dData.dailyExchange, ...v.dailyExchange };
+        if (Array.isArray(v.unlockedCosmetics)) {
+          if (!dData.cosmetics) dData.cosmetics = {};
+          v.unlockedCosmetics.forEach(id => { dData.cosmetics[id] = true; });
+        }
+        saveState();
+        renderContent();
+        populatePreview();
+      }
+    }).catch(() => {});
+  }
+
   const equipCosmeticItem = (item) => {
     if (!item) return;
     if (item.type === 'frame') {
@@ -419,7 +439,7 @@ function modalVault() {
       <div style="border-top:1px solid #291b3b;padding-top:10px;flex-shrink:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <h3 style="color:#e2e8f0;font-size:12px;font-weight:800;margin:0;text-transform:uppercase;letter-spacing:0.8px;">
-            🎨 Catálogo de Cosméticos (Temporada 1 • 26 Objetos)
+            🎨 Catálogo de Cosméticos (Temporada 1 • 25 Objetos en Cofre + Prestigio)
           </h3>
           <span style="font-size:10.5px;color:#94a3b8;">Desbloquea con llaves o fabrica con Polvo de Reliquia</span>
         </div>
@@ -438,45 +458,39 @@ function modalVault() {
     // Canjes de monedas
     const buyCopBtn = wrap.querySelector('#vBtnBuyCopper');
     if (buyCopBtn) {
-      buyCopBtn.onclick = () => {
-        if ((dData.dailyExchange.copper || 0) >= 3) {
-          toast('Has alcanzado el límite diario de canjes de Cobre (3/3)');
-          return;
+      buyCopBtn.onclick = async () => {
+        try {
+          const res = await rpc('vault.exchange', { tier: 'copper' });
+          dData.coins = res.newCoins;
+          dData.keys.copper = res.newKeys;
+          dData.dailyExchange.copper = res.usedToday;
+          saveState();
+          ringer.beep([600, 800], 0.05, 0.1);
+          toast('✓ 1 Llave de Cobre canjeada');
+          renderContent();
+          populatePreview();
+        } catch (e) {
+          toast(e.message);
         }
-        if ((dData.coins || 0) < 150) {
-          toast('Necesitas 150 monedas para este canje');
-          return;
-        }
-        dData.coins -= 150;
-        dData.keys.copper = (dData.keys.copper || 0) + 1;
-        dData.dailyExchange.copper = (dData.dailyExchange.copper || 0) + 1;
-        saveState();
-        ringer.beep([600, 800], 0.05, 0.1);
-        toast('✓ 1 Llave de Cobre canjeada');
-        renderContent();
-        populatePreview();
       };
     }
 
     const buySilBtn = wrap.querySelector('#vBtnBuySilver');
     if (buySilBtn) {
-      buySilBtn.onclick = () => {
-        if ((dData.dailyExchange.silver || 0) >= 1) {
-          toast('Has alcanzado el límite diario de canjes de Plata (1/1)');
-          return;
+      buySilBtn.onclick = async () => {
+        try {
+          const res = await rpc('vault.exchange', { tier: 'silver' });
+          dData.coins = res.newCoins;
+          dData.keys.silver = res.newKeys;
+          dData.dailyExchange.silver = res.usedToday;
+          saveState();
+          ringer.beep([700, 950], 0.05, 0.1);
+          toast('✓ 1 Llave de Plata canjeada');
+          renderContent();
+          populatePreview();
+        } catch (e) {
+          toast(e.message);
         }
-        if ((dData.coins || 0) < 500) {
-          toast('Necesitas 500 monedas para este canje');
-          return;
-        }
-        dData.coins -= 500;
-        dData.keys.silver = (dData.keys.silver || 0) + 1;
-        dData.dailyExchange.silver = (dData.dailyExchange.silver || 0) + 1;
-        saveState();
-        ringer.beep([700, 950], 0.05, 0.1);
-        toast('✓ 1 Llave de Plata canjeada');
-        renderContent();
-        populatePreview();
       };
     }
 
@@ -495,48 +509,36 @@ function modalVault() {
     // Lógica de apertura
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
-      spinBtn.onclick = () => {
+      spinBtn.onclick = async () => {
         if (isSpinning || (dData.keys[selectedTier] || 0) <= 0) return;
         isSpinning = true;
         spinBtn.disabled = true;
         wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
 
-        // Consumir llave
-        dData.keys[selectedTier]--;
-
-        // Determinar rareza ganadora con sistema de piedad
-        const wonRarity = rollRarity(selectedTier);
-
-        // Actualizar contadores de piedad
-        if (wonRarity === 'legendary') {
-          dData.pity.withoutLegendary = 0;
-          dData.pity.withoutEpic = 0;
-        } else if (wonRarity === 'epic') {
-          dData.pity.withoutEpic = 0;
-          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
-        } else {
-          dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
-          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+        // Sorteo y validación autoritativa en el servidor con crypto.randomInt y piedad
+        let sRes = null;
+        try {
+          sRes = await rpc('vault.open', { tier: selectedTier });
+        } catch (e) {
+          toast(e.message);
+          isSpinning = false;
+          spinBtn.disabled = false;
+          wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
+          return;
         }
 
-        // Selección de item dentro de la rareza
-        const candidates = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
-        const unowned = candidates.filter(c => !dData.cosmetics?.[c.id] && !(c.id === 'founder_frame' && dData.founderFrameUnlocked));
-        
-        let winner;
-        let isDuplicate = false;
-        if (unowned.length > 0) {
-          winner = unowned[Math.floor(Math.random() * unowned.length)];
-        } else {
-          // Ya tiene todos los de esa rareza -> otorgar duplicado convertido en Polvo
-          winner = candidates[Math.floor(Math.random() * candidates.length)];
-          isDuplicate = true;
-        }
-
+        const winner = sRes.reward;
+        const wonRarity = sRes.rarity;
+        const isDuplicate = sRes.wasDuplicate;
+        const dustAward = sRes.dustEarned;
+        dData.keys[selectedTier] = sRes.remainingKeys;
+        dData.dust = sRes.totalDust;
+        dData.pity = sRes.newPity;
         saveState();
 
         const cntEl = wrap.querySelector(`#keyCnt${selectedTier[0].toUpperCase() + selectedTier.slice(1)}`);
         if (cntEl) cntEl.textContent = dData.keys[selectedTier] || 0;
+        const candidates = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
 
         // Construcción de la ruleta con 50 cartas generadas con las probabilidades REALES del cofre
         const totalCards = 50;
@@ -1287,6 +1289,7 @@ function connect(url) {
     ws.onclose = () => { if (S.ws === ws) { S.ws = null; if (S.me) scheduleReconnect(); } };
   });
 }
+window.epicRpc = rpc;
 function rpc(t, d = {}) {
   return new Promise((res, rej) => {
     if (!S.ws || S.ws.readyState !== 1) return rej(new Error('Sin conexión'));
@@ -2816,6 +2819,49 @@ function modalInviteFriends(serverId) {
     list,
     h('div', { class: 'row' }, h('button', { onclick: closeModal }, 'Listo'))
   );
+}
+
+
+async function modalModerationReports() {
+  try {
+    const list = await rpc('report.list');
+    const wrap = h('div', { style: 'display:flex;flex-direction:column;gap:12px;max-height:70vh;overflow-y:auto;min-width:min(500px, 90vw);' });
+    if (!list || !list.length) {
+      wrap.appendChild(h('div', { style: 'padding:20px;text-align:center;color:#94a3b8;' }, '✓ No hay reportes pendientes de revisión.'));
+    } else {
+      list.forEach((r) => {
+        const item = h('div', { style: 'background:#1e293b;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;border-left:4px solid ' + (r.status === 'resolved' ? '#10b981' : '#f59e0b') },
+          h('div', { style: 'display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;' },
+            h('span', null, `Reporte #${r.id} • ${new Date(r.ts).toLocaleDateString()} ${new Date(r.ts).toLocaleTimeString()}`),
+            h('span', { style: 'font-weight:bold;color:' + (r.status === 'resolved' ? '#10b981' : '#f59e0b') }, r.status === 'resolved' ? '✓ Resuelto' : '⏳ Pendiente')
+          ),
+          h('div', { style: 'font-size:13px;' },
+            h('b', { style: 'color:#38bdf8;' }, r.reporterName || ('Usuario #' + r.reporter_id)),
+            ' reportó a ',
+            h('b', { style: 'color:#f87171;' }, r.reportedName || ('Usuario #' + r.reported_user_id))
+          ),
+          r.messageText ? h('div', { style: 'background:rgba(0,0,0,0.3);padding:6px 10px;border-radius:6px;font-style:italic;font-size:12px;color:#cbd5e1;' }, '«' + r.messageText + '»') : null,
+          h('div', { style: 'font-size:13px;color:#fde047;' }, 'Motivo: ' + r.reason),
+          r.status !== 'resolved' ? h('div', { style: 'display:flex;gap:8px;margin-top:6px;' },
+            h('button', {
+              class: 'primary',
+              style: 'padding:5px 10px;font-size:12px;',
+              onclick: async () => {
+                await rpc('report.resolve', { reportId: r.id, status: 'resolved' });
+                toast('✓ Reporte marcado como resuelto');
+                closeModal();
+                modalModerationReports();
+              }
+            }, '✓ Marcar Resuelto')
+          ) : null
+        );
+        wrap.appendChild(item);
+      });
+    }
+    modal('🛡️ Buzón de Moderación y Reportes', wrap);
+  } catch (e) {
+    toast('Error al cargar reportes: ' + e.message);
+  }
 }
 
 function modalServerManage() {

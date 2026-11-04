@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('epic', {
   toggleMini: (enable) => ipcRenderer.invoke('window:mini', enable),
   onMiniChanged: (cb) => ipcRenderer.on('window:mini-changed', (_e, val) => cb(val)),
   version: () => ipcRenderer.invoke('app:version'),
+  isStore: () => ipcRenderer.invoke('app:isStore'),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   installUpdate: (url) => ipcRenderer.invoke('app:download-and-install', url),
   downloadAsarUpdate: (url) => ipcRenderer.invoke('app:download-asar-update', url),

@@ -38,10 +38,10 @@
       "name": "Cofre de Cobre",
       "key": "copper",
       "odds": {
-        "common": 0.80,
+        "common": 0.8,
         "rare": 0.17,
         "epic": 0.03,
-        "legendary": 0.00
+        "legendary": 0
       }
     },
     "silver": {
@@ -71,8 +71,8 @@
       "name": "Cofre de Obsidiana",
       "key": "obsidian",
       "odds": {
-        "common": 0.00,
-        "rare": 0.40,
+        "common": 0,
+        "rare": 0.4,
         "epic": 0.45,
         "legendary": 0.15
       }
@@ -97,11 +97,37 @@
   "dungeon_drops": {
     "daily_key_cap": 20,
     "floors": {
-      "1": { "copper": 0.60, "silver": 0.00, "gold": 0.00, "obsidian": 0.00 },
-      "2": { "copper": 0.80, "silver": 0.10, "gold": 0.00, "obsidian": 0.00 },
-      "3": { "copper": 1.00, "silver": 0.25, "gold": 0.00, "obsidian": 0.00 },
-      "4": { "copper": 0.00, "silver": 0.60, "gold": 0.10, "obsidian": 0.00 },
-      "5": { "copper": 0.00, "silver": 1.00, "gold": 0.30, "obsidian": 0.10, "weekly_bonus_obsidian": 1 }
+      "1": {
+        "copper": 0.6,
+        "silver": 0,
+        "gold": 0,
+        "obsidian": 0
+      },
+      "2": {
+        "copper": 0.8,
+        "silver": 0.1,
+        "gold": 0,
+        "obsidian": 0
+      },
+      "3": {
+        "copper": 1,
+        "silver": 0.25,
+        "gold": 0,
+        "obsidian": 0
+      },
+      "4": {
+        "copper": 0,
+        "silver": 0.6,
+        "gold": 0.1,
+        "obsidian": 0
+      },
+      "5": {
+        "copper": 0,
+        "silver": 1,
+        "gold": 0.3,
+        "obsidian": 0.1,
+        "weekly_bonus_obsidian": 1
+      }
     }
   },
   "cosmetics": [
@@ -304,14 +330,21 @@
       "val": "Coloso Caído",
       "rarity": "legendary",
       "desc": "Título legendario resplandeciente reservado para quienes derriban al Gólem."
-    },
+    }
+  ],
+  "prestige_cosmetics": [
     {
       "id": "founder_frame",
       "name": "★ Marco de Avatar FUNDADOR ★",
       "type": "frame",
       "val": "founder_blue",
       "rarity": "legendary",
-      "desc": "Marco Azul Neón con insignia 'FUNDADOR' para llamadas, chat y perfil (Prestigio Edición 1)."
+      "method": "founder_exclusive",
+      "desc": "Marco Azul Neón con insignia «FUNDADOR» para llamadas, chat y perfil (Exclusivo de Primera Edición para los primeros amigos y creadores, fuera de cajas)."
     }
-  ]
+  ],
+  "season_policy": {
+    "no_fomo": true,
+    "rotation_rule": "Cuando comience una nueva temporada, los cosméticos de temporadas pasadas NUNCA desaparecen: permanecen siempre disponibles para fabricación directa con Polvo de Reliquia en la Bóveda."
+  }
 }

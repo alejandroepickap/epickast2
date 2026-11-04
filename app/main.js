@@ -407,6 +407,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('app:isStore', () => !!(process.windowsStore || process.env.STORE_BUILD === '1'));
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
   
     ipcMain.handle('app:download-asar-update', async (e, url) => {
@@ -451,6 +452,9 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:apply-asar-update', async () => {
+    if (process.windowsStore || process.env.STORE_BUILD === '1') {
+      return { ok: false, storeManaged: true, error: 'En la versión de Microsoft Store, las actualizaciones son automáticas a través de la Store.' };
+    }
     try {
       const resourcesDir = process.resourcesPath || (app.isPackaged ? path.dirname(app.getAppPath()) : path.join(__dirname, '..', 'dist'));
       const installDir = path.dirname(resourcesDir);
