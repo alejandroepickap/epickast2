@@ -24,3 +24,4 @@ server/data/
 *.sqlite
 *.db
 server/*firebase-adminsdk*.json
+server/render-env-variable.txt
