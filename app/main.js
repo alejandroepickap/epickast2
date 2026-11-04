@@ -125,12 +125,6 @@ const appConfig = readConfig();
 if (appConfig.disableGpu) {
   // Deshabilitar aceleración por hardware (estilo Discord) para resolver pantallas negras en captura
   app.disableHardwareAcceleration();
-  app.commandLine.appendSwitch('disable-gpu');
-  app.commandLine.appendSwitch('disable-software-rasterizer');
-} else {
-  // Rendimiento acelerado por GPU
-  app.commandLine.appendSwitch('ignore-gpu-blocklist');
-  app.commandLine.appendSwitch('enable-gpu-rasterization');
 }
 // NOTA: Se retira 'enable-zero-copy' porque provoca pantallas negras al capturar ventanas de apps DirectX/GPU
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,MediaRouter,Translate,HardwareMediaKeyHandling,AutofillServerCommunication');
@@ -229,7 +223,8 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, 'index.html'));
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => { if (win && !win.isDestroyed() && !win.isVisible()) win.show(); });
+  setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible()) win.show(); }, 1200);
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 
@@ -286,7 +281,8 @@ function createWindow() {
 
 function createTray() {
   if (tray) return;
-  const iconPath = path.join(__dirname, 'icon.png');
+  try {
+    const iconPath = path.join(__dirname, 'icon.png');
   tray = new Tray(iconPath);
   tray.setToolTip('EpicKast');
 
@@ -330,6 +326,7 @@ function createTray() {
   tray.setContextMenu(contextMenu);
   tray.on('double-click', showApp);
   tray.on('click', showApp);
+  } catch (err) { console.warn('[Tray] Fallback:', err?.message); }
 }
 
 app.whenReady().then(() => {
