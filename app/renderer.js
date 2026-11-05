@@ -1422,31 +1422,36 @@ function modalVault(initialTab = 'roulette') {
     if (!racerContainer) return;
     if (window.CoreRacerGame) {
       if (activeRacerInstance) { try { activeRacerInstance.destroy(); } catch {} }
-      activeRacerInstance = new window.CoreRacerGame(racerContainer, {
-        playerName: S.me?.name || 'Tú',
-        getCoins: () => dData.coins || 0,
-        spendCoins: (amt) => {
-          if ((dData.coins || 0) < amt) {
-            toast('🪙 Monedas insuficientes para esta mejora');
-            return false;
+      try {
+        activeRacerInstance = new window.CoreRacerGame(racerContainer, {
+          playerName: S.me?.name || 'Tú',
+          getCoins: () => dData.coins || 0,
+          spendCoins: (amt) => {
+            if ((dData.coins || 0) < amt) {
+              toast('🪙 Monedas insuficientes para esta mejora');
+              return false;
+            }
+            dData.coins -= amt;
+            saveState();
+            toast(`🔧 ¡Mejora instalada en tu Hover-Kart (-${amt} 🪙)!`);
+            return true;
+          },
+          onReward: (reward) => {
+            if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
+            if (reward.keys) {
+              if (reward.keys.copper) dData.keys.copper = (dData.keys.copper || 0) + reward.keys.copper;
+              if (reward.keys.silver) dData.keys.silver = (dData.keys.silver || 0) + reward.keys.silver;
+              if (reward.keys.gold) dData.keys.gold = (dData.keys.gold || 0) + reward.keys.gold;
+              if (reward.keys.obsidian) dData.keys.obsidian = (dData.keys.obsidian || 0) + reward.keys.obsidian;
+            }
+            saveState();
+            toast(`🏎️ ¡Botín de carrera acreditado (+${reward.coins} 🪙)!`);
           }
-          dData.coins -= amt;
-          saveState();
-          toast(`🔧 ¡Mejora instalada en tu Hover-Kart (-${amt} 🪙)!`);
-          return true;
-        },
-        onReward: (reward) => {
-          if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
-          if (reward.keys) {
-            if (reward.keys.copper) dData.keys.copper = (dData.keys.copper || 0) + reward.keys.copper;
-            if (reward.keys.silver) dData.keys.silver = (dData.keys.silver || 0) + reward.keys.silver;
-            if (reward.keys.gold) dData.keys.gold = (dData.keys.gold || 0) + reward.keys.gold;
-            if (reward.keys.obsidian) dData.keys.obsidian = (dData.keys.obsidian || 0) + reward.keys.obsidian;
-          }
-          saveState();
-          toast(`🏎️ ¡Botín de carrera acreditado (+${reward.coins} 🪙)!`);
-        }
-      });
+        });
+      } catch (err) {
+        console.error('Error al iniciar Turbo Core:', err);
+        racerContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;">Error al iniciar Turbo Core: ' + (err.message || err) + '</div>';
+      }
     } else {
       racerContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Turbo Core...</div>';
     }
@@ -1455,13 +1460,19 @@ function modalVault(initialTab = 'roulette') {
   const mountNinja = () => {
     const ninjaContainer = wrap.querySelector('#vViewNinja');
     if (!ninjaContainer) return;
-    if (window.CardJitsuGame && window.CardJitsuGame.renderNinjaCustomizer) {
-      window.CardJitsuGame.renderNinjaCustomizer(ninjaContainer, () => {
-        saveState();
-        activeTab = 'dojo';
-        renderView();
-        mountDojo();
-      });
+    const fn = (window.CardJitsuGame && window.CardJitsuGame.renderNinjaCustomizer) || window.renderNinjaCustomizer;
+    if (fn) {
+      try {
+        fn(ninjaContainer, () => {
+          saveState();
+          activeTab = 'dojo';
+          renderView();
+          mountDojo();
+        });
+      } catch (err) {
+        console.error('Error al iniciar Ninja Studio:', err);
+        ninjaContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;">Error al cargar Estudio Ninja: ' + (err.message || err) + '</div>';
+      }
     } else {
       ninjaContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Estudio Ninja...</div>';
     }

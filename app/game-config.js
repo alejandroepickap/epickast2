@@ -369,8 +369,11 @@
     {
       id: 'neon_highway',
       level: 1,
+      tier: 'Circuito 1 · Nivel Fácil',
       name: 'Autopista Ciber-Neón',
       laps: 2,
+      lapLength: 1800,
+      aiSpeed: 135,
       difficulty: 'Fácil',
       length: 3600,
       accent: '#38bdf8',
@@ -383,14 +386,20 @@
       groundA: '#090d1a',
       groundB: '#0f172a',
       curveIntensity: 0.7,
+      theme: { sky: '#070b19', accent: '#38bdf8', border: '#2563eb', road: '#0b101c', grid: '#1e293b' },
+      firstReward: { coins: 75, keys: { copper: 1 } },
+      repeatReward: { coins: 35 },
       reward: { coins: 75, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
       desc: 'Rectas veloces bajo los rascacielos holográficos del sector exterior.'
     },
     {
       id: 'magma_canyon',
       level: 2,
+      tier: 'Circuito 2 · Nivel Medio',
       name: 'Desfiladero de Magma',
       laps: 2,
+      lapLength: 2100,
+      aiSpeed: 150,
       difficulty: 'Media',
       length: 4200,
       accent: '#f97316',
@@ -403,14 +412,20 @@
       groundA: '#1c0a05',
       groundB: '#2a1008',
       curveIntensity: 1.0,
+      theme: { sky: '#180606', accent: '#f97316', border: '#ea580c', road: '#180a06', grid: '#431407' },
+      firstReward: { coins: 120, keys: { silver: 1 } },
+      repeatReward: { coins: 55 },
       reward: { coins: 120, key: 'silver', keyCount: 1, keyLabel: '1 Llave Plata' },
       desc: 'Curvas cerradas entre ríos de roca fundida y puentes de basalto.'
     },
     {
       id: 'glacier_summit',
       level: 3,
+      tier: 'Circuito 3 · Nivel Difícil',
       name: 'Cumbre Glaciar Cero',
       laps: 3,
+      lapLength: 2200,
+      aiSpeed: 165,
       difficulty: 'Difícil',
       length: 4800,
       accent: '#7dd3fc',
@@ -423,14 +438,20 @@
       groundA: '#082032',
       groundB: '#0c2d48',
       curveIntensity: 1.25,
+      theme: { sky: '#04131d', accent: '#7dd3fc', border: '#0284c7', road: '#091524', grid: '#0c4a6e' },
+      firstReward: { coins: 180, keys: { gold: 1 } },
+      repeatReward: { coins: 80 },
       reward: { coins: 180, key: 'gold', keyCount: 1, keyLabel: '1 Llave Oro' },
       desc: 'Asfalto congelado a gran altitud con chicanes técnicas de alta velocidad.'
     },
     {
       id: 'obsidian_core',
       level: 4,
+      tier: 'Circuito 4 · Nivel Experto',
       name: 'Santuario del Coloso',
       laps: 3,
+      lapLength: 2500,
+      aiSpeed: 180,
       difficulty: 'Experto',
       length: 5400,
       accent: '#a855f7',
@@ -443,6 +464,9 @@
       groundA: '#0d061a',
       groundB: '#170b2c',
       curveIntensity: 1.5,
+      theme: { sky: '#090314', accent: '#a855f7', border: '#9333ea', road: '#12071f', grid: '#3b0764' },
+      firstReward: { coins: 300, keys: { obsidian: 1 } },
+      repeatReward: { coins: 140 },
       reward: { coins: 300, key: 'obsidian', keyCount: 1, keyLabel: '1 Llave Obsidiana' },
       desc: 'El circuito definitivo alrededor del reactor dimensional del Coloso.'
     }
@@ -451,39 +475,52 @@
   const WORKSHOP_UPGRADES = {
     engine: {
       id: 'engine',
-      name: 'Motor',
+      name: 'Motor Iónico',
       maxLevel: 5,
+      costs: [0, 120, 280, 550, 1000],
       baseCost: 120,
-      desc: 'Incrementa la velocidad punta en recta.',
+      desc: 'Aumenta la velocidad punta y aceleración en todos los circuitos.',
+      sprite: 'workshop_engine',
       spriteKey: 'workshop_engine'
     },
     turbo: {
       id: 'turbo',
       name: 'Inyector Nitro',
       maxLevel: 5,
+      costs: [0, 120, 280, 550, 1000],
       baseCost: 120,
-      desc: 'Mayor potencia y recarga del propulsor Nitro.',
+      desc: 'Incrementa la potencia del propulsor (Espacio) y su recarga.',
+      sprite: 'workshop_turbo',
       spriteKey: 'workshop_turbo'
+    },
+    shield: {
+      id: 'shield',
+      name: 'Escudo Magnético',
+      maxLevel: 5,
+      costs: [0, 120, 280, 550, 1000],
+      baseCost: 120,
+      desc: 'Reduce la pérdida de velocidad al chocar y atrae monedas cercanas.',
+      sprite: 'workshop_shield',
+      spriteKey: 'workshop_shield'
     },
     tires: {
       id: 'tires',
       name: 'Neumáticos Grip',
       maxLevel: 5,
+      costs: [0, 120, 280, 550, 1000],
       baseCost: 120,
       desc: 'Mejor agarre lateral al tomar curvas cerradas.',
+      sprite: 'workshop_tires',
       spriteKey: 'workshop_tires'
     }
   };
 
   const CHASSIS_COLORS = [
-    { id: '#ef4444', name: 'Rojo Ignis', cost: 0 },
-    { id: '#3b82f6', name: 'Azul Torrente', cost: 0 },
-    { id: '#10b981', name: 'Verde Esmeralda', cost: 80 },
-    { id: '#f59e0b', name: 'Ámbar Solar', cost: 80 },
-    { id: '#a855f7', name: 'Púrpura Vacío', cost: 150 },
-    { id: '#ec4899', name: 'Rosa Synthwave', cost: 150 },
-    { id: '#38bdf8', name: 'Cian Hielo', cost: 200 },
-    { id: '#fbbf24', name: 'Oro del Coloso', cost: 350 }
+    { id: 'cyan', name: 'Cian Hiperión', primary: '#06b6d4', glow: '#22d3ee', cost: 0 },
+    { id: 'crimson', name: 'Carmesí Ignis', primary: '#dc2626', glow: '#f87171', cost: 150 },
+    { id: 'emerald', name: 'Esmeralda Nexo', primary: '#059669', glow: '#34d399', cost: 150 },
+    { id: 'gold', name: 'Oro Soberano', primary: '#d97706', glow: '#fbbf24', cost: 300 },
+    { id: 'amethyst', name: 'Amatista Vacío', primary: '#7c3aed', glow: '#c084fc', cost: 300 }
   ];
 
   const DAILY_LIMITS = {

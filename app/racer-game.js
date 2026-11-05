@@ -353,22 +353,24 @@
       const appVer = CFG().APP_VERSION || '1.9.2';
 
       const renderUpgradeCard = (key) => {
-        const meta = upgradesMeta[key];
+        const meta = upgradesMeta[key] || {};
         const lvl = this.save[key] || 1;
         const isMax = lvl >= (meta.maxLevel || 5);
-        const cost = isMax ? 0 : (meta.costs[lvl] || 200);
+        const costs = Array.isArray(meta.costs) ? meta.costs : [0, meta.baseCost || 120, (meta.baseCost || 120) * 2, (meta.baseCost || 120) * 4, (meta.baseCost || 120) * 8];
+        const cost = isMax ? 0 : (costs[lvl] || 200);
         const canAfford = coins >= cost;
+        const spr = meta.sprite || meta.spriteKey || 'workshop_engine';
         return `
           <div style="background:#0c101b;border:1px solid #1f293d;border-radius:10px;padding:11px 13px;display:flex;flex-direction:column;gap:6px;">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
               <span style="font-size:12.5px;font-weight:900;color:#f8fafc;display:inline-flex;align-items:center;gap:6px;">
-                ${renderSpr(meta.sprite, 1.1)} ${meta.name}
+                ${renderSpr(spr, 1.1)} ${meta.name || key}
               </span>
               <span class="ek-pixel-font" style="font-size:9px;font-weight:800;color:${isMax ? '#34d399' : '#38bdf8'};background:rgba(56,189,248,0.12);padding:3px 7px;border-radius:6px;">
                 ${isMax ? 'MAX' : `Nv.${lvl}/5`}
               </span>
             </div>
-            <div style="font-size:11px;color:#94a3b8;line-height:1.35;">${meta.desc}</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.35;">${meta.desc || ''}</div>
             <div style="display:flex;gap:4px;margin:2px 0;">
               ${[1, 2, 3, 4, 5].map(i => `<div style="flex:1;height:5px;border-radius:3px;background:${i <= lvl ? ch.glow : '#1e293b'};"></div>`).join('')}
             </div>
@@ -447,12 +449,16 @@
             ${tracks.map(t => {
               const isCleared = !!this.save.clearedTracks[t.id];
               const best = this.save.bestTimes[t.id] ? `${(this.save.bestTimes[t.id] / 1000).toFixed(2)}s` : 'Sin récord';
-              const keyId = t.firstReward.keys.copper ? 'copper' : t.firstReward.keys.silver ? 'silver' : t.firstReward.keys.gold ? 'gold' : 'obsidian';
+              const theme = t.theme || { accent: t.accent || '#38bdf8', border: '#2563eb', sky: t.skyTop || '#070b19' };
+              const tier = t.tier || `Nivel ${t.level || 1} · ${t.difficulty || 'Normal'}`;
+              const firstReward = t.firstReward || { coins: t.reward?.coins || 75, keys: { [t.reward?.key || 'copper']: 1 } };
+              const repeatReward = t.repeatReward || { coins: Math.round((t.reward?.coins || 75) * 0.45) };
+              const keyId = firstReward.keys?.copper ? 'copper' : firstReward.keys?.silver ? 'silver' : firstReward.keys?.gold ? 'gold' : 'obsidian';
               const keyName = keyId === 'copper' ? 'Cobre' : keyId === 'silver' ? 'Plata' : keyId === 'gold' ? 'Oro' : 'Obsidiana';
               return `
-                <div style="background:linear-gradient(160deg, #0e1320 0%, #090c14 100%);border:1.5px solid ${isCleared ? '#10b981' : t.theme.border};border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 16px rgba(0,0,0,0.4);">
+                <div style="background:linear-gradient(160deg, #0e1320 0%, #090c14 100%);border:1.5px solid ${isCleared ? '#10b981' : theme.border};border-radius:12px;padding:13px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 16px rgba(0,0,0,0.4);">
                   <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;min-width:0;">
-                    <span style="font-size:10px;font-weight:900;color:${t.theme.accent};text-transform:uppercase;letter-spacing:0.3px;">${t.tier}</span>
+                    <span style="font-size:10px;font-weight:900;color:${theme.accent};text-transform:uppercase;letter-spacing:0.3px;">${tier}</span>
                     <span style="font-size:10px;font-weight:800;color:${isCleared ? '#34d399' : '#fbbf24'};background:rgba(0,0,0,0.45);padding:2px 7px;border-radius:8px;border:1px solid ${isCleared ? '#10b981' : 'rgba(251,191,36,0.4)'};white-space:nowrap;">
                       ${isCleared ? `✓ Récord: ${best}` : '★ 1ª Conquista'}
                     </span>
@@ -460,15 +466,15 @@
                   <div style="font-size:14.5px;font-weight:900;color:#f8fafc;">${t.name}</div>
                   <div style="font-size:11.5px;color:#94a3b8;line-height:1.4;flex:1;">${t.desc ?? ''}</div>
                   <div style="font-size:11px;color:#cbd5e1;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;background:#080b12;padding:6px 8px;border-radius:6px;border:1px solid #172033;">
-                    <span>🏁 ${t.laps} Vueltas</span>
+                    <span>🏁 ${t.laps || 2} Vueltas</span>
                     <span style="color:#fbbf24;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
                       ${isCleared
-                        ? `1º: +${t.repeatReward.coins} ${renderSpr('coin', 0.85)}`
-                        : `1º: +${t.firstReward.coins} ${renderSpr('coin', 0.85)} + 1 ${renderSpr('key_' + keyId, 0.85)} ${keyName}`
+                        ? `1º: +${repeatReward.coins} ${renderSpr('coin', 0.85)}`
+                        : `1º: +${firstReward.coins} ${renderSpr('coin', 0.85)} + 1 ${renderSpr('key_' + keyId, 0.85)} ${keyName}`
                       }
                     </span>
                   </div>
-                  <button class="racer-start-btn" data-track="${t.id}" style="background:linear-gradient(135deg, ${t.theme.border}, #2563eb);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:900;font-size:12px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.35);display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+                  <button class="racer-start-btn" data-track="${t.id}" style="background:linear-gradient(135deg, ${theme.border}, #2563eb);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-weight:900;font-size:12px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.35);display:inline-flex;align-items:center;justify-content:center;gap:6px;">
                     ${renderSpr('tab_racer', 1)} Correr en ${t.name}
                   </button>
                 </div>
@@ -497,10 +503,11 @@
       this.container.querySelectorAll('.racer-upg-btn').forEach(btn => {
         btn.onclick = () => {
           const key = btn.dataset.upg;
-          const meta = upgradesMeta[key];
+          const meta = upgradesMeta[key] || {};
           const lvl = this.save[key] || 1;
-          if (!meta || lvl >= 5) return;
-          const cost = meta.costs[lvl];
+          if (lvl >= (meta.maxLevel || 5)) return;
+          const costs = Array.isArray(meta.costs) ? meta.costs : [0, meta.baseCost || 120, (meta.baseCost || 120) * 2, (meta.baseCost || 120) * 4, (meta.baseCost || 120) * 8];
+          const cost = costs[lvl] || 200;
           if (this.spendCoins(cost)) {
             this.save[key] = lvl + 1;
             saveRacerData(this.save);
@@ -512,8 +519,8 @@
 
       this.container.querySelectorAll('.racer-start-btn').forEach(btn => {
         btn.onclick = () => {
-          const tid = Number(btn.dataset.track);
-          const track = tracks.find(t => t.id === tid) || tracks[0];
+          const tid = btn.dataset.track;
+          const track = tracks.find(t => String(t.id) === String(tid)) || tracks[0];
           this.startRace(track);
         };
       });
@@ -523,8 +530,25 @@
       }
     }
 
-    startRace(track) {
+    startRace(rawTrack) {
       if (this.destroyed) return;
+      const baseTrack = rawTrack || getTracks()[0] || {};
+      const theme = baseTrack.theme || {
+        sky: baseTrack.skyTop || '#070b19',
+        accent: baseTrack.accent || '#38bdf8',
+        border: '#2563eb',
+        road: '#0b101c',
+        grid: '#1e293b'
+      };
+      const track = {
+        ...baseTrack,
+        theme,
+        laps: baseTrack.laps || 2,
+        lapLength: baseTrack.lapLength || 1800,
+        aiSpeed: baseTrack.aiSpeed || 140,
+        firstReward: baseTrack.firstReward || { coins: baseTrack.reward?.coins || 75, keys: { [baseTrack.reward?.key || 'copper']: 1 } },
+        repeatReward: baseTrack.repeatReward || { coins: Math.round((baseTrack.reward?.coins || 75) * 0.45) }
+      };
       this.selectedTrack = track;
       this.inRace = true;
       this.paused = false;
@@ -536,7 +560,7 @@
         <div style="display:flex;flex-direction:column;gap:10px;user-select:none;">
           <!-- HUD Superior Pixel (Bloque G3: fuente pixel >= 16px y barra Nitro segmentada) -->
           <div style="background:#0c101a;border:1px solid #20293d;border-radius:10px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;flex-wrap:gap:10px;">
               <span style="font-size:13px;font-weight:900;color:${track.theme.accent};display:inline-flex;align-items:center;gap:6px;">
                 ${renderSpr('tab_racer', 1.1)} ${track.name}
               </span>

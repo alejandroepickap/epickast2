@@ -1395,9 +1395,9 @@
     };
 
     const draw = () => {
-      const beltObj = belts.find((b) => b.id === draft.belt) || belts[0];
-      const weaponObj = weapons.find((w) => w.id === draft.weapon) || weapons[0];
-      const auraObj = auras.find((a) => a.id === draft.aura) || auras[0];
+      const beltObj = belts.find((b) => b.id === draft.belt) || belts[0] || { id: 'white', name: 'Cinturón Blanco', color: '#f8fafc' };
+      const weaponObj = weapons.find((w) => w.id === draft.weapon) || weapons[0] || { id: 'kunai', name: 'Kunai Clásico' };
+      const auraObj = auras.find((a) => a.id === draft.aura) || auras[0] || { id: 'none', name: 'Sin Aura' };
 
       container.innerHTML = `
         <div style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:18px;color:#e2e8f0;display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start;">
@@ -1638,6 +1638,7 @@
     };
   }
 
+  CardJitsuGame.renderNinjaCustomizer = renderNinjaCustomizer;
   window.CardJitsuGame = CardJitsuGame;
   window.renderNinjaCustomizer = renderNinjaCustomizer;
   window.renderPixelNinjaSvg = renderPixelNinjaSvg;

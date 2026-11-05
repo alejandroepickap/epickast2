@@ -1,7 +1,7 @@
-﻿{
-    "version":  "1.9.2",
-    "asarSha256":  "0670879df62cf2d29a989fe6ce42469576a04f2f4f01ddbca300b14fb0034283",
-    "asarSize":  10746674,
-    "updatedAt":  "2026-11-05T06:58:22.546Z",
-    "notes":  "EpicKast v1.9.2 - Proporciones de Tienda y Boveda corregidas, Navegacion a DMs desde perfil reparada, Paleta base optimizada y Nuevos sonidos de chat"
+{
+  "version": "1.9.2",
+  "asarSha256": "132b369d5fcd074df2b6d588298d00ebe15e6023b32b1d4436e9d02398110707",
+  "asarSize": 10752853,
+  "updatedAt": "2026-11-05T07:15:36.935Z",
+  "notes": "EpicKast v1.9.2 - Estudio Ninja y Turbo Core reparados, Boveda optimizada y sonidos."
 }
