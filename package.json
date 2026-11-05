@@ -66,7 +66,8 @@
       "publisher": "CN=84C8DA77-E7AA-4685-90E3-2D5F2F9BA6E9",
       "publisherDisplayName": "epickap",
       "applicationId": "epickap.EpicKast",
-      "backgroundColor": "#151821",
+      "backgroundColor": "#0b0e14",
+      "showNameOnTiles": true,
       "artifactName": "EpicKast-Store.appx",
       "languages": [
         "es-ES",
