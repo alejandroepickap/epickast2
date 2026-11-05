@@ -93,7 +93,9 @@ try {
   console.log('[v1.8.5] Migration notice:', e.message);
 }
 
-function saveBackup() {
+let _localBackupTimer = null;
+
+function _performSaveBackup(forceCloud = false) {
   try {
     const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,status,custom_status,ninja_config,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week FROM users');
     const friends = all('SELECT a,b,status FROM friends');
@@ -107,10 +109,24 @@ function saveBackup() {
     const messages = all('SELECT id,channel,user_id,text,ts,file_id,reply_to,pinned,thread_id FROM messages ORDER BY id DESC LIMIT 2000').reverse();
     const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports, files, messages };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
-    if (!process.env.EPICKAST_TEST) { firebaseAdapter.syncDatabaseToFirebase(DATA, state).catch(() => {}); }
+    if (!process.env.EPICKAST_TEST) { firebaseAdapter.syncDatabaseToFirebase(DATA, state, forceCloud).catch(() => {}); }
   } catch (e) {
     console.error('[backup] Error al guardar respaldo:', e);
   }
+}
+
+function saveBackup(immediate = false) {
+  if (immediate || process.env.EPICKAST_TEST) {
+    if (_localBackupTimer) { clearTimeout(_localBackupTimer); _localBackupTimer = null; }
+    _performSaveBackup(false);
+    return;
+  }
+  if (_localBackupTimer) return;
+  _localBackupTimer = setTimeout(() => {
+    _localBackupTimer = null;
+    _performSaveBackup(false);
+  }, 800);
+  if (typeof _localBackupTimer.unref === 'function') _localBackupTimer.unref();
 }
 
 function applyBackupDataset(data, isAuthoritative = false) {
@@ -1841,5 +1857,17 @@ run('DELETE FROM sessions WHERE created<?', Date.now() - 30 * 864e5);
 
 if (require.main === module) {
   httpServer.listen(PORT, '0.0.0.0', () => console.log(`EpicKast server escuchando en :${PORT}  (datos: ${DATA})`));
+  const gracefulShutdown = async (sig) => {
+    console.log(`[server] Señal ${sig} recibida, sincronizando estado final antes de cerrar...`);
+    try {
+      _performSaveBackup(true);
+      if (typeof firebaseAdapter.flushPendingSync === 'function') {
+        await firebaseAdapter.flushPendingSync();
+      }
+    } catch {}
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 module.exports = { httpServer, wss, db };

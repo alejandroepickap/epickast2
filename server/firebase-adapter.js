@@ -19,6 +19,39 @@ const path = require('node:path');
 let config = null;
 let cachedToken = null;
 let tokenExpiresAt = 0;
+let resolvedBucket = null;
+
+// --- PROTECTOR DE CUOTA GRATUITA DE FIREBASE (SPARK PLAN) ---
+// Límites gratuitos de Firebase Storage: 20,000 subidas/día, 50,000 descargas/día, 1 GB/día descarga, 5 GB total.
+// Con este regulador, syncDatabaseToFirebase agrupa cambios (máx 1 subida cada 60s = máx 1,440/día = 7.2% del límite).
+const MIN_SYNC_INTERVAL_MS = 60 * 1000; // 60 segundos entre subidas de BD
+const MAX_DAILY_UPLOADS = 15000;        // Tope preventivo (límite gratis = 20,000)
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // Máx 5 MB por adjunto en nube
+
+let lastSyncTime = 0;
+let lastSyncedHash = '';
+let pendingSyncTimer = null;
+let pendingDataDir = null;
+let pendingStateObj = null;
+let syncInProgress = false;
+
+let quotaDay = new Date().toISOString().slice(0, 10);
+let dailyUploadCount = 0;
+const missingAttachments = new Set();
+
+function checkUploadQuota() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today !== quotaDay) {
+    quotaDay = today;
+    dailyUploadCount = 0;
+  }
+  if (dailyUploadCount >= MAX_DAILY_UPLOADS) {
+    console.warn('[firebase] Tope preventivo diario alcanzado para proteger el plan gratuito.');
+    return false;
+  }
+  dailyUploadCount++;
+  return true;
+}
 
 function base64url(input) {
   return Buffer.from(input)
@@ -170,6 +203,7 @@ async function getAccessToken(cfg) {
 }
 
 function getStorageBucket(cfg) {
+  if (resolvedBucket) return resolvedBucket;
   if (cfg.storageBucket) return cfg.storageBucket.replace(/^gs:\/\//, '');
   const proj = cfg.project_id || cfg.projectId;
   if (proj) return `${proj}.firebasestorage.app`;
@@ -200,9 +234,10 @@ async function uploadToStorage(cfg, destinationPath, fileBuffer, mimeType = 'app
   }, fileBuffer);
 
   if (res.statusCode >= 200 && res.statusCode < 300) {
+    resolvedBucket = bucket;
     return { ok: true, name: destinationPath };
   } else {
-    // Si da 404, intentar con bucket alternativo .appspot.com
+    // Si da 404, intentar con bucket alternativo .appspot.com y cachearlo
     if (bucket.endsWith('.firebasestorage.app')) {
       const altBucket = bucket.replace('.firebasestorage.app', '.appspot.com');
       const altRes = await request({
@@ -213,6 +248,7 @@ async function uploadToStorage(cfg, destinationPath, fileBuffer, mimeType = 'app
         headers,
       }, fileBuffer);
       if (altRes.statusCode >= 200 && altRes.statusCode < 300) {
+        resolvedBucket = altBucket;
         return { ok: true, name: destinationPath };
       }
     }
@@ -241,6 +277,7 @@ async function downloadFromStorage(cfg, destinationPath) {
   });
 
   if (res.statusCode === 200) {
+    resolvedBucket = bucket;
     return res.data;
   }
   // Fallback con .appspot.com si no se encontró en .firebasestorage.app
@@ -253,27 +290,105 @@ async function downloadFromStorage(cfg, destinationPath) {
       method: 'GET',
       headers
     });
-    if (altRes.statusCode === 200) return altRes.data;
+    if (altRes.statusCode === 200) {
+      resolvedBucket = altBucket;
+      return altRes.data;
+    }
   }
   return null;
 }
 
 /**
- * Guarda el respaldo completo de la base de datos o JSON en Firebase Storage.
+ * Ejecuta la subida real del estado a Firebase Storage verificando hash y cuota.
  */
-async function syncDatabaseToFirebase(dataDir, backupStateObj) {
+async function _executeDatabaseUpload(dataDir, backupStateObj) {
   const cfg = loadConfig(dataDir);
-  if (!cfg) return false;
+  if (!cfg || !backupStateObj) return false;
+  if (syncInProgress) return false;
 
   try {
-    const jsonBuf = Buffer.from(JSON.stringify(backupStateObj, null, 2), 'utf8');
+    syncInProgress = true;
+    // Calcular hash ignorando ts para no subir si el estado real es idéntico
+    const cloneForHash = { ...backupStateObj, ts: 0 };
+    const contentHash = crypto.createHash('sha256').update(JSON.stringify(cloneForHash)).digest('hex');
+    if (contentHash === lastSyncedHash) {
+      return true; // Sin cambios reales, ahorra operación de subida
+    }
+
+    if (!checkUploadQuota()) return false;
+
+    // JSON compacto para ahorrar 35% de ancho de banda y espacio en Firebase
+    const jsonBuf = Buffer.from(JSON.stringify(backupStateObj), 'utf8');
     await uploadToStorage(cfg, 'backups/backup-state.json', jsonBuf, 'application/json');
-    console.log('[firebase] Base de datos sincronizada exitosamente con Firebase Storage.');
+    lastSyncedHash = contentHash;
+    lastSyncTime = Date.now();
+    console.log(`[firebase] Base de datos sincronizada (${(jsonBuf.length / 1024).toFixed(1)} KB, subida #${dailyUploadCount} hoy).`);
     return true;
   } catch (e) {
     console.warn('[firebase] Advertencia al sincronizar con Firebase:', e.message);
+  } finally {
+    syncInProgress = false;
   }
   return false;
+}
+
+/**
+ * Guarda el respaldo completo de la base de datos en Firebase Storage con coalescing (máx 1 cada 60s).
+ */
+async function syncDatabaseToFirebase(dataDir, backupStateObj, forceImmediate = false) {
+  const cfg = loadConfig(dataDir);
+  if (!cfg) return false;
+
+  pendingDataDir = dataDir;
+  pendingStateObj = backupStateObj;
+
+  if (forceImmediate) {
+    if (pendingSyncTimer) {
+      clearTimeout(pendingSyncTimer);
+      pendingSyncTimer = null;
+    }
+    const st = pendingStateObj;
+    pendingStateObj = null;
+    return await _executeDatabaseUpload(dataDir, st);
+  }
+
+  const elapsed = Date.now() - lastSyncTime;
+  if (elapsed >= MIN_SYNC_INTERVAL_MS && !pendingSyncTimer && !syncInProgress) {
+    const st = pendingStateObj;
+    pendingStateObj = null;
+    return await _executeDatabaseUpload(dataDir, st);
+  }
+
+  if (!pendingSyncTimer) {
+    const waitMs = Math.max(2000, MIN_SYNC_INTERVAL_MS - elapsed);
+    pendingSyncTimer = setTimeout(() => {
+      pendingSyncTimer = null;
+      if (pendingStateObj) {
+        const st = pendingStateObj;
+        const dir = pendingDataDir;
+        pendingStateObj = null;
+        _executeDatabaseUpload(dir, st).catch(() => {});
+      }
+    }, waitMs);
+    if (typeof pendingSyncTimer.unref === 'function') pendingSyncTimer.unref();
+  }
+  return true;
+}
+
+/**
+ * Fuerza el vaciado inmediato si el servidor se va a apagar (SIGTERM/SIGINT).
+ */
+async function flushPendingSync() {
+  if (pendingSyncTimer) {
+    clearTimeout(pendingSyncTimer);
+    pendingSyncTimer = null;
+  }
+  if (pendingStateObj && pendingDataDir) {
+    const st = pendingStateObj;
+    const dir = pendingDataDir;
+    pendingStateObj = null;
+    await _executeDatabaseUpload(dir, st);
+  }
 }
 
 /**
@@ -288,6 +403,9 @@ async function restoreDatabaseFromFirebase(dataDir) {
     if (buf && buf.length > 0) {
       const state = JSON.parse(buf.toString('utf8'));
       if (state && Array.isArray(state.users) && state.users.length > 0) {
+        const cloneForHash = { ...state, ts: 0 };
+        lastSyncedHash = crypto.createHash('sha256').update(JSON.stringify(cloneForHash)).digest('hex');
+        lastSyncTime = Date.now();
         console.log(`[firebase] Respaldo restaurado desde Firebase Storage (${state.users.length} usuarios).`);
         return state;
       }
@@ -299,16 +417,24 @@ async function restoreDatabaseFromFirebase(dataDir) {
 }
 
 /**
- * Respalda un archivo adjunto subido a Firebase Storage.
+ * Respalda un archivo adjunto subido a Firebase Storage (con límite de 5 MB y control de cuota).
  */
 async function syncAttachmentToFirebase(dataDir, diskFileName, localFilePath, mimeType) {
   const cfg = loadConfig(dataDir);
   if (!cfg) return null;
 
   try {
+    const stat = fs.statSync(localFilePath);
+    if (stat.size > MAX_ATTACHMENT_BYTES) {
+      console.log(`[firebase] Adjunto ${diskFileName} (${(stat.size / 1048576).toFixed(1)} MB) omitido de nube para proteger cuota gratuita.`);
+      return null;
+    }
+    if (!checkUploadQuota()) return null;
+
     const fileBuf = fs.readFileSync(localFilePath);
     const dest = `uploads/${diskFileName}`;
     await uploadToStorage(cfg, dest, fileBuf, mimeType);
+    missingAttachments.delete(diskFileName);
     console.log(`[firebase] Adjunto respaldado en Firebase Storage: ${dest}`);
     return { ok: true, dest };
   } catch (e) {
@@ -318,11 +444,12 @@ async function syncAttachmentToFirebase(dataDir, diskFileName, localFilePath, mi
 }
 
 /**
- * Recupera un adjunto desde Firebase Storage si no existe en disco local.
+ * Recupera un adjunto desde Firebase Storage si no existe en disco local (con caché negativa).
  */
 async function fetchAttachmentFromFirebase(dataDir, diskFileName, localDestPath) {
   const cfg = loadConfig(dataDir);
   if (!cfg) return false;
+  if (missingAttachments.has(diskFileName)) return false;
 
   try {
     const buf = await downloadFromStorage(cfg, `uploads/${diskFileName}`);
@@ -330,8 +457,11 @@ async function fetchAttachmentFromFirebase(dataDir, diskFileName, localDestPath)
       fs.writeFileSync(localDestPath, buf);
       console.log(`[firebase] Adjunto restaurado desde Firebase Storage a ${localDestPath}`);
       return true;
+    } else {
+      missingAttachments.add(diskFileName);
     }
   } catch (e) {
+    missingAttachments.add(diskFileName);
     console.warn('[firebase] Error al descargar adjunto desde Firebase:', e.message);
   }
   return false;
@@ -340,6 +470,7 @@ async function fetchAttachmentFromFirebase(dataDir, diskFileName, localDestPath)
 module.exports = {
   loadConfig,
   syncDatabaseToFirebase,
+  flushPendingSync,
   restoreDatabaseFromFirebase,
   syncAttachmentToFirebase,
   fetchAttachmentFromFirebase,
