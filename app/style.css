@@ -13,10 +13,10 @@ body.mini-mode #winBar{display:none!important}
 body.mini-mode{-webkit-app-region:drag!important}
 body.mini-mode #bMiniExit{-webkit-app-region:no-drag!important}
 :root{
-  --bg:#0e1015;
-  --bg2:#151821;
-  --bg3:#1e2230;
-  --line:rgba(255,255,255,0.06);
+  --bg-app:#0b0e14; --bg-panel:#0f131d; --bg-raised:#141926; --bg-input:#111622; --border:rgba(255,255,255,.08); --bg:#0b0e14;
+  --bg2:#0f131d;
+  --bg3:#141926;
+  --line:rgba(255,255,255,0.08);
   --tx:#eef0f6;
   --mu:#8c93a8;
   --ac:#7c5cff;
@@ -1418,4 +1418,384 @@ details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-directio
   border-color: rgba(251, 191, 36, 0.55);
   color: #fde047;
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+}
+
+
+/* =========================================================================
+   v1.9.1 — AUDITORÍA INTEGRAL: CONTRASTE, MENCIONES @, PIXEL ART, DOJO,
+   TURBO CORE Y COSMÉTICOS ESTILO DISCORD NITRO
+   ========================================================================= */
+
+/* Tipografía Pixel Art local con fallback limpio (Bloque D) */
+.ek-pixel-font {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  letter-spacing: 0.4px;
+}
+
+/* Bloque A5: Puntos de estado para .avatar y .av (Online, Ausente, No Molestar, Desconectado) */
+.avatar .st,
+.av .st {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-panel, #0f131d);
+  box-sizing: border-box;
+  z-index: 4;
+  background: #64748b;
+}
+.avatar .st.on,
+.av .st.on {
+  background: #22c55e !important;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+.avatar .st.away,
+.av .st.away {
+  background: #eab308 !important;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.7);
+}
+.avatar .st.dnd,
+.av .st.dnd {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.8);
+}
+.avatar .st.dnd::after,
+.av .st.dnd::after {
+  content: '';
+  position: absolute;
+  left: 1.5px;
+  right: 1.5px;
+  top: 50%;
+  height: 1.6px;
+  margin-top: -0.8px;
+  background: #fff;
+  border-radius: 1px;
+}
+.avatar .st.inv,
+.avatar .st.off,
+.av .st.inv,
+.av .st.off {
+  background: #64748b !important;
+  box-shadow: none !important;
+}
+
+/* Bloque A4: Insignia de título en chat vs modo compacto de icono en #meBar y #members */
+.user-title-badge {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-inline: 6px 8px;
+  vertical-align: middle;
+}
+.m i {
+  margin-left: 8px;
+}
+.title-badge-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-left: 5px;
+  background: rgba(124, 92, 255, 0.2);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: #c4b5fd;
+  cursor: help;
+}
+.title-badge-icon.legendary {
+  background: rgba(251, 191, 36, 0.22);
+  border-color: rgba(251, 191, 36, 0.65);
+  color: #fde047;
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.35);
+}
+
+/* Bloque A3: Scrollbar visible y degradado inferior sutil en la Bóveda */
+.vault-modal-body {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0b0e14;
+  position: relative;
+}
+.vault-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+.vault-modal-body::-webkit-scrollbar-track {
+  background: #0b0e14;
+  border-radius: 4px;
+}
+.vault-modal-body::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.vault-modal-body::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Bloque B: Sistema de Menciones @ en Canales de Servidor */
+#composer {
+  position: relative;
+}
+.mention-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 16px;
+  width: 320px;
+  max-width: calc(100vw - 40px);
+  max-height: 332px;
+  overflow-y: auto;
+  background: var(--bg-panel, #0f131d);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.8);
+  z-index: 85;
+  padding: 4px;
+}
+.mention-row {
+  height: 40px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.mention-row:hover,
+.mention-row.active {
+  background: rgba(59, 130, 246, 0.22);
+}
+.mention-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+.mention {
+  background: rgba(59, 130, 246, 0.22);
+  color: #93c5fd;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-block;
+  transition: background 0.12s, color 0.12s;
+}
+.mention:hover {
+  background: rgba(59, 130, 246, 0.38);
+  color: #ffffff;
+}
+.m.mention-me {
+  border-left: 3px solid #facc15;
+  background: rgba(250, 204, 21, 0.06);
+}
+.m.mention-me:hover {
+  background: rgba(250, 204, 21, 0.1);
+}
+.mention-badge {
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.65);
+  flex-shrink: 0;
+}
+.rail-mention-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 9.5px;
+  font-weight: 900;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 2px solid #090a0e;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+}
+
+/* Bloque D & H: Tokens de Rareza y Bordes de Tarjetas de Cosméticos */
+.rarity-card-common {
+  border: 1.5px solid #94a3b8 !important;
+  box-shadow: none !important;
+}
+.rarity-card-rare {
+  border: 1.5px solid #3b82f6 !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.45) !important;
+}
+.rarity-card-epic {
+  border: 1.5px solid #a855f7 !important;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.55) !important;
+  position: relative;
+  overflow: hidden;
+}
+.rarity-card-legendary {
+  border: 1.5px solid #fbbf24 !important;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.6) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Placas de Nombre (Nameplates estilo Discord Nitro - Bloque H1) */
+.plate-copper-forge {
+  background: linear-gradient(90deg, rgba(180, 83, 9, 0.32) 0%, rgba(249, 115, 22, 0.16) 65%, transparent 100%) !important;
+  border-left: 2px solid #f97316;
+}
+.plate-glacier {
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.32) 0%, rgba(56, 189, 248, 0.16) 65%, transparent 100%) !important;
+  border-left: 2px solid #38bdf8;
+}
+.plate-runic-storm {
+  background: linear-gradient(90deg, rgba(147, 51, 234, 0.34) 0%, rgba(236, 72, 153, 0.18) 65%, transparent 100%) !important;
+  border-left: 2px solid #c084fc;
+}
+.plate-colossus {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.38) 0%, rgba(245, 158, 11, 0.24) 65%, transparent 100%) !important;
+  border-left: 2px solid #fbbf24;
+  box-shadow: inset 0 0 12px rgba(251, 191, 36, 0.15);
+}
+
+/* Banners Animados en Tarjetas de Perfil (Bloque H1) */
+@keyframes bannerSheenMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.banner-animated {
+  background-size: 200% 200% !important;
+  animation: bannerSheenMove 5s ease infinite;
+}
+
+/* Bloque F: Cartas del Dojo Elemental (104x148, Tiers 2-4, 5-9, 10-12 y Choque) */
+@keyframes cjDealUp {
+  0% { opacity: 0; transform: translateY(24px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes cjShineSweep {
+  0% { transform: translateX(-140%) skewX(-22deg); }
+  35%, 100% { transform: translateX(220%) skewX(-22deg); }
+}
+@keyframes cjEpicFloatStar {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2.5px); }
+}
+@keyframes cjClashRise {
+  0% { transform: translateY(22px) scale(0.88); opacity: 0.4; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes cjClashFlip {
+  0% { transform: perspective(500px) rotateY(90deg) scale(0.9); opacity: 0.4; }
+  100% { transform: perspective(500px) rotateY(0deg) scale(1); opacity: 1; }
+}
+@keyframes cjNinjaShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-7px) rotate(-3deg); }
+  40% { transform: translateX(7px) rotate(3deg); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(5px); }
+}
+@keyframes cjKeyBounce {
+  0% { transform: scale(0.5); opacity: 0; }
+  65% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes racerPopCountdown {
+  0% { transform: scale(1.4); opacity: 0.35; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cj-card-v191 {
+  width: 104px;
+  height: 148px;
+  border-radius: 10px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px;
+  user-select: none;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.16s ease;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55);
+}
+.cj-hand-card {
+  animation: cjDealUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.cj-hand-card:hover {
+  transform: translateY(-10px) scale(1.06) !important;
+  z-index: 10;
+}
+.cj-tier-low {
+  border: 1.5px solid var(--el-color, #94a3b8);
+}
+.cj-tier-mid {
+  border: 2px solid var(--el-color, #38bdf8);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
+}
+.cj-tier-epic {
+  border: 2.5px solid #fbbf24;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.65), inset 0 0 10px rgba(251, 191, 36, 0.3);
+}
+.cj-card-shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  pointer-events: none;
+  animation: cjShineSweep 4s ease-in-out infinite;
+  z-index: 3;
+}
+.cj-card-holo {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(125deg, rgba(251, 191, 36, 0.16) 0%, rgba(236, 72, 153, 0.14) 35%, rgba(56, 189, 248, 0.16) 70%, rgba(251, 191, 36, 0.2) 100%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 2;
+}
+.cj-epic-star {
+  animation: cjEpicFloatStar 1.6s ease-in-out infinite;
+}
+.cj-clash-enter-up {
+  animation: cjClashRise 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.cj-clash-flip-in {
+  animation: cjClashFlip 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.cj-card-winner-scale {
+  transform: scale(1.15) !important;
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.85) !important;
+  z-index: 8;
+}
+.cj-ninja-hit-shake {
+  animation: cjNinjaShake 0.38s ease;
+}
+.cj-stage-shake {
+  animation: cjNinjaShake 0.26s ease;
+}
+.cj-key-bounce {
+  animation: cjKeyBounce 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.racer-countdown-pop {
+  animation: racerPopCountdown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

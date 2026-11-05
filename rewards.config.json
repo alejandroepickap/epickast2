@@ -1,34 +1,34 @@
 {
-  "version": "2.0.0",
+  "version": "1.9.1",
   "season": 1,
-  "season_name": "Minas de Magma",
+  "season_name": "Santuario del Coloso",
   "rarities": {
     "common": {
       "id": "common",
       "name": "Común",
-      "color": "#4b69ff",
-      "dust_duplicate": 2,
+      "color": "#94a3b8",
+      "dust_duplicate": 5,
       "dust_craft": 40
     },
     "rare": {
       "id": "rare",
       "name": "Raro",
-      "color": "#8847ff",
-      "dust_duplicate": 8,
+      "color": "#3b82f6",
+      "dust_duplicate": 15,
       "dust_craft": 120
     },
     "epic": {
       "id": "epic",
       "name": "Épico",
-      "color": "#d32ce6",
-      "dust_duplicate": 20,
+      "color": "#a855f7",
+      "dust_duplicate": 40,
       "dust_craft": 300
     },
     "legendary": {
       "id": "legendary",
       "name": "Legendario",
       "color": "#fbbf24",
-      "dust_duplicate": 50,
+      "dust_duplicate": 100,
       "dust_craft": 800
     }
   },
@@ -46,7 +46,7 @@
     },
     "silver": {
       "id": "silver",
-      "name": "Sagrario de Plata",
+      "name": "Cofre de Plata",
       "key": "silver",
       "odds": {
         "common": 0.55,
@@ -95,40 +95,7 @@
     }
   },
   "dungeon_drops": {
-    "daily_key_cap": 20,
-    "floors": {
-      "1": {
-        "copper": 0.6,
-        "silver": 0,
-        "gold": 0,
-        "obsidian": 0
-      },
-      "2": {
-        "copper": 0.8,
-        "silver": 0.1,
-        "gold": 0,
-        "obsidian": 0
-      },
-      "3": {
-        "copper": 1,
-        "silver": 0.25,
-        "gold": 0,
-        "obsidian": 0
-      },
-      "4": {
-        "copper": 0,
-        "silver": 0.6,
-        "gold": 0.1,
-        "obsidian": 0
-      },
-      "5": {
-        "copper": 0,
-        "silver": 1,
-        "gold": 0.3,
-        "obsidian": 0.1,
-        "weekly_bonus_obsidian": 1
-      }
-    }
+    "daily_key_cap": 20
   },
   "cosmetics": [
     {
@@ -143,7 +110,7 @@
       "id": "color_amethyst",
       "name": "Color: Púrpura Amatista",
       "type": "color",
-      "val": "#a855f7",
+      "val": "#c084fc",
       "rarity": "common",
       "desc": "Resplandor amatista para tu nombre en la lista de miembros."
     },
@@ -151,7 +118,7 @@
       "id": "color_emerald",
       "name": "Color: Verde Esmeralda",
       "type": "color",
-      "val": "#10b981",
+      "val": "#34d399",
       "rarity": "common",
       "desc": "Tinte resplandeciente esmeralda del Núcleo."
     },
@@ -159,7 +126,7 @@
       "id": "color_cyan",
       "name": "Color: Cian Neón",
       "type": "color",
-      "val": "#00e5ff",
+      "val": "#38bdf8",
       "rarity": "common",
       "desc": "Destello ciberpunk cian brillante para tu nombre."
     },
@@ -167,7 +134,7 @@
       "id": "color_crimson",
       "name": "Color: Rojo Magma",
       "type": "color",
-      "val": "#ff3366",
+      "val": "#fb7185",
       "rarity": "common",
       "desc": "Tono carmesí ardiente de roca fundida."
     },
@@ -177,7 +144,7 @@
       "type": "banner",
       "val": "linear-gradient(135deg, #451a03, #b45309, #78350f)",
       "rarity": "common",
-      "desc": "Estandarte panorámico de magma y basalto para tu tarjeta de perfil."
+      "desc": "Estandarte de magma y basalto para tu tarjeta de perfil."
     },
     {
       "id": "banner_amethyst",
@@ -201,7 +168,7 @@
       "type": "banner",
       "val": "linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d)",
       "rarity": "common",
-      "desc": "Estandarte de los puentes de piedra sobre el abismo volcánico."
+      "desc": "Puentes de piedra sobre el abismo volcánico."
     },
     {
       "id": "banner_sanctum",
@@ -209,7 +176,15 @@
       "type": "banner",
       "val": "linear-gradient(135deg, #09090b, #581c87, #dc2626)",
       "rarity": "common",
-      "desc": "Estandarte solemne del santuario central de obsidiana."
+      "desc": "Santuario central de obsidiana del Núcleo."
+    },
+    {
+      "id": "plate_copper_forge",
+      "name": "Placa: Forja de Cobre",
+      "type": "plate",
+      "val": "plate_copper_forge",
+      "rarity": "common",
+      "desc": "Franja metálica de cobre templado detrás de tu nombre en miembros y mensajes directos."
     },
     {
       "id": "frame_copper",
@@ -217,7 +192,7 @@
       "type": "frame",
       "val": "frame-copper",
       "rarity": "rare",
-      "desc": "Bisel de cobre bruñido con esquinas reforzadas para tu avatar."
+      "desc": "Bisel de cobre bruñido para tu avatar."
     },
     {
       "id": "frame_silver",
@@ -241,7 +216,7 @@
       "type": "title",
       "val": "Explorador del Núcleo",
       "rarity": "rare",
-      "desc": "Distintivo para jugadores que descienden a las profundidades."
+      "desc": "Distintivo para quienes descienden a las profundidades."
     },
     {
       "id": "title_smith",
@@ -268,10 +243,26 @@
       "desc": "Título honorable para los primeros aventureros."
     },
     {
+      "id": "plate_glacier",
+      "name": "Placa: Ventisca Glaciar",
+      "type": "plate",
+      "val": "plate_glacier",
+      "rarity": "rare",
+      "desc": "Placa cristalina con destellos helados detrás de tu nombre."
+    },
+    {
+      "id": "fx_snow",
+      "name": "Efecto: Cristales de Escarcha",
+      "type": "fx",
+      "val": "fx_snow",
+      "rarity": "rare",
+      "desc": "Capa de copos y cristales helados flotando sobre tu tarjeta de perfil."
+    },
+    {
       "id": "color_aurora",
       "name": "Color: Aurora Boreal",
       "type": "color",
-      "val": "linear-gradient(90deg, #00e5ff, #a855f7)",
+      "val": "linear-gradient(90deg, #38bdf8, #a855f7)",
       "rarity": "epic",
       "desc": "Gradiente animado estilo aurora boreal para tu nombre."
     },
@@ -279,7 +270,7 @@
       "id": "color_volcanic_flame",
       "name": "Color: Fuego Volcánico",
       "type": "color",
-      "val": "linear-gradient(90deg, #ff3366, #ffb300)",
+      "val": "linear-gradient(90deg, #fb7185, #fbbf24)",
       "rarity": "epic",
       "desc": "Gradiente ardiente en movimiento continuo."
     },
@@ -289,7 +280,7 @@
       "type": "banner",
       "val": "linear-gradient(135deg, #7f1d1d, #ea580c, #f59e0b, #991b1b)",
       "rarity": "epic",
-      "desc": "Banner con ondulación fluida de lava fundida."
+      "desc": "Banner animado con ondulación fluida de lava fundida."
     },
     {
       "id": "banner_rune_storm",
@@ -297,7 +288,7 @@
       "type": "banner",
       "val": "linear-gradient(135deg, #1e1b4b, #6366f1, #a855f7, #312e81)",
       "rarity": "epic",
-      "desc": "Estandarte cósmico con rayos de energía púrpura."
+      "desc": "Estandarte cósmico animado con rayos de energía púrpura."
     },
     {
       "id": "frame_runic",
@@ -308,20 +299,36 @@
       "desc": "Marco pulsante con chispas mágicas alrededor de tu avatar."
     },
     {
+      "id": "plate_runic_storm",
+      "name": "Placa: Tormenta Rúnica",
+      "type": "plate",
+      "val": "plate_runic_storm",
+      "rarity": "epic",
+      "desc": "Placa arcana con brillo animado recorriendo tu fila de miembro."
+    },
+    {
+      "id": "fx_embers",
+      "name": "Efecto: Brasas del Núcleo",
+      "type": "fx",
+      "val": "fx_embers",
+      "rarity": "epic",
+      "desc": "Chispas ascendentes de fuego elemental sobre tu tarjeta de perfil."
+    },
+    {
       "id": "frame_colossus_legend",
       "name": "Marco: Núcleo del Coloso",
       "type": "frame",
       "val": "frame-colossus-legend",
       "rarity": "legendary",
-      "desc": "Doble halo dorado y cian resplandeciente con rotación continua."
+      "desc": "Doble halo dorado y cian con rotación continua forjado en el corazón del Coloso."
     },
     {
       "id": "banner_golem_animated",
-      "name": "Banner: Despertar del Gólem",
+      "name": "Banner: Despertar del Coloso",
       "type": "banner",
       "val": "linear-gradient(135deg, #18181b, #701a75, #b91c1c, #450a0a)",
       "rarity": "legendary",
-      "desc": "Estandarte legendario animado del coloso de obsidiana despertando."
+      "desc": "Estandarte legendario animado del Coloso de obsidiana despertando."
     },
     {
       "id": "title_colossus_slayer",
@@ -329,7 +336,23 @@
       "type": "title",
       "val": "Coloso Caído",
       "rarity": "legendary",
-      "desc": "Título legendario resplandeciente reservado para quienes derriban al Gólem."
+      "desc": "Título legendario resplandeciente reservado para quienes derriban al Coloso."
+    },
+    {
+      "id": "plate_colossus",
+      "name": "Placa: Fragua del Coloso",
+      "type": "plate",
+      "val": "plate_colossus",
+      "rarity": "legendary",
+      "desc": "Placa de nombre legendaria del Set del Coloso con brasas incandescentes."
+    },
+    {
+      "id": "fx_void",
+      "name": "Efecto: Vórtice Abisal",
+      "type": "fx",
+      "val": "fx_void",
+      "rarity": "legendary",
+      "desc": "Partículas gravitatorias doradas y violetas del vacío sobre tu tarjeta de perfil."
     }
   ],
   "prestige_cosmetics": [
@@ -340,11 +363,11 @@
       "val": "founder_blue",
       "rarity": "legendary",
       "method": "founder_exclusive",
-      "desc": "Marco Azul Neón con insignia «FUNDADOR» para llamadas, chat y perfil (Exclusivo de Primera Edición para los primeros amigos y creadores, fuera de cajas)."
+      "desc": "Marco Azul Neón con insignia «FUNDADOR» para llamadas, chat y perfil (Prestigio Edición 1)."
     }
   ],
   "season_policy": {
     "no_fomo": true,
-    "rotation_rule": "Cuando comience una nueva temporada, los cosméticos de temporadas pasadas NUNCA desaparecen: permanecen siempre disponibles para fabricación directa con Polvo de Reliquia en la Bóveda."
+    "rotation_rule": "Cuando comience una nueva temporada, los cosméticos de temporadas pasadas NUNCA desaparecen: permanecen siempre disponibles para fabricación directa con Esencia Arcana en la Bóveda."
   }
 }

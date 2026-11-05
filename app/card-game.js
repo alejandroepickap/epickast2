@@ -1,1263 +1,612 @@
-'use strict';
 /**
- * Dojo Elemental del Núcleo - Minijuego de Cartas Card-Jitsu
- * Versión: v1.8.6
- *
- * Características y Mejoras v1.8.4:
- * - Personajes Pixel Art en combate a gran escala (3/4 de presencia en el tapete).
- * - Fondo Pixel Art del Dojo Elemental (tatami, shoji, antorchas místicas).
- * - Estudio de Personalización Ninja interactivo (Gi, Máscaras, Ojos, Cinturón, Armas y Auras).
- * - Rediseño de Cartas estilo Trading Card (Ilustración central y placa de valor/elemento en esquina).
- * - Tablero de puntos por columnas elementales independientes con colores 100% distinguibles
- *   (Fuego Carmesí, Agua Azul Océano Profundo y Nieve Blanco Escarcha / Diamante Helado).
- * - Alertas tácticas en tiempo real de condiciones de victoria ("Falta 1 Nieve", "Peligro: 2 de Fuego").
- * - Cinemáticas a pantalla completa para cartas de nivel 10+ (Dragón Ígneo, Tsunami y Ventisca Cero).
- * - Dificultad escalonada por IA (hasta Gran Maestro implacable en Piso 5).
+ * EpicKast v1.9.1 — DOJO ELEMENTAL DE CARTAS (Card-Jitsu Tactical Engine) & ESTUDIO "MI NINJA"
+ * Bloques A1, A2, A3, C, D, E, F integrados con `window.EKLifecycle`, `window.EKGameConfig` y `window.EKSprites`.
  */
-
 (function () {
-  const ELEMENTS = ['fire', 'water', 'snow'];
+  'use strict';
 
-  // COLORES ELEMENTALES RIGUROSAMENTE DISTINGUIBLES
-  const ELEM_CONFIG = {
-    fire: {
-      id: 'fire',
-      name: 'Fuego',
-      icon: '🔥',
-      img: 'assets/cards/cute-fire.svg',
-      color: '#ef4444',
-      badgeBg: '#dc2626',
-      badgeText: '#ffffff',
-      bg: 'linear-gradient(135deg, #7f1d1d, #ef4444)',
-      border: '#f87171',
-      glow: 'rgba(239, 68, 68, 0.5)',
-      defeatBy: 'water',
-      beats: 'snow',
-      verb: 'calcina a',
-      cinematicTitle: '¡EL DESPERTAR DEL DRAGÓN ÍGNEO!'
-    },
-    water: {
-      id: 'water',
-      name: 'Agua',
-      icon: '💧',
-      img: 'assets/cards/cute-water.svg',
-      color: '#2563eb', // AZUL PROFUNDO REAL - CERO CONFUSIÓN
-      badgeBg: '#1d4ed8',
-      badgeText: '#ffffff',
-      bg: 'linear-gradient(135deg, #1e3a8a, #2563eb)',
-      border: '#60a5fa',
-      glow: 'rgba(37, 99, 235, 0.5)',
-      defeatBy: 'snow',
-      beats: 'fire',
-      verb: 'apaga a',
-      cinematicTitle: '¡EL GRAN TSUNAMI DEL LEVIATÁN!'
-    },
-    snow: {
-      id: 'snow',
-      name: 'Nieve',
-      icon: '❄️',
-      img: 'assets/cards/cute-snow.svg',
-      color: '#e0f2fe', // BLANCO CRISTAL DE HIELO
-      badgeBg: '#ffffff',
-      badgeText: '#0f172a',
-      bg: 'linear-gradient(135deg, #0284c7, #e0f2fe)',
-      border: '#a5f3fc',
-      glow: 'rgba(165, 243, 252, 0.65)',
-      defeatBy: 'fire',
-      beats: 'water',
-      verb: 'congela a',
-      cinematicTitle: '¡LA VENTISCA DEL CERO ABSOLUTO!'
-    }
-  };
+  const CFG = () => window.EKGameConfig || {};
+  const SPR = () => window.EKSprites || {};
 
-  // CONFIGURACIÓN DE LOS 5 PISOS Y JEFES
-  const FLOORS = [
-    {
-      level: 1,
-      name: 'Novicio Ignis',
-      belt: 'Cinturón Blanco',
-      avatarImg: 'assets/bosses/ignis.jpg',
-      color: '#ef4444',
-      aiSkill: 0.20,
-      quotes: {
-        intro: '¡Que la llama del Núcleo guíe mis cartas!',
-        winRound: '¡El fuego es impredecible!',
-        loseRound: '¡Ugh, casi me apagas la llama!',
-        defeat: 'Has dominado mi fuego... mereces avanzar.'
-      },
-      reward: { coins: 50, keys: { copper: 1 } },
-      ninjaConfig: { giColor: '#b91c1c', giAccent: '#7f1d1d', beltColor: '#f8fafc', eyeColor: '#f59e0b', maskType: 'classic', weaponType: 'katanas', aura: 'fire' }
-    },
-    {
-      level: 2,
-      name: 'Monje de Escarcha',
-      belt: 'Cinturón Azul',
-      avatarImg: 'assets/bosses/frost.jpg',
-      color: '#38bdf8',
-      aiSkill: 0.50,
-      quotes: {
-        intro: 'El hielo no perdona la indecisión...',
-        winRound: 'Tus movimientos se congelaron.',
-        loseRound: '¡Una grieta en mi defensa de hielo!',
-        defeat: 'El frío se disipa ante tu determinación.'
-      },
-      reward: { coins: 90, keys: { copper: 1, silver: 1 } },
-      ninjaConfig: { giColor: '#0369a1', giAccent: '#075985', beltColor: '#38bdf8', eyeColor: '#e0f2fe', maskType: 'classic', weaponType: 'scroll', aura: 'snow' }
-    },
-    {
-      level: 3,
-      name: 'Guardián del Torrente',
-      belt: 'Cinturón Rojo',
-      avatarImg: 'assets/bosses/torrent.jpg',
-      color: '#06b6d4',
-      aiSkill: 0.75,
-      quotes: {
-        intro: '¡El caudal del torrente arrasará con todo!',
-        winRound: '¡La corriente fue demasiado fuerte!',
-        loseRound: '¡Has frenado mi torrente!',
-        defeat: 'El agua cede el paso al verdadero maestro.'
-      },
-      reward: { coins: 150, keys: { silver: 1, gold: 1 } },
-      ninjaConfig: { giColor: '#0f766e', giAccent: '#134e4a', beltColor: '#dc2626', eyeColor: '#38bdf8', maskType: 'kitsune', weaponType: 'shuriken', aura: 'water' }
-    },
-    {
-      level: 4,
-      name: 'Campeón de Basalto',
-      belt: 'Cinturón Negro',
-      avatarImg: 'assets/bosses/basalt.jpg',
-      color: '#cbd5e1',
-      aiSkill: 0.88,
-      quotes: {
-        intro: 'Forjado en roca y fuego eterno. ¡Demuestra tu valía!',
-        winRound: '¡El basalto es inquebrantable!',
-        loseRound: '¡Un impacto formidable!',
-        defeat: 'Incluso la roca más dura reconoce tu poderío.'
-      },
-      reward: { coins: 250, keys: { gold: 1, obsidian: 1 } },
-      ninjaConfig: { giColor: '#27272a', giAccent: '#18181b', beltColor: '#ef4444', eyeColor: '#ef4444', maskType: 'oni', weaponType: 'staff', aura: 'fire' }
-    },
-    {
-      level: 5,
-      name: 'Sensei del Núcleo',
-      belt: 'Cinturón Dorado Supremo',
-      avatarImg: 'assets/bosses/sensei.jpg',
-      color: '#f59e0b',
-      aiSkill: 0.98,
-      quotes: {
-        intro: 'El verdadero ninja sincroniza mente, cuerpo y elementos. ¡Comencemos!',
-        winRound: 'Equilibrio y armonía superan la fuerza bruta.',
-        loseRound: 'Interesante técnica... pero la batalla continúa.',
-        defeat: '¡Extraordinario! Eres digno del cinturón supremo del Núcleo.'
-      },
-      reward: { coins: 500, keys: { obsidian: 2 } },
-      ninjaConfig: { giColor: '#581c87', giAccent: '#3b0764', beltColor: '#fbbf24', eyeColor: '#fbbf24', maskType: 'sensei_kasa', weaponType: 'staff', aura: 'none' }
-    }
-  ];
-
-  // ==========================================
-  // GENERADOR PIXEL ART VECTORIAL DE NINJAS
-  // ==========================================
-  function generatePixelNinjaSVG(opt = {}, isFacingRight = true, width = 140, height = 175) {
-    const giColor = opt.giColor || '#18181b';
-    const giAccent = opt.giAccent || '#27272a';
-    const skinColor = opt.skinColor || '#fcd34d';
-    const eyeColor = opt.eyeColor || '#00e5ff';
-    const beltColor = opt.beltColor || '#f8fafc';
-    const maskType = opt.maskType || 'classic';
-    const weaponType = opt.weaponType || 'katanas';
-    const aura = opt.aura || 'none';
-
-    const pixelSize = 6;
-    const gridW = 24;
-    const gridH = 30;
-
-    const rects = [];
-    function p(x, y, color, w = 1, h = 1) {
-      if (!color || color === 'none') return;
-      rects.push(`<rect x="${x * pixelSize}" y="${y * pixelSize}" width="${w * pixelSize}" height="${h * pixelSize}" fill="${color}" shape-rendering="crispEdges"/>`);
+  // --- MOTOR DE AUDIO CHIPTUNE (Web Audio API registrado en EKLifecycle) ---
+  class DojoAudio {
+    constructor(scope) {
+      this.scope = scope;
+      this.ctx = null;
+      this.muted = localStorage.getItem('epickast.dojo.mute') === '1';
+      this.masterVol = 0.25;
     }
 
-    // AURA TRASERA
-    if (aura === 'fire') {
-      p(2, 24, '#ef4444', 2, 4); p(1, 26, '#f59e0b', 1, 2);
-      p(20, 23, '#ef4444', 2, 5); p(21, 25, '#fde047', 1, 2);
-      p(3, 16, '#f59e0b', 1, 3); p(19, 14, '#ef4444', 1, 3);
-    } else if (aura === 'water') {
-      p(2, 26, '#0284c7', 3, 2); p(19, 25, '#38bdf8', 3, 2);
-      p(3, 18, '#38bdf8', 1, 2); p(20, 16, '#bae6fd', 1, 2);
-    } else if (aura === 'snow') {
-      p(2, 12, '#ffffff', 1, 1); p(21, 10, '#e0f2fe', 1, 1);
-      p(1, 22, '#7dd3fc', 1, 1); p(22, 20, '#ffffff', 1, 1);
-      p(4, 27, '#e0f2fe', 2, 1); p(18, 26, '#ffffff', 2, 1);
+    toggleMute() {
+      this.muted = !this.muted;
+      localStorage.setItem('epickast.dojo.mute', this.muted ? '1' : '0');
+      return this.muted;
     }
 
-    // ARMA A LA ESPALDA
-    if (weaponType === 'katanas') {
-      p(5, 5, '#fbbf24', 1, 2); p(6, 7, '#d97706', 1, 1); p(7, 8, '#71717a', 2, 8);
-      p(17, 5, '#fbbf24', 1, 2); p(16, 7, '#d97706', 1, 1); p(14, 8, '#71717a', 2, 8);
-    } else if (weaponType === 'shuriken') {
-      p(9, 6, '#94a3b8', 6, 2); p(11, 4, '#cbd5e1', 2, 6); p(11, 7, '#38bdf8', 2, 2);
-    } else if (weaponType === 'scroll') {
-      p(6, 9, '#78350f', 12, 3); p(5, 9, '#d97706', 1, 3); p(18, 9, '#d97706', 1, 3);
-      p(7, 10, '#fef3c7', 10, 1);
-    } else if (weaponType === 'staff') {
-      p(18, 2, '#78350f', 2, 26); p(17, 2, '#fbbf24', 4, 2); p(18, 1, '#f59e0b', 2, 1);
+    ensureCtx() {
+      if (this.muted || (this.scope && this.scope.isDisposed())) return null;
+      if (!this.ctx || this.ctx.state === 'closed') {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return null;
+        this.ctx = new AudioCtx();
+        if (this.scope) this.scope.audio(this.ctx);
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+      return this.ctx;
     }
 
-    // Cintas ondeando
-    p(4, 5, beltColor, 2, 1); p(2, 6, beltColor, 3, 2); p(1, 8, beltColor, 2, 3);
-
-    // PIERNAS Y BOTAS
-    p(7, 20, giColor, 3, 4); p(6, 24, giColor, 4, 3); p(6, 27, '#27272a', 4, 2); p(5, 29, '#09090b', 5, 1);
-    p(13, 20, giAccent, 4, 4); p(14, 24, giAccent, 3, 3); p(14, 27, '#27272a', 3, 2); p(14, 29, '#09090b', 5, 1);
-
-    // TORSO Y GI
-    p(7, 12, giColor, 10, 5); p(8, 13, giAccent, 2, 4); p(10, 12, skinColor, 3, 2); p(9, 14, '#27272a', 5, 1);
-
-    // CINTURÓN (OBI)
-    p(7, 17, beltColor, 10, 2); p(9, 19, beltColor, 2, 4); p(11, 19, beltColor, 2, 3);
-
-    // BRAZOS Y GUARDIA
-    p(4, 13, giColor, 3, 4); p(3, 17, '#27272a', 3, 3); p(3, 20, skinColor, 3, 2);
-    p(16, 13, giAccent, 3, 4); p(17, 16, '#27272a', 3, 3); p(17, 19, skinColor, 3, 2);
-
-    // CABEZA Y MÁSCARA
-    p(8, 3, giColor, 8, 2); p(7, 5, giColor, 10, 6); p(8, 11, giColor, 8, 1);
-
-    if (maskType === 'classic') {
-      p(9, 6, skinColor, 6, 2);
-      p(10, 6, eyeColor, 2, 1); p(13, 6, eyeColor, 2, 1);
-      p(8, 4, '#71717a', 8, 1); p(11, 4, '#e4e4e7', 2, 1);
-    } else if (maskType === 'kitsune') {
-      p(8, 4, '#ffffff', 8, 7);
-      p(7, 3, '#ffffff', 2, 2); p(15, 3, '#ffffff', 2, 2);
-      p(7, 3, '#ef4444', 1, 1); p(16, 3, '#ef4444', 1, 1);
-      p(9, 6, '#ef4444', 1, 2); p(14, 6, '#ef4444', 1, 2); p(11, 9, '#ef4444', 2, 1);
-      p(10, 6, eyeColor, 1, 1); p(13, 6, eyeColor, 1, 1);
-    } else if (maskType === 'oni') {
-      p(8, 4, '#b91c1c', 8, 7);
-      p(7, 2, '#fbbf24', 2, 2); p(15, 2, '#fbbf24', 2, 2);
-      p(10, 6, eyeColor, 2, 1); p(12, 6, eyeColor, 2, 1);
-      p(9, 8, '#ffffff', 1, 2); p(14, 8, '#ffffff', 1, 2);
-    } else if (maskType === 'cyber') {
-      p(8, 4, '#09090b', 8, 7);
-      p(8, 6, eyeColor, 8, 2); p(10, 6, '#ffffff', 4, 1);
-      p(9, 9, '#3f3f46', 6, 2);
-    } else if (maskType === 'sensei_kasa') {
-      p(4, 3, '#78350f', 16, 1); p(6, 2, '#b45309', 12, 1); p(9, 1, '#d97706', 6, 1); p(11, 0, '#fbbf24', 2, 1);
-      p(9, 6, skinColor, 6, 2); p(10, 6, eyeColor, 1, 1); p(13, 6, eyeColor, 1, 1);
-      p(10, 9, '#f8fafc', 4, 4); p(11, 13, '#f8fafc', 2, 2);
+    tone(freq, dur = 0.08, type = 'square', gainVal = 0.2, slideTo = null) {
+      const c = this.ensureCtx();
+      if (!c) return;
+      try {
+        const now = c.currentTime;
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, now);
+        if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, now + dur);
+        const vol = Math.min(0.5, gainVal * this.masterVol);
+        g.gain.setValueAtTime(0.001, now);
+        g.gain.linearRampToValueAtTime(vol, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+        o.connect(g);
+        g.connect(c.destination);
+        o.start(now);
+        o.stop(now + dur + 0.01);
+      } catch {}
     }
 
-    const transform = isFacingRight ? '' : 'transform="scale(-1, 1)" transform-origin="center"';
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${gridW * pixelSize} ${gridH * pixelSize}" width="${width}" height="${height}" style="image-rendering:pixelated;image-rendering:crisp-edges;" ${transform}>${rects.join('')}</svg>`;
+    noise(dur = 0.12, gainVal = 0.25) {
+      const c = this.ensureCtx();
+      if (!c) return;
+      try {
+        const len = Math.max(1, Math.floor(c.sampleRate * dur));
+        const buf = c.createBuffer(1, len, c.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+        const src = c.createBufferSource();
+        src.buffer = buf;
+        const g = c.createGain();
+        g.gain.setValueAtTime(gainVal * this.masterVol, c.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+        src.connect(g);
+        g.connect(c.destination);
+        src.start();
+      } catch {}
+    }
+
+    selectCard() {
+      this.tone(880, 0.06, 'square', 0.35);
+    }
+
+    clash() {
+      this.noise(0.12, 0.45);
+      this.tone(180, 0.1, 'sawtooth', 0.3, 75);
+    }
+
+    cinematicPower() {
+      this.tone(220, 0.25, 'sawtooth', 0.35, 660);
+      if (this.scope) {
+        this.scope.timeout(() => this.tone(880, 0.22, 'square', 0.35, 1320), 140);
+      }
+    }
+
+    winRound() {
+      this.tone(523.25, 0.09, 'square', 0.3);
+      if (this.scope) {
+        this.scope.timeout(() => this.tone(659.25, 0.09, 'square', 0.3), 80);
+        this.scope.timeout(() => this.tone(783.99, 0.14, 'square', 0.35), 160);
+      }
+    }
+
+    loseRound() {
+      this.tone(330, 0.12, 'sawtooth', 0.28, 220);
+      if (this.scope) {
+        this.scope.timeout(() => this.tone(220, 0.18, 'sawtooth', 0.28, 140), 110);
+      }
+    }
+
+    winMatch() {
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((f, idx) => {
+        if (this.scope) {
+          this.scope.timeout(() => this.tone(f, 0.14, 'square', 0.38), idx * 95);
+        }
+      });
+    }
+
+    loseMatch() {
+      const notes = [392, 349.23, 311.13, 261.63];
+      notes.forEach((f, idx) => {
+        if (this.scope) {
+          this.scope.timeout(() => this.tone(f, 0.16, 'sawtooth', 0.3), idx * 110);
+        }
+      });
+    }
+
+    destroy() {
+      if (this.ctx && this.ctx.state !== 'closed') {
+        try { this.ctx.close().catch(() => {}); } catch {}
+      }
+      this.ctx = null;
+    }
+  }
+
+  // --- GENERADOR DE NINJA PIXEL ART 24×30 (Contorno 1px, 3 tonos, poses Idle/Ataque/Victoria, cinta 3 frames, arma y aura) ---
+  function shadeHex(hex, percent) {
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return '#1e293b';
+    const num = parseInt(hex.slice(1), 16);
+    if (Number.isNaN(num)) return hex;
+    const r = Math.min(255, Math.max(0, ((num >> 16) & 0xff) + percent));
+    const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + percent));
+    const b = Math.min(255, Math.max(0, (num & 0xff) + percent));
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
   }
 
   function getSavedNinjaConfig() {
-    try {
-      const raw = localStorage.getItem('epickast.ninja.v1');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return {
-      giColor: '#18181b',
-      giAccent: '#27272a',
-      skinColor: '#fcd34d',
-      eyeColor: '#00e5ff',
-      beltColor: '#f8fafc',
-      beltName: 'Cinturón Blanco',
-      maskType: 'classic',
-      weaponType: 'katanas',
+    const def = {
+      suitColor: '#1e293b',
+      belt: 'white',
+      maskColor: '#0f172a',
+      weapon: 'katana',
       aura: 'none'
     };
+    try {
+      const raw = JSON.parse(localStorage.getItem('epickast.ninja.v1') || '{}');
+      return { ...def, ...raw };
+    } catch {
+      return def;
+    }
   }
 
-  function saveNinjaConfig(cfg) {
-    try { localStorage.setItem('epickast.ninja.v1', JSON.stringify(cfg)); } catch {}
+  function renderPixelNinjaSvg(config = {}, opts = {}) {
+    const cfg = { ...getSavedNinjaConfig(), ...config };
+    const size = opts.size || 132;
+    const flip = !!opts.flip;
+    const pose = opts.pose || 'idle'; // 'idle' | 'attack' | 'victory'
+    const frame = Number(opts.frame) || 0; // 0, 1, 2
+    const belts = CFG().BELTS || [];
+    const beltObj = belts.find((b) => b.id === cfg.belt) || belts[0] || { color: '#f8fafc', shadow: '#cbd5e1' };
+
+    const suitBase = cfg.suitColor || '#1e293b';
+    const suitLight = shadeHex(suitBase, 34);
+    const suitDark = shadeHex(suitBase, -32);
+    const maskBase = cfg.maskColor || '#0f172a';
+    const maskLight = shadeHex(maskBase, 28);
+    const beltColor = beltObj.color || '#f8fafc';
+    const beltShadow = beltObj.shadow || shadeHex(beltColor, -35);
+    const outline = '#070a12';
+
+    // Respiración de 2 frames (desplaza torso/cabeza 1px en frame par/impar)
+    const breathY = pose === 'idle' ? (frame % 2 === 1 ? 1 : 0) : 0;
+    // Cinta ondeando en 3 frames
+    const scarfWave = frame % 3;
+
+    const rects = [];
+    const px = (x, y, w, h, fill) => {
+      rects.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`);
+    };
+
+    // --- ARMA DETRÁS DEL CUERPO ---
+    if (cfg.weapon === 'katana') {
+      px(17, 2 + breathY, 2, 14, '#0f172a');
+      px(18, 2 + breathY, 1, 12, '#e2e8f0');
+      px(16, 4 + breathY, 4, 2, '#fbbf24');
+    } else if (cfg.weapon === 'staff') {
+      px(19, 2, 3, 26, '#1c1008');
+      px(20, 3, 1, 24, '#d97706');
+      px(20, 3, 1, 3, '#fef08a');
+    } else if (cfg.weapon === 'scroll') {
+      px(4, 11 + breathY, 16, 5, '#1c1008');
+      px(5, 12 + breathY, 14, 3, '#fde68a');
+      px(4, 12 + breathY, 2, 3, '#dc2626');
+      px(18, 12 + breathY, 2, 3, '#dc2626');
+    }
+
+    // --- CABEZA Y CAPUCHA (con contorno oscuro 1px y 3 tonos) ---
+    const hy = 4 + breathY;
+    px(7, hy - 1, 10, 1, outline);
+    px(6, hy, 12, 9, outline);
+    px(7, hy, 10, 2, suitLight);
+    px(7, hy + 2, 10, 6, suitBase);
+    px(7, hy + 7, 10, 1, suitDark);
+
+    // Cinta / Bandana en la frente + cola de 3 frames
+    px(6, hy + 2, 12, 2, beltColor);
+    px(6, hy + 3, 12, 1, beltShadow);
+    // Cola de la cinta ondeando a la izquierda
+    if (scarfWave === 0) {
+      px(3, hy + 2, 3, 2, beltColor);
+      px(1, hy + 3, 2, 2, beltShadow);
+    } else if (scarfWave === 1) {
+      px(3, hy + 1, 3, 2, beltColor);
+      px(1, hy + 1, 2, 2, beltShadow);
+    } else {
+      px(3, hy + 3, 3, 2, beltColor);
+      px(2, hy + 5, 2, 2, beltShadow);
+    }
+
+    // Visor de ojos y máscara
+    px(8, hy + 4, 8, 2, '#fde68a');
+    px(9, hy + 4, 2, 2, '#090d16');
+    px(13, hy + 4, 2, 2, '#090d16');
+    px(9, hy + 4, 1, 1, '#ffffff');
+    px(13, hy + 4, 1, 1, '#ffffff');
+    // Máscara facial 3 tonos
+    px(7, hy + 6, 10, 2, maskBase);
+    px(8, hy + 6, 8, 1, maskLight);
+
+    // --- TORSO Y BRAZOS SEGÚN POSE ---
+    const ty = 13 + breathY;
+    px(6, ty, 12, 10, outline);
+    px(7, ty, 10, 9, suitBase);
+    px(7, ty, 3, 8, suitLight);
+    px(14, ty, 3, 8, suitDark);
+
+    // Solapa cruzada del traje ninja
+    px(9, ty + 1, 2, 5, suitDark);
+    px(11, ty + 3, 2, 4, suitDark);
+
+    // Brazos según pose
+    if (pose === 'attack') {
+      // Brazo izquierdo extendido al frente en pose de ataque
+      px(2, ty + 1, 5, 4, outline);
+      px(3, ty + 2, 4, 2, suitLight);
+      px(17, ty, 5, 4, outline);
+      px(17, ty + 1, 4, 2, suitBase);
+    } else if (pose === 'victory') {
+      // Ambos brazos levantados en victoria
+      px(3, ty - 4, 4, 7, outline);
+      px(4, ty - 3, 2, 5, suitLight);
+      px(17, ty - 4, 4, 7, outline);
+      px(18, ty - 3, 2, 5, suitLight);
+    } else {
+      // Idle
+      px(4, ty + 1, 3, 7, outline);
+      px(5, ty + 2, 2, 5, suitLight);
+      px(17, ty + 1, 3, 7, outline);
+      px(17, ty + 2, 2, 5, suitDark);
+    }
+
+    // --- CINTURÓN Y NUDO ---
+    px(6, ty + 6, 12, 3, outline);
+    px(7, ty + 6, 10, 2, beltColor);
+    px(7, ty + 7, 10, 1, beltShadow);
+    px(11, ty + 6, 2, 4, beltColor);
+    px(10, ty + 8, 1, 3, beltShadow);
+    px(13, ty + 8, 1, 3, beltColor);
+
+    // --- ARMA EN MANO ---
+    if (cfg.weapon === 'shuriken') {
+      const sx = pose === 'attack' ? 1 : 18;
+      const sy = pose === 'victory' ? ty - 6 : ty + 4;
+      px(sx, sy, 4, 4, '#0f172a');
+      px(sx + 1, sy, 2, 4, '#f8fafc');
+      px(sx, sy + 1, 4, 2, '#94a3b8');
+    } else if (cfg.weapon === 'kunai') {
+      const kx = pose === 'attack' ? 0 : 18;
+      const ky = pose === 'victory' ? ty - 6 : ty + 3;
+      px(kx, ky, 5, 3, '#0f172a');
+      px(kx + 1, ky + 1, 3, 1, '#e2e8f0');
+      px(kx + 4, ky + 1, 1, 1, '#ef4444');
+    }
+
+    // --- PIERNAS Y BOTAS ---
+    px(7, 23, 4, 6, outline);
+    px(8, 23, 2, 5, suitDark);
+    px(13, 23, 4, 6, outline);
+    px(14, 23, 2, 5, suitBase);
+    // Sombra en el tatami
+    px(5, 28, 14, 2, 'rgba(0,0,0,0.45)');
+
+    const flipStyle = flip ? 'transform:scaleX(-1);' : '';
+    return `<svg class="ek-ninja-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 30" width="${size}" height="${Math.round(size * 1.25)}" shape-rendering="crispEdges" style="image-rendering:pixelated;overflow:visible;${flipStyle}">${rects.join('')}</svg>`;
   }
 
-  // ==========================================
-  // CLASE DE AUDIO EFECTOS (SINTETIZADOR)
-  // ==========================================
-  class AudioEffects {
-    constructor() { this.ctx = null; }
-    init() {
-      if (!this.ctx) {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (AudioCtx) this.ctx = new AudioCtx();
+  // --- PARTÍCULAS DE AURA ELEMENTAL (8–12 partículas pixeladas a máx 30 fps registradas en EKLifecycle) ---
+  function attachAuraLoop(scope, canvas, auraType) {
+    if (!canvas || !scope || !auraType || auraType === 'none') return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    const colors = {
+      fire: ['#ef4444', '#f97316', '#fde047'],
+      water: ['#2563eb', '#38bdf8', '#93c5fd'],
+      snow: ['#7dd3fc', '#e0f2fe', '#ffffff']
+    }[auraType] || ['#fbbf24'];
+
+    const count = 10;
+    const particles = Array.from({ length: count }, (_, i) => ({
+      x: 18 + ((i * 13) % (w - 36)),
+      y: 20 + ((i * 19) % (h - 30)),
+      vy: auraType === 'snow' ? (0.6 + (i % 3) * 0.3) : -(0.8 + (i % 3) * 0.4),
+      vx: ((i % 2 === 0 ? 1 : -1) * 0.35),
+      size: (i % 3 === 0) ? 5 : 4,
+      color: colors[i % colors.length],
+      phase: i * 0.6
+    }));
+
+    let lastStep = 0;
+    const step = (ts) => {
+      if (scope.isDisposed() || !canvas.isConnected) return;
+      if (ts - lastStep >= 34) { // ~30 FPS
+        lastStep = ts;
+        ctx.clearRect(0, 0, w, h);
+        for (const p of particles) {
+          p.y += p.vy;
+          p.x += Math.sin(ts * 0.004 + p.phase) * 0.5 + p.vx;
+          if (auraType === 'snow') {
+            if (p.y > h - 10) { p.y = 10; p.x = 18 + Math.random() * (w - 36); }
+          } else {
+            if (p.y < 10) { p.y = h - 14; p.x = 18 + Math.random() * (w - 36); }
+          }
+          ctx.fillStyle = p.color;
+          ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+        }
       }
-      if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume().catch(() => {});
-      }
-    }
-    playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.08) {
-      this.init();
-      if (!this.ctx) return;
-      try {
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-        gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start();
-        osc.stop(this.ctx.currentTime + duration);
-      } catch {}
-    }
-    cardSelect() { this.playTone(540, 'sine', 0.08, 0.06); }
-    flip() { this.playTone(320, 'triangle', 0.06, 0.05); }
-    clash() {
-      this.playTone(180, 'triangle', 0.22, 0.14);
-      setTimeout(() => this.playTone(110, 'square', 0.18, 0.09), 90);
-    }
-    burnSound() {
-      this.playTone(220, 'sawtooth', 0.4, 0.12);
-      setTimeout(() => this.playTone(440, 'sine', 0.3, 0.08), 120);
-    }
-    freezeSound() {
-      this.playTone(980, 'triangle', 0.3, 0.1);
-      setTimeout(() => this.playTone(660, 'sine', 0.35, 0.08), 90);
-    }
-    splashSound() {
-      this.playTone(300, 'sine', 0.35, 0.12);
-      setTimeout(() => this.playTone(160, 'triangle', 0.28, 0.1), 110);
-    }
-    cinematicPower() {
-      [146, 220, 293, 440, 587, 880].forEach((f, i) => {
-        setTimeout(() => this.playTone(f, 'sawtooth', 0.35, 0.15), i * 65);
-      });
-    }
-    winRound() {
-      [523, 659, 784, 1046].forEach((f, i) => {
-        setTimeout(() => this.playTone(f, 'sine', 0.14, 0.1), i * 75);
-      });
-    }
-    loseRound() {
-      [400, 350, 300, 220].forEach((f, i) => {
-        setTimeout(() => this.playTone(f, 'sawtooth', 0.18, 0.09), i * 85);
-      });
-    }
-    winMatch() {
-      [523, 659, 784, 1046, 1318, 1568].forEach((f, i) => {
-        setTimeout(() => this.playTone(f, 'triangle', 0.3, 0.14), i * 95);
-      });
-    }
+      scope.raf(step);
+    };
+    scope.raf(step);
   }
 
-  // ==========================================
-  // JUEGO PRINCIPAL: CARD-JITSU
-  // ==========================================
+  // --- COMPONENTE DE CARTA DEL DOJO (104×148 px, 3 etapas de mascota, bordes por nivel) ---
+  function renderCardHtml(card, idx = 0, opts = {}) {
+    const elemTokens = CFG().ELEMENT_TOKENS || {};
+    const tok = elemTokens[card.element] || { name: 'FUEGO', color: '#ef4444', bg: '#450a0a', light: '#fca5a5' };
+    const power = Number(card.power) || 2;
+    const tierClass = power >= 10 ? 'cj-tier-epic' : power >= 5 ? 'cj-tier-mid' : 'cj-tier-low';
+    const mascotKey = SPR().getCardMascotKey ? SPR().getCardMascotKey(card.element, power) : 'mascot_fire_1';
+    const mascotSvg = SPR().renderSpriteHtml ? SPR().renderSpriteHtml(mascotKey, 4) : '';
+    const elemIconSvg = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('elem_' + card.element, 1) : '';
+    const delayMs = opts.stagger ? idx * 70 : 0;
+
+    return `
+      <div class="cj-card-v191 ${tierClass}" data-idx="${idx}" style="--el-color:${tok.color};--el-bg:${tok.bg};--el-light:${tok.light};animation-delay:${delayMs}ms;">
+        ${power >= 10 ? `<div class="cj-card-holo"></div><div class="cj-card-star-badge">★ ${power}</div>` : ''}
+        ${power >= 5 && power < 10 ? `<div class="cj-card-shine"></div>` : ''}
+        <div class="cj-card-top">
+          <div class="cj-card-num">${power}</div>
+          <div class="cj-card-elem-ico">${elemIconSvg}</div>
+        </div>
+        <div class="cj-card-art">${mascotSvg}</div>
+        <div class="cj-card-bottom">${tok.name}</div>
+      </div>
+    `;
+  }
+
+  // --- CLASE PRINCIPAL: CardJitsuGame ---
   class CardJitsuGame {
-    constructor(container, options = {}) {
+    constructor(container, onReward, parentScope) {
       this.container = container;
-      this.options = options || {};
-      this.currentFloor = 1;
+      this.onReward = onReward;
+      this.scope = parentScope || (window.EKLifecycle ? window.EKLifecycle.create('dojo') : null);
+      this.sfx = new DojoAudio(this.scope);
+
+      this.destroyed = false;
+      this.paused = false;
+      this.resumeCountdown = 0;
+      this.rewardClaimed = false;
+
+      this.phase = 'lobby'; // 'lobby' | 'playing' | 'clash' | 'cinematic' | 'ended'
+      this.selectedFloor = (CFG().DOJO_FLOORS || [])[0];
       this.playerHand = [];
       this.aiHand = [];
-      this.playerWon = [];
-      this.aiWon = [];
-      this.inMatch = false;
-      this.isResolvingRound = false;
-      this.matchWinner = null;
-      this.turnTimer = null;
-      this.timeLeft = 15;
-      this.sfx = new AudioEffects();
-      this.showTutorial = false;
+      this.playerPoints = [];
+      this.aiPoints = [];
+      this.roundLocked = false;
+      this.turnSeconds = 14;
+      this.turnIntervalId = null;
+      this.idleFrame = 0;
+      this.playerPose = 'idle';
+      this.aiPose = 'idle';
+      this.activeParticles = 0;
 
-      this.playerNinja = getSavedNinjaConfig();
-
-      this.claimedFloors = {};
-      try {
-        const raw = localStorage.getItem('epickast.dojo.floors');
-        if (raw) this.claimedFloors = JSON.parse(raw);
-      } catch {}
-
-      this.initStyles();
-      this.initUI();
+      this.bindLifecycleEvents();
+      this.start();
     }
 
-    initStyles() {
-      if (document.getElementById('card-jitsu-styles-v184')) return;
-      const s = document.createElement('style');
-      s.id = 'card-jitsu-styles-v184';
-      s.textContent = `
-        @keyframes cjCardFlipIn {
-          0% { transform: scale(0.6) rotateY(90deg); opacity: 0; }
-          100% { transform: scale(1) rotateY(0deg); opacity: 1; }
-        }
-        @keyframes cjScreenShake {
-          0% { transform: translate(0, 0); }
-          20% { transform: translate(-6px, 4px); }
-          40% { transform: translate(6px, -4px); }
-          60% { transform: translate(-4px, 2px); }
-          80% { transform: translate(4px, -2px); }
-          100% { transform: translate(0, 0); }
-        }
-        @keyframes cjGoldShine {
-          0% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
-          50% { box-shadow: 0 0 25px rgba(251, 191, 36, 0.9), 0 0 40px rgba(245, 158, 11, 0.6); }
-          100% { box-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
-        }
-        @keyframes cjNinjaIdle {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-5px); }
-          100% { transform: translateY(0px); }
-        }
-        @keyframes cjNinjaStrike {
-          0% { transform: translateX(0px); }
-          50% { transform: translateX(35px) scale(1.08); }
-          100% { transform: translateX(0px); }
-        }
-        @keyframes cjNinjaVictory {
-          0% { transform: translateY(0); }
-          30% { transform: translateY(-18px) rotate(-4deg); }
-          60% { transform: translateY(-8px) rotate(4deg); }
-          100% { transform: translateY(0); }
-        }
-        @keyframes cjBurnDissolve {
-          0% { filter: brightness(1.5) drop-shadow(0 0 12px #ef4444); opacity: 1; transform: scale(1); }
-          50% { filter: contrast(2) drop-shadow(0 0 24px #dc2626); transform: scale(1.1) rotate(5deg); }
-          100% { opacity: 0; transform: scale(0.3) rotate(25deg); }
-        }
-        @keyframes cjIceFreezeShatter {
-          0% { filter: brightness(1.8) drop-shadow(0 0 14px #38bdf8); opacity: 1; }
-          40% { filter: contrast(1.8) drop-shadow(0 0 28px #a5f3fc); transform: scale(1.08); }
-          100% { opacity: 0; transform: scale(0.2) translateY(20px); }
-        }
-        @keyframes cjWaterExtinguish {
-          0% { filter: drop-shadow(0 0 14px #0284c7); opacity: 1; }
-          50% { filter: drop-shadow(0 0 24px #0369a1); transform: scale(1.05) rotate(-6deg); }
-          100% { opacity: 0; transform: scale(0.4) translateY(25px); }
-        }
-
-        .cj-trading-card {
-          width: 104px;
-          height: 148px;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
-          position: relative;
-          user-select: none;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 6px;
-          box-sizing: border-box;
-          overflow: hidden;
-          background: #0f172a;
-        }
-        .cj-trading-card:hover {
-          transform: translateY(-12px) scale(1.08);
-          box-shadow: 0 14px 28px rgba(0,0,0,0.7) !important;
-          z-index: 10;
-        }
-        .cj-trading-card.power-10 {
-          border: 2px solid #fbbf24 !important;
-          animation: cjGoldShine 2s infinite ease-in-out;
-        }
-        .cj-corner-badge {
-          position: absolute;
-          top: 5px;
-          left: 5px;
-          border-radius: 6px;
-          padding: 2px 7px;
-          font-size: 11px;
-          font-weight: 900;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.6);
-          z-index: 5;
-        }
-        .cj-power-star {
-          position: absolute;
-          top: 5px;
-          right: 5px;
-          background: #fbbf24;
-          color: #78350f;
-          font-size: 9px;
-          font-weight: 900;
-          padding: 1px 5px;
-          border-radius: 8px;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-          z-index: 5;
-        }
-      `;
-      document.head.appendChild(s);
-    }
-
-    createCard() {
-      const elem = ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)];
-      const val = Math.floor(Math.random() * 11) + 2; // 2 al 12
-      return { id: 'c_' + Math.random().toString(36).substring(2, 9), element: elem, value: val };
-    }
-
-    initHand() {
-      this.playerHand = [];
-      this.aiHand = [];
-      for (let i = 0; i < 5; i++) {
-        this.playerHand.push(this.createCard());
-        this.aiHand.push(this.createCard());
-      }
-      this.playerWon = [];
-      this.aiWon = [];
-      this.matchWinner = null;
-      this.isResolvingRound = false;
-      this.playerNinja = getSavedNinjaConfig();
-      this.startTurnTimer();
-    }
-
-    startTurnTimer() {
-      clearInterval(this.turnTimer);
-      this.timeLeft = 15;
-      this.updateTimerBar();
-      this.turnTimer = setInterval(() => {
-        this.timeLeft--;
-        this.updateTimerBar();
-        if (this.timeLeft <= 0) {
-          clearInterval(this.turnTimer);
-          if (this.inMatch && !this.isResolvingRound && !this.matchWinner && this.playerHand.length > 0) {
-            const randomCard = this.playerHand[Math.floor(Math.random() * this.playerHand.length)];
-            this.playRound(randomCard, true);
+    bindLifecycleEvents() {
+      if (!this.scope) return;
+      this.scope.listen(document, 'visibilitychange', () => {
+        if (this.destroyed) return;
+        if (document.hidden) {
+          if (this.phase === 'playing' || this.phase === 'clash') {
+            this.pause();
           }
-        }
-      }, 1000);
-    }
-
-    updateTimerBar() {
-      const bar = this.container.querySelector('#dojoTimerFill');
-      const txt = this.container.querySelector('#dojoTimerTxt');
-      if (bar) {
-        const pct = Math.max(0, (this.timeLeft / 15) * 100);
-        bar.style.width = pct + '%';
-        bar.style.background = this.timeLeft <= 4 ? '#ef4444' : this.timeLeft <= 8 ? '#f59e0b' : '#10b981';
-      }
-      if (txt) {
-        txt.textContent = `${this.timeLeft}s`;
-        txt.style.color = this.timeLeft <= 4 ? '#ef4444' : '#94a3b8';
-      }
-    }
-
-    checkWinCondition(wonCards) {
-      if (wonCards.length < 3) return false;
-      const counts = { fire: 0, water: 0, snow: 0 };
-      wonCards.forEach(c => { if (counts[c.element] !== undefined) counts[c.element]++; });
-
-      if (counts.fire >= 1 && counts.water >= 1 && counts.snow >= 1) {
-        return { type: 'triad', desc: '¡Trío Elemental Supremo! (1 Fuego 🔥 + 1 Agua 💧 + 1 Nieve ❄️)' };
-      }
-      for (const el of ELEMENTS) {
-        if (counts[el] >= 3) {
-          const cfg = ELEM_CONFIG[el];
-          return { type: 'monolith', desc: `¡Poder Monolítico! 3 cartas de ${cfg.name} ${cfg.icon}` };
-        }
-      }
-      return false;
-    }
-
-    pickAICard(floorConfig) {
-      if (this.aiHand.length === 0) return this.createCard();
-      const level = floorConfig.level || 1;
-      const skill = floorConfig.aiSkill || 0.3;
-
-      if (level === 1) {
-        if (Math.random() > skill) return this.aiHand[Math.floor(Math.random() * this.aiHand.length)];
-        return this.aiHand.slice().sort((a, b) => a.value - b.value)[0];
-      }
-
-      if (level === 2) {
-        const aiCounts = { fire: 0, water: 0, snow: 0 };
-        this.aiWon.forEach(c => aiCounts[c.element]++);
-        const missing = ELEMENTS.find(e => aiCounts[e] === 0);
-        if (missing && Math.random() < skill) {
-          const want = this.aiHand.find(c => c.element === missing);
-          if (want) return want;
-        }
-      }
-
-      if (level === 3 || level >= 4) {
-        const pCounts = { fire: 0, water: 0, snow: 0 };
-        this.playerWon.forEach(c => pCounts[c.element]++);
-
-        const pMissing = ELEMENTS.filter(e => pCounts[e] === 0);
-        if (pMissing.length === 1 && Math.random() < skill) {
-          const dangerousElem = pMissing[0];
-          const counter = { fire: 'water', snow: 'fire', water: 'snow' }[dangerousElem];
-          const blocker = this.aiHand.find(c => c.element === counter);
-          if (blocker) return blocker;
-        }
-
-        for (const el of ELEMENTS) {
-          if (pCounts[el] === 2 && Math.random() < skill) {
-            const counter = { fire: 'water', snow: 'fire', water: 'snow' }[el];
-            const blocker = this.aiHand.find(c => c.element === counter);
-            if (blocker) return blocker;
-          }
-        }
-      }
-
-      if (level === 4) {
-        const highCards = this.aiHand.filter(c => c.value >= 9);
-        if (highCards.length > 0 && Math.random() < skill) {
-          return highCards.sort((a, b) => b.value - a.value)[0];
-        }
-      }
-
-      if (level === 5) {
-        let bestCard = this.aiHand[0];
-        let maxScore = -999;
-        const pCounts = { fire: 0, water: 0, snow: 0 };
-        this.playerWon.forEach(c => pCounts[c.element]++);
-
-        for (const c of this.aiHand) {
-          let score = c.value * 0.5;
-          const simWon = [...this.aiWon, c];
-          if (this.checkWinCondition(simWon)) score += 100;
-
-          const pMissing = ELEMENTS.filter(e => pCounts[e] === 0);
-          if (pMissing.length === 1) {
-            const danger = pMissing[0];
-            const counter = { fire: 'water', snow: 'fire', water: 'snow' }[danger];
-            if (c.element === counter) score += 50;
-          }
-
-          if (c.value >= 10) score += 15;
-          if (score > maxScore) { maxScore = score; bestCard = c; }
-        }
-        return bestCard;
-      }
-
-      return this.aiHand[Math.floor(Math.random() * this.aiHand.length)];
-    }
-
-    playRound(playerCard, timedOut = false) {
-      if (this.isResolvingRound || this.matchWinner) return;
-      this.isResolvingRound = true;
-      clearInterval(this.turnTimer);
-      this.sfx.cardSelect();
-
-      // Animación de ataque del ninja del jugador
-      const pNinjaWrap = this.container.querySelector('#cjPlayerNinjaContainer');
-      if (pNinjaWrap) {
-        pNinjaWrap.style.animation = 'cjNinjaStrike 0.45s ease';
-        setTimeout(() => { if (pNinjaWrap) pNinjaWrap.style.animation = 'cjNinjaIdle 2.6s infinite ease-in-out'; }, 450);
-      }
-
-      const floor = FLOORS[this.currentFloor - 1];
-      const aiCard = this.pickAICard(floor);
-
-      this.playerHand = this.playerHand.filter(c => c.id !== playerCard.id);
-      this.aiHand = this.aiHand.filter(c => c.id !== aiCard.id);
-      this.playerHand.push(this.createCard());
-      this.aiHand.push(this.createCard());
-
-      let roundWinner = 'tie';
-      let reason = '';
-      let clashType = 'element';
-
-      if (playerCard.element === aiCard.element) {
-        clashType = 'number';
-        if (playerCard.value > aiCard.value) {
-          roundWinner = 'player';
-          reason = `Mismo elemento (${ELEM_CONFIG[playerCard.element].name}). Tu valor (${playerCard.value}) superó a (${aiCard.value}).`;
-        } else if (playerCard.value < aiCard.value) {
-          roundWinner = 'ai';
-          reason = `Mismo elemento (${ELEM_CONFIG[playerCard.element].name}). El valor rival (${aiCard.value}) superó a (${playerCard.value}).`;
-        } else {
-          clashType = 'tie';
-          roundWinner = 'tie';
-          reason = `¡Empate idéntico! Mismo elemento y mismo valor (${playerCard.value}).`;
-        }
-      } else {
-        const winsOver = { fire: 'snow', snow: 'water', water: 'fire' };
-        if (winsOver[playerCard.element] === aiCard.element) {
-          roundWinner = 'player';
-          const pCfg = ELEM_CONFIG[playerCard.element];
-          const aCfg = ELEM_CONFIG[aiCard.element];
-          reason = `¡${pCfg.name} ${pCfg.icon} ${pCfg.verb} ${aCfg.name} ${aCfg.icon}!`;
-        } else {
-          roundWinner = 'ai';
-          const aCfg = ELEM_CONFIG[aiCard.element];
-          const pCfg = ELEM_CONFIG[playerCard.element];
-          reason = `¡${aCfg.name} ${aCfg.icon} rival ${aCfg.verb} tu ${pCfg.name} ${pCfg.icon}!`;
-        }
-      }
-
-      const winningCard = roundWinner === 'player' ? playerCard : roundWinner === 'ai' ? aiCard : null;
-      const isCinematic = winningCard && winningCard.value >= 10;
-
-      this.renderClashPacing(playerCard, aiCard, roundWinner, reason, clashType, isCinematic, timedOut, () => {
-        if (roundWinner === 'player') {
-          this.playerWon.push(playerCard);
-          this.sfx.winRound();
-          if (pNinjaWrap) pNinjaWrap.style.animation = 'cjNinjaVictory 0.7s ease';
-        } else if (roundWinner === 'ai') {
-          this.aiWon.push(aiCard);
-          this.sfx.loseRound();
-          const aiNinjaWrap = this.container.querySelector('#cjAiNinjaContainer');
-          if (aiNinjaWrap) aiNinjaWrap.style.animation = 'cjNinjaVictory 0.7s ease';
-        }
-
-        const pWin = this.checkWinCondition(this.playerWon);
-        const aiWin = this.checkWinCondition(this.aiWon);
-
-        if (pWin) {
-          this.matchWinner = 'player';
-          this.isResolvingRound = false;
-          this.renderMatchBoard();
-          this.sfx.winMatch();
-          this.renderMatchResult(true, pWin.desc);
-        } else if (aiWin) {
-          this.matchWinner = 'ai';
-          this.isResolvingRound = false;
-          this.renderMatchBoard();
-          this.renderMatchResult(false, aiWin.desc);
-        } else {
-          this.isResolvingRound = false;
-          this.renderMatchBoard();
-          this.startTurnTimer();
+        } else if (this.paused) {
+          this.resume();
         }
       });
     }
 
-    renderClashPacing(pCard, aCard, roundWinner, reason, clashType, isCinematic, timedOut, onDone) {
-      const centerClash = this.container.querySelector('#cjCenterClashArea');
-      if (!centerClash) return onDone();
-
-      const pCfg = ELEM_CONFIG[pCard.element];
-      const aCfg = ELEM_CONFIG[aCard.element];
-      const floor = FLOORS[this.currentFloor - 1];
-
-      // FASE 1: Cartas se revelan en el centro
-      centerClash.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;">
-          <div style="font-size:12px;font-weight:900;color:#fbbf24;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;text-shadow:0 0 8px rgba(251,191,36,0.6);">
-            ⚡ ¡CARTAS REVELADAS!
-          </div>
-          <div style="display:flex;justify-content:center;align-items:center;gap:30px;animation: cjCardFlipIn 0.45s ease-out;">
-            <!-- Carta Jugador -->
-            <div class="cj-trading-card ${pCard.value >= 10 ? 'power-10' : ''}" style="border:2px solid ${pCfg.border};box-shadow:0 0 16px ${pCfg.glow};">
-              <div class="cj-corner-badge" style="background:${pCfg.badgeBg};color:${pCfg.badgeText};">
-                ${pCard.value} <span>${pCfg.icon}</span>
-              </div>
-              ${pCard.value >= 10 ? `<div class="cj-power-star">★ ${pCard.value}</div>` : ''}
-              <div style="height:86px;border-radius:6px;background:url('${pCfg.img}') center/cover no-repeat;margin-top:22px;border:1px solid rgba(255,255,255,0.2);"></div>
-              <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;letter-spacing:1px;">${pCfg.name.toUpperCase()}</div>
-            </div>
-
-            <div style="font-size:18px;font-weight:900;color:#64748b;background:#090d14;border:1.5px solid #202636;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.6);">VS</div>
-
-            <!-- Carta Rival -->
-            <div class="cj-trading-card ${aCard.value >= 10 ? 'power-10' : ''}" style="border:2px solid ${aCfg.border};box-shadow:0 0 16px ${aCfg.glow};">
-              <div class="cj-corner-badge" style="background:${aCfg.badgeBg};color:${aCfg.badgeText};">
-                ${aCard.value} <span>${aCfg.icon}</span>
-              </div>
-              ${aCard.value >= 10 ? `<div class="cj-power-star">★ ${aCard.value}</div>` : ''}
-              <div style="height:86px;border-radius:6px;background:url('${aCfg.img}') center/cover no-repeat;margin-top:22px;border:1px solid rgba(255,255,255,0.2);"></div>
-              <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;letter-spacing:1px;">${aCfg.name.toUpperCase()}</div>
-            </div>
-          </div>
-        </div>
-      `;
-      this.sfx.flip();
-
-      // FASE 2: Choque y Cinemática tras 700ms
-      setTimeout(() => {
-        let pAnim = '';
-        let aAnim = '';
-        let cinematicBanner = '';
-
-        if (isCinematic) {
-          this.sfx.cinematicPower();
-          const winCard = roundWinner === 'player' ? pCard : aCard;
-          const winCfg = ELEM_CONFIG[winCard.element];
-          cinematicBanner = `
-            <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.95) 100%);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;pointer-events:none;padding:16px;">
-              <div style="font-size:46px;margin-bottom:6px;filter:drop-shadow(0 0 24px ${winCfg.color});">${winCfg.icon}</div>
-              <div style="font-size:18px;font-weight:900;color:#fde047;letter-spacing:1px;text-transform:uppercase;text-align:center;text-shadow:0 0 16px rgba(251,191,36,0.9);">${winCfg.cinematicTitle}</div>
-              <div style="font-size:12px;color:#cbd5e1;margin-top:4px;">Carta Legendaria de Poder ${winCard.value} desatada</div>
-            </div>
-          `;
-          const mat = this.container.querySelector('#dojoClashMat');
-          if (mat) {
-            mat.style.animation = 'cjScreenShake 0.6s ease-in-out';
-            setTimeout(() => { if (mat) mat.style.animation = ''; }, 600);
-          }
-        }
-
-        if (roundWinner === 'player') {
-          if (clashType === 'element') {
-            if (pCard.element === 'fire') { aAnim = 'animation: cjBurnDissolve 1.6s forwards;'; this.sfx.burnSound(); }
-            else if (pCard.element === 'snow') { aAnim = 'animation: cjIceFreezeShatter 1.6s forwards;'; this.sfx.freezeSound(); }
-            else if (pCard.element === 'water') { aAnim = 'animation: cjWaterExtinguish 1.6s forwards;'; this.sfx.splashSound(); }
-          } else {
-            aAnim = 'animation: cjWaterExtinguish 1.3s forwards;';
-            this.sfx.clash();
-          }
-        } else if (roundWinner === 'ai') {
-          if (clashType === 'element') {
-            if (aCard.element === 'fire') { pAnim = 'animation: cjBurnDissolve 1.6s forwards;'; this.sfx.burnSound(); }
-            else if (aCard.element === 'snow') { pAnim = 'animation: cjIceFreezeShatter 1.6s forwards;'; this.sfx.freezeSound(); }
-            else if (aCard.element === 'water') { pAnim = 'animation: cjWaterExtinguish 1.6s forwards;'; this.sfx.splashSound(); }
-          } else {
-            pAnim = 'animation: cjWaterExtinguish 1.3s forwards;';
-            this.sfx.clash();
-          }
-        } else {
-          pAnim = 'animation: cjScreenShake 0.5s ease;';
-          aAnim = 'animation: cjScreenShake 0.5s ease;';
-          this.sfx.clash();
-        }
-
-        const dialogueQuote = roundWinner === 'player'
-          ? (floor.quotes?.loseRound || '¡Buen golpe!')
-          : roundWinner === 'ai'
-          ? (floor.quotes?.winRound || '¡Siente el poder!')
-          : '¡Equilibrio perfecto!';
-
-        centerClash.innerHTML = `
-          ${cinematicBanner}
-          <div style="position:relative;width:100%;display:flex;flex-direction:column;align-items:center;z-index:5;">
-            ${timedOut ? `<div style="font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:4px;">⏱️ Tiempo agotado: Carta automática</div>` : ''}
-
-            <!-- Banner central de resultado -->
-            <div style="background:${roundWinner === 'player' ? 'rgba(16,185,129,0.22)' : roundWinner === 'ai' ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'};border:1.5px solid ${roundWinner === 'player' ? '#10b981' : roundWinner === 'ai' ? '#ef4444' : '#f59e0b'};border-radius:20px;padding:5px 18px;margin-bottom:10px;box-shadow:0 4px 18px rgba(0,0,0,0.5);">
-              <span style="font-size:13.5px;font-weight:900;letter-spacing:0.5px;color:${roundWinner === 'player' ? '#34d399' : roundWinner === 'ai' ? '#f87171' : '#fbbf24'};">
-                ${roundWinner === 'player' ? '⚡ ¡RONDA PARA TI!' : roundWinner === 'ai' ? '💥 ¡RONDA PARA EL RIVAL!' : '⚖️ ¡EMPATE ELEMENTAL!'}
-              </span>
-            </div>
-
-            <!-- Choque animado -->
-            <div style="display:flex;justify-content:center;align-items:center;gap:30px;margin-bottom:8px;">
-              <div class="cj-trading-card" style="border:2px solid ${pCard.value >= 10 ? '#fbbf24' : pCfg.border};box-shadow:0 0 16px ${pCfg.glow};${pAnim}">
-                <div class="cj-corner-badge" style="background:${pCfg.badgeBg};color:${pCfg.badgeText};">${pCard.value} <span>${pCfg.icon}</span></div>
-                <div style="height:86px;border-radius:6px;background:url('${pCfg.img}') center/cover no-repeat;margin-top:22px;border:1px solid rgba(255,255,255,0.2);"></div>
-                <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;">${pCfg.name.toUpperCase()}</div>
-              </div>
-
-              <div style="font-size:18px;font-weight:900;color:#64748b;background:#090d14;border:1px solid #202636;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;">VS</div>
-
-              <div class="cj-trading-card" style="border:2px solid ${aCard.value >= 10 ? '#fbbf24' : aCfg.border};box-shadow:0 0 16px ${aCfg.glow};${aAnim}">
-                <div class="cj-corner-badge" style="background:${aCfg.badgeBg};color:${aCfg.badgeText};">${aCard.value} <span>${aCfg.icon}</span></div>
-                <div style="height:86px;border-radius:6px;background:url('${aCfg.img}') center/cover no-repeat;margin-top:22px;border:1px solid rgba(255,255,255,0.2);"></div>
-                <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;">${aCfg.name.toUpperCase()}</div>
-              </div>
-            </div>
-
-            <div style="font-size:12px;font-weight:800;color:#cbd5e1;margin-bottom:4px;text-align:center;text-shadow:0 1px 3px rgba(0,0,0,0.8);">
-              ${reason}
-            </div>
-
-            <div style="font-size:11px;color:#94a3b8;font-style:italic;background:rgba(0,0,0,0.6);padding:3px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);">
-              💬 <b>${floor.name}:</b> "${dialogueQuote}"
-            </div>
-          </div>
-        `;
-
-        const totalWait = isCinematic ? 2600 : 2000;
-        setTimeout(onDone, totalWait);
-      }, 700);
-    }
-
-    renderMatchResult(playerWon, reasonDesc) {
-      clearInterval(this.turnTimer);
-      const centerClash = this.container.querySelector('#cjCenterClashArea');
-      if (!centerClash) return;
-
-      const floor = FLOORS[this.currentFloor - 1];
-
-      if (playerWon) {
-        const isFirstClear = !this.claimedFloors[floor.level];
-        let actualReward;
-        let rewTitle;
-        let rewText;
-
-        if (isFirstClear) {
-          actualReward = floor.reward;
-          rewTitle = '🌟 ¡PRIMERA CONQUISTA DEL PISO!';
-          rewText = `+${actualReward.coins} 🪙 Monedas`;
-          if (actualReward.keys) {
-            const kParts = [];
-            if (actualReward.keys.copper) kParts.push(`${actualReward.keys.copper} Cobre 🟤`);
-            if (actualReward.keys.silver) kParts.push(`${actualReward.keys.silver} Plata ⚪`);
-            if (actualReward.keys.gold) kParts.push(`${actualReward.keys.gold} Oro 🟡`);
-            if (actualReward.keys.obsidian) kParts.push(`${actualReward.keys.obsidian} Obsidiana 🟣`);
-            if (kParts.length) rewText += ` · ` + kParts.join(', ');
-          }
-        } else {
-          const trainCoins = Math.max(20, Math.round(floor.reward.coins * 0.5));
-          const bonusCopper = Math.random() < 0.25 ? 1 : 0;
-          actualReward = { coins: trainCoins, keys: bonusCopper ? { copper: 1 } : {} };
-          rewTitle = '🥋 Recompensa de Entrenamiento';
-          rewText = `+${trainCoins} 🪙 Monedas` + (bonusCopper ? ' · +1 Llave de Cobre 🟤 (Bonus)' : '');
-        }
-
-        if (this.options.onReward) {
-          this.options.onReward(actualReward);
-        }
-
-        this.claimedFloors[floor.level] = true;
-        try { localStorage.setItem('epickast.dojo.floors', JSON.stringify(this.claimedFloors)); } catch {}
-
-        centerClash.innerHTML = `
-          <div style="padding:18px 24px;background:rgba(10,25,18,0.92);border:2px solid #10b981;border-radius:12px;text-align:center;box-shadow:0 8px 32px rgba(16,185,129,0.3);animation: cjCardFlipIn 0.35s ease;max-width:440px;">
-            <div style="font-size:32px;margin-bottom:4px;">🏆</div>
-            <div style="font-size:17px;font-weight:900;color:#10b981;margin-bottom:4px;letter-spacing:0.5px;">¡VICTORIA EN PISO ${floor.level}!</div>
-            <div style="font-size:12.5px;color:#e2e8f0;margin-bottom:6px;">${reasonDesc}</div>
-            <div style="font-size:11.5px;color:#94a3b8;font-style:italic;margin-bottom:12px;">"${floor.quotes?.defeat || 'Bien jugado.'}"</div>
-
-            <div style="font-size:12px;font-weight:800;color:#fde047;background:rgba(0,0,0,0.65);border:1px solid rgba(253,224,71,0.35);padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:14px;">
-              <div style="font-size:10px;color:#34d399;text-transform:uppercase;margin-bottom:2px;">${rewTitle}</div>
-              🎁 ${rewText}
-            </div>
-
-            <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
-              ${this.currentFloor < 5 ? `
-                <button id="dojoBtnNextFloor" style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 4px 12px rgba(37,99,235,0.4);">
-                  ⚔️ Desafiar Piso ${this.currentFloor + 1}
-                </button>
-              ` : `
-                <button id="dojoBtnReplay" style="background:#059669;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;">
-                  👑 ¡Maestro del Núcleo! Repetir combate
-                </button>
-              `}
-              <button id="dojoBtnBackLobby" style="background:#1e2433;color:#cbd5e1;border:1px solid #3b4660;padding:8px 14px;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;">
-                Volver al Salón
-              </button>
-            </div>
-          </div>
-        `;
-      } else {
-        centerClash.innerHTML = `
-          <div style="padding:18px 24px;background:rgba(25,12,14,0.92);border:2px solid #ef4444;border-radius:12px;text-align:center;box-shadow:0 8px 32px rgba(239,68,68,0.3);animation: cjCardFlipIn 0.35s ease;max-width:440px;">
-            <div style="font-size:32px;margin-bottom:4px;">💀</div>
-            <div style="font-size:17px;font-weight:900;color:#ef4444;margin-bottom:4px;">DERROTA EN PISO ${floor.level}</div>
-            <div style="font-size:12.5px;color:#e2e8f0;margin-bottom:6px;">${reasonDesc}</div>
-            <div style="font-size:11.5px;color:#94a3b8;font-style:italic;margin-bottom:12px;">"${floor.quotes?.winRound || 'Sigue entrenando.'}"</div>
-
-            <div style="display:flex;justify-content:center;gap:10px;">
-              <button id="dojoBtnRetry" style="background:#ef4444;color:#fff;border:none;padding:8px 16px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 4px 12px rgba(239,68,68,0.4);">
-                🔄 Reintentar Combate
-              </button>
-              <button id="dojoBtnBackLobby" style="background:#1e2433;color:#cbd5e1;border:1px solid #3b4660;padding:8px 14px;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;">
-                Volver al Salón
-              </button>
-            </div>
-          </div>
-        `;
+    start() {
+      if (this.destroyed) return;
+      // Loop de animación de idle (600ms respiración + cinta de 3 frames)
+      if (this.scope) {
+        this.scope.interval(() => {
+          if (this.destroyed || this.paused || this.phase === 'lobby') return;
+          this.idleFrame = (this.idleFrame + 1) % 6;
+          this.refreshArenaSprites();
+        }, 600);
       }
-
-      const btnNext = centerClash.querySelector('#dojoBtnNextFloor');
-      if (btnNext) btnNext.onclick = () => { this.currentFloor++; this.startMatch(this.currentFloor); };
-
-      const btnReplay = centerClash.querySelector('#dojoBtnReplay');
-      if (btnReplay) btnReplay.onclick = () => { this.startMatch(this.currentFloor); };
-
-      const btnRetry = centerClash.querySelector('#dojoBtnRetry');
-      if (btnRetry) btnRetry.onclick = () => { this.startMatch(this.currentFloor); };
-
-      const btnBack = centerClash.querySelector('#dojoBtnBackLobby');
-      if (btnBack) btnBack.onclick = () => { this.inMatch = false; this.initUI(); };
+      this.renderLobby();
     }
 
-    startMatch(floorLevel) {
-      this.currentFloor = floorLevel;
-      this.inMatch = true;
-      this.initHand();
-      this.renderMatchBoard();
+    pause() {
+      if (this.destroyed || this.paused || this.phase === 'lobby' || this.phase === 'ended') return;
+      this.paused = true;
+      this.showPauseOverlay('PAUSA · Ventana en segundo plano');
     }
 
-    renderMatchBoard() {
-      const floor = FLOORS[this.currentFloor - 1];
-      const meName = this.options.playerName || 'Tú';
-      this.playerNinja = getSavedNinjaConfig();
-      const playerNinjaCfg = this.playerNinja;
-      const bossNinjaCfg = floor.ninjaConfig;
-
-      // RENDERIZADOR DE COLUMNAS ELEMENTALES CON COLORES 100% DISTINGUIBLES
-      const renderElementSlots = (cards) => {
-        const fCards = cards.filter(c => c.element === 'fire');
-        const wCards = cards.filter(c => c.element === 'water');
-        const sCards = cards.filter(c => c.element === 'snow');
-
-        return `
-          <div style="display:flex;gap:5px;align-items:center;">
-            <!-- FUEGO 🔥 -->
-            <div style="background:${fCards.length ? '#dc2626' : '#1e1c24'};border:1px solid ${fCards.length ? '#ef4444' : '#2d2b38'};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:900;display:flex;align-items:center;gap:4px;box-shadow:${fCards.length ? '0 0 8px rgba(239,68,68,0.5)' : 'none'};">
-              <span>🔥</span>
-              <span>${fCards.length ? fCards.map(c=>c.value).join(',') : '—'}</span>
-            </div>
-
-            <!-- AGUA 💧 (AZUL PROFUNDO) -->
-            <div style="background:${wCards.length ? '#1d4ed8' : '#141c2b'};border:1px solid ${wCards.length ? '#3b82f6' : '#1e2d45'};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:900;display:flex;align-items:center;gap:4px;box-shadow:${wCards.length ? '0 0 8px rgba(37,99,235,0.5)' : 'none'};">
-              <span>💧</span>
-              <span>${wCards.length ? wCards.map(c=>c.value).join(',') : '—'}</span>
-            </div>
-
-            <!-- NIEVE ❄️ (BLANCO CRISTAL DE HIELO) -->
-            <div style="background:${sCards.length ? '#ffffff' : '#151c22'};border:1.5px solid ${sCards.length ? '#0284c7' : '#1f2e3d'};color:${sCards.length ? '#0f172a' : '#64748b'};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:900;display:flex;align-items:center;gap:4px;box-shadow:${sCards.length ? '0 0 10px rgba(165,243,252,0.8)' : 'none'};">
-              <span>❄️</span>
-              <span>${sCards.length ? sCards.map(c=>c.value).join(',') : '—'}</span>
-            </div>
-          </div>
-        `;
+    resume() {
+      if (this.destroyed || !this.paused) return;
+      this.resumeCountdown = 3;
+      this.showPauseOverlay(`Reanudando en ${this.resumeCountdown} s…`);
+      const step = () => {
+        if (this.destroyed || !this.paused) return;
+        this.resumeCountdown--;
+        if (this.resumeCountdown <= 0) {
+          this.paused = false;
+          this.hidePauseOverlay();
+        } else {
+          this.showPauseOverlay(`Reanudando en ${this.resumeCountdown} s…`);
+          if (this.scope) this.scope.timeout(step, 1000);
+        }
       };
+      if (this.scope) this.scope.timeout(step, 1000);
+    }
 
-      // EVALUADOR TÁCTICO EN TIEMPO REAL
-      const getTacticalAlert = () => {
-        const pCounts = { fire: 0, water: 0, snow: 0 };
-        this.playerWon.forEach(c => pCounts[c.element]++);
-        const aiCounts = { fire: 0, water: 0, snow: 0 };
-        this.aiWon.forEach(c => aiCounts[c.element]++);
-
-        const aiMiss = ELEMENTS.filter(e => aiCounts[e] === 0);
-        if (aiMiss.length === 1) {
-          const name = ELEM_CONFIG[aiMiss[0]].name.toUpperCase();
-          const icon = ELEM_CONFIG[aiMiss[0]].icon;
-          return `<span style="color:#f87171;">⚠️ ¡PELIGRO! Al rival le falta 1 ${name} ${icon} para ganar</span>`;
-        }
-        for (const el of ELEMENTS) {
-          if (aiCounts[el] === 2) return `<span style="color:#f87171;">⚠️ ¡Alerta! Rival tiene 2 cartas de ${ELEM_CONFIG[el].name.toUpperCase()}</span>`;
-        }
-
-        const pMiss = ELEMENTS.filter(e => pCounts[e] === 0);
-        if (pMiss.length === 1) {
-          const name = ELEM_CONFIG[pMiss[0]].name.toUpperCase();
-          const icon = ELEM_CONFIG[pMiss[0]].icon;
-          return `<span style="color:#34d399;">⚡ ¡A 1 CARTA! Necesitas 1 ${name} ${icon} para ganar</span>`;
-        }
-        for (const el of ELEMENTS) {
-          if (pCounts[el] === 2) return `<span style="color:#34d399;">⚡ ¡Tienes 2 de ${ELEM_CONFIG[el].name.toUpperCase()}, 1 más para ganar!</span>`;
-        }
-
-        return '<span style="color:#94a3b8;">Condición de Victoria: 1 de cada elemento (🔥 + 💧 + ❄️) O 3 del mismo elemento</span>';
-      };
-
-      this.container.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <!-- Barra Superior: Tablero de Puntos Elemental y Estado -->
-          <div style="background:#0e121a;border:1px solid #202636;border-radius:10px;padding:8px 14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-              <!-- Puntos Jugador -->
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:11.5px;font-weight:900;color:#38bdf8;">TÚ (${this.playerWon.length}):</span>
-                ${renderElementSlots(this.playerWon)}
-              </div>
-
-              <!-- Centro: Temporizador y Alerta Táctica -->
-              <div style="display:flex;flex-direction:column;align-items:center;gap:3px;">
-                <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="font-size:11px;font-weight:800;color:#94a3b8;">TURNO:</span>
-                  <span id="dojoTimerTxt" style="font-size:12px;font-weight:900;color:#10b981;">15s</span>
-                  <button id="dojoBtnExitMatch" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;padding:2px 8px;border-radius:4px;font-size:10.5px;cursor:pointer;margin-left:6px;font-weight:700;">
-                    ✕ Salir
-                  </button>
-                </div>
-                <div style="width:130px;height:4px;background:#1e2433;border-radius:2px;overflow:hidden;">
-                  <div id="dojoTimerFill" style="width:100%;height:100%;background:#10b981;transition:width 0.3s linear;"></div>
-                </div>
-              </div>
-
-              <!-- Puntos Rival -->
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:11.5px;font-weight:900;color:#f87171;">RIVAL (${this.aiWon.length}):</span>
-                ${renderElementSlots(this.aiWon)}
-              </div>
-            </div>
-
-            <div style="text-align:center;margin-top:6px;font-size:11px;border-top:1px solid #1a2233;padding-top:4px;">
-              ${getTacticalAlert()}
-            </div>
-          </div>
-
-          <!-- TAPETE DE COMBATE CON FONDO PIXEL ART DEL DOJO Y NINJAS A GRAN ESCALA -->
-          <div id="dojoClashMat" style="background:linear-gradient(rgba(10,14,22,0.65), rgba(10,14,22,0.8)), url('assets/dojo-arena.jpg') center/cover no-repeat;border:1.5px solid #28334a;border-radius:12px;min-height:280px;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;position:relative;overflow:hidden;box-shadow:inset 0 0 35px rgba(0,0,0,0.85);">
-            
-            <!-- LADO IZQUIERDO: NINJA DEL JUGADOR (PIXEL ART) -->
-            <div id="cjPlayerNinjaContainer" style="display:flex;flex-direction:column;align-items:center;min-width:140px;z-index:4;animation: cjNinjaIdle 2.6s infinite ease-in-out;">
-              <div style="filter:drop-shadow(0 10px 14px rgba(0,0,0,0.85));">
-                ${generatePixelNinjaSVG(playerNinjaCfg, true, 135, 170)}
-              </div>
-              <div style="width:85px;height:12px;background:radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, transparent 70%);border-radius:50%;margin-top:-6px;"></div>
-              <div style="margin-top:6px;background:rgba(15,23,42,0.92);border:1.5px solid #3b82f6;border-radius:12px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.6);">
-                <div style="font-size:12px;font-weight:900;color:#fff;">${meName}</div>
-                <div style="font-size:10px;font-weight:800;color:#93c5fd;">${playerNinjaCfg.beltName || 'Cinturón Blanco'}</div>
-              </div>
-            </div>
-
-            <!-- CENTRO: ÁREA DE CLASH / CARTAS Y RESULTADOS -->
-            <div id="cjCenterClashArea" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:5;min-height:220px;padding:0 12px;">
-              <div style="font-size:13.5px;font-weight:900;color:#f8fafc;margin-bottom:8px;text-shadow:0 2px 8px rgba(0,0,0,0.9);letter-spacing:0.5px;">
-                ⚡ Selecciona una carta de tu mano para atacar
-              </div>
-              <div style="display:flex;gap:12px;font-size:11px;color:#cbd5e1;background:rgba(13,17,26,0.85);padding:6px 14px;border-radius:20px;border:1px solid #202b3d;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
-                <span style="color:#f87171;font-weight:800;">🔥 Fuego vence Nieve ❄️</span>
-                <span style="color:#38bdf8;font-weight:800;">❄️ Nieve vence Agua 💧</span>
-                <span style="color:#60a5fa;font-weight:800;">💧 Agua vence Fuego 🔥</span>
-              </div>
-            </div>
-
-            <!-- LADO DERECHO: NINJA DEL SENSEI RIVAL (PIXEL ART) -->
-            <div id="cjAiNinjaContainer" style="display:flex;flex-direction:column;align-items:center;min-width:140px;z-index:4;animation: cjNinjaIdle 2.6s infinite ease-in-out;animation-delay:0.7s;">
-              <div style="filter:drop-shadow(0 10px 14px rgba(0,0,0,0.85));">
-                ${generatePixelNinjaSVG(bossNinjaCfg, false, 135, 170)}
-              </div>
-              <div style="width:85px;height:12px;background:radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, transparent 70%);border-radius:50%;margin-top:-6px;"></div>
-              <div style="margin-top:6px;background:rgba(15,23,42,0.92);border:1.5px solid ${floor.color};border-radius:12px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.6);">
-                <div style="font-size:12px;font-weight:900;color:${floor.color};">${floor.name}</div>
-                <div style="font-size:10px;font-weight:800;color:#cbd5e1;">${floor.belt} · Piso ${floor.level}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- MANO DEL JUGADOR: REDISEÑO ESTILO TRADING CARD -->
-          <div style="background:#0e121a;border:1px solid #202636;border-radius:10px;padding:12px 16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-              <div style="font-size:11.5px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">
-                🃏 TU MANO (Elige una carta para lanzar):
-              </div>
-              <div style="font-size:11px;color:#fbbf24;font-weight:700;">
-                ★ Cartas de poder 10+ desatan cinemáticas legendarias
-              </div>
-            </div>
-
-            <div id="dojoHandContainer" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-              ${this.playerHand.map((c, idx) => {
-                const cfg = ELEM_CONFIG[c.element];
-                const isPower = c.value >= 10;
-                return `
-                  <div class="cj-trading-card ${isPower ? 'power-10' : ''}" data-card-idx="${idx}" style="border:2px solid ${isPower ? '#fbbf24' : cfg.border};box-shadow:0 0 14px ${cfg.glow};">
-                    <!-- Insignia en esquina -->
-                    <div class="cj-corner-badge" style="background:${cfg.badgeBg};color:${cfg.badgeText};">
-                      <span>${c.value}</span>
-                      <span>${cfg.icon}</span>
-                    </div>
-
-                    ${isPower ? `<div class="cj-power-star">★ ${c.value}</div>` : ''}
-
-                    <!-- Ilustración central -->
-                    <div style="height:90px;border-radius:6px;background:rgba(0,0,0,0.4);margin-top:22px;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;padding:4px;"><img src="${cfg.img}" style="width:72px;height:72px;object-fit:contain;image-rendering:pixelated;" alt="${cfg.name}"></div>
-
-                    <!-- Pie de carta -->
-                    <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;letter-spacing:0.5px;">
-                      ${cfg.name.toUpperCase()}
-                    </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-        </div>
+    showPauseOverlay(msg) {
+      if (!this.container) return;
+      let ov = this.container.querySelector('#cjPauseOverlay');
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'cjPauseOverlay';
+        ov.style.cssText = 'position:absolute;inset:0;background:rgba(11,14,20,0.86);backdrop-filter:blur(4px);z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;';
+        this.container.style.position = 'relative';
+        this.container.appendChild(ov);
+      }
+      ov.innerHTML = `
+        <div class="ek-pixel-font" style="font-size:20px;color:#fbbf24;letter-spacing:1px;">⏸ PAUSA</div>
+        <div style="font-size:13px;color:#e2e8f0;font-weight:700;"></div>
       `;
-
-      const handCards = this.container.querySelectorAll('.cj-trading-card');
-      handCards.forEach(el => {
-        el.onclick = () => {
-          if (this.isResolvingRound || this.matchWinner) return;
-          const idx = parseInt(el.dataset.cardIdx, 10);
-          if (this.playerHand[idx]) {
-            this.playRound(this.playerHand[idx]);
-          }
-        };
-      });
-
-      const btnExit = this.container.querySelector('#dojoBtnExitMatch');
-      if (btnExit) btnExit.onclick = () => {
-        clearInterval(this.turnTimer);
-        this.inMatch = false;
-        this.initUI();
-      };
+      ov.lastElementChild.textContent = msg;
     }
 
-    // ==========================================
-    // SALÓN PRINCIPAL DEL DOJO (LOBBY)
-    // ==========================================
-    initUI() {
-      const clearedCount = FLOORS.filter(f => !!this.claimedFloors[f.level]).length;
+    hidePauseOverlay() {
+      const ov = this.container?.querySelector('#cjPauseOverlay');
+      if (ov) ov.remove();
+    }
+
+    isMatchActive() {
+      return !this.destroyed && (this.phase === 'playing' || this.phase === 'clash' || this.phase === 'cinematic');
+    }
+
+    confirmAbortIfActive() {
+      if (!this.isMatchActive()) return true;
+      return window.confirm('¿Salir? Perderás esta partida (sin recompensas)');
+    }
+
+    destroy() {
+      if (this.destroyed) return;
+      this.destroyed = true;
+      this.paused = false;
+      this.phase = 'ended';
+      if (this.sfx) this.sfx.destroy();
+      if (this.scope) this.scope.dispose();
+    }
+
+    getClaimedFloors() {
+      const v = window.EconomyService ? window.EconomyService.getVault() : {};
+      return v.claimedFloors || {};
+    }
+
+    markFloorClaimed(level) {
+      if (!window.EconomyService) return;
+      const v = window.EconomyService.getVault();
+      v.claimedFloors[level] = true;
+      window.EconomyService.saveVault(v);
+    }
+
+    renderLobby() {
+      if (this.destroyed || !this.container) return;
+      this.phase = 'lobby';
+      const floors = CFG().DOJO_FLOORS || [];
+      const claimed = this.getClaimedFloors();
       const myNinja = getSavedNinjaConfig();
+      const belts = CFG().BELTS || [];
+      const myBeltObj = belts.find((b) => b.id === myNinja.belt) || belts[0] || { name: 'Cinturón Blanco', color: '#f8fafc' };
+
+      const coinSvg = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('coin', 1) : '';
+
       this.container.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          <!-- Encabezado con Vista Previa de Ninja, Rango de Cinturón y Botones -->
-          <div style="background:linear-gradient(135deg, #0c1018 0%, #151c2c 100%);border:1px solid #243048;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.35);">
+        <div style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:18px;color:#e2e8f0;position:relative;">
+          <!-- Cabecera del Dojo -->
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:14px;margin-bottom:14px;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h3 class="ek-pixel-font" style="margin:0;font-size:15px;color:#f8fafc;display:flex;align-items:center;gap:10px;">
+                ${SPR().renderSpriteHtml ? SPR().renderSpriteHtml('tab_dojo', 1.4) : ''}
+                <span>DOJO ELEMENTAL DE CARTAS</span>
+              </h3>
+              <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">
+                Triángulo Elemental: <b style="color:#ef4444;">Fuego vence a Nieve</b> · <b style="color:#7dd3fc;">Nieve vence a Agua</b> · <b style="color:#3b82f6;">Agua vence a Fuego</b>
+              </p>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button id="cjBtnMuteLobby" style="background:#141926;border:1px solid rgba(255,255,255,0.12);color:#cbd5e1;padding:6px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
+                ${this.sfx.muted ? '🔇 Sonido OFF' : '🔊 Sonido ON'}
+              </button>
+              <div style="background:#141926;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 12px;font-size:11.5px;color:#cbd5e1;">
+                🏆 Victoria: <b>3 elementos distintos</b> o <b>3 del mismo elemento</b>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tu Ninja Actual -->
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 16px;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
             <div style="display:flex;align-items:center;gap:14px;">
-              <div style="width:54px;height:54px;border-radius:12px;background:rgba(15,23,42,0.9);border:1.5px solid #38bdf8;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 0 14px rgba(56,189,248,0.2);">
-                ${generatePixelNinjaSVG(myNinja, true, 46, 52)}
+              <div style="width:56px;height:66px;background:#0b0e14;border:1px solid #334155;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                ${renderPixelNinjaSvg(myNinja, { size: 46, pose: 'idle', frame: 0 })}
               </div>
               <div>
-                <div style="font-size:15px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:8px;">
-                  <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.9.0
-                  <span style="font-size:10px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:2px 8px;border-radius:10px;font-weight:800;">${clearedCount}/5 Pisos Dominados</span>
-                </div>
-                <div style="font-size:11.5px;color:#94a3b8;margin-top:3px;">
-                  Duelos tácticos Card-Jitsu con Ninjas Pixel Art, economía sincronizada y poderes cinemáticos.
-                </div>
+                <div style="font-size:10px;font-weight:800;color:#38bdf8;text-transform:uppercase;letter-spacing:0.6px;">Tu Combatiente</div>
+                <div style="font-size:14px;font-weight:900;color:#f8fafc;">Ninja del Núcleo · <span style="color:${myBeltObj.color};">${myBeltObj.name}</span></div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px;">Personaliza traje, cinta, arma y aura en la pestaña «Mi Ninja».</div>
               </div>
             </div>
-
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button id="dojoBtnCustomNinja" style="background:linear-gradient(135deg, #7c3aed, #6d28d9);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:11.5px;cursor:pointer;box-shadow:0 4px 10px rgba(124,58,237,0.3);display:flex;align-items:center;gap:6px;">
-                <span>🥷</span> Personalizar Mi Ninja
-              </button>
-              <button id="dojoBtnHowToPlay" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;padding:7px 12px;border-radius:8px;font-weight:700;font-size:11.5px;cursor:pointer;">
-                📖 Reglas
-              </button>
+            <div style="font-size:11.5px;color:#94a3b8;">
+              Pisos dominados: <b style="color:#22c55e;">${Object.keys(claimed).filter((k) => claimed[k]).length} / ${floors.length}</b>
             </div>
           </div>
 
-          <!-- Tutorial Desplegable -->
-          <div id="dojoTutorialBox" style="display:${this.showTutorial ? 'block' : 'none'};background:#090d14;border:1px solid #1a2233;border-radius:10px;padding:14px 18px;animation: cjCardFlipIn 0.25s ease;">
-            <div style="font-size:13px;font-weight:900;color:#f8fafc;margin-bottom:8px;">Reglas Oficiales del Dojo:</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;font-size:12px;color:#cbd5e1;">
-              <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
-                <b style="color:#ef4444;">1. Triángulo Elemental:</b><br>
-                • 🔥 <b>Fuego</b> vence a ❄️ <b>Nieve</b>.<br>
-                • ❄️ <b>Nieve</b> vence a 💧 <b>Agua</b>.<br>
-                • 💧 <b>Agua</b> vence a 🔥 <b>Fuego</b>.
-              </div>
-              <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
-                <b style="color:#38bdf8;">2. Desempate por Números:</b><br>
-                • En mismo elemento, gana la carta con el número más alto (2 al 12).<br>
-                • ¡Las cartas <b>10 o más</b> desatan cinemáticas legendarias de impacto!
-              </div>
-              <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
-                <b style="color:#10b981;">3. Cómo Ganar la Partida:</b><br>
-                • <b>Trío Elemental:</b> 1 de cada elemento (1 🔥 + 1 💧 + 1 ❄️).<br>                • <b>Monolito:</b> 3 cartas del mismo elemento (3 🔥, 3 💧 o 3 ❄️).<br>                • <i>3 cartas mixtas (ej: 2 agua y 1 fuego) NO dan victoria.</i>
-              </div>
-            </div>
-          </div>
-
-          <!-- Cuadrícula de los 5 Guardianes del Dojo -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:12px;">
-            ${FLOORS.map(f => {
-              const isCleared = !!this.claimedFloors[f.level];
-              const trainCoins = Math.max(20, Math.round(f.reward.coins * 0.5));
-              const keyDesc = f.reward.keys?.copper ? `${f.reward.keys.copper} Cobre` : f.reward.keys?.silver ? `${f.reward.keys.silver} Plata` : f.reward.keys?.gold ? `${f.reward.keys.gold} Oro` : `${f.reward.keys?.obsidian || 1} Obsidiana`;
+          <!-- Selector de los Guardianes del Dojo (Insignias sin solapamiento A3 y Lore sin undefined A2) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(168px, 1fr));gap:10px;">
+            ${floors.map((f) => {
+              const isDone = !!claimed[f.level];
+              const portraitSvg = SPR().renderSpriteHtml ? SPR().renderSpriteHtml(f.spriteKey, 3) : '';
+              const keySprite = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('key_' + f.reward.key, 1) : '';
+              const trainCoins = Math.round(f.reward.coins * (CFG().TRAINING_REWARD_RULES?.coinMultiplier || 0.5));
+              const descSafe = f.desc ?? '';
               return `
-                <div style="background:linear-gradient(160deg, #0f141f 0%, #0b0e16 100%);border:1.5px solid ${isCleared ? '#10b981' : '#222b3d'};border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;position:relative;transition:0.18s;box-shadow:0 6px 16px rgba(0,0,0,0.45);">
-                  ${isCleared ? `<div style="position:absolute;top:8px;right:8px;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#34d399;font-size:10px;font-weight:900;padding:2px 8px;border-radius:10px;">✓ DOMINADO</div>` : `<div style="position:absolute;top:8px;right:8px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.4);color:#fbbf24;font-size:9.5px;font-weight:900;padding:2px 7px;border-radius:10px;">1ª RECOMPENSA</div>`}
-
-                  <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:52px;height:52px;border-radius:10px;background:url('${f.avatarImg}') center/cover no-repeat;border:2px solid ${f.color};box-shadow:0 0 14px ${f.color}40;flex-shrink:0;"></div>
-                    <div>
-                      <div style="font-size:10.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;">Piso ${f.level} · ${f.belt}</div>
-                      <div style="font-size:14px;font-weight:900;color:#f8fafc;">${f.name}</div>
+                <div class="cj-floor-card" style="background:#141926;border:1.5px solid ${isDone ? 'rgba(34,197,94,0.45)' : f.color};border-radius:10px;padding:12px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;min-width:0;">
+                  <div>
+                    <!-- Cabecera flex-wrap sin superposición (Bloque A3) -->
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:space-between;min-width:0;margin-bottom:8px;">
+                      <span style="flex:1 1 auto;min-width:0;font-size:10px;font-weight:900;color:${f.color};text-transform:uppercase;letter-spacing:0.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        PISO ${f.level} · ${f.belt}
+                      </span>
+                      <span style="flex:none;position:static;background:${isDone ? 'rgba(34,197,94,0.18)' : 'rgba(251,191,36,0.16)'};border:1px solid ${isDone ? '#22c55e' : '#fbbf24'};color:${isDone ? '#4ade80' : '#fde047'};font-size:9px;font-weight:900;padding:2px 6px;border-radius:4px;">
+                        ${isDone ? '✓ DOMINADO' : '1ª RECOMPENSA'}
+                      </span>
                     </div>
+
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                      <div style="width:52px;height:52px;border-radius:8px;border:2px solid ${f.color};background:#0b0e14;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px ${f.color}33;">
+                        ${portraitSvg}
+                      </div>
+                      <div style="min-width:0;">
+                        <div style="font-size:13.5px;font-weight:900;color:#f8fafc;line-height:1.2;">${f.name}</div>
+                        <div style="font-size:10.5px;color:#94a3b8;margin-top:2px;">IA Táctica: ${Math.round(f.aiSkill * 100)}%</div>
+                      </div>
+                    </div>
+
+                    <p style="font-size:11px;color:#cbd5e1;margin:0 0 8px;line-height:1.35;">${descSafe}</p>
                   </div>
 
-                  <div style="font-size:11.5px;color:#94a3b8;line-height:1.4;flex:1;">
-                    ${f.desc}
+                  <div>
+                    <div style="background:#0b0e14;border:1px solid rgba(255,255,255,0.07);border-radius:6px;padding:6px 8px;font-size:10.5px;color:#fbbf24;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+                      ${isDone
+                        ? `<span>Entrenamiento: +${trainCoins}</span> ${coinSvg} <span>· 25%</span> ${SPR().renderSpriteHtml ? SPR().renderSpriteHtml('key_copper', 0.9) : ''}`
+                        : `<span>1ª Conquista: +${f.reward.coins}</span> ${coinSvg} <span>+</span> ${keySprite} <span>${f.reward.keyLabel}</span>`
+                      }
+                    </div>
+                    <button class="cjStartFloorBtn ek-pixel-font" data-level="${f.level}" style="width:100%;background:${f.color};border:none;color:${f.level === 2 || f.level === 5 ? '#090d16' : '#fff'};font-weight:900;font-size:10px;padding:9px 8px;border-radius:6px;cursor:pointer;letter-spacing:0.4px;">
+                      ${isDone ? 'ENTRENAR' : 'DESAFIAR'}
+                    </button>
                   </div>
-
-                  <div style="font-size:11px;font-weight:700;color:${isCleared ? '#6ee7b7' : '#fbbf24'};background:#090d14;border:1px solid #1a2233;padding:6px 9px;border-radius:7px;">
-                    ${isCleared
-                      ? `🥋 Entrenamiento: +${trainCoins} 🪙 + 25% Llave Cobre`
-                      : `🎁 1ª Conquista: +${f.reward.coins} 🪙 + ${keyDesc}`}
-                  </div>
-
-                  <button class="dojo-btn-challenge" data-floor="${f.level}" style="background:${isCleared ? 'linear-gradient(135deg,#059669,#047857)' : 'linear-gradient(135deg,#2563eb,#1d4ed8)'};color:#fff;border:none;padding:8px 14px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;transition:0.15s;box-shadow:0 4px 10px rgba(0,0,0,0.3);">
-                    ⚔️ ${isCleared ? `Entrenar en Piso ${f.level}` : `Desafiar Piso ${f.level}`}
-                  </button>
                 </div>
               `;
             }).join('')}
@@ -1265,269 +614,1031 @@
         </div>
       `;
 
-      const btnHelp = this.container.querySelector('#dojoBtnHowToPlay');
-      if (btnHelp) btnHelp.onclick = () => {
-        this.showTutorial = !this.showTutorial;
-        this.initUI();
-      };
+      const muteBtn = this.container.querySelector('#cjBtnMuteLobby');
+      if (muteBtn) {
+        muteBtn.onclick = () => {
+          const muted = this.sfx.toggleMute();
+          muteBtn.textContent = muted ? '🔇 Sonido OFF' : '🔊 Sonido ON';
+        };
+      }
 
-      const btnCustom = this.container.querySelector('#dojoBtnCustomNinja');
-      if (btnCustom) btnCustom.onclick = () => {
-        CardJitsuGame.renderNinjaCustomizer(this.container, () => { this.initUI(); });
-      };
+      this.container.querySelectorAll('.cjStartFloorBtn').forEach((btn) => {
+        btn.onclick = () => {
+          const lvl = Number(btn.getAttribute('data-level'));
+          this.sfx.selectCard();
+          this.startMatch(lvl);
+        };
+      });
 
-      const challengeBtns = this.container.querySelectorAll('.dojo-btn-challenge');
-      challengeBtns.forEach(b => {
-        b.onclick = () => {
-          const fl = parseInt(b.dataset.floor, 10);
-          this.startMatch(fl);
+      window.__EK?.assertNoBadText(this.container);
+    }
+
+    drawRandomCard() {
+      const elems = ['fire', 'water', 'snow'];
+      const element = elems[Math.floor(Math.random() * elems.length)];
+      const r = Math.random();
+      let power;
+      if (r < 0.55) power = 2 + Math.floor(Math.random() * 4); // 2..5
+      else if (r < 0.85) power = 6 + Math.floor(Math.random() * 4); // 6..9
+      else power = 10 + Math.floor(Math.random() * 3); // 10..12
+      return {
+        id: Math.random().toString(36).slice(2, 9),
+        element,
+        power
+      };
+    }
+
+    startMatch(level) {
+      if (this.destroyed) return;
+      const floors = CFG().DOJO_FLOORS || [];
+      this.selectedFloor = floors.find((f) => f.level === level) || floors[0];
+      this.phase = 'playing';
+      this.rewardClaimed = false;
+      this.roundLocked = false;
+      this.playerPose = 'idle';
+      this.aiPose = 'idle';
+      this.playerPoints = [];
+      this.aiPoints = [];
+      this.playerHand = Array.from({ length: 5 }, () => this.drawRandomCard());
+      this.aiHand = Array.from({ length: 5 }, () => this.drawRandomCard());
+
+      this.renderMatchArena({ staggerHand: true });
+      this.setSpeech(this.selectedFloor.quotes.start);
+      this.startTurnTimer();
+    }
+
+    startTurnTimer() {
+      this.stopTurnTimer();
+      if (this.destroyed || this.phase !== 'playing') return;
+      this.turnSeconds = 14;
+      this.updateTimerHud();
+
+      this.turnIntervalId = this.scope ? this.scope.interval(() => {
+        if (this.destroyed || this.paused || this.phase !== 'playing' || this.roundLocked) return;
+        this.turnSeconds--;
+        this.updateTimerHud();
+        if (this.turnSeconds <= 0) {
+          this.stopTurnTimer();
+          const randIdx = Math.floor(Math.random() * this.playerHand.length);
+          this.playRound(randIdx);
+        }
+      }, 1000) : null;
+    }
+
+    stopTurnTimer() {
+      if (this.turnIntervalId && this.scope) {
+        this.scope.clearInterval(this.turnIntervalId);
+        this.turnIntervalId = null;
+      }
+    }
+
+    updateTimerHud() {
+      const txt = this.container?.querySelector('#cjTurnTimerText');
+      const bar = this.container?.querySelector('#cjTurnTimerBar');
+      if (txt) {
+        txt.textContent = `${this.turnSeconds}s`;
+        txt.style.color = this.turnSeconds <= 4 ? '#ef4444' : '#38bdf8';
+      }
+      if (bar) {
+        bar.style.width = `${Math.max(0, (this.turnSeconds / 14) * 100)}%`;
+        bar.style.background = this.turnSeconds <= 4 ? '#ef4444' : '#38bdf8';
+      }
+    }
+
+    setSpeech(text) {
+      const b = this.container?.querySelector('#cjSenseiSpeech');
+      if (b) b.textContent = `«${text || ''}»`;
+    }
+
+    formatPointsRow(points) {
+      const elems = ['fire', 'water', 'snow'];
+      const tokMap = CFG().ELEMENT_TOKENS || {};
+      return elems.map((el) => {
+        const tok = tokMap[el] || { color: '#ef4444', bg: '#450a0a' };
+        const cards = points.filter((p) => p.element === el);
+        const ico = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('elem_' + el, 0.9) : '';
+        if (!cards.length) {
+          return `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(15,23,42,0.7);border:1px dashed rgba(255,255,255,0.15);padding:3px 8px;border-radius:6px;opacity:0.45;font-size:11px;">${ico} -</span>`;
+        }
+        return `<span style="display:inline-flex;align-items:center;gap:4px;background:${tok.bg};border:1.5px solid ${tok.color};color:#fff;padding:3px 9px;border-radius:6px;font-weight:900;font-size:11px;">${ico} ${cards.map((c) => c.power).join(', ')}</span>`;
+      }).join(' ');
+    }
+
+    refreshArenaSprites() {
+      if (this.destroyed || !this.container) return;
+      const pBox = this.container.querySelector('#cjPlayerSpriteWrap');
+      const aBox = this.container.querySelector('#cjAiSpriteWrap');
+      if (pBox) {
+        pBox.innerHTML = renderPixelNinjaSvg(getSavedNinjaConfig(), {
+          size: 120,
+          pose: this.playerPose,
+          frame: this.idleFrame
+        });
+      }
+      if (aBox && this.selectedFloor) {
+        aBox.innerHTML = renderPixelNinjaSvg(this.selectedFloor.ninjaConfig, {
+          size: 120,
+          flip: true,
+          pose: this.aiPose,
+          frame: this.idleFrame
+        });
+      }
+    }
+
+    renderMatchArena(opts = {}) {
+      if (this.destroyed || !this.container) return;
+      const f = this.selectedFloor;
+      const myNinja = getSavedNinjaConfig();
+      const belts = CFG().BELTS || [];
+      const myBeltObj = belts.find((b) => b.id === myNinja.belt) || belts[0] || { name: 'Cinturón Blanco', color: '#f8fafc' };
+
+      this.container.innerHTML = `
+        <div id="cjMatchRoot" style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:14px;color:#e2e8f0;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;">
+          <!-- Marcador Superior -->
+          <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span class="ek-pixel-font" style="font-size:10px;color:#38bdf8;">TÚ (${this.playerPoints.length}):</span>
+              <div id="cjPlayerScoreRow" style="display:flex;gap:5px;flex-wrap:wrap;">${this.formatPointsRow(this.playerPoints)}</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;align-items:center;min-width:150px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span class="ek-pixel-font" style="font-size:9px;color:#94a3b8;">TURNO: <b id="cjTurnTimerText" style="color:#38bdf8;">${this.turnSeconds}s</b></span>
+                <button id="cjBtnMuteArena" style="background:#1e293b;border:1px solid #334155;color:#cbd5e1;padding:2px 7px;border-radius:4px;font-size:10px;cursor:pointer;" title="Silenciar efectos">${this.sfx.muted ? '🔇' : '🔊'}</button>
+                <button id="cjBtnExitMatch" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;">✕ Salir</button>
+              </div>
+              <div style="width:140px;height:5px;background:#0b0e14;border-radius:3px;overflow:hidden;">
+                <div id="cjTurnTimerBar" style="width:100%;height:100%;background:#38bdf8;transition:width 0.25s linear;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span class="ek-pixel-font" style="font-size:10px;color:${f.color};">RIVAL (${this.aiPoints.length}):</span>
+              <div id="cjAiScoreRow" style="display:flex;gap:5px;flex-wrap:wrap;">${this.formatPointsRow(this.aiPoints)}</div>
+            </div>
+          </div>
+
+          <!-- Tatami Pixel Art -->
+          <div id="cjBattleStage" style="position:relative;min-height:256px;border-radius:10px;border:2px solid #263147;background:linear-gradient(180deg, #0b0e14 0%, #141926 68%, #271a14 68%, #18100c 100%);display:grid;grid-template-columns:165px 1fr 165px;align-items:center;padding:12px 16px;overflow:hidden;">
+            <!-- Decoración Tatami -->
+            <div style="position:absolute;left:0;right:0;top:68%;height:3px;background:#b45309;opacity:0.7;pointer-events:none;"></div>
+
+            <!-- Combatiente Jugador -->
+            <div id="cjPlayerCharBox" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;transition:transform 0.18s ease;">
+              <div style="position:relative;width:136px;height:156px;display:flex;align-items:center;justify-content:center;">
+                <canvas id="cjPlayerAuraCanvas" width="136" height="156" style="position:absolute;inset:0;pointer-events:none;"></canvas>
+                <div id="cjPlayerSpriteWrap">${renderPixelNinjaSvg(myNinja, { size: 120, pose: this.playerPose, frame: this.idleFrame })}</div>
+              </div>
+              <div style="background:rgba(11,14,20,0.9);border:1.5px solid #38bdf8;border-radius:6px;padding:3px 10px;text-align:center;">
+                <div style="font-size:11.5px;font-weight:900;color:#fff;">Tú</div>
+                <div style="font-size:9.5px;color:${myBeltObj.color};font-weight:700;">${myBeltObj.name}</div>
+              </div>
+            </div>
+
+            <!-- Zona Central de Choque -->
+            <div id="cjCenterClashZone" style="position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:210px;">
+              <div id="cjSenseiSpeech" style="background:rgba(11,14,20,0.92);border:1px solid ${f.color};color:#f8fafc;padding:5px 12px;border-radius:16px;font-size:11.5px;font-style:italic;margin-bottom:10px;text-align:center;max-width:360px;"></div>
+              <div id="cjArenaTable" style="display:flex;align-items:center;justify-content:center;gap:22px;min-height:154px;">
+                <div style="text-align:center;color:#94a3b8;font-size:12px;">
+                  <div class="ek-pixel-font" style="font-size:11px;color:#f8fafc;margin-bottom:6px;">ELIGE UNA CARTA DE TU MANO</div>
+                  <div style="font-size:11px;">🔥 Fuego &gt; ❄️ Nieve &gt; 💧 Agua &gt; 🔥 Fuego</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Combatiente Guardián -->
+            <div id="cjAiCharBox" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;transition:transform 0.18s ease;">
+              <div style="position:relative;width:136px;height:156px;display:flex;align-items:center;justify-content:center;">
+                <canvas id="cjAiAuraCanvas" width="136" height="156" style="position:absolute;inset:0;pointer-events:none;"></canvas>
+                <div id="cjAiSpriteWrap">${renderPixelNinjaSvg(f.ninjaConfig, { size: 120, flip: true, pose: this.aiPose, frame: this.idleFrame })}</div>
+              </div>
+              <div style="background:rgba(11,14,20,0.9);border:1.5px solid ${f.color};border-radius:6px;padding:3px 10px;text-align:center;">
+                <div style="font-size:11.5px;font-weight:900;color:${f.color};">${f.name}</div>
+                <div style="font-size:9.5px;color:#cbd5e1;font-weight:700;">${f.belt} · Piso ${f.level}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mano de 5 Cartas (104×148 px) -->
+          <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:10px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span class="ek-pixel-font" style="font-size:10px;color:#94a3b8;">TU MANO (HAZ CLIC PARA LANZAR)</span>
+              <span style="font-size:10.5px;color:#fbbf24;font-weight:700;">★ Cartas 10–12 activan cinemática elemental</span>
+            </div>
+            <div id="cjHandRow" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;min-height:154px;align-items:center;">
+              ${this.playerHand.map((c, i) => renderCardHtml(c, i, { stagger: !!opts.staggerHand })).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Iniciar partículas de aura elemental
+      attachAuraLoop(this.scope, this.container.querySelector('#cjPlayerAuraCanvas'), myNinja.aura);
+      attachAuraLoop(this.scope, this.container.querySelector('#cjAiAuraCanvas'), f.ninjaConfig?.aura);
+
+      const exitBtn = this.container.querySelector('#cjBtnExitMatch');
+      if (exitBtn) {
+        exitBtn.onclick = () => {
+          if (!this.confirmAbortIfActive()) return;
+          this.stopTurnTimer();
+          this.renderLobby();
+        };
+      }
+
+      const muteBtn = this.container.querySelector('#cjBtnMuteArena');
+      if (muteBtn) {
+        muteBtn.onclick = () => {
+          const m = this.sfx.toggleMute();
+          muteBtn.textContent = m ? '🔇' : '🔊';
+        };
+      }
+
+      this.bindHandClicks();
+      window.__EK?.assertNoBadText(this.container);
+    }
+
+    bindHandClicks() {
+      if (!this.container) return;
+      this.container.querySelectorAll('#cjHandRow .cj-card-v191').forEach((cardEl) => {
+        cardEl.onclick = () => {
+          if (this.destroyed || this.paused || this.roundLocked || this.phase !== 'playing') return;
+          const idx = Number(cardEl.getAttribute('data-idx'));
+          cardEl.classList.add('cj-card-selected');
+          this.playRound(idx);
         };
       });
     }
 
-    // ==========================================
-    // ESTUDIO INTERACTIVO DE PERSONALIZACIÓN NINJA
-    // ==========================================
-    static renderNinjaCustomizer(container, onBack) {
-      let cfg = getSavedNinjaConfig();
+    chooseAiCardIndex(playerCard) {
+      const skill = this.selectedFloor?.aiSkill || 0.3;
+      if (Math.random() < skill) {
+        for (let i = 0; i < this.aiHand.length; i++) {
+          if (this.resolveOutcome(this.aiHand[i], playerCard) === 'player') return i;
+        }
+      }
+      return Math.floor(Math.random() * this.aiHand.length);
+    }
 
-      const GI_OPTIONS = [
-        { name: 'Negro Sombra', val: '#18181b', accent: '#27272a' },
-        { name: 'Blanco Espectral', val: '#f8fafc', accent: '#cbd5e1' },
-        { name: 'Carmesí Ígneo', val: '#dc2626', accent: '#991b1b' },
-        { name: 'Azul Abisal', val: '#2563eb', accent: '#1e3a8a' },
-        { name: 'Cian Glaciar', val: '#06b6d4', accent: '#0891b2' },
-        { name: 'Verde Jade', val: '#059669', accent: '#047857' },
-        { name: 'Púrpura Sombrío', val: '#7c3aed', accent: '#5b21b6' },
-        { name: 'Oro Imperial', val: '#eab308', accent: '#a16207' }
-      ];
+    resolveOutcome(pCard, aCard) {
+      if (pCard.element === aCard.element) {
+        if (pCard.power > aCard.power) return 'player';
+        if (aCard.power > pCard.power) return 'ai';
+        return 'tie';
+      }
+      const beats = { fire: 'snow', snow: 'water', water: 'fire' };
+      return beats[pCard.element] === aCard.element ? 'player' : 'ai';
+    }
 
-      const MASK_OPTIONS = [
-        { id: 'classic', name: 'Capucha Clásica y Placa' },
-        { id: 'kitsune', name: 'Máscara Kitsune Sagrada' },
-        { id: 'oni', name: 'Máscara Oni con Cuernos' },
-        { id: 'cyber', name: 'Visor Ciber-Ninja Neón' },
-        { id: 'sensei_kasa', name: 'Sombrero Kasa y Barba' }
-      ];
+    // --- CINEMÁTICA DE CARTAS 10+ (Máx 2.2s, <canvas> animado, saltable tras 600ms, respeta prefers-reduced-motion) ---
+    triggerCinematic(card, isPlayer, onDone) {
+      if (this.destroyed) return;
+      const stage = this.container?.querySelector('#cjBattleStage');
+      if (!stage) { onDone(); return; }
 
-      const EYE_OPTIONS = [
-        { name: 'Cian Neón', val: '#00e5ff' },
-        { name: 'Rojo Carmesí', val: '#ef4444' },
-        { name: 'Oro Eléctrico', val: '#fbbf24' },
-        { name: 'Verde Esmeralda', val: '#10b981' },
-        { name: 'Blanco Fantasma', val: '#ffffff' }
-      ];
+      const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const tok = (CFG().ELEMENT_TOKENS || {})[card.element] || { color: '#ef4444', name: 'FUEGO' };
 
-      const BELT_OPTIONS = [
-        { name: 'Cinturón Blanco', val: '#f8fafc' },
-        { name: 'Cinturón Amarillo', val: '#facc15' },
-        { name: 'Cinturón Azul', val: '#38bdf8' },
-        { name: 'Cinturón Rojo', val: '#ef4444' },
-        { name: 'Cinturón Negro', val: '#27272a' },
-        { name: 'Dorado del Núcleo', val: '#fbbf24' }
-      ];
+      if (reducedMotion) {
+        const flash = document.createElement('div');
+        flash.style.cssText = `position:absolute;inset:0;background:${tok.color};opacity:0.45;z-index:60;pointer-events:none;transition:opacity 0.6s;`;
+        stage.appendChild(flash);
+        this.scope.timeout(() => {
+          flash.remove();
+          if (!this.destroyed) onDone();
+        }, 600);
+        return;
+      }
 
-      const WEAPON_OPTIONS = [
-        { id: 'katanas', name: 'Katanas Cruzadas ⚔️' },
-        { id: 'shuriken', name: 'Shuriken Gigante ✴️' },
-        { id: 'scroll', name: 'Pergamino Rúnico 📜' },
-        { id: 'staff', name: 'Bastón de Bo 🥢' },
-        { id: 'none', name: 'Sin Arma (Manos Limpias)' }
-      ];
+      this.phase = 'cinematic';
+      this.sfx.cinematicPower();
 
-      const AURA_OPTIONS = [
-        { id: 'none', name: 'Sin Aura' },
-        { id: 'fire', name: 'Llamas de Fuego 🔥' },
-        { id: 'water', name: 'Salpicaduras de Agua 💧' },
-        { id: 'snow', name: 'Cristales de Nieve ❄️' }
-      ];
+      const overlay = document.createElement('div');
+      overlay.className = 'cj-cinematic-v191';
+      overlay.style.cssText = 'position:absolute;inset:0;background:rgba(5,7,12,0.75);z-index:65;display:flex;flex-direction:column;justify-content:space-between;align-items:center;overflow:hidden;cursor:pointer;';
 
-      const renderStudio = () => {
-        container.innerHTML = `
-          <div style="background:#0e121a;border:1.5px solid #28334a;border-radius:12px;padding:20px;color:#fff;font-family:system-ui,-apple-system,sans-serif;">
-            <!-- Cabecera -->
-            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #202636;padding-bottom:12px;margin-bottom:18px;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <span style="font-size:26px;">🥷</span>
-                <div>
-                  <h3 style="margin:0;font-size:17px;font-weight:900;">Estudio de Personalización Ninja</h3>
-                  <p style="margin:2px 0 0 0;font-size:11.5px;color:#94a3b8;">Diseña tu aspecto en el tatami de combate. Tu ninja luchará con este traje.</p>
-                </div>
-              </div>
-              <button id="customBackBtn" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;padding:6px 14px;border-radius:6px;cursor:pointer;font-weight:800;font-size:12px;">
-                ← Volver al Dojo
-              </button>
-            </div>
-
-            <!-- Contenido: Izquierda Preview, Derecha Selectores -->
-            <div style="display:grid;grid-template-columns:260px 1fr;gap:22px;align-items:start;">
-              <!-- Panel de Vista Previa -->
-              <div style="background:#090d14;border:1px solid #1a2233;border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
-                <div style="font-size:12px;font-weight:900;color:#94a3b8;margin-bottom:12px;text-transform:uppercase;">
-                  Vista Previa en Tatami
-                </div>
-                <div id="ninjaLivePreview" style="filter:drop-shadow(0 12px 18px rgba(0,0,0,0.9));margin-bottom:6px;min-height:190px;display:flex;align-items:center;justify-content:center;">
-                  ${generatePixelNinjaSVG(cfg, true, 160, 200)}
-                </div>
-                <div style="width:110px;height:14px;background:radial-gradient(ellipse at center, rgba(0,0,0,0.8) 0%, transparent 70%);border-radius:50%;margin-bottom:14px;"></div>
-
-                <div style="width:100%;background:#131824;border:1px solid #202b3d;border-radius:8px;padding:8px 12px;font-size:11px;color:#94a3b8;display:flex;flex-direction:column;gap:4px;">
-                  <div>🥋 <b>Traje:</b> <span style="color:#fff;">${GI_OPTIONS.find(g=>g.val===cfg.giColor)?.name || 'Personalizado'}</span></div>
-                  <div>🎭 <b>Máscara:</b> <span style="color:#fff;">${MASK_OPTIONS.find(m=>m.id===cfg.maskType)?.name || 'Clásica'}</span></div>
-                  <div>🥋 <b>Cinturón:</b> <span style="color:#fbbf24;">${cfg.beltName || 'Cinturón Blanco'}</span></div>
-                  <div>⚔️ <b>Arma:</b> <span style="color:#fff;">${WEAPON_OPTIONS.find(w=>w.id===cfg.weaponType)?.name || 'Katanas'}</span></div>
-                </div>
-
-                <button id="saveNinjaBtn" style="margin-top:14px;width:100%;background:linear-gradient(135deg,#059669,#10b981);color:#fff;border:none;padding:10px;border-radius:8px;font-weight:900;font-size:12.5px;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,0.35);">
-                  💾 Guardar Mi Ninja
-                </button>
-              </div>
-
-              <!-- Panel de Opciones -->
-              <div style="display:flex;flex-direction:column;gap:14px;max-height:480px;overflow-y:auto;padding-right:6px;">
-                <!-- 1. Color del Gi / Traje -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">1. Color del Traje (Gi)</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${GI_OPTIONS.map(g => `
-                      <button class="optGiBtn" data-val="${g.val}" data-acc="${g.accent}" style="background:${g.val};color:${g.val==='#f8fafc'?'#000':'#fff'};border:2px solid ${cfg.giColor===g.val?'#fff':'rgba(255,255,255,0.2)'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);">
-                        ${g.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <!-- 2. Máscara y Casco -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">2. Máscara y Cabeza</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${MASK_OPTIONS.map(m => `
-                      <button class="optMaskBtn" data-id="${m.id}" style="background:${cfg.maskType===m.id?'#2563eb':'#141924'};color:#fff;border:1px solid ${cfg.maskType===m.id?'#3b82f6':'#242f44'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
-                        ${m.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <!-- 3. Brillo de Ojos -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">3. Brillo de Ojos</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${EYE_OPTIONS.map(e => `
-                      <button class="optEyeBtn" data-val="${e.val}" style="background:#111520;color:${e.val};border:1.5px solid ${cfg.eyeColor===e.val?e.val:'#242f44'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px;">
-                        <span style="width:8px;height:8px;border-radius:50%;background:${e.val};box-shadow:0 0 6px ${e.val};"></span>
-                        ${e.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <!-- 4. Rango de Cinturón -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">4. Rango de Cinturón</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${BELT_OPTIONS.map(b => `
-                      <button class="optBeltBtn" data-val="${b.val}" data-name="${b.name}" style="background:${cfg.beltColor===b.val?'#1e293b':'#111520'};color:${b.val};border:1.5px solid ${cfg.beltColor===b.val?b.val:'#242f44'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;">
-                        ${b.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <!-- 5. Arma a la Espalda -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">5. Arma a la Espalda</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${WEAPON_OPTIONS.map(w => `
-                      <button class="optWeaponBtn" data-id="${w.id}" style="background:${cfg.weaponType===w.id?'#2563eb':'#141924'};color:#fff;border:1px solid ${cfg.weaponType===w.id?'#3b82f6':'#242f44'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
-                        ${w.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <!-- 6. Aura Elemental -->
-                <div>
-                  <div style="font-size:12px;font-weight:900;color:#f8fafc;margin-bottom:6px;">6. Aura Elemental</div>
-                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    ${AURA_OPTIONS.map(a => `
-                      <button class="optAuraBtn" data-id="${a.id}" style="background:${cfg.aura===a.id?'#2563eb':'#141924'};color:#fff;border:1px solid ${cfg.aura===a.id?'#3b82f6':'#242f44'};padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">
-                        ${a.name}
-                      </button>
-                    `).join('')}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-
-        // Eventos
-        container.querySelector('#customBackBtn').onclick = () => {
-          saveNinjaConfig(cfg);
-          if (onBack) onBack();
-        };
-
-        container.querySelector('#saveNinjaBtn').onclick = () => {
-          saveNinjaConfig(cfg);
-          if (typeof toast === 'function') toast('🥷 ¡Tu Ninja personalizado ha sido guardado!');
-          if (onBack) onBack();
-        };
-
-        container.querySelectorAll('.optGiBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.giColor = b.dataset.val;
-            cfg.giAccent = b.dataset.acc;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
-
-        container.querySelectorAll('.optMaskBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.maskType = b.dataset.id;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
-
-        container.querySelectorAll('.optEyeBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.eyeColor = b.dataset.val;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
-
-        container.querySelectorAll('.optBeltBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.beltColor = b.dataset.val;
-            cfg.beltName = b.dataset.name;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
-
-        container.querySelectorAll('.optWeaponBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.weaponType = b.dataset.id;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
-
-        container.querySelectorAll('.optAuraBtn').forEach(b => {
-          b.onclick = () => {
-            cfg.aura = b.dataset.id;
-            saveNinjaConfig(cfg);
-            renderStudio();
-          };
-        });
+      const titleMap = {
+        fire: '¡DRAGÓN DE MAGMA SUPREMO!',
+        water: '¡LEVIATÁN ABISAL DESATADO!',
+        snow: '¡VENTISCA CERO ABSOLUTA!'
       };
 
-      renderStudio();
+      overlay.innerHTML = `
+        <div class="cj-cine-bar" style="width:100%;height:12%;background:#000;border-bottom:2px solid ${tok.color};display:flex;align-items:center;justify-content:center;">
+          <span class="ek-pixel-font" style="font-size:10px;color:${tok.color};letter-spacing:1px;">★ PODER ELEMENTAL NIVEL ${card.power} ★</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+          <canvas id="cjCineCanvas" width="220" height="130" style="image-rendering:pixelated;"></canvas>
+          <div class="ek-pixel-font" style="font-size:13px;color:#fff;text-shadow:0 0 12px ${tok.color};">${titleMap[card.element] || '¡ATAQUE SUPREMO!'}</div>
+          <div id="cjCineSkipHint" style="font-size:10px;color:#94a3b8;opacity:0;">Clic / Espacio / ESC para saltar</div>
+        </div>
+        <div class="cj-cine-bar" style="width:100%;height:12%;background:#000;border-top:2px solid ${tok.color};display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:11px;color:#cbd5e1;font-weight:800;">${isPlayer ? 'Tu técnica sacude el tatami' : `${this.selectedFloor.name} invoca su técnica maestra`}</span>
+        </div>
+      `;
+      stage.appendChild(overlay);
+      stage.classList.add('cj-stage-shake');
+
+      const cvs = overlay.querySelector('#cjCineCanvas');
+      const ctx = cvs?.getContext('2d');
+      let cineFinished = false;
+      let canSkip = false;
+      let frameIdx = 0;
+
+      const finishCinematic = () => {
+        if (cineFinished || this.destroyed) return;
+        cineFinished = true;
+        stage.classList.remove('cj-stage-shake');
+        overlay.remove();
+        this.phase = 'clash';
+        onDone();
+      };
+
+      this.scope.timeout(() => {
+        canSkip = true;
+        const hint = overlay.querySelector('#cjCineSkipHint');
+        if (hint) hint.style.opacity = '1';
+      }, 600);
+
+      overlay.onclick = () => {
+        if (canSkip) finishCinematic();
+      };
+
+      const unlistenKey = this.scope.listen(window, 'keydown', (e) => {
+        if (!canSkip || cineFinished) return;
+        if (e.key === 'Escape' || e.key === ' ') {
+          e.stopPropagation();
+          e.preventDefault();
+          unlistenKey();
+          finishCinematic();
+        }
+      }, true);
+
+      // Animación de 4 frames en el canvas de la cinemática
+      const mascotKey = `mascot_${card.element}_3`;
+      const spec = SPR().SPRITES?.[mascotKey];
+      const drawCineFrame = () => {
+        if (cineFinished || this.destroyed || !ctx || !spec) return;
+        frameIdx++;
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        // Rayos de fondo
+        ctx.fillStyle = tok.color + '33';
+        for (let i = 0; i < 6; i++) {
+          const rx = ((i * 42 + frameIdx * 8) % cvs.width);
+          ctx.fillRect(rx, 0, 10, cvs.height);
+        }
+        // Dibujar el sprite 16×16 escalado a ×6 en el centro con pulso
+        const scale = (frameIdx % 2 === 0) ? 6 : 7;
+        const ox = Math.floor((cvs.width - 16 * scale) / 2);
+        const oy = Math.floor((cvs.height - 16 * scale) / 2);
+        for (let y = 0; y < 16; y++) {
+          const row = spec.map[y] || '';
+          for (let x = 0; x < 16; x++) {
+            const ch = row[x];
+            if (ch && ch !== '.' && spec.palette[ch]) {
+              ctx.fillStyle = spec.palette[ch];
+              ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale);
+            }
+          }
+        }
+      };
+      drawCineFrame();
+      const cineInt = this.scope.interval(drawCineFrame, 160);
+
+      // Duración máxima estricta: 2.0s (≤ 2.2s)
+      this.scope.timeout(() => {
+        this.scope.clearInterval(cineInt);
+        unlistenKey();
+        finishCinematic();
+      }, 2000);
+    }
+
+    // --- PARTÍCULAS DE DESTRUCCIÓN DE CARTA (24 partículas pixel con gravedad en 600ms, tope global 120) ---
+    shatterLoserCard(cardContainer, element) {
+      if (!cardContainer || this.destroyed) return;
+      const tok = (CFG().ELEMENT_TOKENS || {})[element] || { color: '#ef4444', light: '#fca5a5' };
+      const allowed = Math.min(24, Math.max(0, 120 - this.activeParticles));
+      if (allowed <= 0) return;
+
+      this.activeParticles += allowed;
+      const cvs = document.createElement('canvas');
+      cvs.width = 180;
+      cvs.height = 200;
+      cvs.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:40;';
+      cardContainer.style.position = 'relative';
+      cardContainer.appendChild(cvs);
+
+      const ctx = cvs.getContext('2d');
+      const parts = Array.from({ length: allowed }, (_, i) => {
+        const angle = (Math.PI * 2 * i) / allowed + (Math.random() - 0.5) * 0.4;
+        const speed = 2.2 + Math.random() * 4.2;
+        return {
+          x: 90 + (Math.random() - 0.5) * 40,
+          y: 100 + (Math.random() - 0.5) * 60,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2.4,
+          size: 5 + (i % 3) * 2,
+          color: i % 3 === 0 ? '#ffffff' : i % 2 === 0 ? tok.color : tok.light,
+          alpha: 1
+        };
+      });
+
+      const t0 = performance.now();
+      const step = (now) => {
+        if (this.destroyed) return;
+        const elapsed = now - t0;
+        const p = Math.min(1, elapsed / 600);
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        for (const pt of parts) {
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.vy += 0.22; // gravedad
+          pt.alpha = Math.max(0, 1 - p);
+          ctx.globalAlpha = pt.alpha;
+          ctx.fillStyle = pt.color;
+          ctx.fillRect(Math.round(pt.x), Math.round(pt.y), pt.size, pt.size);
+        }
+        if (p < 1) {
+          this.scope.raf(step);
+        } else {
+          this.activeParticles = Math.max(0, this.activeParticles - allowed);
+          cvs.remove();
+        }
+      };
+      this.scope.raf(step);
+    }
+
+    // --- FICHA DE PUNTO VOLANDO AL MARCADOR (400ms curva Bézier con "+1") ---
+    flyPointToken(fromEl, toEl, element) {
+      if (!fromEl || !toEl || this.destroyed) return;
+      const root = this.container?.querySelector('#cjMatchRoot');
+      if (!root) return;
+      const rRoot = root.getBoundingClientRect();
+      const rFrom = fromEl.getBoundingClientRect();
+      const rTo = toEl.getBoundingClientRect();
+      const tok = (CFG().ELEMENT_TOKENS || {})[element] || { color: '#ef4444', bg: '#450a0a' };
+
+      const chip = document.createElement('div');
+      chip.className = 'ek-pixel-font';
+      chip.style.cssText = `position:absolute;left:${rFrom.left - rRoot.left + rFrom.width / 2 - 22}px;top:${rFrom.top - rRoot.top + rFrom.height / 2 - 14}px;background:${tok.bg};border:2px solid ${tok.color};color:#fff;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:900;z-index:75;pointer-events:none;box-shadow:0 0 12px ${tok.color};transition:transform 400ms cubic-bezier(0.22, 1, 0.36, 1), opacity 400ms ease;`;
+      chip.innerHTML = `${SPR().renderSpriteHtml ? SPR().renderSpriteHtml('elem_' + element, 0.9) : ''} +1`;
+      root.appendChild(chip);
+
+      const dx = (rTo.left + rTo.width / 2) - (rFrom.left + rFrom.width / 2);
+      const dy = (rTo.top + rTo.height / 2) - (rFrom.top + rFrom.height / 2);
+      requestAnimationFrame(() => {
+        chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.85)`;
+      });
+      this.scope.timeout(() => chip.remove(), 420);
+    }
+
+    // --- SECUENCIA EXACTA DE ATAQUE (Bloque F) ---
+    playRound(playerCardIdx) {
+      if (this.destroyed || this.paused || this.roundLocked || this.phase !== 'playing') return;
+      this.roundLocked = true;
+      this.phase = 'clash';
+      this.stopTurnTimer();
+      this.sfx.selectCard();
+
+      const pCard = this.playerHand[playerCardIdx];
+      const aiIdx = this.chooseAiCardIndex(pCard);
+      const aCard = this.aiHand[aiIdx];
+      const outcome = this.resolveOutcome(pCard, aCard);
+
+      const table = this.container?.querySelector('#cjArenaTable');
+      const stage = this.container?.querySelector('#cjBattleStage');
+      if (!table || !stage) return;
+
+      // 1) 0–250ms: Tu carta sube al centro (ease-out) y la del rival se voltea (250ms)
+      table.innerHTML = `
+        <div id="cjDuelPlayerSlot" class="cj-clash-enter-up" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <span class="ek-pixel-font" style="font-size:8px;color:#38bdf8;">TU CARTA</span>
+          ${renderCardHtml(pCard, 0)}
+        </div>
+        <div class="ek-pixel-font" style="font-size:16px;color:#fbbf24;">VS</div>
+        <div id="cjDuelAiSlot" class="cj-clash-flip-in" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <span class="ek-pixel-font" style="font-size:8px;color:${this.selectedFloor.color};">${this.selectedFloor.name.toUpperCase()}</span>
+          ${renderCardHtml(aCard, 0)}
+        </div>
+      `;
+
+      const runResolutionAfterRise = () => {
+        if (this.destroyed) return;
+        const executeImpact = () => {
+          if (this.destroyed) return;
+          // 2) Hit-stop de 80ms + flash blanco de 60ms
+          this.sfx.clash();
+          const flash = document.createElement('div');
+          flash.style.cssText = 'position:absolute;inset:0;background:#ffffff;opacity:0.75;z-index:55;pointer-events:none;';
+          stage.appendChild(flash);
+          this.scope.timeout(() => flash.remove(), 60);
+
+          this.scope.timeout(() => {
+            if (this.destroyed) return;
+            const pSlot = this.container?.querySelector('#cjDuelPlayerSlot');
+            const aSlot = this.container?.querySelector('#cjDuelAiSlot');
+            const pCharBox = this.container?.querySelector('#cjPlayerCharBox');
+            const aCharBox = this.container?.querySelector('#cjAiCharBox');
+
+            // 3) Ganadora escala ×1.15 con halo; perdedora se rompe en 24 partículas pixel (600ms)
+            // 4) Ninja ganador embiste 28px en 180ms; perdedor tiembla ±4px en 6 cuadros
+            if (outcome === 'player') {
+              this.sfx.winRound();
+              this.playerPoints.push(pCard);
+              this.playerPose = 'attack';
+              this.aiPose = 'idle';
+              this.refreshArenaSprites();
+
+              if (pSlot) pSlot.classList.add('cj-card-winner-scale');
+              if (aSlot) {
+                const cardNode = aSlot.querySelector('.cj-card-v191');
+                if (cardNode) cardNode.style.opacity = '0';
+                this.shatterLoserCard(aSlot, aCard.element);
+              }
+              if (pCharBox) pCharBox.style.transform = 'translateX(28px)';
+              if (aCharBox) aCharBox.classList.add('cj-ninja-hit-shake');
+
+              this.flyPointToken(pSlot, this.container?.querySelector('#cjPlayerScoreRow'), pCard.element);
+              this.setSpeech(this.selectedFloor.quotes.loseRound);
+            } else if (outcome === 'ai') {
+              this.sfx.loseRound();
+              this.aiPoints.push(aCard);
+              this.playerPose = 'idle';
+              this.aiPose = 'attack';
+              this.refreshArenaSprites();
+
+              if (aSlot) aSlot.classList.add('cj-card-winner-scale');
+              if (pSlot) {
+                const cardNode = pSlot.querySelector('.cj-card-v191');
+                if (cardNode) cardNode.style.opacity = '0';
+                this.shatterLoserCard(pSlot, pCard.element);
+              }
+              if (aCharBox) aCharBox.style.transform = 'translateX(-28px)';
+              if (pCharBox) pCharBox.classList.add('cj-ninja-hit-shake');
+
+              this.flyPointToken(aSlot, this.container?.querySelector('#cjAiScoreRow'), aCard.element);
+              this.setSpeech(this.selectedFloor.quotes.winRound);
+            } else {
+              this.setSpeech('¡Empate de poder elemental! Ninguna carta cede.');
+            }
+
+            // Actualizar marcador tras vuelo de ficha (400ms)
+            this.scope.timeout(() => {
+              if (this.destroyed) return;
+              const pScore = this.container?.querySelector('#cjPlayerScoreRow');
+              const aScore = this.container?.querySelector('#cjAiScoreRow');
+              if (pScore) pScore.innerHTML = this.formatPointsRow(this.playerPoints);
+              if (aScore) aScore.innerHTML = this.formatPointsRow(this.aiPoints);
+            }, 380);
+
+            // Reemplazar cartas jugadas y evaluar condición de victoria tras los 600ms de partículas
+            this.scope.timeout(() => {
+              if (this.destroyed) return;
+              this.playerPose = 'idle';
+              this.aiPose = 'idle';
+              this.playerHand[playerCardIdx] = this.drawRandomCard();
+              this.aiHand[aiIdx] = this.drawRandomCard();
+
+              const pWin = this.checkWinCondition(this.playerPoints);
+              const aWin = this.checkWinCondition(this.aiPoints);
+              if (pWin || aWin) {
+                this.finishMatch(!!pWin, pWin || aWin);
+              } else {
+                this.roundLocked = false;
+                this.phase = 'playing';
+                this.renderMatchArena({ staggerHand: false });
+                this.setSpeech('Elige tu siguiente carta elemental…');
+                this.startTurnTimer();
+              }
+            }, 720);
+          }, 80); // fin hit-stop 80ms
+        };
+
+        // Si alguna carta es 10+, disparar cinemática antes del impacto
+        if (pCard.power >= 10 || aCard.power >= 10) {
+          const cineCard = pCard.power >= aCard.power ? pCard : aCard;
+          const cineIsPlayer = pCard.power >= aCard.power;
+          this.triggerCinematic(cineCard, cineIsPlayer, executeImpact);
+        } else {
+          executeImpact();
+        }
+      };
+
+      this.scope.timeout(runResolutionAfterRise, 250);
+    }
+
+    checkWinCondition(points) {
+      const byElem = { fire: 0, water: 0, snow: 0 };
+      for (const p of points) byElem[p.element] = (byElem[p.element] || 0) + 1;
+      if (byElem.fire >= 1 && byElem.water >= 1 && byElem.snow >= 1) {
+        return 'Trío Elemental (Fuego + Agua + Nieve)';
+      }
+      for (const el of ['fire', 'water', 'snow']) {
+        if (byElem[el] >= 3) {
+          const tok = (CFG().ELEMENT_TOKENS || {})[el] || { name: el };
+          return `Dominio de ${tok.name} (3 cartas de ${tok.name})`;
+        }
+      }
+      return null;
+    }
+
+    finishMatch(playerWon, winReason) {
+      if (this.destroyed) return;
+      this.stopTurnTimer();
+      this.phase = 'ended';
+      this.playerPose = playerWon ? 'victory' : 'idle';
+      this.aiPose = playerWon ? 'idle' : 'victory';
+      this.refreshArenaSprites();
+
+      const f = this.selectedFloor;
+      let coinsAwarded = 0;
+      let keyAwarded = null;
+      let keyLabel = null;
+      let isFirstClear = false;
+
+      if (playerWon && !this.rewardClaimed) {
+        this.rewardClaimed = true;
+        this.sfx.winMatch();
+        const claimed = this.getClaimedFloors();
+        isFirstClear = !claimed[f.level];
+
+        if (isFirstClear) {
+          coinsAwarded = f.reward.coins;
+          keyAwarded = f.reward.key;
+          keyLabel = f.reward.keyLabel;
+          this.markFloorClaimed(f.level);
+        } else {
+          const rules = CFG().TRAINING_REWARD_RULES || { coinMultiplier: 0.5, copperKeyChance: 0.25 };
+          coinsAwarded = Math.round(f.reward.coins * rules.coinMultiplier);
+          if (Math.random() < rules.copperKeyChance) {
+            keyAwarded = 'copper';
+            keyLabel = '1 Llave Cobre (Bono Entrenamiento)';
+          }
+        }
+
+        if (typeof this.onReward === 'function') {
+          this.onReward({
+            grantId: `dojo:${f.level}:${Date.now()}`,
+            coins: coinsAwarded,
+            key: keyAwarded,
+            keyCount: keyAwarded ? 1 : 0,
+            floor: f.level
+          });
+        }
+      } else if (!playerWon) {
+        this.sfx.loseMatch();
+      }
+
+      const table = this.container?.querySelector('#cjArenaTable');
+      if (!table) return;
+
+      const myNinja = getSavedNinjaConfig();
+      const keySprite = keyAwarded && SPR().renderSpriteHtml ? SPR().renderSpriteHtml('key_' + keyAwarded, 1.5) : '';
+      const coinSprite = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('coin', 1.2) : '';
+
+      table.innerHTML = `
+        <div style="background:rgba(11,14,20,0.96);border:2px solid ${playerWon ? '#22c55e' : '#ef4444'};border-radius:12px;padding:16px 22px;text-align:center;max-width:410px;box-shadow:0 12px 32px rgba(0,0,0,0.85);">
+          <div style="display:flex;justify-content:center;margin-bottom:6px;">
+            ${renderPixelNinjaSvg(playerWon ? myNinja : f.ninjaConfig, { size: 68, pose: 'victory', frame: 0 })}
+          </div>
+          <div class="ek-pixel-font" style="font-size:15px;color:${playerWon ? '#4ade80' : '#f87171'};margin-bottom:6px;">
+            ${playerWon ? `¡VICTORIA EN PISO ${f.level}!` : `DERROTA EN PISO ${f.level}`}
+          </div>
+          <div style="font-size:12px;color:#f8fafc;font-weight:700;margin-bottom:4px;">${winReason}</div>
+          <div style="font-size:11px;color:#94a3b8;font-style:italic;margin-bottom:10px;">
+            «${playerWon ? f.quotes.winMatch : f.quotes.loseMatch}»
+          </div>
+
+          ${playerWon ? `
+            <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;">
+              <span style="display:inline-flex;align-items:center;gap:5px;font-weight:900;color:#fbbf24;font-size:13px;">
+                ${coinSprite} +<span id="cjCoinCounterAnim">0</span> Monedas
+              </span>
+              ${keyAwarded ? `
+                <span class="cj-key-bounce" style="display:inline-flex;align-items:center;gap:5px;font-weight:900;color:#f8fafc;font-size:12px;background:rgba(255,255,255,0.08);padding:3px 8px;border-radius:6px;">
+                  ${keySprite} <span>${keyLabel}</span>
+                </span>
+              ` : ''}
+            </div>
+          ` : ''}
+
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+            <button id="cjBtnRetryMatch" class="ek-pixel-font" style="background:${playerWon ? '#1e293b' : '#ef4444'};border:1px solid rgba(255,255,255,0.15);color:#fff;padding:8px 12px;border-radius:6px;font-size:9.5px;cursor:pointer;">
+              REPETIR
+            </button>
+            ${playerWon && f.level < (CFG().DOJO_FLOORS || []).length ? `
+              <button id="cjBtnNextFloor" class="ek-pixel-font" style="background:#2563eb;border:none;color:#fff;padding:8px 12px;border-radius:6px;font-size:9.5px;cursor:pointer;">
+                SIGUIENTE PISO →
+              </button>
+            ` : ''}
+            <button id="cjBtnBackLobby" class="ek-pixel-font" style="background:#141926;border:1px solid #334155;color:#cbd5e1;padding:8px 12px;border-radius:6px;font-size:9.5px;cursor:pointer;">
+              SALIR
+            </button>
+          </div>
+        </div>
+      `;
+
+      // Animación de contador de monedas (600ms)
+      if (playerWon && coinsAwarded > 0) {
+        const coinEl = table.querySelector('#cjCoinCounterAnim');
+        if (coinEl && this.scope) {
+          const t0 = performance.now();
+          const tickCoins = (now) => {
+            if (this.destroyed || !coinEl.isConnected) return;
+            const prog = Math.min(1, (now - t0) / 600);
+            coinEl.textContent = String(Math.round(coinsAwarded * prog));
+            if (prog < 1) this.scope.raf(tickCoins);
+          };
+          this.scope.raf(tickCoins);
+        }
+      }
+
+      const retryBtn = table.querySelector('#cjBtnRetryMatch');
+      if (retryBtn) retryBtn.onclick = () => this.startMatch(f.level);
+
+      const nextBtn = table.querySelector('#cjBtnNextFloor');
+      if (nextBtn) nextBtn.onclick = () => this.startMatch(f.level + 1);
+
+      const lobbyBtn = table.querySelector('#cjBtnBackLobby');
+      if (lobbyBtn) lobbyBtn.onclick = () => this.renderLobby();
     }
   }
 
+  // --- ESTUDIO "MI NINJA" (Bloque E: 24×30, 3 tonos, poses Idle/Ataque/Victoria, Aleatorio/Restablecer, cintas por piso, cambios sin guardar) ---
+  function renderNinjaCustomizer(container, onSaveCallback, parentScope) {
+    if (!container) return;
+    const scope = parentScope || (window.EKLifecycle ? window.EKLifecycle.create('ninja_studio') : null);
+    const savedInitial = getSavedNinjaConfig();
+    let draft = { ...savedInitial };
+    let currentPose = 'idle';
+    let animFrame = 0;
+    let isDirty = false;
+
+    const v = window.EconomyService ? window.EconomyService.getVault() : {};
+    const claimedFloors = v.claimedFloors || {};
+    const isFloorCleared = (reqFloor) => {
+      if (!reqFloor || reqFloor <= 0) return true;
+      return !!(claimedFloors[reqFloor] || claimedFloors[String(reqFloor)]);
+    };
+
+    const suits = CFG().NINJA_SUITS || [];
+    const masks = CFG().NINJA_MASKS || [];
+    const belts = CFG().BELTS || [];
+    const weapons = CFG().NINJA_WEAPONS || [];
+    const auras = CFG().NINJA_AURAS || [];
+
+    const checkDirty = () => {
+      isDirty = JSON.stringify(draft) !== JSON.stringify(savedInitial);
+      const badge = container.querySelector('#njDirtyBadge');
+      if (badge) {
+        badge.style.display = isDirty ? 'inline-flex' : 'none';
+      }
+    };
+
+    const draw = () => {
+      const beltObj = belts.find((b) => b.id === draft.belt) || belts[0];
+      const weaponObj = weapons.find((w) => w.id === draft.weapon) || weapons[0];
+      const auraObj = auras.find((a) => a.id === draft.aura) || auras[0];
+
+      container.innerHTML = `
+        <div style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:18px;color:#e2e8f0;display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:start;">
+          <!-- Columna Izquierda: Vista Previa Animada + Poses -->
+          <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+              <span class="ek-pixel-font" style="font-size:10px;color:#38bdf8;">VISTA PREVIA 24×30</span>
+              <span id="njDirtyBadge" style="display:${isDirty ? 'inline-flex' : 'none'};align-items:center;gap:4px;font-size:10px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.4);padding:2px 7px;border-radius:999px;">
+                ● Cambios sin guardar
+              </span>
+            </div>
+
+            <div style="position:relative;width:180px;height:200px;background:radial-gradient(circle at 50% 60%, #1e293b 0%, #0b0e14 80%);border:2px solid #334155;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+              <canvas id="njPreviewAuraCanvas" width="180" height="200" style="position:absolute;inset:0;pointer-events:none;"></canvas>
+              <div id="njPreviewSpriteHolder">
+                ${renderPixelNinjaSvg(draft, { size: 136, pose: currentPose, frame: animFrame })}
+              </div>
+            </div>
+
+            <!-- Botones de Pose: Idle / Ataque / Victoria -->
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;">
+              ${[
+                { id: 'idle', label: 'Idle' },
+                { id: 'attack', label: 'Ataque' },
+                { id: 'victory', label: 'Victoria' }
+              ].map((p) => `
+                <button class="njPoseBtn" data-pose="${p.id}" style="background:${currentPose === p.id ? '#2563eb' : '#0b0e14'};border:1px solid ${currentPose === p.id ? '#60a5fa' : '#334155'};color:#fff;font-size:11px;font-weight:800;padding:6px 4px;border-radius:6px;cursor:pointer;">
+                  ${p.label}
+                </button>
+              `).join('')}
+            </div>
+
+            <div style="font-size:11.5px;color:#cbd5e1;text-align:center;line-height:1.4;">
+              <div><b style="color:${beltObj.color};">${beltObj.name}</b></div>
+              <div style="font-size:11px;color:#94a3b8;">${weaponObj.name} · ${auraObj.name}</div>
+            </div>
+
+            <!-- Aleatorio y Restablecer -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;">
+              <button id="njBtnRandom" style="background:#1e293b;border:1px solid #475569;color:#f8fafc;font-size:11.5px;font-weight:800;padding:7px 8px;border-radius:6px;cursor:pointer;">
+                🎲 Aleatorio
+              </button>
+              <button id="njBtnReset" style="background:#1e293b;border:1px solid #475569;color:#cbd5e1;font-size:11.5px;font-weight:700;padding:7px 8px;border-radius:6px;cursor:pointer;">
+                ↺ Restablecer
+              </button>
+            </div>
+
+            <button id="njBtnSave" class="ek-pixel-font" style="width:100%;background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;font-weight:900;font-size:11px;padding:11px;border-radius:8px;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+              ✓ GUARDAR MI NINJA
+            </button>
+          </div>
+
+          <!-- Columna Derecha: Opciones de Personalización -->
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <!-- 1. Traje Ninja -->
+            <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">1. Color del Traje Ninja (Sombreado 3 Tonos)</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${suits.map((s) => `
+                  <button class="njSuitBtn" data-val="${s.id}" title="${s.name}" style="width:34px;height:34px;border-radius:8px;background:${s.id};border:${draft.suitColor === s.id ? '3px solid #fff' : '2px solid #334155'};cursor:pointer;box-shadow:${draft.suitColor === s.id ? '0 0 10px ' + s.id : 'none'};"></button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- 2. Máscara -->
+            <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">2. Color de Máscara</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                ${masks.map((m) => `
+                  <button class="njMaskBtn" data-val="${m.id}" style="background:${draft.maskColor === m.id ? '#2563eb' : '#0b0e14'};border:1.5px solid ${draft.maskColor === m.id ? '#60a5fa' : '#334155'};color:#f8fafc;padding:6px 11px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                    <span style="width:12px;height:12px;border-radius:3px;background:${m.id};border:1px solid rgba(255,255,255,0.3);"></span>
+                    <span>${m.name}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- 3. Cintas del Dojo (Desbloqueo por piso conquistado) -->
+            <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">3. Cinta y Rango del Dojo</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;">
+                ${belts.map((b) => {
+                  const unlocked = isFloorCleared(b.reqFloor);
+                  const isSel = draft.belt === b.id;
+                  const tip = unlocked ? b.name : `🔒 Domina el Piso ${b.reqFloor} del Dojo para desbloquear`;
+                  return `
+                    <button class="njBeltBtn" data-val="${b.id}" data-unlocked="${unlocked ? '1' : '0'}" data-req="${b.reqFloor}" title="${tip}" style="background:${isSel ? '#1e293b' : '#0b0e14'};border:1.5px solid ${isSel ? b.color : '#263147'};color:${unlocked ? '#f8fafc' : '#64748b'};padding:7px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:${unlocked ? 'pointer' : 'not-allowed'};display:flex;align-items:center;justify-content:space-between;gap:6px;opacity:${unlocked ? '1' : '0.6'};">
+                      <span style="display:flex;align-items:center;gap:6px;min-width:0;">
+                        <span style="width:12px;height:12px;border-radius:3px;background:${b.color};border:1px solid #000;flex-shrink:0;"></span>
+                        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${b.name.replace('Cinturón ', '')}</span>
+                      </span>
+                      <span style="font-size:10px;">${unlocked ? (isSel ? '✓' : '') : `🔒 P${b.reqFloor}`}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- 4. Arma Equipada (Sprites Pixel 16×16 sin emojis rotos) -->
+            <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">4. Arma Ninja (Sprite Pixel)</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;">
+                ${weapons.map((w) => {
+                  const isSel = draft.weapon === w.id;
+                  const ico = SPR().renderSpriteHtml ? SPR().renderSpriteHtml(w.spriteKey, 1.2) : '';
+                  return `
+                    <button class="njWeaponBtn" data-val="${w.id}" style="background:${isSel ? '#2563eb' : '#0b0e14'};border:1.5px solid ${isSel ? '#60a5fa' : '#263147'};color:#f8fafc;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                      ${ico}
+                      <span>${w.name}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- 5. Aura Elemental -->
+            <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;">
+              <div style="font-size:11px;font-weight:900;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">5. Aura Elemental (Partículas en Vivo)</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px;">
+                ${auras.map((a) => {
+                  const isSel = draft.aura === a.id;
+                  const ico = a.element && SPR().renderSpriteHtml ? SPR().renderSpriteHtml('elem_' + a.element, 1.1) : '';
+                  return `
+                    <button class="njAuraBtn" data-val="${a.id}" style="background:${isSel ? '#1e293b' : '#0b0e14'};border:1.5px solid ${isSel ? (a.color !== 'transparent' ? a.color : '#60a5fa') : '#263147'};color:#f8fafc;padding:7px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                      ${ico}
+                      <span>${a.name}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      attachAuraLoop(scope, container.querySelector('#njPreviewAuraCanvas'), draft.aura);
+
+      container.querySelectorAll('.njPoseBtn').forEach((b) => {
+        b.onclick = () => {
+          currentPose = b.getAttribute('data-pose') || 'idle';
+          draw();
+        };
+      });
+
+      container.querySelectorAll('.njSuitBtn').forEach((b) => {
+        b.onclick = () => {
+          draft.suitColor = b.getAttribute('data-val');
+          checkDirty();
+          draw();
+        };
+      });
+
+      container.querySelectorAll('.njMaskBtn').forEach((b) => {
+        b.onclick = () => {
+          draft.maskColor = b.getAttribute('data-val');
+          checkDirty();
+          draw();
+        };
+      });
+
+      container.querySelectorAll('.njBeltBtn').forEach((b) => {
+        b.onclick = () => {
+          if (b.getAttribute('data-unlocked') !== '1') return;
+          draft.belt = b.getAttribute('data-val');
+          checkDirty();
+          draw();
+        };
+      });
+
+      container.querySelectorAll('.njWeaponBtn').forEach((b) => {
+        b.onclick = () => {
+          draft.weapon = b.getAttribute('data-val');
+          checkDirty();
+          draw();
+        };
+      });
+
+      container.querySelectorAll('.njAuraBtn').forEach((b) => {
+        b.onclick = () => {
+          draft.aura = b.getAttribute('data-val');
+          checkDirty();
+          draw();
+        };
+      });
+
+      const rndBtn = container.querySelector('#njBtnRandom');
+      if (rndBtn) {
+        rndBtn.onclick = () => {
+          const unlockedBelts = belts.filter((b) => isFloorCleared(b.reqFloor));
+          draft.suitColor = suits[Math.floor(Math.random() * suits.length)].id;
+          draft.maskColor = masks[Math.floor(Math.random() * masks.length)].id;
+          draft.belt = unlockedBelts[Math.floor(Math.random() * unlockedBelts.length)].id;
+          draft.weapon = weapons[Math.floor(Math.random() * weapons.length)].id;
+          draft.aura = auras[Math.floor(Math.random() * auras.length)].id;
+          checkDirty();
+          draw();
+        };
+      }
+
+      const resetBtn = container.querySelector('#njBtnReset');
+      if (resetBtn) {
+        resetBtn.onclick = () => {
+          draft = { suitColor: '#1e293b', belt: 'white', maskColor: '#0f172a', weapon: 'katana', aura: 'none' };
+          checkDirty();
+          draw();
+        };
+      }
+
+      const saveBtn = container.querySelector('#njBtnSave');
+      if (saveBtn) {
+        saveBtn.onclick = () => {
+          localStorage.setItem('epickast.ninja.v1', JSON.stringify(draft));
+          Object.assign(savedInitial, draft);
+          checkDirty();
+          if (window.EconomyService) {
+            window.EconomyService.saveVault(window.EconomyService.getVault());
+          }
+          if (typeof onSaveCallback === 'function') onSaveCallback(draft);
+        };
+      }
+
+      window.__EK?.assertNoBadText(container);
+    };
+
+    if (scope) {
+      scope.interval(() => {
+        animFrame = (animFrame + 1) % 6;
+        const holder = container.querySelector('#njPreviewSpriteHolder');
+        if (holder) {
+          holder.innerHTML = renderPixelNinjaSvg(draft, { size: 136, pose: currentPose, frame: animFrame });
+        }
+      }, 600);
+    }
+
+    draw();
+    return {
+      hasUnsavedChanges: () => isDirty
+    };
+  }
+
   window.CardJitsuGame = CardJitsuGame;
+  window.renderNinjaCustomizer = renderNinjaCustomizer;
+  window.renderPixelNinjaSvg = renderPixelNinjaSvg;
 })();

@@ -178,10 +178,32 @@ handleAppSplash();
 function modalVault(initialTab = 'roulette') {
   const m = $('modal');
   if (!m) return;
+
+  // Garantizar ciclo de vida idempotente y limpiar suscripciones previas
+  if (window.__EK && typeof window.__EK.disposeVaultScopes === 'function') {
+    window.__EK.disposeVaultScopes();
+  }
+  const vaultScope = (window.EKLifecycle && typeof window.EKLifecycle.create === 'function')
+    ? window.EKLifecycle.create('vault')
+    : null;
+
   m.classList.remove('hidden');
   m.replaceChildren();
 
-  // Cargar datos locales de llaves del jugador, cosméticos, polvo y piedad
+  const cfg = window.EKGameConfig || {};
+  const PROFILE_COSMETICS = cfg.COSMETICS || [];
+  const RARITY_COLORS = cfg.RARITY_TOKENS ? {
+    common: cfg.RARITY_TOKENS.common.color,
+    rare: cfg.RARITY_TOKENS.rare.color,
+    epic: cfg.RARITY_TOKENS.epic.color,
+    legendary: cfg.RARITY_TOKENS.legendary.color
+  } : { common: '#94a3b8', rare: '#3b82f6', epic: '#a855f7', legendary: '#fbbf24' };
+
+  const KEY_PRICES = { copper: 250, silver: 1000, gold: 4000, obsidian: 15000 };
+  const KEY_PACK_DISCOUNT = 0.90;
+  const DUST_DUPLICATE = cfg.DUST_DUPLICATE || { common: 5, rare: 15, epic: 40, legendary: 100 };
+  const DUST_CRAFT = cfg.DUST_CRAFT || { common: 40, rare: 120, epic: 300, legendary: 800 };
+
   let dData = {
     coins: 50,
     keys: { copper: 1, silver: 0, gold: 0, obsidian: 0 },
@@ -203,76 +225,17 @@ function modalVault(initialTab = 'roulette') {
     }
   } catch {}
 
-  // Actualización a versión 1.8.6 preservando progreso y balance legítimo
-  if (dData.version !== '1.8.6') {
-    if (dData.version !== '1.8.5') {
-      dData.coins = dData.coins || 250;
-      dData.keys = dData.keys || { copper: 1, silver: 0, gold: 0, obsidian: 0 };
-      dData.dust = dData.dust || 0;
-      dData.pity = dData.pity || { withoutEpic: 0, withoutLegendary: 0 };
-    }
-    dData.version = '1.8.6';
+  const currentVer = cfg.APP_VERSION || '1.9.1';
+  if (dData.version !== currentVer) {
+    dData.version = currentVer;
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  if (!dData.dailyExchange || dData.dailyExchange.date !== today) {
-    dData.dailyExchange = { date: today, copper: 0, silver: 0 };
-  }
-
-  // CATÁLOGO DE 26 COSMÉTICOS (ORDENADO ESTRICTAMENTE POR PRESTIGIO / RAREZA)
-  const PROFILE_COSMETICS = [
-    // 1. LEGENDARIOS (4)
-    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia \"FUNDADOR\" para llamadas, chat y perfil (Prestigio Edición 1).' },
-    { id: 'frame_colossus_legend', name: 'Marco: Núcleo del Coloso', type: 'frame', val: 'frame-colossus-legend', rarity: 'legendary', desc: 'Doble halo dorado y cian con rotación continua.' },
-    { id: 'banner_golem_animated', name: 'Banner: Despertar del Gólem', type: 'banner', val: 'linear-gradient(135deg, #18181b, #701a75, #b91c1c, #450a0a)', rarity: 'legendary', desc: 'Estandarte animado del coloso de obsidiana despertando.' },
-    { id: 'title_colossus_slayer', name: 'Título: Coloso Caído', type: 'title', val: 'Coloso Caído', rarity: 'legendary', desc: 'Título resplandeciente reservado para quienes derriban al Gólem.' },
-
-    // 2. ÉPICOS (5)
-    { id: 'frame_runic', name: 'Marco: Partículas Rúnicas', type: 'frame', val: 'frame-runic', rarity: 'epic', desc: 'Marco pulsante con chispas mágicas alrededor de tu avatar.' },
-    { id: 'color_aurora', name: 'Color: Aurora Boreal', type: 'color', val: 'linear-gradient(90deg, #00e5ff, #a855f7)', rarity: 'epic', desc: 'Gradiente animado estilo aurora boreal para tu nombre.' },
-    { id: 'color_volcanic_flame', name: 'Color: Fuego Volcánico', type: 'color', val: 'linear-gradient(90deg, #ff3366, #ffb300)', rarity: 'epic', desc: 'Gradiente ardiente en movimiento continuo.' },
-    { id: 'banner_fluid_lava', name: 'Banner: Lava Fluida', type: 'banner', val: 'linear-gradient(135deg, #7f1d1d, #ea580c, #f59e0b, #991b1b)', rarity: 'epic', desc: 'Banner con ondulación fluida de lava fundida.' },
-    { id: 'banner_rune_storm', name: 'Banner: Tormenta Rúnica', type: 'banner', val: 'linear-gradient(135deg, #1e1b4b, #6366f1, #a855f7, #312e81)', rarity: 'epic', desc: 'Estandarte cósmico con rayos de energía púrpura.' },
-
-    // 3. RAROS (7)
-    { id: 'frame_copper', name: 'Marco: Cobre Forjado', type: 'frame', val: 'frame-copper', rarity: 'rare', desc: 'Bisel de cobre bruñido para tu avatar.' },
-    { id: 'frame_silver', name: 'Marco: Plata Rúnica', type: 'frame', val: 'frame-silver', rarity: 'rare', desc: 'Bisel plateado brillante con runas grabadas.' },
-    { id: 'frame_amethyst', name: 'Marco: Geoda Amatista', type: 'frame', val: 'frame-amethyst', rarity: 'rare', desc: 'Cristales de amatista facetados que rodean tu avatar.' },
-    { id: 'title_explorer', name: 'Título: Explorador del Núcleo', type: 'title', val: 'Explorador del Núcleo', rarity: 'rare', desc: 'Distintivo para quienes descienden a las profundidades.' },
-    { id: 'title_smith', name: 'Título: Herrero de Magma', type: 'title', val: 'Herrero de Magma', rarity: 'rare', desc: 'Insignia rúnica de maestro forjador de reliquias.' },
-    { id: 'title_shadow', name: 'Título: Cazador de Sombras', type: 'title', val: 'Cazador de Sombras', rarity: 'rare', desc: 'Otorgado a quienes purgan las galerías oscuras.' },
-    { id: 'title_pioneer', name: 'Título: Pionero', type: 'title', val: 'Pionero', rarity: 'rare', desc: 'Título honorable para los primeros aventureros.' },
-
-    // 4. COMUNES (10)
-    { id: 'color_amber', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'common', desc: 'Tinte ígneo de magma ardiente para tu nombre y perfil.' },
-    { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#a855f7', rarity: 'common', desc: 'Resplandor amatista para tu nombre en la lista de miembros.' },
-    { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#10b981', rarity: 'common', desc: 'Tinte resplandeciente esmeralda del Núcleo.' },
-    { id: 'color_cyan', name: 'Color: Cian Neón', type: 'color', val: '#00e5ff', rarity: 'common', desc: 'Destello ciberpunk cian brillante para tu nombre.' },
-    { id: 'color_crimson', name: 'Color: Rojo Magma', type: 'color', val: '#ff3366', rarity: 'common', desc: 'Tono carmesí ardiente de roca fundida.' },
-    { id: 'banner_mines', name: 'Banner: Minas de Magma', type: 'banner', val: 'linear-gradient(135deg, #451a03, #b45309, #78350f)', rarity: 'common', desc: 'Estandarte de magma y basalto para tu tarjeta de perfil.' },
-    { id: 'banner_amethyst', name: 'Banner: Galerías de Amatista', type: 'banner', val: 'linear-gradient(135deg, #2e1065, #7e22ce, #3b0764)', rarity: 'common', desc: 'Estandarte de geodas púrpuras brillantes para tu tarjeta de perfil.' },
-    { id: 'banner_crypt', name: 'Banner: Cripta Ancestral', type: 'banner', val: 'linear-gradient(135deg, #09090b, #1e293b, #334155)', rarity: 'common', desc: 'Muros de piedra antigua y niebla espectral.' },
-    { id: 'banner_bridges', name: 'Banner: Puentes de Lava', type: 'banner', val: 'linear-gradient(135deg, #1c1917, #ea580c, #7f1d1d)', rarity: 'common', desc: 'Puentes de piedra sobre el abismo volcánico.' },
-    { id: 'banner_sanctum', name: 'Banner: Sagrario del Núcleo', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'common', desc: 'Santuario central de obsidiana del Núcleo.' }
-  ];
-
-  const RARITY_COLORS = { common: '#60a5fa', rare: '#a78bfa', epic: '#f43f5e', legendary: '#fbbf24' };
-  
-  const KEY_PRICES = { copper: 250, silver: 1000, gold: 4000, obsidian: 15000 };
-  const KEY_PACK_DISCOUNT = 0.90; // 10% descuento al comprar pack x5
-
-  const CHEST_ODDS = {
-    copper: { common: 0.80, rare: 0.17, epic: 0.03, legendary: 0.00 },
-    silver: { common: 0.55, rare: 0.33, epic: 0.11, legendary: 0.01 },
-    gold: { common: 0.25, rare: 0.45, epic: 0.25, legendary: 0.05 },
-    obsidian: { common: 0.00, rare: 0.40, epic: 0.45, legendary: 0.15 }
-  };
-  const DUST_DUPLICATE = { common: 2, rare: 8, epic: 20, legendary: 50 };
-  const DUST_CRAFT = { common: 40, rare: 120, epic: 300, legendary: 800 };
-
   let activeTab = (typeof initialTab === 'string' && ['roulette', 'collection', 'dojo', 'racer', 'ninja'].includes(initialTab)) ? initialTab : 'roulette';
-  let activeFilter = 'all';    // 'all' | 'frame' | 'banner' | 'color' | 'title'
+  let activeFilter = 'all'; // 'all' | 'frame' | 'banner' | 'color' | 'title' | 'nameplate' | 'profile_fx'
+  let activeRarityFilter = 'all'; // 'all' | 'common' | 'rare' | 'epic' | 'legendary'
+  let sortNewestFirst = true;
+
   let selectedTier = 'copper';
   if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
   else if ((dData.keys.gold || 0) > 0) selectedTier = 'gold';
@@ -280,6 +243,7 @@ function modalVault(initialTab = 'roulette') {
 
   let isSpinning = false;
   let lastSpinResult = null;
+  let activeDojoInstance = null;
   let activeRacerInstance = null;
 
   const saveState = () => {
@@ -301,29 +265,31 @@ function modalVault(initialTab = 'roulette') {
   };
 
   const rollRarity = (tier) => {
+    if (cfg.rollRarityWithPity) {
+      return cfg.rollRarityWithPity(tier, dData.pity);
+    }
+    const CHEST_ODDS = cfg.CHESTS ? {
+      copper: cfg.CHESTS.copper.odds,
+      silver: cfg.CHESTS.silver.odds,
+      gold: cfg.CHESTS.gold.odds,
+      obsidian: cfg.CHESTS.obsidian.odds
+    } : {
+      copper: { common: 0.80, rare: 0.17, epic: 0.03, legendary: 0.00 },
+      silver: { common: 0.55, rare: 0.33, epic: 0.11, legendary: 0.01 },
+      gold: { common: 0.25, rare: 0.45, epic: 0.25, legendary: 0.05 },
+      obsidian: { common: 0.00, rare: 0.40, epic: 0.45, legendary: 0.15 }
+    };
     const odds = { ...CHEST_ODDS[tier] };
     const pLeg = dData.pity.withoutLegendary || 0;
     const pEpic = dData.pity.withoutEpic || 0;
-
-    // Sintonía dura legendaria apertura 60
     if (pLeg >= 59 && tier !== 'copper') return 'legendary';
-
-    // Sintonía suave legendaria desde apertura 35
     if (pLeg >= 35 && tier !== 'copper') {
-      const extra = (pLeg - 34) * 0.015;
-      odds.legendary = Math.min(0.90, odds.legendary + extra);
+      odds.legendary = Math.min(0.90, odds.legendary + (pLeg - 34) * 0.015);
     }
-
-    // Sintonía de épico cada 10 aperturas
     if (pEpic >= 9) {
-      if (odds.legendary > 0) {
-        odds.epic = 1.0 - odds.legendary;
-        odds.rare = 0; odds.common = 0;
-      } else {
-        odds.epic = 1.0; odds.rare = 0; odds.common = 0;
-      }
+      if (odds.legendary > 0) { odds.epic = 1.0 - odds.legendary; odds.rare = 0; odds.common = 0; }
+      else { odds.epic = 1.0; odds.rare = 0; odds.common = 0; }
     }
-
     const r = Math.random();
     let acc = 0;
     for (const [rar, prob] of Object.entries(odds)) {
@@ -354,106 +320,342 @@ function modalVault(initialTab = 'roulette') {
       if (S.me) S.me.title = item.val;
       if (typeof rpc === 'function') rpc('profile.set', { title: item.val }).catch(() => {});
       toast('👑 ¡Título equipado!');
+    } else if (item.type === 'nameplate') {
+      localStorage.setItem('epickast.equipped_nameplate', item.val);
+      if (S.me) S.me.nameplate = item.val;
+      if (typeof rpc === 'function') rpc('profile.set', { nameplate: item.val }).catch(() => {});
+      toast('🏷️ ¡Placa de nombre equipada!');
+    } else if (item.type === 'profile_fx') {
+      localStorage.setItem('epickast.equipped_profile_fx', item.val);
+      if (S.me) S.me.profile_fx = item.val;
+      if (typeof rpc === 'function') rpc('profile.set', { profile_fx: item.val }).catch(() => {});
+      toast('✨ ¡Efecto de perfil Nitro activado!');
     }
     render();
     renderView();
     if (activeTab === 'collection') renderCosmeticsGrid();
   };
 
+  // Previsualizador en vivo estilo Nitro
+  const openCosmeticLivePreviewModal = (item) => {
+    const prevWrap = document.createElement('div');
+    prevWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#0f131d;border:1.5px solid #283247;border-radius:14px;padding:24px;width:92%;max-width:440px;box-shadow:0 16px 40px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;position:relative;overflow:hidden;';
+
+    const eqFrame = (item.type === 'frame' ? item.val : localStorage.getItem('epickast.equipped_frame')) || S.me?.frame;
+    const eqBanner = (item.type === 'banner' ? item.val : localStorage.getItem('epickast.equipped_banner')) || S.me?.banner || 'linear-gradient(135deg, #1e1b4b, #4338ca)';
+    const eqColor = (item.type === 'color' ? item.val : localStorage.getItem('epickast.equipped_color')) || S.me?.color || '#38bdf8';
+    const eqTitle = (item.type === 'title' ? item.val : localStorage.getItem('epickast.equipped_title')) || S.me?.title || 'Aspirante del Núcleo';
+    const eqPlate = (item.type === 'nameplate' ? item.val : localStorage.getItem('epickast.equipped_nameplate')) || S.me?.nameplate || '';
+    const activeFx = (item.type === 'profile_fx' ? item.val : localStorage.getItem('epickast.equipped_profile_fx')) || S.me?.profile_fx || '';
+
+    const frameCls = eqFrame === 'founder_blue' ? 'frame-founder' : (eqFrame ? ' ' + eqFrame : '');
+    const isAnimatedBanner = String(eqBanner).includes('linear-gradient') && item.type === 'banner' && item.rarity === 'legendary';
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2638;padding-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">👁️</span>
+          <b style="font-size:14px;letter-spacing:0.3px;">Vista Previa de Perfil Nitro</b>
+        </div>
+        <button id="closePreviewBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
+      </div>
+
+      <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#0b0e14;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
+        <!-- Banner con efecto de partículas si aplica -->
+        <div class="preview-banner-box ${isAnimatedBanner ? 'banner-animated' : ''}" style="height:90px;background:${eqBanner};background-size:cover;position:relative;">
+          <canvas id="prevFxCanvas" width="390" height="90" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+        </div>
+
+        <div style="padding:16px;position:relative;margin-top:-38px;">
+          <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:10px;">
+            <div class="avatar ${frameCls}" style="width:64px;height:64px;font-size:24px;background:#1e293b;border:3px solid #0f131d;border-radius:50%;display:grid;place-items:center;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,0.6);flex-shrink:0;">
+              ${(S.me?.name || 'Tú').slice(0, 2).toUpperCase()}
+            </div>
+            <div style="min-width:0;">
+              <div class="${eqPlate ? ('plate-' + eqPlate.replace(/_/g, '-')) : ''}" style="padding:3px 8px;border-radius:6px;display:inline-block;">
+                <span style="font-size:15px;font-weight:900;${nameColorStyle(eqColor)}">${S.me?.name || 'EpicKap'}</span>
+              </div>
+              <div style="margin-top:2px;">
+                ${titleBadgeEl(eqTitle, 'pill')?.outerHTML || ''}
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size:11.5px;color:#cbd5e1;line-height:1.4;background:#141926;border:1px solid #1e2638;border-radius:8px;padding:8px 12px;margin-top:8px;">
+            <b style="color:#fbbf24;">${item.name}</b> · <span style="color:${RARITY_COLORS[item.rarity] || '#94a3b8'};text-transform:uppercase;font-size:10px;font-weight:800;">${item.rarity}</span>
+            <p style="margin:4px 0 0 0;font-size:11px;color:#94a3b8;">${item.desc || ''}</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+        <button id="closePreviewBtn2" style="background:#1e2638;border:1px solid #2d3748;color:#cbd5e1;padding:7px 16px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;">Cerrar</button>
+        <button id="equipFromPreviewBtn" style="background:#10b981;border:none;color:#fff;padding:7px 18px;border-radius:6px;font-weight:900;font-size:12px;cursor:pointer;box-shadow:0 2px 10px rgba(16,185,129,0.4);">✓ Equipar en mi Perfil</button>
+      </div>
+    `;
+
+    prevWrap.appendChild(box);
+    document.body.appendChild(prevWrap);
+
+    let fxRaf = null;
+    const cvs = box.querySelector('#prevFxCanvas');
+    if (cvs && activeFx) {
+      const ctx = cvs.getContext('2d');
+      const parts = [];
+      const count = activeFx === 'fx_snow' ? 24 : activeFx === 'fx_embers' ? 20 : 16;
+      for (let i = 0; i < count; i++) {
+        parts.push({
+          x: Math.random() * cvs.width,
+          y: Math.random() * cvs.height,
+          r: Math.random() * 2 + 1,
+          vx: activeFx === 'fx_snow' ? (Math.random() - 0.5) * 0.8 : (Math.random() - 0.5) * 0.4,
+          vy: activeFx === 'fx_snow' ? Math.random() * 0.9 + 0.4 : activeFx === 'fx_embers' ? -(Math.random() * 1.2 + 0.5) : (Math.random() - 0.5) * 0.6,
+          alpha: Math.random() * 0.7 + 0.3
+        });
+      }
+      const loop = () => {
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        parts.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (activeFx === 'fx_snow' && p.y > cvs.height) { p.y = -5; p.x = Math.random() * cvs.width; }
+          if (activeFx === 'fx_embers' && p.y < -5) { p.y = cvs.height + 5; p.x = Math.random() * cvs.width; }
+          if (activeFx === 'fx_void') {
+            if (p.x < 0 || p.x > cvs.width) p.vx *= -1;
+            if (p.y < 0 || p.y > cvs.height) p.vy *= -1;
+          }
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          if (activeFx === 'fx_snow') ctx.fillStyle = 'rgba(255,255,255,' + p.alpha + ')';
+          else if (activeFx === 'fx_embers') ctx.fillStyle = 'rgba(251,146,60,' + p.alpha + ')';
+          else ctx.fillStyle = 'rgba(192,132,252,' + p.alpha + ')';
+          ctx.fill();
+        });
+        fxRaf = requestAnimationFrame(loop);
+      };
+      fxRaf = requestAnimationFrame(loop);
+    }
+
+    const closeMe = () => {
+      if (fxRaf) cancelAnimationFrame(fxRaf);
+      if (prevWrap.parentNode) prevWrap.parentNode.removeChild(prevWrap);
+    };
+
+    box.querySelector('#closePreviewBtn').onclick = closeMe;
+    box.querySelector('#closePreviewBtn2').onclick = closeMe;
+    box.querySelector('#equipFromPreviewBtn').onclick = () => {
+      equipCosmeticItem(item);
+      closeMe();
+    };
+  };
+
+  // Modal explicativo de probabilidades nominales y sintonía
+  const openProbabilitiesModal = () => {
+    const oddsWrap = document.createElement('div');
+    oddsWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(4px);';
+
+    const oddsBox = document.createElement('div');
+    oddsBox.style.cssText = 'background:#111622;border:1.5px solid #283247;border-radius:12px;padding:22px;max-width:540px;width:92%;box-shadow:0 12px 36px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;';
+
+    const pEpic = dData.pity.withoutEpic || 0;
+    const pLeg = dData.pity.withoutLegendary || 0;
+
+    oddsBox.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2638;padding-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:20px;">ⓘ</span>
+          <b style="font-size:15px;">Probabilidades Nominales y Sistema de Sintonía</b>
+        </div>
+        <button id="closeOddsBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:14px;text-align:center;">
+        <thead>
+          <tr style="background:#182030;color:#94a3b8;">
+            <th style="padding:6px;text-align:left;">Cofre</th>
+            <th>Común</th>
+            <th>Raro</th>
+            <th>Épico</th>
+            <th>Legendario</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #1c2333;">
+            <td style="padding:7px;text-align:left;color:#d97706;font-weight:800;">🟤 Cobre</td>
+            <td>80%</td><td>17%</td><td>3%</td><td style="color:#64748b;">0%</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1c2333;">
+            <td style="padding:7px;text-align:left;color:#cbd5e1;font-weight:800;">⚪ Plata</td>
+            <td>55%</td><td>33%</td><td>11%</td><td>1%</td>
+          </tr>
+          <tr style="border-bottom:1px solid #1c2333;">
+            <td style="padding:7px;text-align:left;color:#fbbf24;font-weight:800;">🟡 Oro</td>
+            <td>25%</td><td>45%</td><td>25%</td><td>5%</td>
+          </tr>
+          <tr>
+            <td style="padding:7px;text-align:left;color:#c084fc;font-weight:800;">🟣 Obsidiana</td>
+            <td style="color:#64748b;">0%</td><td>40%</td><td>45%</td><td>15%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="background:#0b0e14;border:1px solid #1e2638;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.45;">
+        <div style="color:#38bdf8;font-weight:800;margin-bottom:4px;">🛡️ Tus Contadores de Protección Anti-Mala Suerte en Vivo:</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding:6px 10px;background:#141926;border-radius:6px;">
+          <span>Garantía Épica:</span>
+          <b style="color:#a855f7;">${pEpic}/10</b>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding:6px 10px;background:#141926;border-radius:6px;">
+          <span>Sintonía Legendaria:</span>
+          <b style="color:#fbbf24;">${pLeg}/60</b>
+        </div>
+        <ul style="margin:8px 0 0 16px;padding:0;color:#94a3b8;font-size:11px;">
+          <li><b>Garantía Épica (10 tiradas):</b> si pasan 9 aperturas sin Épico ni Legendario, la tirada 10 es asegurada calidad Épica o superior.</li>
+          <li><b>Sintonía Progresiva Legendaria (35+ tiradas):</b> desde la apertura 35 sin Legendario, la probabilidad base sube un +1.5% extra en cada apertura.</li>
+          <li><b>Garantía Absoluta Legendaria (60 tiradas):</b> si llegas a 59 tiradas sin Legendario, la tirada 60 garantiza un Legendario 100% asegurado en cofres de Plata, Oro u Obsidiana.</li>
+          <li><i>Nota:</i> los cofres de Cobre nunca otorgan Legendarios ni acumulan sintonía legendaria.</li>
+        </ul>
+      </div>
+
+      <div style="text-align:right;">
+        <button id="closeOddsBtn2" style="background:#2563eb;color:#fff;border:none;padding:7px 18px;border-radius:6px;cursor:pointer;font-weight:800;font-size:12px;">Entendido</button>
+      </div>
+    `;
+
+    oddsWrap.appendChild(oddsBox);
+    document.body.appendChild(oddsWrap);
+
+    const closeMe = () => { if (oddsWrap.parentNode) oddsWrap.parentNode.removeChild(oddsWrap); };
+    oddsBox.querySelector('#closeOddsBtn').onclick = closeMe;
+    oddsBox.querySelector('#closeOddsBtn2').onclick = closeMe;
+  };
+
+  const closeVaultOrModal = () => {
+    if (activeDojoInstance && activeDojoInstance.hasActiveMatch && activeDojoInstance.hasActiveMatch()) {
+      if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
+    }
+    if (activeRacerInstance && activeRacerInstance.hasActiveMatch && activeRacerInstance.hasActiveMatch()) {
+      if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
+    }
+    if (activeDojoInstance) { try { activeDojoInstance.destroy(); } catch {} activeDojoInstance = null; }
+    if (activeRacerInstance) { try { activeRacerInstance.destroy(); } catch {} activeRacerInstance = null; }
+    if (window.__EK && typeof window.__EK.disposeVaultScopes === 'function') {
+      window.__EK.disposeVaultScopes();
+    }
+    m.classList.add('hidden');
+    m.replaceChildren();
+  };
+
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'box-sizing:border-box;width:96%;max-width:960px;max-height:90vh;overflow-y:auto;background:#11141c;border:1px solid #282f40;border-radius:12px;padding:20px;box-shadow:0 12px 36px rgba(0,0,0,0.6);font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;margin:auto;position:relative;';
+  wrap.className = 'vault-modal-body';
+  wrap.style.cssText = 'box-sizing:border-box;width:96%;max-width:960px;max-height:90vh;overflow-y:auto;background:var(--bg-panel, #0f131d);border:1px solid var(--border, rgba(255,255,255,0.08));border-radius:12px;padding:20px;box-shadow:0 12px 36px rgba(0,0,0,0.7);font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;margin:auto;position:relative;';
 
   const renderView = () => {
     if (activeRacerInstance && activeTab !== 'racer') {
       try { activeRacerInstance.destroy(); } catch {}
       activeRacerInstance = null;
     }
-    wrap.innerHTML = '';
+    if (activeDojoInstance && activeTab !== 'dojo') {
+      try { activeDojoInstance.destroy(); } catch {}
+      activeDojoInstance = null;
+    }
 
-    const unlockedCount = Object.keys(dData.cosmetics || {}).length + (dData.founderFrameUnlocked ? 1 : 0);
-    const pctUnlocked = Math.round((unlockedCount / 26) * 100);
+    wrap.innerHTML = '';
+    const totalCosmetics = PROFILE_COSMETICS.length;
+    const unlockedCount = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
+    const pctUnlocked = Math.round((unlockedCount / Math.max(1, totalCosmetics)) * 100);
+
+    const renderTabIco = (key) => {
+      if (window.EKSprites && window.EKSprites.renderSpriteHtml) {
+        return window.EKSprites.renderSpriteHtml(key, 15);
+      }
+      return '⭐';
+    };
 
     wrap.innerHTML = `
-      <!-- Cabecera Discreta y Navegación Modular por Pestañas -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222938;padding-bottom:14px;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
+      <!-- Cabecera de la Bóveda -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2638;padding-bottom:14px;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.0</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v${currentVer}</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
           </div>
         </div>
 
-        <!-- 5 Pestañas Modulares tipo Pill -->
-        <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;margin-left:auto;flex-wrap:wrap;">
-          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
-            🎁 Ruleta y Cofres
+        <!-- 5 Pestañas Modulares con Sprites Pixel-Art -->
+        <div style="display:flex;background:#0b0e14;padding:3px;border-radius:8px;border:1px solid #1a2233;gap:4px;margin-left:auto;flex-wrap:wrap;">
+          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#1e2638':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_roulette')} <span>Ruleta y Cofres</span>
           </button>
-          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#232a3b':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
-            🎨 Mi Armario (${unlockedCount}/26)
+          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#1e2638':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_armory')} <span>Mi Armario (${unlockedCount}/${totalCosmetics})</span>
           </button>
-          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
-            🥋 Dojo Elemental
+          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#1e2638':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_dojo')} <span>Dojo Elemental</span>
           </button>
-          <button id="vTabBtnRacer" style="background:${activeTab==='racer'?'#232a3b':'transparent'};color:${activeTab==='racer'?'#fff':'#94a3b8'};border:${activeTab==='racer'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
-            🏎️ Turbo Core
+          <button id="vTabBtnRacer" style="background:${activeTab==='racer'?'#1e2638':'transparent'};color:${activeTab==='racer'?'#fff':'#94a3b8'};border:${activeTab==='racer'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_racer')} <span>Turbo Core</span>
           </button>
-          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#232a3b':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
-            🥷 Mi Ninja
+          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#1e2638':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_ninja')} <span>Mi Ninja</span>
           </button>
         </div>
 
-        <!-- Botón de Cerrar formal en la esquina derecha -->
-        <button id="vCloseBtn" style="background:#1e2433;border:1px solid #3b4660;color:#f8fafc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;transition:0.15s;flex-shrink:0;" title="Cerrar Bóveda (o presiona ESC)">✕ Cerrar</button>
+        <!-- Botón de Cerrar formal -->
+        <button id="vCloseBtn" style="background:#1e2638;border:1px solid #3b4660;color:#f8fafc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;transition:0.15s;flex-shrink:0;" title="Cerrar Bóveda (o presiona ESC)">✕ Cerrar</button>
       </div>
 
       <!-- Barra de Recursos y Llaves con Tienda Ilimitada -->
-      <div style="background:#131722;border:1px solid #202636;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;">
+      <div style="background:#131826;border:1px solid #1f273b;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <!-- Monedas, Esencia y Sintonía -->
           <div style="display:flex;gap:14px;align-items:center;font-size:12.5px;">
-            <span>🪙 <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('coin')} <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
             <span style="color:#334155;">|</span>
-            <span>✨ <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('essence')} <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
             <span style="color:#334155;">|</span>
-            <span style="color:#94a3b8;">⭐ Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
+            <span style="display:inline-flex;align-items:center;gap:5px;color:#94a3b8;">${renderTabIco('pity_star')} Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
           </div>
 
-          <!-- Botón Directo Tienda de Llaves -->
           <div style="display:flex;gap:8px;align-items:center;">
+            <button id="vBtnProbabilities" style="background:#1e2638;color:#94a3b8;border:1px solid #2d3748;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:4px;" title="Ver tabla de probabilidades y sintonía">
+              <span>ⓘ</span> Probabilidades
+            </button>
             <button id="vBtnOpenKeyShop" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;box-shadow:0 2px 8px rgba(37,99,235,0.4);display:flex;align-items:center;gap:6px;">
-              <span>🛒</span> Comprar Llaves con Monedas
+              ${renderTabIco('shop_cart')} <span>Comprar Llaves con Monedas</span>
             </button>
           </div>
         </div>
 
-        <!-- Inventario de Llaves en Posesión -->
-        <div style="display:flex;justify-content:space-between;align-items:center;background:#0a0d14;border:1px solid #1a2233;border-radius:6px;padding:6px 14px;font-size:11.5px;flex-wrap:wrap;gap:8px;">
+        <!-- Inventario de Llaves en Posesión con Siluetas Unificadas -->
+        <div style="display:flex;justify-content:space-between;align-items:center;background:#090d14;border:1px solid #161e2e;border-radius:6px;padding:6px 14px;font-size:11.5px;flex-wrap:wrap;gap:8px;">
           <div style="font-weight:800;color:#94a3b8;display:flex;align-items:center;gap:6px;">
             <span>🗝️</span> TUS LLAVES DISPONIBLES:
           </div>
           <div style="display:flex;gap:14px;align-items:center;font-weight:800;">
-            <span style="color:#d97706;">🟤 Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
-            <span style="color:#cbd5e1;">⚪ Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
-            <span style="color:#fbbf24;">🟡 Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
-            <span style="color:#c084fc;">🟣 Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
+            <span style="color:#d97706;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_copper')} Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
+            <span style="color:#cbd5e1;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_silver')} Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
+            <span style="color:#fbbf24;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_gold')} Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
+            <span style="color:#c084fc;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_obsidian')} Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
           </div>
         </div>
       </div>
 
       <!-- VISTA 1: RULETA Y COFRES -->
       <div id="vViewRoulette" style="display:${activeTab==='roulette'?'flex':'none'};flex-direction:column;gap:12px;">
-        <!-- Selector de Cofre / Nivel -->
         <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;">
           ${['copper','silver','gold','obsidian'].map(tier => {
             const count = dData.keys[tier] || 0;
             const isSel = selectedTier === tier;
             const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
-            const icons = { copper: '🔑', silver: '🔑', gold: '🥇', obsidian: '💎' };
+            const keySprite = 'key_' + tier;
             const color = { copper: '#d97706', silver: '#cbd5e1', gold: '#fbbf24', obsidian: '#a855f7' }[tier];
             return `
-              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? '#1e2536' : '#141822'};border:1.5px solid ${isSel ? color : '#222838'};border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:0.15s;">
-                <span style="font-size:15px;">${icons[tier]}</span>
+              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? '#1a2233' : '#111622'};border:1.5px solid ${isSel ? color : '#20283a'};border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:0.15s;">
+                <span>${renderTabIco(keySprite)}</span>
                 <span style="font-size:12px;font-weight:800;color:${isSel ? '#fff' : '#94a3b8'};">${names[tier]}</span>
                 <span style="font-size:10px;font-weight:700;color:${color};">${count} Llaves</span>
               </button>
@@ -461,35 +663,38 @@ function modalVault(initialTab = 'roulette') {
           }).join('')}
         </div>
 
-        <!-- Probabilidades del Cofre Seleccionado -->
-        <div style="font-size:11px;color:#94a3b8;text-align:center;">
-          Probabilidades: Común ${Math.round(CHEST_ODDS[selectedTier].common*100)}% · Raro ${Math.round(CHEST_ODDS[selectedTier].rare*100)}% · Épico ${Math.round(CHEST_ODDS[selectedTier].epic*100)}% · Legendario ${Math.round(CHEST_ODDS[selectedTier].legendary*100)}%
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8;padding:0 4px;">
+          <span>Probabilidades Nominales: Común ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.common || 0)*100)}% · Raro ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.rare || 0)*100)}% · Épico ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.epic || 0)*100)}% · Legendario ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.legendary || 0)*100)}%</span>
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="vChkSkipAnim" ${localStorage.getItem('epickast.skip_chest_anim')==='1'?'checked':''} style="cursor:pointer;" />
+            <span style="color:#cbd5e1;">Saltar animación</span>
+          </label>
         </div>
 
-        <!-- Visor de la Ruleta -->
-        <div style="position:relative;background:#0d1017;border:1px solid #202636;border-radius:8px;height:120px;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
+        <!-- Visor de la Ruleta Honesta -->
+        <div style="position:relative;background:#090d14;border:1px solid #1a2233;border-radius:8px;height:120px;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
           <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:#38bdf8;z-index:10;transform:translateX(-50%);box-shadow:0 0 8px #38bdf8;">
             <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #38bdf8;"></div>
           </div>
           <div id="vTrack" style="display:flex;height:100%;align-items:center;position:absolute;left:0;top:0;will-change:transform;"></div>
         </div>
 
-        <!-- Botón Único y Limpio de Apertura de Cofre -->
-        <div style="display:flex;justify-content:center;gap:12px;margin-top:8px;">
+        <!-- Botones de Acción de Apertura -->
+        <div style="display:flex;justify-content:center;gap:12px;margin-top:6px;">
           ${(dData.keys[selectedTier] || 0) > 0 ? `
             <button id="vBtnSpin" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:1px solid #3b82f6;font-size:13px;font-weight:900;padding:11px 32px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(37,99,235,0.4);display:flex;align-items:center;gap:8px;transition:0.15s;">
               <span>🔓</span>
-              <span>ABRIR COFRE (${(dData.keys[selectedTier] || 0)} Llave${(dData.keys[selectedTier] || 0) > 1 ? 's' : ''} disponible${(dData.keys[selectedTier] || 0) > 1 ? 's' : ''})</span>
+              <span>ABRIR COFRE (${dData.keys[selectedTier] || 0} Llave${(dData.keys[selectedTier]||0)>1?'s':''})</span>
             </button>
           ` : `
-            <button id="vBtnSpin" style="background:#1e2433;color:#fbbf24;border:1.5px solid #d97706;font-size:13px;font-weight:900;padding:11px 28px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(217,119,6,0.25);display:flex;align-items:center;gap:8px;transition:0.15s;">
+            <button id="vBtnSpin" style="background:#1a2233;color:#fbbf24;border:1.5px solid #d97706;font-size:13px;font-weight:900;padding:11px 28px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(217,119,6,0.25);display:flex;align-items:center;gap:8px;transition:0.15s;">
               <span>🛒</span>
               <span>COMPRAR 1 LLAVE (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙) Y ABRIR</span>
             </button>
           `}
         </div>
 
-        <!-- Notificación Clara y Permanente: Nuevo vs Duplicado -->
+        <!-- Notificación de Ganador -->
         ${lastSpinResult ? `
           <div id="vWinnerArea" style="margin-top:12px;padding:14px 18px;background:${lastSpinResult.isDuplicate ? '#161426' : '#0a1d15'};border:2px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};border-radius:10px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.6);animation:cjCardFlipIn 0.3s ease;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -507,22 +712,21 @@ function modalVault(initialTab = 'roulette') {
             </div>
 
             <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">
-              ${lastSpinResult.winner.desc}
+              ${lastSpinResult.winner.desc || ''}
             </div>
 
             ${lastSpinResult.isDuplicate ? `
               <div style="font-size:12px;color:#e9d5ff;font-weight:800;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);border-radius:6px;padding:6px 14px;display:inline-block;margin-bottom:4px;">
-                ✨ Duplicado convertido automáticamente en <b>+${lastSpinResult.dustAward} Esencia Arcana</b> (Saldo actual: ${dData.dust} Esencia)
-              </div>
-              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
-                Colección actual: <b>${lastSpinResult.unlockedCount} / 26</b> desbloqueados
+                ✨ Duplicado convertido automáticamente en <b>+${lastSpinResult.dustAward} Esencia Arcana</b> (Saldo: ${dData.dust} Esencia)
               </div>
             ` : `
               <div style="display:flex;justify-content:center;gap:12px;align-items:center;margin-top:8px;">
                 <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 2px 10px rgba(16,185,129,0.4);">
                   ✨ EQUIPAR EN MI PERFIL AHORA
                 </button>
-                <span style="font-size:11.5px;color:#94a3b8;">Colección: <b>${lastSpinResult.unlockedCount} / 26</b></span>
+                <button id="vBtnPreviewWinner" style="background:#1e2638;border:1px solid #3b82f6;color:#93c5fd;font-weight:800;font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;">
+                  👁️ Probar en Perfil
+                </button>
               </div>
             `}
           </div>
@@ -533,336 +737,160 @@ function modalVault(initialTab = 'roulette') {
 
       <!-- VISTA 2: MI ARMARIO Y COLECCIÓN DISCRETA -->
       <div id="vViewCollection" style="display:${activeTab==='collection'?'flex':'none'};flex-direction:column;gap:12px;">
-        <!-- Barra de Filtros y Progreso -->
-        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;background:#141822;padding:8px 12px;border-radius:8px;border:1px solid #202636;">
-          <div style="display:flex;gap:5px;flex-wrap:wrap;">
-            <button class="vFilterBtn" data-filter="all" style="background:${activeFilter==='all'?'#283247':'transparent'};color:${activeFilter==='all'?'#fff':'#94a3b8'};border:${activeFilter==='all'?'1px solid #3e4b68':'1px solid transparent'};padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">Todos (26)</button>
-            <button class="vFilterBtn" data-filter="frame" style="background:${activeFilter==='frame'?'#283247':'transparent'};color:${activeFilter==='frame'?'#fff':'#94a3b8'};border:${activeFilter==='frame'?'1px solid #3e4b68':'1px solid transparent'};padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🖼️ Marcos (5)</button>
-            <button class="vFilterBtn" data-filter="banner" style="background:${activeFilter==='banner'?'#283247':'transparent'};color:${activeFilter==='banner'?'#fff':'#94a3b8'};border:${activeFilter==='banner'?'1px solid #3e4b68':'1px solid transparent'};padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🏷️ Banners (7)</button>
-            <button class="vFilterBtn" data-filter="color" style="background:${activeFilter==='color'?'#283247':'transparent'};color:${activeFilter==='color'?'#fff':'#94a3b8'};border:${activeFilter==='color'?'1px solid #3e4b68':'1px solid transparent'};padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">🎨 Colores (7)</button>
-            <button class="vFilterBtn" data-filter="title" style="background:${activeFilter==='title'?'#283247':'transparent'};color:${activeFilter==='title'?'#fff':'#94a3b8'};border:${activeFilter==='title'?'1px solid #3e4b68':'1px solid transparent'};padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">👑 Títulos (7)</button>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px;font-size:11px;color:#94a3b8;">
-            <span>Colección: <b style="color:#e2e8f0;">${unlockedCount} / 26</b> (${pctUnlocked}%)</span>
-            <div style="width:70px;height:5px;background:#202636;border-radius:3px;overflow:hidden;">
-              <div style="width:${pctUnlocked}%;height:100%;background:#38bdf8;"></div>
+        <!-- Banner del Set del Coloso -->
+        ${(() => {
+          const colosoItems = ['frame_colossus_legend', 'banner_colossus_awakening', 'title_colossus_slayer', 'plate_colossus'];
+          const ownedColoso = colosoItems.filter(id => !!(dData.cosmetics && dData.cosmetics[id])).length;
+          const isComplete = ownedColoso >= 4;
+          return `
+            <div style="background:linear-gradient(135deg, rgba(69,10,10,0.5), rgba(24,24,27,0.8));border:1.5px solid ${isComplete ? '#fbbf24' : '#ef4444'};border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+              <div>
+                <b style="color:${isComplete ? '#fbbf24' : '#f87171'};font-size:13px;">${isComplete ? '⚡ Set del Coloso (4/4 COMPLETADO)' : '🛡️ Set del Coloso (' + ownedColoso + '/4 Desbloqueados)'}</b>
+                <p style="margin:2px 0 0 0;font-size:11px;color:#94a3b8;">Marco Núcleo + Banner Despertar + Título Coloso Caído + Placa del Coloso</p>
+              </div>
+              <span style="font-size:11px;font-weight:800;background:${isComplete ? '#fbbf24' : '#222838'};color:${isComplete ? '#000' : '#cbd5e1'};padding:3px 10px;border-radius:4px;">
+                ${isComplete ? '✓ Conquistador del Coloso' : ownedColoso + ' de 4 obtenidos'}
+              </span>
             </div>
+          `;
+        })()}
+
+        <!-- Barra de Filtros por Categoría y Rareza -->
+        <div style="display:flex;flex-direction:column;gap:8px;background:#131826;padding:10px 12px;border-radius:8px;border:1px solid #1f273b;">
+          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;">
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              ${[
+                ['all', 'Todos (' + totalCosmetics + ')'],
+                ['frame', '🖼️ Marcos'],
+                ['banner', '🏷️ Banners'],
+                ['color', '🎨 Colores'],
+                ['title', '👑 Títulos'],
+                ['nameplate', '📛 Placas'],
+                ['profile_fx', '✨ Efectos Nitro']
+              ].map(([k, lbl]) => `
+                <button class="vFilterBtn" data-filter="${k}" style="background:${activeFilter===k?'#2563eb':'transparent'};color:${activeFilter===k?'#fff':'#94a3b8'};border:${activeFilter===k?'1px solid #3b82f6':'1px solid transparent'};padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">${lbl}</button>
+              `).join('')}
+            </div>
+
+            <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:#94a3b8;">
+              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
+                <input type="checkbox" id="vChkNewestFirst" ${sortNewestFirst ? 'checked' : ''} style="cursor:pointer;" />
+                <span>Nuevos primero</span>
+              </label>
+              <span>Colección: <b style="color:#e2e8f0;">${unlockedCount} / ${totalCosmetics}</b> (${pctUnlocked}%)</span>
+              <div style="width:60px;height:5px;background:#1a2233;border-radius:3px;overflow:hidden;">
+                <div style="width:${pctUnlocked}%;height:100%;background:#38bdf8;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filtro secundario por rareza -->
+          <div style="display:flex;gap:4px;align-items:center;border-top:1px solid #1c2333;padding-top:6px;font-size:11px;">
+            <span style="color:#64748b;font-weight:700;margin-right:4px;">Rareza:</span>
+            ${[
+              ['all', 'Todas'],
+              ['common', 'Común'],
+              ['rare', 'Raro'],
+              ['epic', 'Épico'],
+              ['legendary', 'Legendario']
+            ].map(([rKey, rLbl]) => `
+              <button class="vRarityFilterBtn" data-rarity="${rKey}" style="background:${activeRarityFilter===rKey?'#1e2638':'transparent'};color:${activeRarityFilter===rKey?(RARITY_COLORS[rKey]||'#fff'):'#64748b'};border:${activeRarityFilter===rKey?'1px solid #3b4660':'1px solid transparent'};padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10.5px;font-weight:700;">${rLbl}</button>
+            `).join('')}
           </div>
         </div>
 
-        <!-- Cuadrícula Sobria y Ordenada por Rareza -->
+        <!-- Cuadrícula Sobria y Ordenada -->
         <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:10px;width:100%;box-sizing:border-box;"></div>
       </div>
 
-      <!-- VISTA 3: DOJO ELEMENTAL (MINIJUEGO) -->
+      <!-- VISTA 3: DOJO ELEMENTAL -->
       <div id="vViewDojo" style="display:${activeTab==='dojo'?'block':'none'};width:100%;"></div>
 
-      <!-- VISTA 3B: TURBO CORE (CARRERAS PIXEL-NEON CON ECONOMÍA COMPARTIDA) -->
+      <!-- VISTA 4: TURBO CORE -->
       <div id="vViewRacer" style="display:${activeTab==='racer'?'block':'none'};width:100%;"></div>
 
-      <!-- VISTA 4: PERSONALIZACIÓN DE NINJA PIXEL ART -->
+      <!-- VISTA 5: PERSONALIZACIÓN NINJA -->
       <div id="vViewNinja" style="display:${activeTab==='ninja'?'block':'none'};width:100%;"></div>
     `;
 
-    // Asignar eventos de pestañas
-    const tabRoulette = wrap.querySelector('#vTabBtnRoulette');
-    const tabCollection = wrap.querySelector('#vTabBtnCollection');
-    const tabDojo = wrap.querySelector('#vTabBtnDojo');
-    const tabRacer = wrap.querySelector('#vTabBtnRacer');
-    const tabNinja = wrap.querySelector('#vTabBtnNinja');
-    if (tabRoulette) tabRoulette.onclick = () => { if (isSpinning) return; activeTab = 'roulette'; renderView(); populatePreview(); };
-    if (tabCollection) tabCollection.onclick = () => { if (isSpinning) return; activeTab = 'collection'; renderView(); renderCosmeticsGrid(); };
-    if (tabDojo) tabDojo.onclick = () => { if (isSpinning) return; activeTab = 'dojo'; renderView(); mountDojo(); };
-    if (tabRacer) tabRacer.onclick = () => { if (isSpinning) return; activeTab = 'racer'; renderView(); mountRacer(); };
-    if (tabNinja) tabNinja.onclick = () => { if (isSpinning) return; activeTab = 'ninja'; renderView(); mountNinja(); };
+    // Eventos de Pestañas
+    const bindTab = (id, tabName, mountFn) => {
+      const btn = wrap.querySelector(id);
+      if (btn) {
+        btn.onclick = () => {
+          if (isSpinning) return;
+          if (activeDojoInstance && activeDojoInstance.hasActiveMatch && activeDojoInstance.hasActiveMatch()) {
+            if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
+          }
+          if (activeRacerInstance && activeRacerInstance.hasActiveMatch && activeRacerInstance.hasActiveMatch()) {
+            if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
+          }
+          activeTab = tabName;
+          renderView();
+          if (mountFn) mountFn();
+        };
+      }
+    };
 
-    // Filtros de colección
-    wrap.querySelectorAll('.vFilterBtn').forEach(btn => {
-      btn.onclick = () => {
-        activeFilter = btn.dataset.filter;
+    bindTab('#vTabBtnRoulette', 'roulette', populatePreview);
+    bindTab('#vTabBtnCollection', 'collection', renderCosmeticsGrid);
+    bindTab('#vTabBtnDojo', 'dojo', mountDojo);
+    bindTab('#vTabBtnRacer', 'racer', mountRacer);
+    bindTab('#vTabBtnNinja', 'ninja', mountNinja);
+
+    const closeBtn = wrap.querySelector('#vCloseBtn');
+    if (closeBtn) closeBtn.onclick = closeVaultOrModal;
+
+    const probBtn = wrap.querySelector('#vBtnProbabilities');
+    if (probBtn) probBtn.onclick = openProbabilitiesModal;
+
+    const chkSkip = wrap.querySelector('#vChkSkipAnim');
+    if (chkSkip) {
+      chkSkip.onchange = () => {
+        localStorage.setItem('epickast.skip_chest_anim', chkSkip.checked ? '1' : '0');
+      };
+    }
+
+    const chkNewest = wrap.querySelector('#vChkNewestFirst');
+    if (chkNewest) {
+      chkNewest.onchange = () => {
+        sortNewestFirst = chkNewest.checked;
+        renderCosmeticsGrid();
+      };
+    }
+
+    // Filtros de categoría y rareza
+    wrap.querySelectorAll('.vFilterBtn').forEach(b => {
+      b.onclick = () => {
+        activeFilter = b.dataset.filter;
         renderView();
         renderCosmeticsGrid();
       };
     });
 
-    // Cerrar modal
-    const closeBtn = wrap.querySelector('#vCloseBtn');
-    if (closeBtn) closeBtn.onclick = () => {
-      if (activeRacerInstance) { try { activeRacerInstance.destroy(); } catch {} activeRacerInstance = null; }
-      m.classList.add('hidden');
-      m.replaceChildren();
-    };
-
-    // Botones de canje
-    // Handlers de la Tienda de Llaves y Apertura con Monedas
-    const openKeyShopModal = () => {
-      const modalWrap = document.createElement('div');
-      modalWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(4px);';
-      
-      const shopBox = document.createElement('div');
-      shopBox.style.cssText = 'background:#111520;border:1.5px solid #2d3748;border-radius:12px;padding:22px;max-width:540px;width:92%;box-shadow:0 12px 36px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;';
-      
-      const renderShop = () => {
-        shopBox.innerHTML = `
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #222938;padding-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <span style="font-size:24px;">🛒</span>
-              <div>
-                <h3 style="margin:0;font-size:16px;font-weight:900;">Tienda de Llaves del Núcleo</h3>
-                <p style="margin:2px 0 0 0;font-size:11.5px;color:#94a3b8;">Canjea tus monedas sin límite diario para abrir cofres en la Bóveda</p>
-              </div>
-            </div>
-            <button id="closeShopBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
-          </div>
-
-          <div style="background:#090d14;border:1px solid #1a2233;border-radius:8px;padding:8px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:12px;color:#94a3b8;">Tus Monedas acumuladas:</span>
-            <span style="font-size:14px;font-weight:900;color:#fbbf24;">🪙 ${(dData.coins || 0).toLocaleString()}</span>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
-            ${['copper','silver','gold','obsidian'].map(tier => {
-              const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
-              const icons = { copper: '🟤', silver: '⚪', gold: '🟡', obsidian: '🟣' };
-              const singlePrice = KEY_PRICES[tier];
-              const packPrice = Math.round(singlePrice * 5 * KEY_PACK_DISCOUNT);
-              return `
-                <div style="background:#161c28;border:1px solid #252e42;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;">
-                  <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <b style="font-size:13px;">${icons[tier]} Llave de ${names[tier]}</b>
-                    <span style="font-size:11px;color:#94a3b8;">Tienes: <b>${dData.keys[tier] || 0}</b></span>
-                  </div>
-                  <div style="display:flex;gap:6px;">
-                    <button class="shopBuy1Btn" data-tier="${tier}" style="flex:1;background:#2563eb;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;">
-                      1x (${singlePrice.toLocaleString()} 🪙)
-                    </button>
-                    <button class="shopBuy5Btn" data-tier="${tier}" style="flex:1;background:#059669;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;" title="10% de descuento">
-                      5x (${packPrice.toLocaleString()} 🪙)
-                    </button>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `;
-
-        shopBox.querySelector('#closeShopBtn').onclick = () => {
-          document.body.removeChild(modalWrap);
-          renderView();
-          populatePreview();
-        };
-
-        shopBox.querySelectorAll('.shopBuy1Btn').forEach(b => {
-          b.onclick = () => {
-            const tier = b.dataset.tier;
-            const price = KEY_PRICES[tier];
-            if ((dData.coins || 0) < price) return toast('Monedas insuficientes');
-            dData.coins -= price;
-            dData.keys[tier] = (dData.keys[tier] || 0) + 1;
-            saveState();
-            ringer.beep([587, 880], 0.06, 0.12);
-            toast(`🔑 ¡Compraste 1 Llave de ${tier.toUpperCase()}!`);
-            renderShop();
-          };
-        });
-
-        shopBox.querySelectorAll('.shopBuy5Btn').forEach(b => {
-          b.onclick = () => {
-            const tier = b.dataset.tier;
-            const price = Math.round(KEY_PRICES[tier] * 5 * KEY_PACK_DISCOUNT);
-            if ((dData.coins || 0) < price) return toast('Monedas insuficientes para pack de 5');
-            dData.coins -= price;
-            dData.keys[tier] = (dData.keys[tier] || 0) + 5;
-            saveState();
-            ringer.beep([659, 987, 1318], 0.06, 0.16);
-            toast(`🔑 ¡Compraste 5 Llaves de ${tier.toUpperCase()} con 10% dto!`);
-            renderShop();
-          };
-        });
+    wrap.querySelectorAll('.vRarityFilterBtn').forEach(b => {
+      b.onclick = () => {
+        activeRarityFilter = b.dataset.rarity;
+        renderView();
+        renderCosmeticsGrid();
       };
+    });
 
-      renderShop();
-      modalWrap.appendChild(shopBox);
-      document.body.appendChild(modalWrap);
-    };
-
-    const btnOpenShop = wrap.querySelector('#vBtnOpenKeyShop');
-    if (btnOpenShop) btnOpenShop.onclick = openKeyShopModal;
-
-    const btnBuy1 = wrap.querySelector('#vBtnBuy1Key');
-    if (btnBuy1) {
-      btnBuy1.onclick = () => {
-        const price = KEY_PRICES[selectedTier];
-        if ((dData.coins || 0) < price) return toast('Monedas insuficientes');
-        dData.coins -= price;
-        dData.keys[selectedTier] = (dData.keys[selectedTier] || 0) + 1;
-        saveState();
-        ringer.beep([587, 880], 0.06, 0.12);
-        toast(`🔑 ¡1 Llave de ${selectedTier.toUpperCase()} comprada!`);
+    // Pestañas de nivel de cofre
+    wrap.querySelectorAll('.vTabBtn').forEach(b => {
+      b.onclick = () => {
+        if (isSpinning) return;
+        selectedTier = b.dataset.tier;
         renderView();
         populatePreview();
       };
-    }
+    });
 
-    // Función Maestra de Giro de Ruleta (Con Llave o con Monedas)
-    const executeRouletteSpin = () => {
-      if (isSpinning) return;
-      if ((dData.keys[selectedTier] || 0) <= 0) {
-        toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre`);
-        return;
-      }
-      dData.keys[selectedTier] -= 1;
+    // Botón de tienda de llaves
+    const btnShop = wrap.querySelector('#vBtnOpenKeyShop');
+    if (btnShop) btnShop.onclick = openKeyShopModal;
 
-      saveState();
-      isSpinning = true;
-      lastSpinResult = null;
-
-      // Bloquear ABSOLUTAMENTE TODOS los botones para que no se interrumpa el giro
-      wrap.querySelectorAll('button').forEach(b => {
-        b.disabled = true;
-        b.style.pointerEvents = 'none';
-      });
-
-      // Limpiar ganador anterior y reiniciar desplazamiento de la pista
-      const prevWinner = wrap.querySelector('#vWinnerArea');
-      if (prevWinner) { prevWinner.style.display = 'none'; prevWinner.innerHTML = ''; }
-      const trk = wrap.querySelector('#vTrack');
-      if (trk) { trk.style.transition = 'none'; trk.style.transform = 'translateX(0px)'; trk.offsetHeight; }
-
-      const wonRarity = rollRarity(selectedTier);
-      if (wonRarity === 'legendary') {
-        dData.pity.withoutLegendary = 0;
-        dData.pity.withoutEpic = 0;
-      } else if (wonRarity === 'epic') {
-        dData.pity.withoutEpic = 0;
-        dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
-      } else {
-        dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
-        dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
-      }
-
-      const pool = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
-      const winner = pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0];
-      const isDuplicate = !!(dData.cosmetics && dData.cosmetics[winner.id]);
-
-      const track = wrap.querySelector('#vTrack');
-      if (!track) { isSpinning = false; return; }
-
-      const cardWidth = 100;
-      const totalCards = 45;
-      const winnerIndex = 36;
-      const cards = [];
-
-      for (let i = 0; i < totalCards; i++) {
-        if (i === winnerIndex) {
-          cards.push(winner);
-        } else {
-          const r = rollRarity(selectedTier);
-          const p = PROFILE_COSMETICS.filter(c => c.rarity === r);
-          cards.push(p[Math.floor(Math.random() * p.length)] || PROFILE_COSMETICS[0]);
-        }
-      }
-
-      track.innerHTML = cards.map(item => {
-        const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
-        let visualPreview = '';
-        if (item.type === 'frame') {
-          visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
-        } else if (item.type === 'color') {
-          visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
-        } else if (item.type === 'title') {
-          visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
-        } else {
-          visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
-        }
-
-        return `
-          <div style="width:${cardWidth}px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
-            <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
-            ${visualPreview}
-            <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
-          </div>
-        `;
-      }).join('');
-
-      const viewportWidth = 720;
-      const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + (Math.random() * 30 - 15);
-      const duration = 4000;
-
-      let startTime = null;
-      let lastTick = -1;
-      let tickInt = null;
-
-      if (typeof ringer !== 'undefined' && ringer.beep) {
-        startTime = Date.now();
-        tickInt = setInterval(() => {
-          const elap = Date.now() - startTime;
-          if (elap >= duration) { clearInterval(tickInt); return; }
-          const p = 1 - Math.pow(1 - (elap / duration), 3);
-          const curX = p * targetOffset;
-          const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
-          if (curCard !== lastTick && curCard < totalCards) {
-            lastTick = curCard;
-            ringer.beep([950], 0.035, 0.08);
-          }
-        }, 25);
-      }
-
-      track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
-      track.style.transform = `translateX(-${targetOffset}px)`;
-
-      setTimeout(() => {
-        if (tickInt) clearInterval(tickInt);
-        isSpinning = false;
-
-        if (!isDuplicate) {
-          if (!dData.cosmetics) dData.cosmetics = {};
-          dData.cosmetics[winner.id] = true;
-          if (winner.id === 'founder_frame') dData.founderFrameUnlocked = true;
-        } else {
-          const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
-          dData.dust = (dData.dust || 0) + dustAward;
-        }
-
-        saveState();
-
-        if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
-
-        // Desbloquear todos los botones
-        wrap.querySelectorAll('button').forEach(b => {
-          b.disabled = false;
-          b.style.pointerEvents = '';
-        });
-
-        // Guardar resultado y persistir para que no se borre al re-renderizar
-        const currentUnlocked = Object.keys(dData.cosmetics || {}).length + (dData.founderFrameUnlocked ? 1 : 0);
-        const dustAward = isDuplicate ? (DUST_DUPLICATE[winner.rarity] || 2) : 0;
-
-        let previewHtml = '';
-        if (winner.type === 'color') {
-          previewHtml = `<div style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${winner.val};vertical-align:middle;box-shadow:0 0 8px ${winner.val};"></div>`;
-        } else if (winner.type === 'banner') {
-          previewHtml = `<div style="display:inline-block;width:65px;height:22px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;"></div>`;
-        } else if (winner.type === 'title') {
-          previewHtml = '<span style="font-size:20px;vertical-align:middle;">👑</span>';
-        } else {
-          previewHtml = '<span style="font-size:20px;vertical-align:middle;">⭐</span>';
-        }
-
-        lastSpinResult = {
-          winner,
-          isDuplicate,
-          dustAward,
-          unlockedCount: currentUnlocked,
-          previewHtml
-        };
-
-        renderView();
-        populatePreview();
-      }, duration + 150);
-    };
-
-    // Botón Unificado de Apertura / Compra Directa
+    // Botón de giro de ruleta
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
       spinBtn.onclick = () => {
@@ -872,7 +900,7 @@ function modalVault(initialTab = 'roulette') {
         } else {
           const price = KEY_PRICES[selectedTier] || 250;
           if ((dData.coins || 0) < price) {
-            toast(`🪙 Necesitas ${price.toLocaleString()} Monedas para esta llave. ¡Gánalas en el Dojo!`);
+            toast(`🪙 Necesitas ${price.toLocaleString()} Monedas para esta llave. ¡Gánalas en el Dojo o Turbo Core!`);
             if (typeof ringer !== 'undefined') ringer.beep([330, 260], 0.08, 0.15);
             return;
           }
@@ -886,7 +914,6 @@ function modalVault(initialTab = 'roulette') {
       };
     }
 
-    // Botón para cerrar el aviso de ganador
     const btnCloseNotice = wrap.querySelector('#vBtnCloseWinnerNotice');
     if (btnCloseNotice) {
       btnCloseNotice.onclick = () => {
@@ -896,7 +923,6 @@ function modalVault(initialTab = 'roulette') {
       };
     }
 
-    // Botón para equipar cosmético ganado directamente
     const equipBtn = wrap.querySelector('#vBtnEquipWinner');
     if (equipBtn && lastSpinResult && !lastSpinResult.isDuplicate) {
       equipBtn.onclick = () => {
@@ -906,15 +932,312 @@ function modalVault(initialTab = 'roulette') {
       };
     }
 
-    // Pestañas de cofre
-    wrap.querySelectorAll('.vTabBtn').forEach(b => {
-      b.onclick = () => {
-        if (isSpinning) return;
-        selectedTier = b.dataset.tier;
+    const prevWinnerBtn = wrap.querySelector('#vBtnPreviewWinner');
+    if (prevWinnerBtn && lastSpinResult && !lastSpinResult.isDuplicate) {
+      prevWinnerBtn.onclick = () => {
+        openCosmeticLivePreviewModal(lastSpinResult.winner);
+      };
+    }
+
+    if (window.__EK && typeof window.__EK.assertNoBadText === 'function') {
+      window.__EK.assertNoBadText(wrap);
+    }
+  };
+
+  const openKeyShopModal = () => {
+    const modalWrap = document.createElement('div');
+    modalWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(4px);';
+
+    const shopBox = document.createElement('div');
+    shopBox.style.cssText = 'background:#111520;border:1.5px solid #2d3748;border-radius:12px;padding:22px;max-width:540px;width:92%;box-shadow:0 12px 36px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;';
+
+    const renderShop = () => {
+      shopBox.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid #222938;padding-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:24px;">🛒</span>
+            <div>
+              <h3 style="margin:0;font-size:16px;font-weight:900;">Tienda de Llaves del Núcleo</h3>
+              <p style="margin:2px 0 0 0;font-size:11.5px;color:#94a3b8;">Canjea tus monedas sin límite diario para abrir cofres en la Bóveda</p>
+            </div>
+          </div>
+          <button id="closeShopBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
+        </div>
+
+        <div style="background:#090d14;border:1px solid #1a2233;border-radius:8px;padding:8px 14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:#94a3b8;">Tus Monedas acumuladas:</span>
+          <span style="font-size:14px;font-weight:900;color:#fbbf24;">🪙 ${(dData.coins || 0).toLocaleString()}</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          ${['copper','silver','gold','obsidian'].map(tier => {
+            const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
+            const icons = { copper: '🟤', silver: '⚪', gold: '🟡', obsidian: '🟣' };
+            const singlePrice = KEY_PRICES[tier];
+            const packPrice = Math.round(singlePrice * 5 * KEY_PACK_DISCOUNT);
+            return `
+              <div style="background:#161c28;border:1px solid #252e42;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <b style="font-size:13px;">${icons[tier]} Llave de ${names[tier]}</b>
+                  <span style="font-size:11px;color:#94a3b8;">Tienes: <b>${dData.keys[tier] || 0}</b></span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="shopBuy1Btn" data-tier="${tier}" style="flex:1;background:#2563eb;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;">
+                    1x (${singlePrice.toLocaleString()} 🪙)
+                  </button>
+                  <button class="shopBuy5Btn" data-tier="${tier}" style="flex:1;background:#059669;color:#fff;border:none;padding:6px;border-radius:5px;font-weight:800;font-size:11px;cursor:pointer;" title="10% de descuento">
+                    5x (${packPrice.toLocaleString()} 🪙)
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+
+      shopBox.querySelector('#closeShopBtn').onclick = () => {
+        document.body.removeChild(modalWrap);
         renderView();
         populatePreview();
       };
+
+      shopBox.querySelectorAll('.shopBuy1Btn').forEach(b => {
+        b.onclick = () => {
+          const tier = b.dataset.tier;
+          const price = KEY_PRICES[tier];
+          if ((dData.coins || 0) < price) return toast('Monedas insuficientes');
+          dData.coins -= price;
+          dData.keys[tier] = (dData.keys[tier] || 0) + 1;
+          saveState();
+          ringer.beep([587, 880], 0.06, 0.12);
+          toast(`🔑 ¡Compraste 1 Llave de ${tier.toUpperCase()}!`);
+          renderShop();
+        };
+      });
+
+      shopBox.querySelectorAll('.shopBuy5Btn').forEach(b => {
+        b.onclick = () => {
+          const tier = b.dataset.tier;
+          const price = Math.round(KEY_PRICES[tier] * 5 * KEY_PACK_DISCOUNT);
+          if ((dData.coins || 0) < price) return toast('Monedas insuficientes para pack de 5');
+          dData.coins -= price;
+          dData.keys[tier] = (dData.keys[tier] || 0) + 5;
+          saveState();
+          ringer.beep([659, 987, 1318], 0.06, 0.16);
+          toast(`🔑 ¡Compraste 5 Llaves de ${tier.toUpperCase()} con 10% dto!`);
+          renderShop();
+        };
+      });
+    };
+
+    renderShop();
+    modalWrap.appendChild(shopBox);
+    document.body.appendChild(modalWrap);
+  };
+
+  const populatePreview = () => {
+    const track = wrap.querySelector('#vTrack');
+    if (!track) return;
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0px)';
+
+    // Ruleta honesta: generar cartas del strip ponderadas según el cofre seleccionado
+    const sample = [];
+    for (let i = 0; i < 20; i++) {
+      const rar = cfg.rollNominalRarity ? cfg.rollNominalRarity(selectedTier) : 'common';
+      const pool = PROFILE_COSMETICS.filter(c => c.rarity === rar);
+      sample.push(pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0]);
+    }
+
+    track.innerHTML = sample.map(item => {
+      const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
+      let visualPreview = '';
+      if (item.type === 'frame') {
+        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
+      } else if (item.type === 'color') {
+        visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
+      } else if (item.type === 'title') {
+        visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
+      } else if (item.type === 'nameplate') {
+        visualPreview = `<div style="font-size:8px;font-weight:800;color:${rColor};border:1px solid ${rColor};border-radius:3px;padding:2px 4px;margin:3px 0;">📛 PLACA</div>`;
+      } else if (item.type === 'profile_fx') {
+        visualPreview = `<div style="font-size:8px;font-weight:800;color:${rColor};background:rgba(168,85,247,0.2);border:1px solid ${rColor};border-radius:3px;padding:2px 4px;margin:3px 0;">✨ EFECTO</div>`;
+      } else {
+        visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
+      }
+
+      return `
+        <div style="width:100px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
+          <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
+          ${visualPreview}
+          <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
+        </div>
+      `;
+    }).join('');
+  };
+
+  const executeRouletteSpin = () => {
+    if (isSpinning) return;
+    if ((dData.keys[selectedTier] || 0) <= 0) {
+      toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre`);
+      return;
+    }
+    dData.keys[selectedTier] -= 1;
+    saveState();
+    isSpinning = true;
+    lastSpinResult = null;
+
+    wrap.querySelectorAll('button').forEach(b => {
+      b.disabled = true;
+      b.style.pointerEvents = 'none';
     });
+
+    const prevWinner = wrap.querySelector('#vWinnerArea');
+    if (prevWinner) { prevWinner.style.display = 'none'; prevWinner.innerHTML = ''; }
+    const trk = wrap.querySelector('#vTrack');
+    if (trk) { trk.style.transition = 'none'; trk.style.transform = 'translateX(0px)'; trk.offsetHeight; }
+
+    const wonRarity = rollRarity(selectedTier);
+    if (wonRarity === 'legendary') {
+      dData.pity.withoutLegendary = 0;
+      dData.pity.withoutEpic = 0;
+    } else if (wonRarity === 'epic') {
+      dData.pity.withoutEpic = 0;
+      dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+    } else {
+      dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
+      dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+    }
+
+    const pool = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
+    const winner = pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0];
+    const isDuplicate = !!(dData.cosmetics && dData.cosmetics[winner.id]);
+
+    const cardWidth = 100;
+    const totalCards = 45;
+    const winnerIndex = 36;
+    const cards = [];
+
+    // Tira honesta ponderada por el cofre seleccionado (sin cartas ilegales)
+    for (let i = 0; i < totalCards; i++) {
+      if (i === winnerIndex) {
+        cards.push(winner);
+      } else {
+        const r = cfg.rollNominalRarity ? cfg.rollNominalRarity(selectedTier) : 'common';
+        const p = PROFILE_COSMETICS.filter(c => c.rarity === r);
+        cards.push(p[Math.floor(Math.random() * p.length)] || PROFILE_COSMETICS[0]);
+      }
+    }
+
+    const track = wrap.querySelector('#vTrack');
+    if (!track) { isSpinning = false; return; }
+
+    track.innerHTML = cards.map(item => {
+      const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
+      let visualPreview = '';
+      if (item.type === 'frame') {
+        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
+      } else if (item.type === 'color') {
+        visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
+      } else if (item.type === 'title') {
+        visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
+      } else if (item.type === 'nameplate') {
+        visualPreview = `<div style="font-size:8px;font-weight:800;color:${rColor};border:1px solid ${rColor};border-radius:3px;padding:2px 4px;margin:3px 0;">📛 PLACA</div>`;
+      } else if (item.type === 'profile_fx') {
+        visualPreview = `<div style="font-size:8px;font-weight:800;color:${rColor};background:rgba(168,85,247,0.2);border:1px solid ${rColor};border-radius:3px;padding:2px 4px;margin:3px 0;">✨ EFECTO</div>`;
+      } else {
+        visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
+      }
+
+      return `
+        <div style="width:${cardWidth}px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
+          <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
+          ${visualPreview}
+          <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
+        </div>
+      `;
+    }).join('');
+
+    const skipAnim = localStorage.getItem('epickast.skip_chest_anim') === '1';
+    const viewportWidth = 720;
+    const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + (Math.random() * 24 - 12);
+    const duration = skipAnim ? 100 : 3600;
+
+    let tickInt = null;
+    if (!skipAnim && typeof ringer !== 'undefined' && ringer.beep) {
+      const startTime = Date.now();
+      let lastTick = -1;
+      tickInt = setInterval(() => {
+        const elap = Date.now() - startTime;
+        if (elap >= duration) { clearInterval(tickInt); return; }
+        const p = 1 - Math.pow(1 - (elap / duration), 3);
+        const curX = p * targetOffset;
+        const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
+        if (curCard !== lastTick && curCard < totalCards) {
+          lastTick = curCard;
+          ringer.beep([950], 0.035, 0.08);
+        }
+      }, 25);
+    }
+
+    track.style.transition = skipAnim ? 'none' : `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
+    track.style.transform = `translateX(-${targetOffset}px)`;
+
+    setTimeout(() => {
+      if (tickInt) clearInterval(tickInt);
+      isSpinning = false;
+
+      if (!isDuplicate) {
+        if (!dData.cosmetics) dData.cosmetics = {};
+        dData.cosmetics[winner.id] = true;
+        if (winner.id === 'founder_frame') dData.founderFrameUnlocked = true;
+      } else {
+        const dustAward = DUST_DUPLICATE[winner.rarity] || 5;
+        dData.dust = (dData.dust || 0) + dustAward;
+      }
+
+      saveState();
+
+      if (typeof ringer !== 'undefined') {
+        if (winner.rarity === 'legendary') ringer.beep([523, 659, 784, 1046, 1318], 0.08, 0.2);
+        else if (winner.rarity === 'epic') ringer.beep([523, 659, 784, 1046], 0.07, 0.16);
+        else ringer.beep([523, 659, 784], 0.06, 0.12);
+      }
+
+      wrap.querySelectorAll('button').forEach(b => {
+        b.disabled = false;
+        b.style.pointerEvents = '';
+      });
+
+      const currentUnlocked = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
+      const dustAward = isDuplicate ? (DUST_DUPLICATE[winner.rarity] || 5) : 0;
+
+      let previewHtml = '';
+      if (winner.type === 'color') {
+        previewHtml = `<div style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${winner.val};vertical-align:middle;box-shadow:0 0 8px ${winner.val};"></div>`;
+      } else if (winner.type === 'banner') {
+        previewHtml = `<div style="display:inline-block;width:65px;height:22px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;"></div>`;
+      } else if (winner.type === 'title') {
+        previewHtml = '<span style="font-size:20px;vertical-align:middle;">👑</span>';
+      } else if (winner.type === 'nameplate') {
+        previewHtml = '<span style="font-size:18px;vertical-align:middle;">📛</span>';
+      } else if (winner.type === 'profile_fx') {
+        previewHtml = '<span style="font-size:18px;vertical-align:middle;">✨</span>';
+      } else {
+        previewHtml = '<span style="font-size:20px;vertical-align:middle;">⭐</span>';
+      }
+
+      lastSpinResult = {
+        winner,
+        isDuplicate,
+        dustAward,
+        unlockedCount: currentUnlocked,
+        previewHtml
+      };
+
+      renderView();
+      populatePreview();
+    }, duration + 100);
   };
 
   const renderCosmeticsGrid = () => {
@@ -926,28 +1249,42 @@ function modalVault(initialTab = 'roulette') {
     const eqColor = localStorage.getItem('epickast.equipped_color') || S.me?.color;
     const eqBanner = localStorage.getItem('epickast.equipped_banner') || S.me?.banner;
     const eqTitle = localStorage.getItem('epickast.equipped_title') || S.me?.title;
+    const eqPlate = localStorage.getItem('epickast.equipped_nameplate') || S.me?.nameplate;
+    const eqFx = localStorage.getItem('epickast.equipped_profile_fx') || S.me?.profile_fx;
 
-    // Filtrar y ordenar por rareza (Legendario -> Épico -> Raro -> Común)
     const rarityRank = { legendary: 4, epic: 3, rare: 2, common: 1 };
-    const filtered = PROFILE_COSMETICS
-      .filter(c => activeFilter === 'all' || c.type === activeFilter)
-      .sort((a, b) => (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0));
+    let filtered = PROFILE_COSMETICS.filter(c => {
+      const matchType = activeFilter === 'all' || c.type === activeFilter;
+      const matchRarity = activeRarityFilter === 'all' || c.rarity === activeRarityFilter;
+      return matchType && matchRarity;
+    });
+
+    filtered.sort((a, b) => {
+      if (sortNewestFirst) {
+        const isAUnl = !!(dData.cosmetics && dData.cosmetics[a.id]);
+        const isBUnl = !!(dData.cosmetics && dData.cosmetics[b.id]);
+        if (isAUnl !== isBUnl) return isAUnl ? -1 : 1;
+      }
+      return (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0);
+    });
 
     filtered.forEach(c => {
       const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
       const isEquipped = (c.type === 'frame' && eqFrame === c.val) ||
                          (c.type === 'color' && eqColor === c.val) ||
                          (c.type === 'banner' && eqBanner === c.val) ||
-                         (c.type === 'title' && eqTitle === c.val);
+                         (c.type === 'title' && eqTitle === c.val) ||
+                         (c.type === 'nameplate' && eqPlate === c.val) ||
+                         (c.type === 'profile_fx' && eqFx === c.val);
 
       const rColor = RARITY_COLORS[c.rarity] || '#60a5fa';
       const craftCost = DUST_CRAFT[c.rarity] || 40;
       const canCraft = !isUnlocked && (dData.dust || 0) >= craftCost;
 
       const card = document.createElement('div');
-      card.style.cssText = `box-sizing:border-box;background:#141822;border:1px solid ${isEquipped ? '#10b981' : '#222838'};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;position:relative;`;
+      card.className = `rarity-card-${c.rarity}`;
+      card.style.cssText = `box-sizing:border-box;background:#141824;border:1px solid ${isEquipped ? '#10b981' : '#222838'};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;position:relative;`;
 
-      // Vista previa visual discreta
       let preview = '';
       if (c.type === 'frame') {
         const frameCls = c.val === 'founder_blue' ? 'frame-founder' : c.val;
@@ -961,7 +1298,7 @@ function modalVault(initialTab = 'roulette') {
         preview = `
           <div style="display:flex;align-items:center;gap:8px;background:#0d1017;padding:6px 10px;border-radius:6px;border:1px solid #1a202c;">
             <span style="width:16px;height:16px;border-radius:50%;background:${c.val};flex-shrink:0;"></span>
-            <span style="font-size:11.5px;font-weight:800;color:${c.val};">@${S.me?.name || 'Usuario'}</span>
+            <span style="font-size:11.5px;font-weight:800;${nameColorStyle(c.val)}">@${S.me?.name || 'Usuario'}</span>
           </div>
         `;
       } else if (c.type === 'title') {
@@ -969,6 +1306,21 @@ function modalVault(initialTab = 'roulette') {
         preview = `
           <div style="display:flex;align-items:center;justify-content:center;background:#0d1017;padding:6px;border-radius:6px;border:1px solid #1a202c;">
             <div class="user-title-badge ${isLegend ? 'legendary' : ''}" style="font-size:10.5px;padding:2px 8px;">👑 ${c.val}</div>
+          </div>
+        `;
+      } else if (c.type === 'nameplate') {
+        preview = `
+          <div style="display:flex;align-items:center;justify-content:center;background:#0d1017;padding:6px;border-radius:6px;border:1px solid #1a202c;">
+            <div class="plate-${c.val.replace(/_/g, '-')}" style="padding:3px 10px;border-radius:6px;font-size:11.5px;font-weight:800;">
+              @${S.me?.name || 'Usuario'}
+            </div>
+          </div>
+        `;
+      } else if (c.type === 'profile_fx') {
+        preview = `
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(168,85,247,0.1);padding:6px;border-radius:6px;border:1px solid rgba(168,85,247,0.3);">
+            <span style="font-size:15px;">✨</span>
+            <span style="font-size:11px;font-weight:800;color:#c084fc;">Efecto Nitro Animado</span>
           </div>
         `;
       } else {
@@ -981,17 +1333,32 @@ function modalVault(initialTab = 'roulette') {
       if (isEquipped) {
         actionHtml = '<button style="width:100%;background:#0f291e;border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:default;">✓ Equipado en Perfil</button>';
       } else if (isUnlocked) {
-        actionHtml = '<button class="vEqBtn" style="width:100%;background:#283247;border:1px solid #3d4b68;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;">Equipar</button>';
+        actionHtml = `
+          <div style="display:flex;gap:4px;">
+            <button class="vEqBtn" style="flex:1;background:#2563eb;border:1px solid #3b82f6;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;">Equipar</button>
+            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+          </div>
+        `;
       } else if (canCraft) {
-        actionHtml = `<button class="vCraftBtn" style="width:100%;background:#2a2040;border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;" title="Fabricar permanente">🔨 Fabricar (${craftCost} ✨)</button>`;
+        actionHtml = `
+          <div style="display:flex;gap:4px;">
+            <button class="vCraftBtn" style="flex:1;background:#2a2040;border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;" title="Fabricar permanente">🔨 Fabricar (${craftCost} ✨)</button>
+            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+          </div>
+        `;
       } else {
-        actionHtml = `<button disabled style="width:100%;background:#151922;border:1px solid #202634;color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:5px;cursor:not-allowed;">🔒 Bloqueado (${craftCost} ✨)</button>`;
+        actionHtml = `
+          <div style="display:flex;gap:4px;">
+            <button disabled style="flex:1;background:#151922;border:1px solid #202634;color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:5px;cursor:not-allowed;">🔒 Bloqueado (${craftCost} ✨)</button>
+            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+          </div>
+        `;
       }
 
       card.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;">● ${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</span>
-          ${isEquipped ? '<span style="font-size:9.5px;color:#10b981;font-weight:800;">ACTIVO</span>' : ''}
+          ${isEquipped ? '<span style="font-size:9.5px;color:#10b981;font-weight:800;">ACTIVO</span>' : (isUnlocked ? '<span style="font-size:9px;color:#38bdf8;font-weight:800;">EN POSESIÓN</span>' : '')}
         </div>
         <div style="font-size:12px;font-weight:800;color:#f1f5f9;line-height:1.2;">${c.name}</div>
         ${preview}
@@ -1003,6 +1370,9 @@ function modalVault(initialTab = 'roulette') {
 
       const eqBtn = card.querySelector('.vEqBtn');
       if (eqBtn) eqBtn.onclick = () => equipCosmeticItem(c);
+
+      const prevBtn = card.querySelector('.vPrevBtn');
+      if (prevBtn) prevBtn.onclick = () => openCosmeticLivePreviewModal(c);
 
       const craftBtn = card.querySelector('.vCraftBtn');
       if (craftBtn) {
@@ -1023,40 +1393,12 @@ function modalVault(initialTab = 'roulette') {
     });
   };
 
-  const populatePreview = () => {
-    const track = wrap.querySelector('#vTrack');
-    if (!track) return;
-    track.style.transition = 'none';
-    track.style.transform = 'translateX(0px)';
-    const sample = PROFILE_COSMETICS.slice(0, 16);
-    track.innerHTML = sample.map(item => {
-      const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
-      let visualPreview = '';
-      if (item.type === 'frame') {
-        visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
-      } else if (item.type === 'color') {
-        visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
-      } else if (item.type === 'title') {
-        visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
-      } else {
-        visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
-      }
-
-      return `
-        <div style="width:100px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
-          <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
-          ${visualPreview}
-          <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
-        </div>
-      `;
-    }).join('');
-  };
-
   const mountDojo = () => {
     const dojoContainer = wrap.querySelector('#vViewDojo');
     if (!dojoContainer) return;
     if (window.CardJitsuGame) {
-      new window.CardJitsuGame(dojoContainer, {
+      if (activeDojoInstance) { try { activeDojoInstance.destroy(); } catch {} }
+      activeDojoInstance = new window.CardJitsuGame(dojoContainer, {
         playerName: S.me?.name || 'Tú',
         onReward: (reward) => {
           if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
@@ -1154,6 +1496,57 @@ function renderGuideContent(chKey) {
           <div>
             <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Historial Oficial de Versiones</h1>
             <p style="color:#94a3b8;font-size:13px;margin:0;">Hilo unificado de notas de versión, optimizaciones y registros de desarrollo de EpicKast.</p>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.1 (ACTUAL) ==================== -->
+        <div style="border:2px solid #38bdf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#0b1522;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2c44;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.1</h2>
+            </div>
+            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Estabilidad, @ Menciones y Acabado Audiovisual</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#38bdf8;">🛡️ Ciclo de Vida Idempotente y Cero Fugas de Memoria (EKLifecycle):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Gestión centralizada de rAF, timers, event listeners y AudioContext mediante <code>EKLifecycle</code>.</li>
+                <li>Pausa automática en pestaña oculta (overlay de pausa + cuenta atrás de reanudación de 3s). Confirmación de salida en partidas activas para evitar pérdida de recompensas.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#fbbf24;">📢 Menciones con @ en Canales de Servidor:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Menú flotante predictivo con búsqueda rápida de miembros (incluye desconectados) y selección con teclado.</li>
+                <li>Tokens anti-XSS seguros, borde dorado en mensajes dirigidos a ti, insignias rojas en canales y riel de servidores, y notificación sonora nativa.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#a855f7;">💎 Recompensas Nitro: 33 Cosméticos, Placas y Set del Coloso:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Nuevas Placas de Nombre (Cobre Forjado, Glaciar, Tormenta Rúnica, Coloso) y Efectos de Perfil con partículas en vivo (Ventisca, Ascuas, Vacío).</li>
+                <li>Progreso del Set del Coloso (4/4) con insignia exclusiva de Conquistador y previsualizador en tiempo real estilo Discord Nitro.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#f87171;">🥋 Dojo Elemental: Mascotas Evolutivas y Choque Cinemático:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>3 etapas de evolución visual por elemento en pixel-art kawaii, bordes holográficos para cartas legendarias, hit-stop de impacto, desintegración de cartas derrotadas en 24 partículas y cinemáticas de cartas 10+ con opción de saltar.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#34d399;">🏎️ Turbo Core Refinado:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Sol synthwave con franjas de horizonte, montañas parallax dobles, líneas de velocidad nitro, sacudida de pantalla en choques, cuenta atrás 3-2-1-GO elástica y podio de posiciones detallado.</li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -1652,10 +2045,10 @@ const S = {
   ws: null, seq: 0, pend: new Map(), me: null, token: localStorage.getItem('epickast.token') || '', ice: [],
   friends: { friends: [], incoming: [], outgoing: [] }, servers: [], sdata: new Map(),
   view: { kind: 'home', sid: null }, chan: null, chanType: null, chanName: '',
-  rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
+  rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.9.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.1', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -1713,14 +2106,125 @@ $('bTogglePass')?.addEventListener('click', (e) => {
   }
 });
 
-// ---------- avatares ----------
+// ---------- avatares y contraste WCAG AA (Bloques A4, A5) ----------
 const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd', '#00d2d3', '#ffa502', '#f59e0b', '#10b981', '#a855f7'];
-function nameColorStyle(col) {
-  if (!col) return '';
-  if (col.startsWith('linear-gradient') || col.startsWith('radial-gradient')) {
-    return `background:${col};-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;font-weight:800;`;
+
+function parseHexToRgb(hex) {
+  const clean = String(hex || '').trim().replace(/^#/, '');
+  if (clean.length === 3) {
+    return [
+      parseInt(clean[0] + clean[0], 16),
+      parseInt(clean[1] + clean[1], 16),
+      parseInt(clean[2] + clean[2], 16)
+    ];
   }
-  return `color:${col};font-weight:700;`;
+  if (clean.length === 6) {
+    return [
+      parseInt(clean.slice(0, 2), 16),
+      parseInt(clean.slice(2, 4), 16),
+      parseInt(clean.slice(4, 6), 16)
+    ];
+  }
+  return null;
+}
+
+function relLuminance([r, g, b]) {
+  const f = (c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function contrastRatio(rgb1, rgb2) {
+  const l1 = relLuminance(rgb1);
+  const l2 = relLuminance(rgb2);
+  const hi = Math.max(l1, l2);
+  const lo = Math.min(l1, l2);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [h, s, l];
+}
+
+function hslToRgb([h, s, l]) {
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function rgbToHex([r, g, b]) {
+  return '#' + [r, g, b].map(x => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('');
+}
+
+function ensureContrast(color, bg = '#0b0e14', minRatio = 4.5) {
+  if (!color) return '#eef0f6';
+  const bgRgb = parseHexToRgb(bg) || [11, 14, 20];
+  const bgLum = relLuminance(bgRgb);
+
+  const adjustSingleHex = (hexStr) => {
+    const rgb = parseHexToRgb(hexStr);
+    if (!rgb) return hexStr;
+    if (contrastRatio(rgb, bgRgb) >= minRatio) return rgbToHex(rgb);
+    let [h, s, l] = rgbToHsl(rgb);
+    const step = bgLum < 0.5 ? 0.03 : -0.03;
+    for (let i = 0; i < 32; i++) {
+      l = Math.max(0.05, Math.min(0.96, l + step));
+      const candidate = hslToRgb([h, s, l]);
+      if (contrastRatio(candidate, bgRgb) >= minRatio) {
+        return rgbToHex(candidate);
+      }
+    }
+    return bgLum < 0.5 ? '#f8fafc' : '#0f172a';
+  };
+
+  if (String(color).includes('gradient')) {
+    return String(color).replace(/#[0-9a-fA-F]{3,6}/g, (m) => adjustSingleHex(m));
+  }
+  if (String(color).startsWith('#')) {
+    return adjustSingleHex(color);
+  }
+  return color;
+}
+window.ensureContrast = ensureContrast;
+
+function nameColorStyle(col, minRatio = 4.5) {
+  if (!col) return '';
+  const safeCol = ensureContrast(col, '#0b0e14', minRatio);
+  if (safeCol.startsWith('linear-gradient') || safeCol.startsWith('radial-gradient')) {
+    return `background:${safeCol};-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;font-weight:800;`;
+  }
+  return `color:${safeCol};font-weight:700;`;
 }
 
 const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
@@ -1728,8 +2232,9 @@ const avCache = new Map(); const avWait = new Set();
 
 function statusDotClass(u, online) {
   const isMe = u && S.me && (u.id === S.me.id);
-  const st = isMe ? (S.me?.status || u?.status || 'online') : (u?.status || (online ? 'online' : 'offline'));
-  if (!isMe && (!online || st === 'offline' || st === 'invisible')) return ' off';
+  const isOn = isMe ? true : (online !== undefined ? !!online : !!u?.online);
+  const st = isMe ? (S.me?.status || u?.status || 'online') : (u?.status || (isOn ? 'online' : 'offline'));
+  if (!isMe && (!isOn || st === 'offline' || st === 'invisible')) return ' off';
   if (st === 'away') return ' away';
   if (st === 'dnd') return ' dnd';
   if (st === 'invisible') return ' inv';
@@ -1746,10 +2251,19 @@ function statusBadgeText(u) {
   return '🟢 En línea';
 }
 
-function titleBadgeEl(titleVal) {
+function titleBadgeEl(titleVal, mode = 'pill') {
   if (!titleVal) return null;
-  const isLeg = titleVal === 'Coloso Caído';
-  return h('span', { class: 'cosmetic-title-badge' + (isLeg ? ' legendary' : ''), title: `Título de Reliquia: ${titleVal}` }, `👑 ${titleVal}`);
+  const isLeg = titleVal === 'Coloso Caído' || titleVal.includes('Coloso');
+  if (mode === 'icon') {
+    return h('span', {
+      class: 'title-badge-icon' + (isLeg ? ' legendary' : ''),
+      title: `👑 ${titleVal}`
+    }, '👑');
+  }
+  return h('span', {
+    class: 'user-title-badge cosmetic-title-badge' + (isLeg ? ' legendary' : ''),
+    title: `Título de Reliquia: ${titleVal}`
+  }, `👑 ${titleVal}`);
 }
 
 function avatar(u, size = 32, online) {
@@ -1759,7 +2273,8 @@ function avatar(u, size = 32, online) {
   if (myFrame === 'founder_blue') frameClass = ' frame-founder';
   else if (myFrame && myFrame.startsWith('frame-')) frameClass = ' ' + myFrame;
   const el = h('div', { class: 'avatar' + frameClass, style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
-  if (online !== undefined) el.append(h('span', { class: 'st' + statusDotClass(u, online) }));
+  const effectiveOnline = online !== undefined ? online : (u && typeof u.online === 'boolean' ? u.online : undefined);
+  if (effectiveOnline !== undefined) el.append(h('span', { class: 'st' + statusDotClass(u, effectiveOnline) }));
   paintAvatar(el); return el;
 }
 function paintAvatar(el) {
@@ -2375,7 +2890,7 @@ async function openServer(id) {
 }
 async function openChannel(key, type, name) {
   if (S.chan !== key) closeThread();
-  S.chan = key; S.chanType = type; S.chanName = name; S.unread.delete(key); S.oldest = null;
+  S.chan = key; S.chanType = type; S.chanName = name; S.unread.delete(key); S.mentionsByChannel.delete(key); S.oldest = null;
   clearReply();
   cancelEditMsg();
   $('typingBar').classList.add('hidden');
@@ -2493,11 +3008,20 @@ function attachmentEl(m) {
   );
 }
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderMsgText(text) {
   if (!text) return null;
 
   if (text.includes('epickast://game/join')) {
-    const cleanMsg = text.replace(/epickast:\/\/game\/join/i, '').trim();
+    const cleanMsg = text.replace(/epickast://game/join/i, '').trim();
     return h('div', { class: 'tx' },
       cleanMsg ? h('div', { style: 'margin-bottom:6px' }, cleanMsg) : null,
       h('div', {
@@ -2519,55 +3043,144 @@ function renderMsgText(text) {
     );
   }
 
-  const match = /epickast:\/\/join\/([a-fA-F0-9]+)/i.exec(text);
-  if (!match) return h('div', { class: 'tx' }, text);
+  const matchJoin = /epickast:\/\/join\/([a-fA-F0-9]+)/i.exec(text);
+  if (matchJoin) {
+    const codeVal = matchJoin[1].toLowerCase();
+    const cleanMsg = text.replace(/epickast:\/\/join\/[a-fA-F0-9]+/i, '').trim();
 
-  const code = match[1].toLowerCase();
-  const cleanMsg = text.replace(/epickast:\/\/join\/[a-fA-F0-9]+/i, '').trim();
-
-  const joinBtn = h('button', {
-    class: 'primary',
-    style: 'padding:7px 14px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;border-radius:6px;margin-top:6px',
-    onclick: async (e) => {
-      const b = e.currentTarget;
-      b.disabled = true;
-      b.textContent = 'Uniéndose...';
-      try {
-        const res = await rpc('server.join', { code });
-        toast('¡Te has unido al servidor correctamente!');
-        b.textContent = '✓ Ya te uniste';
-        b.style.background = '#2ea043';
-        if (res?.id) {
-          await loadServers();
-          selectServer(res.id);
+    const joinBtn = h('button', {
+      class: 'primary',
+      style: 'padding:7px 14px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;border-radius:6px;margin-top:6px',
+      onclick: async (e) => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        b.textContent = 'Uniéndose...';
+        try {
+          const res = await rpc('server.join', { code: codeVal });
+          toast('¡Te has unido al servidor correctamente!');
+          b.textContent = '✓ Ya te uniste';
+          b.style.background = '#2ea043';
+          if (res?.id) {
+            await loadServers();
+            selectServer(res.id);
+          }
+        } catch (err) {
+          toast(err.message || 'Error al unirse');
+          b.disabled = false;
+          b.textContent = '🚀 Unirme al servidor';
         }
-      } catch (err) {
-        toast(err.message || 'Error al unirse');
-        b.disabled = false;
-        b.textContent = '🚀 Unirme al servidor';
       }
-    }
-  }, '🚀 Unirme al servidor');
+    }, '🚀 Unirme al servidor');
 
-  return h('div', { class: 'tx' },
-    cleanMsg ? h('div', { style: 'margin-bottom:6px' }, cleanMsg) : null,
-    h('div', {
-      style: 'background:rgba(20,24,35,0.7);border:1px solid rgba(130,160,255,0.3);border-radius:10px;padding:12px 14px;max-width:340px;margin-top:4px'
-    },
-      h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px' },
-        h('span', { style: 'font-size:24px' }, '🏰'),
-        h('div', null,
-          h('div', { style: 'font-size:11px;text-transform:uppercase;color:#8ba3c7;font-weight:700' }, 'Invitación a Servidor'),
-          h('div', { style: 'font-size:13px;font-weight:600;color:#fff' }, `Código: ${code}`)
-        )
-      ),
-      joinBtn
-    )
-  );
+    return h('div', { class: 'tx' },
+      cleanMsg ? h('div', { style: 'margin-bottom:6px' }, cleanMsg) : null,
+      h('div', {
+        style: 'background:rgba(20,24,35,0.7);border:1px solid rgba(130,160,255,0.3);border-radius:10px;padding:12px 14px;max-width:340px;margin-top:4px'
+      },
+        h('div', { style: 'display:flex;align-items:center;gap:10px;margin-bottom:6px' },
+          h('span', { style: 'font-size:24px' }, '🏰'),
+          h('div', null,
+            h('div', { style: 'font-size:11px;text-transform:uppercase;color:#8ba3c7;font-weight:700' }, 'Invitación a Servidor'),
+            h('div', { style: 'font-size:13px;font-weight:600;color:#fff' }, `Código: ${codeVal}`)
+          )
+        ),
+        joinBtn
+      )
+    );
+  }
+
+  // Parse anti-XSS y render de menciones fuera de bloques de código
+  // Separar bloques de código para nunca alterar menciones dentro de ``` o `
+  const codeBlockRegex = /(```[\s\S]*?```|`[^\n`]+`)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let mPart;
+
+  while ((mPart = codeBlockRegex.exec(text)) !== null) {
+    if (mPart.index > lastIndex) {
+      parts.push({ isCode: false, str: text.slice(lastIndex, mPart.index) });
+    }
+    parts.push({ isCode: true, str: mPart[0] });
+    lastIndex = codeBlockRegex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push({ isCode: false, str: text.slice(lastIndex) });
+  }
+
+  // Obtener lista de miembros actuales para resolver nombres
+  let membersList = [];
+  if (S.view.kind === 'server') {
+    const sd = S.sdata.get(S.view.sid);
+    if (sd && sd.members) membersList = sd.members;
+  }
+  if (S.friends && S.friends.friends) {
+    membersList = membersList.concat(S.friends.friends);
+  }
+  if (S.me) membersList.push(S.me);
+
+  const getMemberById = (uid) => membersList.find(m => String(m.id) === String(uid));
+  const getMemberByName = (nm) => membersList.find(m => m.name.toLowerCase() === nm.toLowerCase());
+
+  let finalHtml = '';
+  parts.forEach(p => {
+    if (p.isCode) {
+      if (p.str.startsWith('```')) {
+        const clean = p.str.slice(3, -3);
+        finalHtml += `<pre style="background:#090d14;border:1px solid #1a2233;padding:8px;border-radius:6px;overflow-x:auto;font-family:monospace;font-size:12px;color:#cbd5e1;"><code>${escapeHtml(clean)}</code></pre>`;
+      } else {
+        const clean = p.str.slice(1, -1);
+        finalHtml += `<code style="background:#090d14;padding:2px 5px;border-radius:4px;font-family:monospace;font-size:12px;color:#cbd5e1;border:1px solid #1a2233;">${escapeHtml(clean)}</code>`;
+      }
+    } else {
+      let escaped = escapeHtml(p.str);
+      // Reemplazar tokens <@123>
+      escaped = escaped.replace(/&lt;@(\d+)&gt;/g, (orig, uid) => {
+        const mem = getMemberById(uid);
+        const name = mem ? mem.name : uid;
+        return `<span class="mention" data-uid="${uid}">@${name}</span>`;
+      });
+      // Reemplazar menciones @Nombre si coincide con miembro
+      membersList.forEach(mem => {
+        if (!mem.name) return;
+        const re = new RegExp('(^|\s)@' + escapeHtml(mem.name) + '(?=\s|$|[.,!?])', 'gi');
+        escaped = escaped.replace(re, (match, prefix) => {
+          return `${prefix}<span class="mention" data-uid="${mem.id}">@${mem.name}</span>`;
+        });
+      });
+      finalHtml += escaped.replace(/\n/g, '<br/>');
+    }
+  });
+
+  const txEl = h('div', { class: 'tx' });
+  txEl.innerHTML = finalHtml;
+
+  // Click en mención para abrir tarjeta de perfil
+  txEl.querySelectorAll('.mention').forEach(span => {
+    span.onclick = (e) => {
+      e.stopPropagation();
+      const uid = span.dataset.uid;
+      if (!uid) return;
+      if (S.view.kind === 'server') {
+        const sd = S.sdata.get(S.view.sid);
+        const mem = sd?.members?.find(m => String(m.id) === String(uid));
+        if (mem) return modalMemberCard(sd, mem);
+      }
+      const fr = S.friends.friends.find(f => String(f.id) === String(uid));
+      if (fr) {
+        openChannel(fr.dm, 'dm', fr.name);
+      } else if (String(uid) === String(S.me?.id)) {
+        modalProfile();
+      }
+    };
+  });
+
+  return txEl;
 }
 
 const msgEl = (m, isThreadItem = false) => {
-  const isMentioned = (m.mentions && m.mentions.includes(S.me?.id)) || (m.text && m.text.includes('@' + S.me?.name)) || m.highlight;
+  const isMentioned = (m.mentions && Array.isArray(m.mentions) && m.mentions.includes(S.me?.id)) ||
+    (m.text && (m.text.includes('<@' + S.me?.id + '>') || m.text.includes('@' + S.me?.name))) ||
+    m.highlight;
   const uTitle = m.title || (m.userId === S.me?.id ? localStorage.getItem('epickast.equipped_title') : null);
   const uColor = (m.userId === S.me?.id ? (localStorage.getItem('epickast.equipped_color') || m.color) : m.color);
   const tCount = Number(m.threadCount) || 0;
@@ -2784,7 +3397,21 @@ function onChatMsg(m) {
     const preview = m.msg.text || (m.msg.fileName ? `📎 ${m.msg.fileName}` : 'Nuevo mensaje');
 
     // Notificar si no está silenciado el servidor ni está en No Molestar
+    // Verificar si el usuario actual fue mencionado directamente
+    const wasMentioned = (m.msg?.mentions && Array.isArray(m.msg.mentions) && m.msg.mentions.includes(S.me?.id)) ||
+      (m.msg?.text && (m.msg.text.includes('<@' + S.me?.id + '>') || m.msg.text.includes('@' + S.me?.name)));
+
+    if (wasMentioned && !isCurrentChannel) {
+      S.mentionsByChannel.set(m.channel, (S.mentionsByChannel.get(m.channel) || 0) + 1);
+      renderSide();
+      renderRail();
+    }
+
     if (!isServerMuted && !settings.dnd && S.me?.status !== 'dnd') {
+      if (wasMentioned) {
+        ringer.beep([659, 880, 1046], 0.05, 0.12);
+      }
+
       const windowUnfocused = !document.hasFocus();
 
       if (!isCurrentChannel || windowUnfocused) {
@@ -2908,12 +3535,147 @@ $('bVoiceNote').addEventListener('click', async () => {
 
 $('bAttach').addEventListener('click', () => $('fileInput').click());
 $('fileInput').addEventListener('change', (e) => { uploadFiles(e.target.files); e.target.value = ''; });
+// Autocomplete predictivo flotante para menciones @
+let mentionPopupEl = null;
+let mentionCandidates = [];
+let mentionSelectedIndex = 0;
+let mentionMatchQuery = null;
+
+function hideMentionPopup() {
+  if (mentionPopupEl) {
+    mentionPopupEl.remove();
+    mentionPopupEl = null;
+  }
+}
+
+function insertMention(member) {
+  const inp = $('msgInput');
+  if (!inp || !member) return;
+  const pos = inp.selectionStart;
+  const val = inp.value;
+  const before = val.slice(0, pos);
+  const after = val.slice(pos);
+  const match = /@([a-zA-Z0-9_À-ſ]*)$/.exec(before);
+  if (!match) return;
+  const replaceStart = match.index;
+  const insertText = '@' + member.name + ' ';
+  inp.value = val.slice(0, replaceStart) + insertText + after;
+  const newPos = replaceStart + insertText.length;
+  inp.setSelectionRange(newPos, newPos);
+  inp.focus();
+  hideMentionPopup();
+}
+
+function updateMentionPopupSelection() {
+  if (!mentionPopupEl) return;
+  const items = mentionPopupEl.querySelectorAll('.mention-popup-item');
+  items.forEach((it, idx) => {
+    it.classList.toggle('sel', idx === mentionSelectedIndex);
+  });
+}
+
+function checkMentionAutocomplete() {
+  const inp = $('msgInput');
+  if (!inp || !S.chan || S.chanType === 'voice') { hideMentionPopup(); return; }
+  const pos = inp.selectionStart;
+  const before = inp.value.slice(0, pos);
+  const match = /@([a-zA-Z0-9_À-ſ]*)$/.exec(before);
+
+  if (!match) {
+    hideMentionPopup();
+    return;
+  }
+
+  mentionMatchQuery = match[1].toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  let pool = [];
+  if (S.view.kind === 'server') {
+    const sd = S.sdata.get(S.view.sid);
+    if (sd && sd.members) pool = sd.members.slice();
+  } else if (S.friends && S.friends.friends) {
+    pool = S.friends.friends.slice();
+  }
+
+  if (mentionMatchQuery) {
+    const starts = pool.filter(m => m.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').startsWith(mentionMatchQuery));
+    const contains = pool.filter(m => !starts.includes(m) && m.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(mentionMatchQuery));
+    mentionCandidates = starts.concat(contains).slice(0, 8);
+  } else {
+    mentionCandidates = pool.slice(0, 8);
+  }
+
+  mentionSelectedIndex = 0;
+
+  if (!mentionPopupEl) {
+    mentionPopupEl = document.createElement('div');
+    mentionPopupEl.className = 'mention-popup';
+    const comp = $('composer');
+    if (comp) comp.appendChild(mentionPopupEl);
+    else document.body.appendChild(mentionPopupEl);
+  }
+
+  mentionPopupEl.replaceChildren();
+
+  if (mentionCandidates.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'mention-popup-empty';
+    empty.textContent = 'Sin coincidencias';
+    mentionPopupEl.appendChild(empty);
+    return;
+  }
+
+  mentionCandidates.forEach((m, idx) => {
+    const item = document.createElement('div');
+    item.className = 'mention-popup-item' + (idx === 0 ? ' sel' : '');
+    const avEl = avatar(m, 28, m.online);
+    const nmSpan = document.createElement('span');
+    nmSpan.className = 'name';
+    nmSpan.textContent = m.name;
+    const stEl = document.createElement('span');
+    stEl.className = 'st' + statusDotClass(m, m.online);
+
+    item.append(avEl, nmSpan, stEl);
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      insertMention(m);
+    };
+    mentionPopupEl.appendChild(item);
+  });
+}
+
 $('msgInput').addEventListener('input', () => {
+  checkMentionAutocomplete();
   if (!S.chan || S.chanType === 'voice') return;
   const now = Date.now();
   if (now - S.lastTypingSent > 2200) { S.lastTypingSent = now; sendRaw('msg.typing', { channel: S.chan }); }
 });
 $('msgInput').addEventListener('keydown', (e) => {
+  if (mentionPopupEl && mentionCandidates.length > 0) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      mentionSelectedIndex = (mentionSelectedIndex + 1) % mentionCandidates.length;
+      updateMentionPopupSelection();
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      mentionSelectedIndex = (mentionSelectedIndex - 1 + mentionCandidates.length) % mentionCandidates.length;
+      updateMentionPopupSelection();
+      return;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      insertMention(mentionCandidates[mentionSelectedIndex]);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      hideMentionPopup();
+      return;
+    }
+  }
+
   if (e.key === 'Escape') {
     if (S.editingMsg) {
       cancelEditMsg();
@@ -2974,7 +3736,20 @@ $('composer').addEventListener('submit', (e) => {
   const replyTo = S.replyTo?.id || undefined;
   $('msgInput').value = '';
   clearReply();
-  rpc('msg.send', { channel: S.chan, text: t, replyTo }).catch((er) => toast(er.message));
+  let membersPool = [];
+  if (S.view.kind === 'server') {
+    const sd = S.sdata.get(S.view.sid);
+    if (sd && sd.members) membersPool = sd.members;
+  }
+  const mentionIds = [];
+  membersPool.forEach(mem => {
+    const re = new RegExp('(^|\\s)@' + mem.name + '(?=\\s|$|[.,!?])', 'i');
+    if (re.test(t)) {
+      if (!mentionIds.includes(mem.id)) mentionIds.push(mem.id);
+    }
+  });
+  hideMentionPopup();
+  rpc('msg.send', { channel: S.chan, text: t, replyTo, mentions: mentionIds }).catch((er) => toast(er.message));
 });
 
 // ---------- Mensajes Fijados (estilo Slack / Linear) ----------
@@ -3112,7 +3887,7 @@ function renderMe() {
       h('div', { style: 'min-width:0' },
         h('div', { style: 'display:flex;align-items:center;gap:4px;overflow:hidden' },
           h('b', { style: nameColorStyle(localStorage.getItem('epickast.equipped_color') || S.me.color) }, S.me.name),
-          titleBadgeEl(eqTitle)
+          titleBadgeEl(eqTitle, 'icon')
         ),
         h('small', { class: S.me.activity?.name ? 'act-live' : '' }, actTxt)
       )
@@ -3138,11 +3913,15 @@ function renderRail() {
     const content = s.icon
       ? h('img', { src: s.icon, alt: s.name })
       : s.name.slice(0, 2).toUpperCase();
+    const srvMentions = (s.channels || []).reduce((acc, ch) => acc + (S.mentionsByChannel.get(ch.key) || 0), 0);
     r.append(h('div', {
       class: 'ico' + (S.view.sid === s.id ? ' sel' : '') + (isMuted ? ' muted-srv' : ''),
       title: s.name + (isMuted ? ' (Silenciado)' : ''),
       onclick: () => openServer(s.id)
-    }, content, isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null));
+    }, content,
+      isMuted ? h('span', { class: 'mute-badge', title: 'Servidor silenciado' }, '🔕') : null,
+      srvMentions > 0 ? h('span', { class: 'rail-mention-badge' }, String(srvMentions)) : null
+    ));
   }
   r.append(h('div', { class: 'ico', title: 'Crear o unirse a un servidor', onclick: modalServer }, '+'));
   r.append(h('div', {
@@ -3168,7 +3947,7 @@ function userItem(u, onclick, extra) {
       h('div', { class: 'u-stack' },
         h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
           h('span', { style: nameColorStyle(u.color) }, u.name),
-          titleBadgeEl(u.title),
+          titleBadgeEl(u.title, 'icon'),
           S.unread.has(u.dm) ? ' ●' : ''
         ),
         stSub ? h('small', { class: u.activity?.name ? 'u-act' : 'u-bio' }, stSub) : null
@@ -3234,7 +4013,8 @@ function renderSide() {
       const prefix = type === 'text' ? '# ' : (/^[\p{Emoji}\u200d]+/u.test(c.name) ? '' : '🔊 ');
       L.append(h('div', { class: 'item' + (sel ? ' sel' : ''), onclick: () => (type === 'voice' ? joinCall(c.key, c.name) : openChannel(c.key, 'text', c.name)) },
         h('span', { class: 'l' }, prefix, h('span', { class: 'nm' }, c.name)),
-        countBadge
+        countBadge,
+        (S.mentionsByChannel.get(c.key) > 0) ? h('span', { class: 'mention-badge' }, String(S.mentionsByChannel.get(c.key))) : null
       ));
       if (type === 'voice') {
         const pt = S.partyTracks.get(c.key);
@@ -3287,7 +4067,7 @@ function renderMembers() {
         h('div', { class: 'u-stack' },
           h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
             h('span', { style: nameColorStyle(mColor) + (rInfo.color && !m.color ? `;font-weight:600` : '') }, m.name),
-            titleBadgeEl(mTitle),
+            titleBadgeEl(mTitle, 'icon'),
             rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null
           ),
           subTxt ? h('small', { class: m.online && m.activity?.name ? 'u-act' : 'u-bio' }, subTxt) : null
@@ -6185,6 +6965,11 @@ $('winClose')?.addEventListener('click', () => window.epic?.close?.());
 // Global keydown: Escape + Atajos de Navegación Rápida (Ctrl+, / Ctrl+0 / Ctrl+1..9)
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (typeof hideMentionPopup === 'function' && mentionPopupEl) {
+      hideMentionPopup();
+      return;
+    }
+
     if (document.fullscreenElement) {
       document.exitFullscreen?.().catch(() => {});
     } else if (S.mini) {

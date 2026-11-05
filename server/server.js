@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, reporter_id INTEGER, 
 CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER, blocked_id INTEGER, ts INTEGER, PRIMARY KEY(blocker_id, blocked_id));
 
 `);
-for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT', "status TEXT DEFAULT 'online'", "custom_status TEXT DEFAULT ''", "ninja_config TEXT DEFAULT '{}'"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT', 'nameplate TEXT', 'profile_fx TEXT', "status TEXT DEFAULT 'online'", "custom_status TEXT DEFAULT ''", "ninja_config TEXT DEFAULT '{}'"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 for (const col of ["coins INTEGER DEFAULT 0","dust INTEGER DEFAULT 0","keys_copper INTEGER DEFAULT 0","keys_silver INTEGER DEFAULT 0","keys_gold INTEGER DEFAULT 0","keys_obsidian INTEGER DEFAULT 0","pity_epic INTEGER DEFAULT 0","pity_legendary INTEGER DEFAULT 0","daily_keys_date TEXT DEFAULT ''","daily_keys_count INTEGER DEFAULT 0","daily_exchange_date TEXT DEFAULT ''","daily_exchange_copper INTEGER DEFAULT 0","daily_exchange_silver INTEGER DEFAULT 0","unlocked_cosmetics TEXT DEFAULT '[]'","weekly_boss_claimed_week INTEGER DEFAULT 0"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0', 'thread_id INTEGER DEFAULT NULL']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
@@ -270,11 +270,11 @@ function presenceAudience(uid) {
 }
 
 const selfView = (id) => {
-  const row = get('SELECT id,name,color,banner,bio,frame,title,status,custom_status customStatus,ninja_config ninjaConfig,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
+  const row = get('SELECT id,name,color,banner,bio,frame,title,nameplate,profile_fx profileFx,status,custom_status customStatus,ninja_config ninjaConfig,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
   return { ...row, status: row.status || 'online', customStatus: row.customStatus || '', activity: activities.get(id) || null };
 };
 const profileOf = (id) => {
-  const row = get('SELECT color,banner,frame,title,status,custom_status customStatus,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
+  const row = get('SELECT color,banner,frame,title,nameplate,profile_fx profileFx,status,custom_status customStatus,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
   return { ...row, status: publicStatusOf(id), customStatus: row.customStatus || '', activity: activities.get(id) || null };
 };
 function roomUsers(key) {
@@ -415,8 +415,8 @@ const serverView = (sid, uid) => {
       partyTrack: c.type === 'voice' ? (parties.get(key)?.current?.title || null) : undefined,
     };
   });
-  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.status,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
-    id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, frame: m.frame || null, title: m.title || null, av: m.av,
+  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
+    id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, frame: m.frame || null, title: m.title || null, nameplate: m.nameplate || null, profileFx: m.profileFx || null, av: m.av,
     role: m.id === s.owner ? 'owner' : (m.role || 'member'),
     online: isOnline(m.id),
     status: publicStatusOf(m.id),
@@ -426,10 +426,10 @@ const serverView = (sid, uid) => {
   return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
-  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.status ustatus,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
+  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status ustatus,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
   const out = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
-    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, frame: r.frame || null, title: r.title || null, av: r.av, online: isOnline(r.uid), status: publicStatusOf(r.uid), customStatus: r.customStatus || '', activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
+    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, frame: r.frame || null, title: r.title || null, nameplate: r.nameplate || null, profileFx: r.profileFx || null, av: r.av, online: isOnline(r.uid), status: publicStatusOf(r.uid), customStatus: r.customStatus || '', activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
     if (r.status === 'accepted') out.friends.push(u); else if (r.b === uid) out.incoming.push(u); else out.outgoing.push(u);
   }
   return out;
@@ -776,9 +776,22 @@ const H = {
       if (!rootMsg) fail('El hilo de conversación no existe en este canal');
       threadId = rootMsg.thread_id || rootMsg.id;
     }
+    // Bloque B3: Validar que los userId mencionados pertenezcan al servidor/canal
+    const audienceSet = new Set(a.audience.map(Number));
+    const mentionCandidates = new Set();
+    if (Array.isArray(d.mentions)) {
+      for (const uid of d.mentions) mentionCandidates.add(Number(uid));
+    }
+    const tokenRe = /<@(\d+)>/g;
+    let tm;
+    while ((tm = tokenRe.exec(text)) !== null) {
+      mentionCandidates.add(Number(tm[1]));
+    }
+    const mentions = [...mentionCandidates].filter((uid) => uid > 0 && audienceSet.has(uid));
+
     const ts = Date.now();
     const id = Number(run('INSERT INTO messages(channel,user_id,text,ts,reply_to,thread_id) VALUES(?,?,?,?,?,?)', d.channel, ws.user.id, text, ts, replyTo, threadId).lastInsertRowid);
-    const payloadMsg = { id, userId: ws.user.id, name: ws.user.name, text, ts, replyId: replyTo, replyName, replyText, threadId, threadCount: 0, pinned: false, ...profileOf(ws.user.id) };
+    const payloadMsg = { id, userId: ws.user.id, name: ws.user.name, text, ts, mentions, replyId: replyTo, replyName, replyText, threadId, threadCount: 0, pinned: false, ...profileOf(ws.user.id) };
     if (threadId) {
       const tStats = get('SELECT COUNT(*) cnt FROM messages WHERE thread_id=?', threadId);
       const threadCount = tStats?.cnt || 1;
@@ -787,30 +800,40 @@ const H = {
       toUsers(a.audience, { t: 'msg', channel: d.channel, msg: payloadMsg });
     }
     setTimeout(saveBackup, 500);
-    return { id, threadId };
+    return { id, threadId, mentions };
   },
   'msg.history': (ws, d) => {
-    authorize(d.channel, ws.user.id);
+    const a = authorize(d.channel, ws.user.id);
+    const audienceSet = new Set(a.audience.map(Number));
     const before = Number(d.before) || Number.MAX_SAFE_INTEGER;
-    return all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
+    return all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,u.nameplate,u.profile_fx profileFx,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
       (SELECT COUNT(*) FROM messages tm WHERE tm.thread_id=m.id) threadCount,
       (SELECT MAX(tm.ts) FROM messages tm WHERE tm.thread_id=m.id) threadLastTs,
       f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize,
       rm.id replyId,ru.name replyName,COALESCE(NULLIF(rm.text,''), CASE WHEN rf.name IS NOT NULL THEN '📎 '||rf.name ELSE '' END) replyText
       FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
       LEFT JOIN messages rm ON rm.id=m.reply_to LEFT JOIN users ru ON ru.id=rm.user_id LEFT JOIN files rf ON rf.id=rm.file_id
-      WHERE m.channel=? AND m.thread_id IS NULL AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse();
+      WHERE m.channel=? AND m.thread_id IS NULL AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse().map((row) => {
+        const mIds = new Set();
+        const re = /<@(\d+)>/g;
+        let x;
+        while ((x = re.exec(String(row.text || ''))) !== null) {
+          const uid = Number(x[1]);
+          if (audienceSet.has(uid)) mIds.add(uid);
+        }
+        return { ...row, mentions: [...mIds] };
+      });
   },
   'thread.history': (ws, d) => {
     authorize(d.channel, ws.user.id);
     const tid = Number(d.threadId);
     if (!tid) fail('Hilo inválido');
-    const root = get(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
+    const root = get(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,u.nameplate,u.profile_fx profileFx,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
       f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize
       FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
       WHERE m.id=? AND m.channel=?`, tid, d.channel);
     if (!root) fail('Mensaje raíz del hilo no encontrado');
-    const replies = all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
+    const replies = all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,u.nameplate,u.profile_fx profileFx,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
       f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize
       FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
       WHERE m.channel=? AND m.thread_id=? ORDER BY m.id ASC LIMIT 200`, d.channel, tid);
@@ -903,7 +926,7 @@ const H = {
   },
   'call.decline': (ws, d) => { const r = rings.get(d.key); if (r && r.to === ws.user.id) stopRing(d.key, 'declined'); },
   'profile.set': (ws, d) => {
-    const cur = get('SELECT avatar,color,banner,bio,frame,title,av FROM users WHERE id=?', ws.user.id);
+    const cur = get('SELECT avatar,color,banner,bio,frame,title,nameplate,profile_fx,av FROM users WHERE id=?', ws.user.id);
     let { avatar, av } = cur;
     if (d.avatar !== undefined) {
       if (d.avatar === null || d.avatar === '') { avatar = null; av = Date.now(); }
@@ -915,15 +938,17 @@ const H = {
     const bio = d.bio !== undefined ? clean(d.bio, 120) : cur.bio;
     const frame = d.frame !== undefined ? (d.frame ? clean(d.frame, 40) : null) : (cur.frame || null);
     const title = d.title !== undefined ? (d.title ? clean(d.title, 60) : null) : (cur.title || null);
-    run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,frame=?,title=?,av=? WHERE id=?', avatar, color, banner, bio, frame, title, av, ws.user.id);
-    const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, frame, title, av: avatar ? av : 0 };
+    const nameplate = d.nameplate !== undefined ? (d.nameplate ? clean(d.nameplate, 50) : null) : (cur.nameplate || null);
+    const profileFx = d.profileFx !== undefined ? (d.profileFx ? clean(d.profileFx, 50) : null) : (cur.profile_fx || null);
+    run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,frame=?,title=?,nameplate=?,profile_fx=?,av=? WHERE id=?', avatar, color, banner, bio, frame, title, nameplate, profileFx, av, ws.user.id);
+    const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, frame, title, nameplate, profileFx, av: avatar ? av : 0 };
     toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'profile.changed', profile: pub });
     setTimeout(saveBackup, 300);
     return pub;
   },
   'profile.get': (ws, d) => {
-    const u = get('SELECT id,name,color,banner,bio,frame,title,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
-    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, frame: u.frame || null, title: u.title || null, av: u.avatar ? u.av : 0 };
+    const u = get('SELECT id,name,color,banner,bio,frame,title,nameplate,profile_fx profileFx,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
+    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, frame: u.frame || null, title: u.title || null, nameplate: u.nameplate || null, profileFx: u.profileFx || null, av: u.avatar ? u.av : 0 };
   },
   'profile.avatar': (ws, d) => ({ avatar: get('SELECT avatar FROM users WHERE id=?', Number(d.id))?.avatar || null }),
   'voice.leave': (ws) => leaveRoom(ws),
