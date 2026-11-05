@@ -77,6 +77,21 @@ const run = (s, ...a) => sql(s).run(...a);
 const BACKUP_FILE = path.join(DATA, 'backup-state.json');
 const SEED_FILE = path.join(__dirname, 'seed.json');
 
+
+// Migración v1.8.5: Reinicio de balance para todos los usuarios (solicitado en v1.8.5)
+try {
+  db.exec("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, val TEXT)");
+  const mRow = get("SELECT val FROM meta WHERE key='econ_v185'");
+  if (!mRow) {
+    run("UPDATE users SET coins=250, keys_copper=1, keys_silver=0, keys_gold=0, keys_obsidian=0, dust=0, pity_epic=0, pity_legendary=0");
+    run("INSERT OR REPLACE INTO meta(key, val) VALUES('econ_v185', 'done')");
+    console.log('[v1.8.5] Reinicio de monedas y llaves aplicado en SQLite users (250 monedas, 1 llave cobre)');
+    setTimeout(saveBackup, 800);
+  }
+} catch (e) {
+  console.log('[v1.8.5] Migration notice:', e.message);
+}
+
 function saveBackup() {
   try {
     const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week FROM users');

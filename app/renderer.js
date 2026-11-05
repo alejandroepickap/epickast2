@@ -203,6 +203,16 @@ function modalVault() {
     }
   } catch {}
 
+  // Reinicio de balance y monedas bugueadas para versión 1.8.5
+  if (dData.version !== '1.8.5') {
+    dData.coins = 250;
+    dData.keys = { copper: 1, silver: 0, gold: 0, obsidian: 0 };
+    dData.dust = 0;
+    dData.pity = { withoutEpic: 0, withoutLegendary: 0 };
+    dData.version = '1.8.5';
+    try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+  }
+
   const today = new Date().toISOString().slice(0, 10);
   if (!dData.dailyExchange || dData.dailyExchange.date !== today) {
     dData.dailyExchange = { date: today, copper: 0, silver: 0 };
@@ -347,7 +357,7 @@ function modalVault() {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.4</h2>
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.5</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
           </div>
         </div>
@@ -498,9 +508,11 @@ function modalVault() {
     const tabCollection = wrap.querySelector('#vTabBtnCollection');
     const tabDojo = wrap.querySelector('#vTabBtnDojo');
 
-    if (tabRoulette) tabRoulette.onclick = () => { activeTab = 'roulette'; renderView(); populatePreview(); };
-    if (tabCollection) tabCollection.onclick = () => { activeTab = 'collection'; renderView(); renderCosmeticsGrid(); };
-    if (tabDojo) tabDojo.onclick = () => { activeTab = 'dojo'; renderView(); mountDojo(); };
+    const tabNinja = wrap.querySelector('#vTabBtnNinja');
+    if (tabRoulette) tabRoulette.onclick = () => { if (isSpinning) return; activeTab = 'roulette'; renderView(); populatePreview(); };
+    if (tabCollection) tabCollection.onclick = () => { if (isSpinning) return; activeTab = 'collection'; renderView(); renderCosmeticsGrid(); };
+    if (tabDojo) tabDojo.onclick = () => { if (isSpinning) return; activeTab = 'dojo'; renderView(); mountDojo(); };
+    if (tabNinja) tabNinja.onclick = () => { if (isSpinning) return; activeTab = 'ninja'; renderView(); mountNinja(); };
 
     // Filtros de colección
     wrap.querySelectorAll('.vFilterBtn').forEach(btn => {
@@ -626,160 +638,149 @@ function modalVault() {
       };
     }
 
-    const btnSpinCoins = wrap.querySelector('#vBtnSpinCoins');
-    if (btnSpinCoins) {
-      btnSpinCoins.onclick = () => {
-        if (isSpinning) return;
-        const price = KEY_PRICES[selectedTier];
-        if ((dData.coins || 0) < price) return toast(`Necesitas ${price.toLocaleString()} 🪙 Monedas`);
-        dData.coins -= price;
-        saveState();
-        toast(`🪙 ${price.toLocaleString()} Monedas consumidas para abrir cofre`);
-        // Disparar giro como si tuviera llave
-        dData.keys[selectedTier] = (dData.keys[selectedTier] || 0) + 1;
-        const sBtn = wrap.querySelector('#vBtnSpin');
-        if (sBtn) sBtn.click();
-      };
-    }
+    // Función Maestra de Giro de Ruleta (Con Llave o con Monedas)
+    const executeRouletteSpin = (isPaidWithCoins = false) => {
+      if (isSpinning) return;
+      const price = KEY_PRICES[selectedTier] || 250;
 
-    // Pestañas de cofre
-    wrap.querySelectorAll('.vTabBtn').forEach(b => {
-      b.onclick = () => {
-        if (isSpinning) return;
-        selectedTier = b.dataset.tier;
-        renderView();
-        populatePreview();
-      };
-    });
-
-    // Botón Abrir Cofre (Ruleta)
-    const spinBtn = wrap.querySelector('#vBtnSpin');
-    if (spinBtn) {
-      spinBtn.onclick = () => {
-        if (isSpinning) return;
-        if ((dData.keys[selectedTier] || 0) <= 0) {
-          toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre. ¡Juega en el Dojo!`);
+      if (isPaidWithCoins) {
+        if ((dData.coins || 0) < price) {
+          toast(`Necesitas ${price.toLocaleString()} 🪙 Monedas`);
           return;
         }
-
-        isSpinning = true;
-        spinBtn.disabled = true;
-        spinBtn.style.opacity = '0.5';
-        wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = true);
-        const prevWinner = wrap.querySelector('#vWinnerArea');
-        if (prevWinner) { prevWinner.style.display = 'none'; prevWinner.innerHTML = ''; }
-        const trk = wrap.querySelector('#vTrack');
-        if (trk) { trk.style.transition = 'none'; trk.style.transform = 'translateX(0px)'; trk.offsetHeight; }
-
+        dData.coins -= price;
+        toast(`🪙 ${price.toLocaleString()} Monedas consumidas para abrir cofre`);
+      } else {
+        if ((dData.keys[selectedTier] || 0) <= 0) {
+          toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre`);
+          return;
+        }
         dData.keys[selectedTier] -= 1;
+      }
 
-        const wonRarity = rollRarity(selectedTier);
-        if (wonRarity === 'legendary') {
-          dData.pity.withoutLegendary = 0;
-          dData.pity.withoutEpic = 0;
-        } else if (wonRarity === 'epic') {
-          dData.pity.withoutEpic = 0;
-          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+      saveState();
+      isSpinning = true;
+
+      // Bloquear ABSOLUTAMENTE TODOS los botones para que no se interrumpa el giro
+      wrap.querySelectorAll('button').forEach(b => {
+        b.disabled = true;
+        b.style.pointerEvents = 'none';
+      });
+
+      // Limpiar ganador anterior y reiniciar desplazamiento de la pista
+      const prevWinner = wrap.querySelector('#vWinnerArea');
+      if (prevWinner) { prevWinner.style.display = 'none'; prevWinner.innerHTML = ''; }
+      const trk = wrap.querySelector('#vTrack');
+      if (trk) { trk.style.transition = 'none'; trk.style.transform = 'translateX(0px)'; trk.offsetHeight; }
+
+      const wonRarity = rollRarity(selectedTier);
+      if (wonRarity === 'legendary') {
+        dData.pity.withoutLegendary = 0;
+        dData.pity.withoutEpic = 0;
+      } else if (wonRarity === 'epic') {
+        dData.pity.withoutEpic = 0;
+        dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+      } else {
+        dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
+        dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+      }
+
+      const pool = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
+      const winner = pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0];
+      const isDuplicate = !!(dData.cosmetics && dData.cosmetics[winner.id]);
+
+      const track = wrap.querySelector('#vTrack');
+      if (!track) { isSpinning = false; return; }
+
+      const cardWidth = 100;
+      const totalCards = 45;
+      const winnerIndex = 36;
+      const cards = [];
+
+      for (let i = 0; i < totalCards; i++) {
+        if (i === winnerIndex) {
+          cards.push(winner);
         } else {
-          dData.pity.withoutEpic = (dData.pity.withoutEpic || 0) + 1;
-          dData.pity.withoutLegendary = (dData.pity.withoutLegendary || 0) + 1;
+          const r = rollRarity(selectedTier);
+          const p = PROFILE_COSMETICS.filter(c => c.rarity === r);
+          cards.push(p[Math.floor(Math.random() * p.length)] || PROFILE_COSMETICS[0]);
+        }
+      }
+
+      track.innerHTML = cards.map(item => {
+        const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
+        let visualPreview = '';
+        if (item.type === 'frame') {
+          visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
+        } else if (item.type === 'color') {
+          visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
+        } else if (item.type === 'title') {
+          visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
+        } else {
+          visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
         }
 
-        const pool = PROFILE_COSMETICS.filter(c => c.rarity === wonRarity);
-        const winner = pool[Math.floor(Math.random() * pool.length)] || PROFILE_COSMETICS[0];
-        const isDuplicate = !!(dData.cosmetics && dData.cosmetics[winner.id]);
+        return `
+          <div style="width:${cardWidth}px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
+            <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
+            ${visualPreview}
+            <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
+          </div>
+        `;
+      }).join('');
 
-        const track = wrap.querySelector('#vTrack');
-        if (!track) return;
+      const viewportWidth = 720;
+      const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + (Math.random() * 30 - 15);
+      const duration = 4000;
 
-        const cardWidth = 100;
-        const totalCards = 45;
-        const winnerIndex = 36;
-        const cards = [];
+      let startTime = null;
+      let lastTick = -1;
+      let tickInt = null;
 
-        for (let i = 0; i < totalCards; i++) {
-          if (i === winnerIndex) {
-            cards.push(winner);
-          } else {
-            const r = rollRarity(selectedTier);
-            const p = PROFILE_COSMETICS.filter(c => c.rarity === r);
-            cards.push(p[Math.floor(Math.random() * p.length)] || PROFILE_COSMETICS[0]);
+      if (typeof ringer !== 'undefined' && ringer.beep) {
+        startTime = Date.now();
+        tickInt = setInterval(() => {
+          const elap = Date.now() - startTime;
+          if (elap >= duration) { clearInterval(tickInt); return; }
+          const p = 1 - Math.pow(1 - (elap / duration), 3);
+          const curX = p * targetOffset;
+          const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
+          if (curCard !== lastTick && curCard < totalCards) {
+            lastTick = curCard;
+            ringer.beep([950], 0.035, 0.08);
           }
+        }, 25);
+      }
+
+      track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
+      track.style.transform = `translateX(-${targetOffset}px)`;
+
+      setTimeout(() => {
+        if (tickInt) clearInterval(tickInt);
+        isSpinning = false;
+
+        if (!isDuplicate) {
+          if (!dData.cosmetics) dData.cosmetics = {};
+          dData.cosmetics[winner.id] = true;
+          if (winner.id === 'founder_frame') dData.founderFrameUnlocked = true;
+        } else {
+          const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
+          dData.dust = (dData.dust || 0) + dustAward;
         }
 
-        track.innerHTML = cards.map(item => {
-          const rColor = RARITY_COLORS[item.rarity] || '#60a5fa';
-          let visualPreview = '';
-          if (item.type === 'frame') {
-            visualPreview = '<div style="width:28px;height:28px;border-radius:50%;border:2px solid ' + rColor + ';display:grid;place-items:center;font-size:9.5px;font-weight:900;color:' + rColor + ';margin:2px 0;">★</div>';
-          } else if (item.type === 'color') {
-            visualPreview = `<div style="width:20px;height:20px;border-radius:50%;background:${item.val};margin:2px 0;"></div>`;
-          } else if (item.type === 'title') {
-            visualPreview = `<div style="font-size:9px;font-weight:700;color:${rColor};padding:2px 5px;border-radius:3px;background:rgba(255,255,255,0.06);border:1px solid ${rColor};margin:4px 0;">👑 Título</div>`;
-          } else {
-            visualPreview = `<div style="width:56px;height:14px;border-radius:3px;background:${item.val};border:1px solid rgba(255,255,255,0.2);margin:4px 0;"></div>`;
-          }
+        saveState();
 
-          return `
-            <div style="width:${cardWidth}px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
-              <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
-              ${visualPreview}
-              <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
-            </div>
-          `;
-        }).join('');
+        if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
 
-        const viewportWidth = 720;
-        const targetOffset = (winnerIndex * cardWidth) - (viewportWidth / 2) + (cardWidth / 2) + (Math.random() * 30 - 15);
-        const duration = 4000;
+        // Desbloquear todos los botones
+        wrap.querySelectorAll('button').forEach(b => {
+          b.disabled = false;
+          b.style.pointerEvents = '';
+        });
 
-        let startTime = null;
-        let lastTick = -1;
-        let tickInt = null;
-
-        if (typeof ringer !== 'undefined' && ringer.beep) {
-          startTime = Date.now();
-          tickInt = setInterval(() => {
-            const elap = Date.now() - startTime;
-            if (elap >= duration) { clearInterval(tickInt); return; }
-            const p = 1 - Math.pow(1 - (elap / duration), 3);
-            const curX = p * targetOffset;
-            const curCard = Math.floor((curX + (viewportWidth / 2)) / cardWidth);
-            if (curCard !== lastTick && curCard < totalCards) {
-              lastTick = curCard;
-              ringer.beep([950], 0.035, 0.08);
-            }
-          }, 25);
-        }
-
-        track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.8, 0.33, 1)`;
-        track.style.transform = `translateX(-${targetOffset}px)`;
-
-        setTimeout(() => {
-          if (tickInt) clearInterval(tickInt);
-          isSpinning = false;
-          wrap.querySelectorAll('.vTabBtn').forEach(b => b.disabled = false);
-          if (spinBtn) {
-            spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
-            spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
-            spinBtn.innerHTML = (dData.keys[selectedTier] || 0) > 0 ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)` : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega en el Dojo)`;
-          }
-          const dustEl = wrap.querySelector('#vDustCount');
-          if (dustEl) dustEl.textContent = dData.dust || 0;
-          if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784, 1046], 0.08, 0.16);
-
-          if (!isDuplicate) {
-            if (!dData.cosmetics) dData.cosmetics = {};
-            dData.cosmetics[winner.id] = true;
-            if (winner.id === 'founder_frame') dData.founderFrameUnlocked = true;
-          } else {
-            const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
-            dData.dust = (dData.dust || 0) + dustAward;
-          }
-
-          saveState();
-
-          const winnerArea = wrap.querySelector('#vWinnerArea');
+        // Mostrar ganador
+        const winnerArea = wrap.querySelector('#vWinnerArea');
+        if (winnerArea) {
           const rColor = RARITY_COLORS[winner.rarity] || '#60a5fa';
           winnerArea.style.display = 'block';
           winnerArea.style.borderColor = rColor;
@@ -808,7 +809,7 @@ function modalVault() {
                 ✨ Convertido automáticamente en +${dustAward} Esencia Arcana (Total: ${dData.dust})
               </div>
               <div style="font-size:11px;color:#94a3b8;">
-                Usa tu polvo en \"Mi Armario\" para forjar cualquier cosmético que te falte.
+                Usa tu polvo en "Mi Armario" para forjar cualquier cosmético que te falte.
               </div>
             `;
           } else {
@@ -836,19 +837,43 @@ function modalVault() {
               };
             }
           }
+        }
 
-          spinBtn.disabled = (dData.keys[selectedTier] || 0) <= 0;
-          spinBtn.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
-          spinBtn.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
-          spinBtn.innerHTML = (dData.keys[selectedTier] || 0) > 0
-            ? `🔓 ABRIR COFRE DE ${selectedTier.toUpperCase()} (Consume 1 Llave)`
-            : `🔒 NECESITAS 1 LLAVE DE ${selectedTier.toUpperCase()} (Juega en el Dojo)`;
+        // Reajustar texto y estado de botones
+        const spinBtnEl = wrap.querySelector('#vBtnSpin');
+        if (spinBtnEl) {
+          spinBtnEl.disabled = (dData.keys[selectedTier] || 0) <= 0;
+          spinBtnEl.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
+          spinBtnEl.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
+          spinBtnEl.innerHTML = `<span>🔓</span><span>ABRIR CON 1 LLAVE (${dData.keys[selectedTier] || 0} disponibles)</span>`;
+        }
 
-          const dCountEl = wrap.querySelector('#vDustCount');
-          if (dCountEl) dCountEl.textContent = dData.dust || 0;
-        }, duration + 150);
-      };
+        renderView();
+        populatePreview();
+      }, duration + 150);
+    };
+
+    // Botón Abrir con Llave
+    const spinBtn = wrap.querySelector('#vBtnSpin');
+    if (spinBtn) {
+      spinBtn.onclick = () => executeRouletteSpin(false);
     }
+
+    // Botón Abrir con Monedas
+    const btnSpinCoins = wrap.querySelector('#vBtnSpinCoins');
+    if (btnSpinCoins) {
+      btnSpinCoins.onclick = () => executeRouletteSpin(true);
+    }
+
+    // Pestañas de cofre
+    wrap.querySelectorAll('.vTabBtn').forEach(b => {
+      b.onclick = () => {
+        if (isSpinning) return;
+        selectedTier = b.dataset.tier;
+        renderView();
+        populatePreview();
+      };
+    });
   };
 
   const renderCosmeticsGrid = () => {
@@ -1008,9 +1033,26 @@ function modalVault() {
     }
   };
 
+  const mountNinja = () => {
+    const ninjaContainer = wrap.querySelector('#vViewNinja');
+    if (!ninjaContainer) return;
+    if (window.CardJitsuGame && window.CardJitsuGame.renderNinjaCustomizer) {
+      window.CardJitsuGame.renderNinjaCustomizer(ninjaContainer, () => {
+        activeTab = 'dojo';
+        renderView();
+        mountDojo();
+      });
+    } else {
+      ninjaContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Estudio Ninja...</div>';
+    }
+  };
+
   m.appendChild(wrap);
   renderView();
-  populatePreview();
+  if (activeTab === 'ninja') mountNinja();
+  else if (activeTab === 'dojo') mountDojo();
+  else if (activeTab === 'collection') renderCosmeticsGrid();
+  else populatePreview();
 }
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
@@ -1036,71 +1078,57 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-                <!-- ==================== VERSIÓN 1.8.4 (ACTUAL) ==================== -->
+                        <!-- ==================== VERSIÓN 1.8.5 (ACTUAL) ==================== -->
         <div style="border:2px solid #818cf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#141328;box-shadow:0 8px 24px rgba(99,102,241,0.15);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #2d2b52;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="background:#4f46e5;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
-              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.4</h2>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.5</h2>
             </div>
             <span style="font-size:12px;color:#a5b4fc;font-weight:700;">Lanzamiento Estable</span>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
             <div>
-              <b style="color:#fde047;">🥷 Ninjas Pixel Art en Combate a Gran Escala:</b>
+              <b style="color:#fde047;">✨ Mascotas Pixel Art Cute para las Cartas:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Los avatares reducidos se reemplazaron por luchadores Pixel Art de cuerpo completo en posición marcial sobre el tatami del Dojo.</li>
-                <li>Animaciones de postura idle, arremetida de ataque al lanzar cartas y saltos de victoria.</li>
+                <li>Reemplazo de los vórtices hiper-saturados por adorables espíritus elementales pixel art estilo retro (Llamita tierna sonriente 🔥, Gotita de agua kawaii 💧 y Pingüino de nieve con bufanda ❄️).</li>
+                <li>Diseño limpio y armonizado con el dojo sin sobrecargar la vista.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#a855f7;">🎨 Estudio de Personalización Ninja:</b>
+              <b style="color:#38bdf8;">🥷 Reparación de la Pestaña "Mi Ninja":</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Nueva pestaña y estudio interactivo para personalizar color del Gi (8 variantes), Máscaras (Clásica, Kitsune, Oni, Cyber, Kasa de Maestro), Brillo de Ojos, Cinturones, Armas a la espalda (Katanas, Shuriken, Pergamino, Bastón) y Auras elementales con guardado persistente.</li>
+                <li>Solución al enlace de navegación de la barra superior; ahora abre directamente el estudio de personalización en vivo.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#38bdf8;">🏯 Arena con Fondo Pixel Art del Dojo:</b>
+              <b style="color:#10b981;">🪙 Apertura con Monedas y Bloqueo Anti-Interrupciones:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Fondo de combate ambientado en un dojo elemental retro de 16-bits con tatami central, biombos shoji y antorchas místicas.</li>
+                <li>El botón "Abrir con Monedas" ahora ejecuta el giro directamente sin depender del botón de llaves.</li>
+                <li>Bloqueo total de la interfaz durante el giro de ruleta para evitar que clics en otras pestañas o cofres congelen la animación.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#ec4899;">🃏 Rediseño de Cartas Estilo Trading Card:</b>
+              <b style="color:#ec4899;">🔄 Reinicio Global de Monedas y Llaves:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Ilustración principal amplia en el cuerpo de la carta y placa con número y símbolo elemental en la esquina superior izquierda.</li>
-                <li>Insignias doradas ★ 10, ★ 11 y ★ 12 con animación de brillo para cartas de poder.</li>
-              </ul>
-            </div>
-
-            <div>
-              <b style="color:#10b981;">⚖️ Puntuación Elemental Clara (Cero Confusión Agua vs Nieve):</b>
-              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Diferenciación cromática absoluta: Fuego (Rojo Carmesí 🔥), Agua (Azul Marino Profundo 💧) y Nieve (Blanco Escarcha Diamante ❄️).</li>
-                <li>Tablero de 3 columnas fijas por elemento y alertas tácticas en tiempo real ("¡Al rival le falta 1 Nieve para ganar!").</li>
-              </ul>
-            </div>
-
-            <div>
-              <b style="color:#f59e0b;">🪙 Tienda de Llaves Ilimitada y Apertura Directa con Monedas:</b>
-              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Eliminación de topes diarios: ahora puedes canjear tus monedas por llaves individuales o packs de 5 llaves con 10% de descuento en cualquier momento.</li>
-                <li>Botón directo "Abrir con Monedas" en cada cofre para desbloquear cosméticos y alimentar la sintonía sin bloqueos.</li>
-                <li>Contador explícito del inventario de llaves disponibles en la cabecera.</li>
-              </ul>
-            </div>
-
-            <div>
-              <b style="color:#ef4444;">🧹 Retiro del Minijuego de Mazmorra de Llamadas:</b>
-              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li>Limpieza completa del lanzador del minijuego antiguo en las llamadas para evitar saturación de controles grupales.</li>
+                <li>Reinicio limpio del balance a 250 monedas iniciales y 1 llave de cobre para todos los usuarios, purgando saldos desbalanceados de versiones de prueba previas.</li>
               </ul>
             </div>
           </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.8.4 ==================== -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <h3 style="color:#818cf8;font-size:16px;font-weight:800;margin:0 0 10px 0;">Versión 1.8.4</h3>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:22px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Luchadores Pixel Art a Gran Escala:</b> Presencia de 3/4 en el tatami con animaciones de ataque y victoria.</li>
+            <li><b>Fondo de Tatami del Dojo:</b> Arena de combate ambientada en un dojo elemental de 16 bits.</li>
+            <li><b>Diferenciación Estricta:</b> Fuego (Carmesí), Agua (Azul Marino Profundo) y Nieve (Blanco Escarcha Diamante).</li>
+          </ul>
         </div>
 
         <!-- ==================== VERSIÓN 1.8.3 ==================== -->
@@ -1468,7 +1496,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.8.5', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,

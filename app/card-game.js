@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Dojo Elemental del Núcleo - Minijuego de Cartas Card-Jitsu
- * Versión: v1.8.4
+ * Versión: v1.8.5
  *
  * Características y Mejoras v1.8.4:
  * - Personajes Pixel Art en combate a gran escala (3/4 de presencia en el tapete).
@@ -24,7 +24,7 @@
       id: 'fire',
       name: 'Fuego',
       icon: '🔥',
-      img: 'assets/cards/fire.jpg',
+      img: 'assets/cards/cute-fire.svg',
       color: '#ef4444',
       badgeBg: '#dc2626',
       badgeText: '#ffffff',
@@ -40,7 +40,7 @@
       id: 'water',
       name: 'Agua',
       icon: '💧',
-      img: 'assets/cards/water.jpg',
+      img: 'assets/cards/cute-water.svg',
       color: '#2563eb', // AZUL PROFUNDO REAL - CERO CONFUSIÓN
       badgeBg: '#1d4ed8',
       badgeText: '#ffffff',
@@ -56,7 +56,7 @@
       id: 'snow',
       name: 'Nieve',
       icon: '❄️',
-      img: 'assets/cards/snow.jpg',
+      img: 'assets/cards/cute-snow.svg',
       color: '#e0f2fe', // BLANCO CRISTAL DE HIELO
       badgeBg: '#ffffff',
       badgeText: '#0f172a',
@@ -1116,7 +1116,7 @@
                     ${isPower ? `<div class="cj-power-star">★ ${c.value}</div>` : ''}
 
                     <!-- Ilustración central -->
-                    <div style="height:90px;border-radius:6px;background:url('${cfg.img}') center/cover no-repeat;margin-top:22px;border:1px solid rgba(255,255,255,0.2);"></div>
+                    <div style="height:90px;border-radius:6px;background:rgba(0,0,0,0.4);margin-top:22px;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;padding:4px;"><img src="${cfg.img}" style="width:72px;height:72px;object-fit:contain;image-rendering:pixelated;" alt="${cfg.name}"></div>
 
                     <!-- Pie de carta -->
                     <div style="font-size:10px;font-weight:900;color:#fff;text-align:center;letter-spacing:0.5px;">
@@ -1159,7 +1159,7 @@
           <div style="background:linear-gradient(135deg, #0e121a, #161b26);border:1px solid #202636;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
               <div style="font-size:15px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:8px;">
-                <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.8.4
+                <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.8.5
               </div>
               <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">
                 Duelos tácticos Card-Jitsu con Ninjas Pixel Art, fondos interactivos y combate cinemático.
