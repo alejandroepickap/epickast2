@@ -1,7 +1,7 @@
 {
   "version": "1.9.3",
-  "asarSha256": "ce5c33979241c57c611567fac118f934b8550502a723d67d32d58a2fd787f7f5",
-  "asarSize": 10758845,
-  "updatedAt": "2026-11-05T07:30:54.348Z",
-  "notes": "EpicKast v1.9.3 - Turbo Core 2D: pistas arcade 2D con rampas de salto, obstaculos (aceite, barreras laser), velocidad de rivales equilibrada y minimapa vertical."
+  "asarSha256": "c1a9a7799d8e95b138ee050aab6bcdb4c5dd61eb0fe590eba64602efd035ffc2",
+  "asarSize": 10758870,
+  "updatedAt": "2026-11-05T07:50:05.271Z",
+  "notes": "EpicKast v1.9.3 - Turbo Core 2D: camara alejada con vision panoramica, velocidad nivelada para maximo control, longitud de pistas ampliada (45-60s) y obstaculos con rampas de salto."
 }

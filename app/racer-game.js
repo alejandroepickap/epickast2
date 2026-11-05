@@ -631,7 +631,7 @@
       const canvas = this.container.querySelector('#racerCanvas');
       const ctx = canvas.getContext('2d');
 
-      const maxSpd = 9.4 + (this.save.engine - 1) * 0.7;
+      const maxSpd = 5.4 + (this.save.engine - 1) * 0.42;
       this.raceState = {
         countdown: 3,
         startedAt: 0,
@@ -659,14 +659,14 @@
           phase: i * 0.1
         })),
         rivals: [
-          { name: 'Kenshin-X', x: -0.45, targetX: -0.45, dist: 28, baseSpeed: 9.1, speed: 9.1, color: '#ef4444', jumpTimer: 0, jumpHeight: 0 },
-          { name: 'Valkyria-9', x: 0.0, targetX: 0.0, dist: 54, baseSpeed: 9.35, speed: 9.35, color: '#eab308', jumpTimer: 0, jumpHeight: 0 },
-          { name: 'Sensei-GT', x: 0.45, targetX: 0.45, dist: 80, baseSpeed: 9.65, speed: 9.65, color: '#a855f7', jumpTimer: 0, jumpHeight: 0 }
+          { name: 'Kenshin-X', x: -0.45, targetX: -0.45, dist: 35, baseSpeed: 5.15, speed: 5.15, color: '#ef4444', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Valkyria-9', x: 0.0, targetX: 0.0, dist: 70, baseSpeed: 5.35, speed: 5.35, color: '#eab308', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Sensei-GT', x: 0.45, targetX: 0.45, dist: 105, baseSpeed: 5.55, speed: 5.55, color: '#a855f7', jumpTimer: 0, jumpHeight: 0 }
         ]
       };
 
       // Generación procedural de circuito 2D: Monedas, Rampas de Salto, Turbos, Aceite y Barreras
-      for (let d = 160; d < this.raceState.totalDist - 160; d += 90) {
+      for (let d = 160; d < this.raceState.totalDist - 160; d += 130) {
         const lane = [-0.62, -0.21, 0.21, 0.62][Math.floor(Math.random() * 4)];
         const roll = Math.random();
         if (roll < 0.30) {
@@ -750,9 +750,9 @@
         st.vx += Math.sin(st.skidTimer * 0.9) * 0.006;
       }
 
-      if (left) st.vx = Math.max(st.vx - 0.009, -0.034);
-      else if (right) st.vx = Math.min(st.vx + 0.009, 0.034);
-      else st.vx *= 0.80;
+      if (left) st.vx = Math.max(st.vx - 0.0075, -0.026);
+      else if (right) st.vx = Math.min(st.vx + 0.0075, 0.026);
+      else st.vx *= 0.82;
 
       st.x = Math.max(-0.84, Math.min(0.84, st.x + st.vx));
 
@@ -763,7 +763,7 @@
         st.jumpHeight = 0;
       }
 
-      const boostBonus = st.nitroActive > 0 ? (3.4 + (this.save.turbo - 1) * 0.45) : 0;
+      const boostBonus = st.nitroActive > 0 ? (2.4 + (this.save.turbo - 1) * 0.35) : 0;
       if (st.nitroActive > 0) st.nitroActive--;
       else st.nitro = Math.min(100, st.nitro + 0.14 + (this.save.turbo - 1) * 0.03);
 
@@ -792,12 +792,12 @@
         // Rubberband justo: asegura emoción y carrera reñida
         const diff = r.dist - st.dist;
         let rubberband = 0;
-        if (diff > 120) rubberband = -0.65;
-        else if (diff > 60) rubberband = -0.30;
-        else if (diff < -120) rubberband = 0.55;
-        else if (diff < -50) rubberband = 0.25;
+        if (diff > 160) rubberband = -0.50;
+        else if (diff > 80) rubberband = -0.25;
+        else if (diff < -160) rubberband = 0.45;
+        else if (diff < -70) rubberband = 0.20;
 
-        r.speed = r.baseSpeed + rubberband + Math.sin(st.dist * 0.015 + idx * 1.5) * 0.18;
+        r.speed = r.baseSpeed + rubberband + Math.sin(st.dist * 0.012 + idx * 1.5) * 0.15;
         r.dist += r.speed;
 
         // Rivales saltan si tocan una rampa
@@ -1037,12 +1037,13 @@
       }
 
       // Línea de Meta / Cuadros de llegada si estamos cerca del final de la carrera
+      const py = 325;
       const distToFinish = st.totalDist - st.dist;
-      if (distToFinish < 250 && distToFinish > -80) {
-        const fy = 300 - distToFinish * 2.4;
+      if (distToFinish < 380 && distToFinish > -60) {
+        const fy = py - distToFinish * 0.85;
         const checkSz = 16;
         for (let cx = roadLeft; cx < roadRight; cx += checkSz) {
-          for (let cy = fy - 16; cy < fy + 16; cy += checkSz) {
+          for (let cy = fy - 14; cy < fy + 14; cy += checkSz) {
             const isWhite = (Math.floor((cx - roadLeft) / checkSz) + Math.floor((cy - fy) / checkSz)) % 2 === 0;
             ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
             ctx.fillRect(cx, cy, checkSz, checkSz);
@@ -1050,25 +1051,24 @@
         }
       }
 
-      // Dibujar Objetos en pista (Monedas, Rampas, Turbos, Aceite, Barreras)
-      const py = 300;
+      // Dibujar Objetos en pista (Monedas, Rampas, Turbos, Aceite, Barreras) con cámara alejada (visibilidad 380+ unidades)
       for (const item of st.items) {
         const dz = item.dist - st.dist;
-        if (dz < -70 || dz > 160) continue;
-        const iy = py - dz * 2.4;
+        if (dz < -50 || dz > 390) continue;
+        const iy = py - dz * 0.85;
         const ix = roadCenterX + item.x * (roadW * 0.42);
 
         if (item.type === 'coin' && !item.taken) {
           ctx.save();
           ctx.fillStyle = '#fbbf24';
           ctx.beginPath();
-          ctx.arc(ix, iy, 12, 0, Math.PI * 2);
+          ctx.arc(ix, iy, 10, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#fef08a';
-          ctx.lineWidth = 2.5;
+          ctx.lineWidth = 2;
           ctx.stroke();
           ctx.fillStyle = '#78350f';
-          ctx.font = '900 11px sans-serif';
+          ctx.font = '900 10px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('🪙', ix, iy);
@@ -1076,12 +1076,12 @@
         } else if (item.type === 'boost' && !item.taken) {
           ctx.save();
           ctx.fillStyle = '#0284c7';
-          ctx.fillRect(ix - 24, iy - 12, 48, 24);
+          ctx.fillRect(ix - 19, iy - 9, 38, 18);
           ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(ix - 24, iy - 12, 48, 24);
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(ix - 19, iy - 9, 38, 18);
           ctx.fillStyle = '#f8fafc';
-          ctx.font = '900 13px sans-serif';
+          ctx.font = '900 10px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('▲ ▲ ▲', ix, iy);
@@ -1089,59 +1089,57 @@
         } else if (item.type === 'ramp') {
           // Rampa Neón de salto elevada
           ctx.save();
-          const rGrad = ctx.createLinearGradient(ix, iy - 16, ix, iy + 16);
+          const rGrad = ctx.createLinearGradient(ix, iy - 12, ix, iy + 12);
           rGrad.addColorStop(0, '#f59e0b');
           rGrad.addColorStop(0.5, '#d97706');
           rGrad.addColorStop(1, '#78350f');
           ctx.fillStyle = rGrad;
-          ctx.fillRect(ix - 30, iy - 16, 60, 32);
+          ctx.fillRect(ix - 24, iy - 12, 48, 24);
           ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 2.5;
-          ctx.strokeRect(ix - 30, iy - 16, 60, 32);
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ix - 24, iy - 12, 48, 24);
 
           // Flechas animadas fluorescentes
           ctx.fillStyle = item.triggered ? '#64748b' : '#fef08a';
-          ctx.font = '900 14px sans-serif';
+          ctx.font = '900 11px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('▲ ▲ ▲', ix, iy);
 
           // Rótulo RAMPA
-          ctx.font = 'bold 9px monospace';
+          ctx.font = 'bold 8px monospace';
           ctx.fillStyle = '#ffffff';
-          ctx.fillText('RAMPA', ix, iy - 20);
+          ctx.fillText('RAMPA', ix, iy - 15);
           ctx.restore();
         } else if (item.type === 'oil' && !item.hit) {
           // Charco de aceite ciber
           ctx.save();
           ctx.fillStyle = '#0f0d1a';
           ctx.beginPath();
-          ctx.ellipse(ix, iy, 26, 14, 0, 0, Math.PI * 2);
+          ctx.ellipse(ix, iy, 22, 11, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#a855f7';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 1.5;
           ctx.stroke();
           ctx.fillStyle = 'rgba(168, 85, 247, 0.4)';
           ctx.beginPath();
-          ctx.ellipse(ix - 5, iy - 3, 14, 6, 0, 0, Math.PI * 2);
+          ctx.ellipse(ix - 4, iy - 2, 11, 5, 0, 0, Math.PI * 2);
           ctx.fill();
           ctx.restore();
         } else if (item.type === 'hazard' && !item.hit) {
           // Barrera láser electrificada
           ctx.save();
-          // Dos conos
           ctx.fillStyle = '#f97316';
-          ctx.fillRect(ix - 24, iy - 10, 10, 20);
-          ctx.fillRect(ix + 14, iy - 10, 10, 20);
+          ctx.fillRect(ix - 17, iy - 8, 8, 16);
+          ctx.fillRect(ix + 9, iy - 8, 8, 16);
           ctx.fillStyle = '#ffffff';
-          ctx.fillRect(ix - 24, iy - 4, 10, 6);
-          ctx.fillRect(ix + 14, iy - 4, 10, 6);
-          // Láser rojo pulsante
+          ctx.fillRect(ix - 17, iy - 3, 8, 5);
+          ctx.fillRect(ix + 9, iy - 3, 8, 5);
           ctx.strokeStyle = '#ef4444';
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 2.5;
           ctx.beginPath();
-          ctx.moveTo(ix - 14, iy);
-          ctx.lineTo(ix + 14, iy);
+          ctx.moveTo(ix - 9, iy);
+          ctx.lineTo(ix + 9, iy);
           ctx.stroke();
           ctx.strokeStyle = '#ffffff';
           ctx.lineWidth = 1;
@@ -1152,16 +1150,16 @@
 
       // Dibujar Rivales (Kenshin-X, Valkyria-9, Sensei-GT)
       for (const r of st.rivals) {
-        const ry = py - (r.dist - st.dist) * 2.4;
+        const ry = py - (r.dist - st.dist) * 0.85;
         const rx = roadCenterX + r.x * (roadW * 0.42);
         if (ry >= -60 && ry <= H + 60) {
-          this.drawKart(ctx, rx, ry - (r.jumpHeight || 0), 1.25, r.color, '#ffffff', r.name, false, 0.95, r.jumpHeight || 0);
+          this.drawKart(ctx, rx, ry - (r.jumpHeight || 0), 0.90, r.color, '#ffffff', r.name, false, 0.95, r.jumpHeight || 0);
         }
       }
 
-      // Dibujar Coche del Jugador
+      // Dibujar Coche del Jugador con cámara panorámica alejada
       const px = roadCenterX + st.x * (roadW * 0.42);
-      this.drawKart(ctx, px, py - st.jumpHeight, 1.35, ch.primary, ch.glow, this.options.playerName || 'Tú', st.nitroActive > 0, 1.0, st.jumpHeight);
+      this.drawKart(ctx, px, py - st.jumpHeight, 0.96, ch.primary, ch.glow, this.options.playerName || 'Tú', st.nitroActive > 0, 1.0, st.jumpHeight);
 
       // Líneas de velocidad durante NITRO
       if (st.nitroActive > 0) {

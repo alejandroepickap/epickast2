@@ -1,0 +1,105 @@
+{
+  "name": "epickast",
+  "productName": "EpicKast",
+  "version": "1.9.3",
+  "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
+  "author": {
+    "name": "EpicKap",
+    "email": "soporte@epickap.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alejandroepickap/epickast2.git"
+  },
+  "main": "app/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server/server.js",
+    "test": "node tools/smoke-test.js",
+    "pack:friends": "electron-builder --win nsis zip --x64",
+    "pack:store": "electron-builder --win appx --x64",
+    "pack:linux": "electron-builder --linux tar.gz deb --x64"
+  },
+  "build": {
+    "appId": "com.epickap.epickast",
+    "productName": "EpicKast",
+    "asar": true,
+    "files": [
+      "app/**/*",
+      "rewards.config.json",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "afterPack": "tools/harden-fuses.js",
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EpicKast",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "artifactName": "EpicKast-Instalador.exe"
+    },
+    "appx": {
+      "identityName": "epickap.EpicKast",
+      "publisher": "CN=84C8DA77-E7AA-4685-90E3-2D5F2F9BA6E9",
+      "publisherDisplayName": "epickap",
+      "applicationId": "epickap.EpicKast",
+      "backgroundColor": "#0b0e14",
+      "showNameOnTiles": true,
+      "artifactName": "EpicKast-Store.appx",
+      "languages": [
+        "es-ES",
+        "es-MX",
+        "es",
+        "en-US"
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Network;Chat",
+      "target": [
+        "tar.gz",
+        "deb"
+      ],
+      "maintainer": "EpicKap <soporte@epickap.com>"
+    },
+    "deb": {
+      "packageCategory": "net",
+      "priority": "optional"
+    }
+  },
+  "dependencies": {
+    "@timephy/rnnoise-wasm": "^1.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2"
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}
