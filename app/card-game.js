@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Dojo Elemental del Núcleo - Minijuego de Cartas Card-Jitsu
- * Versión: v1.8.5
+ * Versión: v1.8.6
  *
  * Características y Mejoras v1.8.4:
  * - Personajes Pixel Art en combate a gran escala (3/4 de presencia en el tapete).
@@ -545,7 +545,7 @@
       wonCards.forEach(c => { if (counts[c.element] !== undefined) counts[c.element]++; });
 
       if (counts.fire >= 1 && counts.water >= 1 && counts.snow >= 1) {
-        return { type: 'triad', desc: '¡Trío Elemental Supremo! (Fuego 🔥 + Agua 💧 + Nieve ❄️)' };
+        return { type: 'triad', desc: '¡Trío Elemental Supremo! (1 Fuego 🔥 + 1 Agua 💧 + 1 Nieve ❄️)' };
       }
       for (const el of ELEMENTS) {
         if (counts[el] >= 3) {
@@ -704,10 +704,14 @@
 
         if (pWin) {
           this.matchWinner = 'player';
+          this.isResolvingRound = false;
+          this.renderMatchBoard();
           this.sfx.winMatch();
           this.renderMatchResult(true, pWin.desc);
         } else if (aiWin) {
           this.matchWinner = 'ai';
+          this.isResolvingRound = false;
+          this.renderMatchBoard();
           this.renderMatchResult(false, aiWin.desc);
         } else {
           this.isResolvingRound = false;
@@ -951,7 +955,8 @@
     renderMatchBoard() {
       const floor = FLOORS[this.currentFloor - 1];
       const meName = this.options.playerName || 'Tú';
-      const playerNinjaCfg = this.playerNinja || getSavedNinjaConfig();
+      this.playerNinja = getSavedNinjaConfig();
+      const playerNinjaCfg = this.playerNinja;
       const bossNinjaCfg = floor.ninjaConfig;
 
       // RENDERIZADOR DE COLUMNAS ELEMENTALES CON COLORES 100% DISTINGUIBLES
@@ -1010,7 +1015,7 @@
           if (pCounts[el] === 2) return `<span style="color:#34d399;">⚡ ¡Tienes 2 de ${ELEM_CONFIG[el].name.toUpperCase()}, 1 más para ganar!</span>`;
         }
 
-        return '<span style="color:#94a3b8;">Condición: 3 distintos (🔥💧❄️) o 3 del mismo elemento</span>';
+        return '<span style="color:#94a3b8;">Condición de Victoria: 1 de cada elemento (🔥 + 💧 + ❄️) O 3 del mismo elemento</span>';
       };
 
       this.container.innerHTML = `
@@ -1159,7 +1164,7 @@
           <div style="background:linear-gradient(135deg, #0e121a, #161b26);border:1px solid #202636;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
               <div style="font-size:15px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:8px;">
-                <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.8.5
+                <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.8.6
               </div>
               <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">
                 Duelos tácticos Card-Jitsu con Ninjas Pixel Art, fondos interactivos y combate cinemático.
@@ -1193,8 +1198,7 @@
               </div>
               <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
                 <b style="color:#10b981;">3. Cómo Ganar:</b><br>
-                • Colecciona <b>3 elementos distintos</b> (1 🔥 + 1 💧 + 1 ❄️).<br>
-                • O colecciona <b>3 del mismo elemento</b> (3 🔥, 3 💧 o 3 ❄️).
+                • <b>Trío Elemental:</b> 1 de cada elemento (1 🔥 + 1 💧 + 1 ❄️).<br>                • <b>Monolito:</b> 3 cartas del mismo elemento (3 🔥, 3 💧 o 3 ❄️).<br>                • <i>Regla estricta: 3 cartas mixtas (ej: 2 agua y 1 fuego) NO otorgan victoria.</i>
               </div>
             </div>
           </div>
@@ -1432,6 +1436,7 @@
 
         // Eventos
         container.querySelector('#customBackBtn').onclick = () => {
+          saveNinjaConfig(cfg);
           if (onBack) onBack();
         };
 
@@ -1445,6 +1450,7 @@
           b.onclick = () => {
             cfg.giColor = b.dataset.val;
             cfg.giAccent = b.dataset.acc;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });
@@ -1452,6 +1458,7 @@
         container.querySelectorAll('.optMaskBtn').forEach(b => {
           b.onclick = () => {
             cfg.maskType = b.dataset.id;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });
@@ -1459,6 +1466,7 @@
         container.querySelectorAll('.optEyeBtn').forEach(b => {
           b.onclick = () => {
             cfg.eyeColor = b.dataset.val;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });
@@ -1467,6 +1475,7 @@
           b.onclick = () => {
             cfg.beltColor = b.dataset.val;
             cfg.beltName = b.dataset.name;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });
@@ -1474,6 +1483,7 @@
         container.querySelectorAll('.optWeaponBtn').forEach(b => {
           b.onclick = () => {
             cfg.weaponType = b.dataset.id;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });
@@ -1481,6 +1491,7 @@
         container.querySelectorAll('.optAuraBtn').forEach(b => {
           b.onclick = () => {
             cfg.aura = b.dataset.id;
+            saveNinjaConfig(cfg);
             renderStudio();
           };
         });

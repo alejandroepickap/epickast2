@@ -203,13 +203,15 @@ function modalVault() {
     }
   } catch {}
 
-  // Reinicio de balance y monedas bugueadas para versión 1.8.5
-  if (dData.version !== '1.8.5') {
-    dData.coins = 250;
-    dData.keys = { copper: 1, silver: 0, gold: 0, obsidian: 0 };
-    dData.dust = 0;
-    dData.pity = { withoutEpic: 0, withoutLegendary: 0 };
-    dData.version = '1.8.5';
+  // Actualización a versión 1.8.6 preservando progreso y balance legítimo
+  if (dData.version !== '1.8.6') {
+    if (dData.version !== '1.8.5') {
+      dData.coins = dData.coins || 250;
+      dData.keys = dData.keys || { copper: 1, silver: 0, gold: 0, obsidian: 0 };
+      dData.dust = dData.dust || 0;
+      dData.pity = dData.pity || { withoutEpic: 0, withoutLegendary: 0 };
+    }
+    dData.version = '1.8.6';
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
   }
 
@@ -277,6 +279,7 @@ function modalVault() {
   else if ((dData.keys.silver || 0) > 0) selectedTier = 'silver';
 
   let isSpinning = false;
+  let lastSpinResult = null;
 
   const saveState = () => {
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
@@ -357,7 +360,7 @@ function modalVault() {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.5</h2>
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.6</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
           </div>
         </div>
@@ -449,28 +452,61 @@ function modalVault() {
           <div id="vTrack" style="display:flex;height:100%;align-items:center;position:absolute;left:0;top:0;will-change:transform;"></div>
         </div>
 
-        <!-- Botones de Apertura: Con Llave o Directo con Monedas -->
-        <div style="display:flex;justify-content:center;gap:12px;margin-top:6px;flex-wrap:wrap;">
-          <!-- Opción A: Abrir con Llave -->
-          <button id="vBtnSpin" ${(dData.keys[selectedTier]||0)<=0?'disabled':''} style="background:${(dData.keys[selectedTier]||0)>0?'#2563eb':'#1e2433'};color:${(dData.keys[selectedTier]||0)>0?'#fff':'#64748b'};border:1px solid ${(dData.keys[selectedTier]||0)>0?'#3b82f6':'#2e384d'};font-size:12.5px;font-weight:800;padding:10px 20px;border-radius:6px;cursor:${(dData.keys[selectedTier]||0)>0?'pointer':'not-allowed'};letter-spacing:0.5px;transition:0.15s;display:flex;align-items:center;gap:8px;">
-            <span>🔓</span>
-            <span>ABRIR CON 1 LLAVE (${dData.keys[selectedTier]||0} disponibles)</span>
-          </button>
-
-          <!-- Opción B: Abrir Directo con Monedas -->
-          <button id="vBtnSpinCoins" style="background:#059669;color:#fff;border:1px solid #10b981;font-size:12.5px;font-weight:800;padding:10px 20px;border-radius:6px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(5,150,105,0.3);display:flex;align-items:center;gap:8px;">
-            <span>🪙</span>
-            <span>ABRIR CON ${(KEY_PRICES[selectedTier]||250).toLocaleString()} MONEDAS</span>
-          </button>
-
-          <!-- Opción C: Comprar Pack -->
-          <button id="vBtnBuy1Key" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;font-size:12px;font-weight:700;padding:10px 14px;border-radius:6px;cursor:pointer;">
-            +1 Llave (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙)
-          </button>
+        <!-- Botón Único y Limpio de Apertura de Cofre -->
+        <div style="display:flex;justify-content:center;gap:12px;margin-top:8px;">
+          ${(dData.keys[selectedTier] || 0) > 0 ? `
+            <button id="vBtnSpin" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:1px solid #3b82f6;font-size:13px;font-weight:900;padding:11px 32px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(37,99,235,0.4);display:flex;align-items:center;gap:8px;transition:0.15s;">
+              <span>🔓</span>
+              <span>ABRIR COFRE (${(dData.keys[selectedTier] || 0)} Llave${(dData.keys[selectedTier] || 0) > 1 ? 's' : ''} disponible${(dData.keys[selectedTier] || 0) > 1 ? 's' : ''})</span>
+            </button>
+          ` : `
+            <button id="vBtnSpin" style="background:#1e2433;color:#fbbf24;border:1.5px solid #d97706;font-size:13px;font-weight:900;padding:11px 28px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(217,119,6,0.25);display:flex;align-items:center;gap:8px;transition:0.15s;">
+              <span>🛒</span>
+              <span>COMPRAR 1 LLAVE (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙) Y ABRIR</span>
+            </button>
+          `}
         </div>
 
-        <!-- Área de Ganador Desbloqueado o Duplicado Reciclado -->
-        <div id="vWinnerArea" style="display:none;padding:12px;background:#141923;border:1.5px solid #38bdf8;border-radius:8px;text-align:center;"></div>
+        <!-- Notificación Clara y Permanente: Nuevo vs Duplicado -->
+        ${lastSpinResult ? `
+          <div id="vWinnerArea" style="margin-top:12px;padding:14px 18px;background:${lastSpinResult.isDuplicate ? '#161426' : '#0a1d15'};border:2px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};border-radius:10px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.6);animation:cjCardFlipIn 0.3s ease;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:11px;font-weight:900;letter-spacing:0.8px;padding:3px 10px;border-radius:6px;background:${lastSpinResult.isDuplicate ? 'rgba(168,85,247,0.2)' : 'rgba(16,185,129,0.2)'};color:${lastSpinResult.isDuplicate ? '#c084fc' : '#34d399'};border:1px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};">
+                ${lastSpinResult.isDuplicate ? '♻️ [ COSMÉTICO REPETIDO · YA EN TU COLECCIÓN ]' : '🎉 [ ¡NUEVO COSMÉTICO DESBLOQUEADO! ]'}
+              </div>
+              <button id="vBtnCloseWinnerNotice" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;" title="Cerrar aviso">✕</button>
+            </div>
+            
+            <div style="font-size:16px;font-weight:900;color:#fff;margin:6px 0;display:flex;align-items:center;justify-content:center;gap:8px;">
+              ${lastSpinResult.previewHtml} <span>${lastSpinResult.winner.name}</span>
+              <span style="font-size:10.5px;font-weight:800;color:${RARITY_COLORS[lastSpinResult.winner.rarity]};text-transform:uppercase;background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:4px;border:1px solid ${RARITY_COLORS[lastSpinResult.winner.rarity]};">
+                ${lastSpinResult.winner.rarity}
+              </span>
+            </div>
+
+            <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">
+              ${lastSpinResult.winner.desc}
+            </div>
+
+            ${lastSpinResult.isDuplicate ? `
+              <div style="font-size:12px;color:#e9d5ff;font-weight:800;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);border-radius:6px;padding:6px 14px;display:inline-block;margin-bottom:4px;">
+                ✨ Duplicado convertido automáticamente en <b>+${lastSpinResult.dustAward} Esencia Arcana</b> (Saldo actual: ${dData.dust} Esencia)
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">
+                Colección actual: <b>${lastSpinResult.unlockedCount} / 26</b> desbloqueados
+              </div>
+            ` : `
+              <div style="display:flex;justify-content:center;gap:12px;align-items:center;margin-top:8px;">
+                <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 2px 10px rgba(16,185,129,0.4);">
+                  ✨ EQUIPAR EN MI PERFIL AHORA
+                </button>
+                <span style="font-size:11.5px;color:#94a3b8;">Colección: <b>${lastSpinResult.unlockedCount} / 26</b></span>
+              </div>
+            `}
+          </div>
+        ` : `
+          <div id="vWinnerArea" style="display:none;"></div>
+        `}
       </div>
 
       <!-- VISTA 2: MI ARMARIO Y COLECCIÓN DISCRETA -->
@@ -639,27 +675,17 @@ function modalVault() {
     }
 
     // Función Maestra de Giro de Ruleta (Con Llave o con Monedas)
-    const executeRouletteSpin = (isPaidWithCoins = false) => {
+    const executeRouletteSpin = () => {
       if (isSpinning) return;
-      const price = KEY_PRICES[selectedTier] || 250;
-
-      if (isPaidWithCoins) {
-        if ((dData.coins || 0) < price) {
-          toast(`Necesitas ${price.toLocaleString()} 🪙 Monedas`);
-          return;
-        }
-        dData.coins -= price;
-        toast(`🪙 ${price.toLocaleString()} Monedas consumidas para abrir cofre`);
-      } else {
-        if ((dData.keys[selectedTier] || 0) <= 0) {
-          toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre`);
-          return;
-        }
-        dData.keys[selectedTier] -= 1;
+      if ((dData.keys[selectedTier] || 0) <= 0) {
+        toast(`Necesitas 1 llave de ${selectedTier.toUpperCase()} para abrir este cofre`);
+        return;
       }
+      dData.keys[selectedTier] -= 1;
 
       saveState();
       isSpinning = true;
+      lastSpinResult = null;
 
       // Bloquear ABSOLUTAMENTE TODOS los botones para que no se interrumpa el giro
       wrap.querySelectorAll('button').forEach(b => {
@@ -778,91 +804,76 @@ function modalVault() {
           b.style.pointerEvents = '';
         });
 
-        // Mostrar ganador
-        const winnerArea = wrap.querySelector('#vWinnerArea');
-        if (winnerArea) {
-          const rColor = RARITY_COLORS[winner.rarity] || '#60a5fa';
-          winnerArea.style.display = 'block';
-          winnerArea.style.borderColor = rColor;
+        // Guardar resultado y persistir para que no se borre al re-renderizar
+        const currentUnlocked = Object.keys(dData.cosmetics || {}).length + (dData.founderFrameUnlocked ? 1 : 0);
+        const dustAward = isDuplicate ? (DUST_DUPLICATE[winner.rarity] || 2) : 0;
 
-          let previewHtml = '';
-          if (winner.type === 'color') {
-            previewHtml = `<div style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${winner.val};vertical-align:middle;margin-right:8px;"></div>`;
-          } else if (winner.type === 'banner') {
-            previewHtml = `<div style="display:inline-block;width:70px;height:20px;border-radius:3px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;margin-right:8px;"></div>`;
-          } else if (winner.type === 'title') {
-            previewHtml = '<span style="font-size:18px;vertical-align:middle;margin-right:6px;">👑</span>';
-          } else {
-            previewHtml = '<span style="font-size:18px;vertical-align:middle;margin-right:6px;">⭐</span>';
-          }
-
-          if (isDuplicate) {
-            const dustAward = DUST_DUPLICATE[winner.rarity] || 2;
-            winnerArea.innerHTML = `
-              <div style="font-size:11px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:3px;">
-                ♻️ ¡COSMÉTICO REPETIDO! (${winner.rarity.toUpperCase()})
-              </div>
-              <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
-                ${previewHtml} <span>${winner.name}</span>
-              </div>
-              <div style="font-size:12px;color:#c084fc;font-weight:700;margin-bottom:4px;">
-                ✨ Convertido automáticamente en +${dustAward} Esencia Arcana (Total: ${dData.dust})
-              </div>
-              <div style="font-size:11px;color:#94a3b8;">
-                Usa tu polvo en "Mi Armario" para forjar cualquier cosmético que te falte.
-              </div>
-            `;
-          } else {
-            winnerArea.innerHTML = `
-              <div style="font-size:11px;font-weight:800;color:${rColor};text-transform:uppercase;margin-bottom:3px;">
-                🎉 ¡NUEVA RECOMPENSA DESBLOQUEADA! (${winner.rarity.toUpperCase()})
-              </div>
-              <div style="font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;justify-content:center;">
-                ${previewHtml} <span>${winner.name}</span>
-              </div>
-              <div style="font-size:11.5px;color:#94a3b8;max-width:560px;margin:0 auto 10px auto;">${winner.desc}</div>
-              <div>
-                <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:800;font-size:12px;padding:7px 22px;border-radius:6px;cursor:pointer;">
-                  ✨ EQUIPAR AHORA
-                </button>
-              </div>
-            `;
-
-            const equipBtn = winnerArea.querySelector('#vBtnEquipWinner');
-            if (equipBtn) {
-              equipBtn.onclick = () => {
-                equipCosmeticItem(winner);
-                equipBtn.textContent = '✓ ¡Equipado en tu perfil!';
-                equipBtn.style.background = '#047857';
-              };
-            }
-          }
+        let previewHtml = '';
+        if (winner.type === 'color') {
+          previewHtml = `<div style="display:inline-block;width:24px;height:24px;border-radius:50%;background:${winner.val};vertical-align:middle;box-shadow:0 0 8px ${winner.val};"></div>`;
+        } else if (winner.type === 'banner') {
+          previewHtml = `<div style="display:inline-block;width:65px;height:22px;border-radius:4px;background:${winner.val};border:1px solid rgba(255,255,255,0.3);vertical-align:middle;"></div>`;
+        } else if (winner.type === 'title') {
+          previewHtml = '<span style="font-size:20px;vertical-align:middle;">👑</span>';
+        } else {
+          previewHtml = '<span style="font-size:20px;vertical-align:middle;">⭐</span>';
         }
 
-        // Reajustar texto y estado de botones
-        const spinBtnEl = wrap.querySelector('#vBtnSpin');
-        if (spinBtnEl) {
-          spinBtnEl.disabled = (dData.keys[selectedTier] || 0) <= 0;
-          spinBtnEl.style.opacity = (dData.keys[selectedTier] || 0) > 0 ? '1' : '0.5';
-          spinBtnEl.style.cursor = (dData.keys[selectedTier] || 0) > 0 ? 'pointer' : 'not-allowed';
-          spinBtnEl.innerHTML = `<span>🔓</span><span>ABRIR CON 1 LLAVE (${dData.keys[selectedTier] || 0} disponibles)</span>`;
-        }
+        lastSpinResult = {
+          winner,
+          isDuplicate,
+          dustAward,
+          unlockedCount: currentUnlocked,
+          previewHtml
+        };
 
         renderView();
         populatePreview();
       }, duration + 150);
     };
 
-    // Botón Abrir con Llave
+    // Botón Unificado de Apertura / Compra Directa
     const spinBtn = wrap.querySelector('#vBtnSpin');
     if (spinBtn) {
-      spinBtn.onclick = () => executeRouletteSpin(false);
+      spinBtn.onclick = () => {
+        if (isSpinning) return;
+        if ((dData.keys[selectedTier] || 0) > 0) {
+          executeRouletteSpin();
+        } else {
+          const price = KEY_PRICES[selectedTier] || 250;
+          if ((dData.coins || 0) < price) {
+            toast(`🪙 Necesitas ${price.toLocaleString()} Monedas para esta llave. ¡Gánalas en el Dojo!`);
+            if (typeof ringer !== 'undefined') ringer.beep([330, 260], 0.08, 0.15);
+            return;
+          }
+          dData.coins -= price;
+          dData.keys[selectedTier] = (dData.keys[selectedTier] || 0) + 1;
+          saveState();
+          if (typeof ringer !== 'undefined') ringer.beep([587, 880], 0.06, 0.12);
+          toast(`🔑 ¡1 Llave de ${selectedTier.toUpperCase()} comprada!`);
+          executeRouletteSpin();
+        }
+      };
     }
 
-    // Botón Abrir con Monedas
-    const btnSpinCoins = wrap.querySelector('#vBtnSpinCoins');
-    if (btnSpinCoins) {
-      btnSpinCoins.onclick = () => executeRouletteSpin(true);
+    // Botón para cerrar el aviso de ganador
+    const btnCloseNotice = wrap.querySelector('#vBtnCloseWinnerNotice');
+    if (btnCloseNotice) {
+      btnCloseNotice.onclick = () => {
+        lastSpinResult = null;
+        renderView();
+        populatePreview();
+      };
+    }
+
+    // Botón para equipar cosmético ganado directamente
+    const equipBtn = wrap.querySelector('#vBtnEquipWinner');
+    if (equipBtn && lastSpinResult && !lastSpinResult.isDuplicate) {
+      equipBtn.onclick = () => {
+        equipCosmeticItem(lastSpinResult.winner);
+        equipBtn.textContent = '✓ ¡Equipado en tu perfil!';
+        equipBtn.style.background = '#047857';
+      };
     }
 
     // Pestañas de cofre
@@ -1078,14 +1089,62 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-                        <!-- ==================== VERSIÓN 1.8.5 (ACTUAL) ==================== -->
-        <div style="border:2px solid #818cf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#141328;box-shadow:0 8px 24px rgba(99,102,241,0.15);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #2d2b52;padding-bottom:10px;">
+                        <!-- ==================== VERSIÓN 1.8.6 (ACTUAL) ==================== -->
+        <div style="border:2px solid #10b981;border-radius:12px;padding:20px;margin-bottom:24px;background:#0d1814;box-shadow:0 8px 24px rgba(16,185,129,0.18);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1c3629;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:#4f46e5;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
-              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.5</h2>
+              <span style="background:#059669;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.6</h2>
             </div>
-            <span style="font-size:12px;color:#a5b4fc;font-weight:700;">Lanzamiento Estable</span>
+            <span style="font-size:12px;color:#6ee7b7;font-weight:700;">Lanzamiento Estable</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#6ee7b7;">🎛️ Des-saturación y Botón Único de Apertura en Bóveda:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Eliminación de botones redundantes de "Abrir con Monedas" y "+1 Llave".</li>
+                <li>Un único botón de alta visibilidad gestiona la apertura con llave o la compra directa en 1 clic si no posees llaves, manteniendo la interfaz despejada y limpia.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#fbbf24;">🏷️ Notificación Permanente de Cosméticos (Nuevo vs Repetido):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Banner persistente e inequívoco con badges de alto contraste visual: <b>[ 🎉 ¡NUEVA RECOMPENSA DESBLOQUEADA! ]</b> con botón de equipar directo o <b>[ ♻️ COSMÉTICO REPETIDO ]</b> indicando la Esencia Arcana obtenida y el estado exacto de tu colección (ej: 13/26).</li>
+                <li>Se solucionó el bug donde el aviso del ganador desaparecía inmediatamente tras el giro.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">📜 Reglas Estrictas y Sincronización del Dojo (Card-Jitsu):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Sincronización instantánea del tablero de puntos superior al ganar una ronda decisiva, evitando desfases visuales.</li>
+                <li>Clarificación estricta de condiciones de victoria: se gana completando <b>1 de cada elemento (🔥 + 💧 + ❄️)</b> O <b>3 cartas del mismo elemento</b>. No otorgan victoria combinaciones mixtas de 3 cartas.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#e879f9;">🥷 Ninja Personalizado Persistente en Combate:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Auto-guardado en tiempo real en la pestaña "Mi Ninja". Cada traje, máscara, ojos, cinturón, arma o aura se sincroniza de inmediato con el personaje en el tatami durante las partidas.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#c084fc;">📊 Auditoría Técnica Completa REA v1.8.6:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Generación del informe arquitectónico exhaustivo <code>Auditoria_Completa_EpicKast_REA_v186.md</code> evaluando rendimiento, economía y minijuegos.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.8.5 ==================== -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #281b3d;padding-bottom:8px;">
+            <h2 style="font-size:16px;font-weight:800;color:#fff;margin:0;">Versión 1.8.5</h2>
+            <span style="font-size:11px;color:#94a3b8;">4 de Noviembre de 2026</span>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
@@ -1309,21 +1368,27 @@ function renderGuideContent(chKey) {
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
           <span style="font-size:32px;">⚔️</span>
           <div>
-            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Dungeons of the Core • Temporada 1</h1>
-            <p style="color:#94a3b8;font-size:13px;margin:0;">Minijuego de 5 pisos, armas de combate, llaves criptográficas y catálogo mensual de skins.</p>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Bóveda de Reliquias y Dojo Elemental • Temporada 1</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Minijuego de combate elemental Card-Jitsu, Estudio Ninja, Ruleta criptográfica de 4 llaves y 26 cosméticos.</p>
           </div>
         </div>
 
-        <!-- Cómo funciona -->
+        <!-- Dojo Elemental y Combate de Cartas -->
         <div style="background:#130f24;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
-          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;">🌋 Mecánicas y Navegación</h2>
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:800;margin:0 0 8px 0;">🥋 Dojo Elemental y Reglas Card-Jitsu</h2>
           <p style="font-size:13px;color:#cbd5e1;margin:0 0 10px 0;">
-            Avanza a través de <b>5 plantas temáticas</b>: Minas de Magma, Galerías de Amatista, Puentes de Lava, Cripta de Basalto y el Sagrario del Núcleo.
+            Enfréntate a los <b>5 Maestros Elementales del Núcleo</b> en el tatami (Novicio Ignis, Adepto Aqua, Guardián Glacial, Maestro Basalto y el Sensei del Núcleo).
           </p>
-          <ul style="font-size:12.5px;color:#94a3b8;padding-left:20px;margin:0;">
-            <li><b>Combate:</b> Clic Izquierdo (Espada melee con empuje) y Clic Derecho (Ballesta a distancia).</li>
-            <li><b>Portal Místico (🌀):</b> Al derrotar a todos los enemigos de la sala, camina hacia el portal para descender y curarte (+35 HP).</li>
-            <li><b>Inventario del Juego:</b> Los enemigos sueltan armas y armaduras para el juego que puedes equipar en la pestaña 🎒 Inventario.</li>
+          <ul style="font-size:12.5px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>Triángulo Elemental:</b> 🔥 Fuego vence a ❄️ Nieve • ❄️ Nieve vence a 💧 Agua • 💧 Agua vence a 🔥 Fuego.</li>
+            <li><b>Desempate Numérico:</b> En empate de elemento, gana la carta con el número más alto (del 2 al 12).</li>
+            <li><b>Cinemáticas Legendarias:</b> Cartas de nivel 10 o superior (10, 11 y 12) desatan impactos cinematográficos en pantalla completa.</li>
+            <li><b>Condición Estricta de Victoria:</b>
+              <br>• <b>Opción A (Trío Elemental):</b> 1 carta de cada elemento (1 🔥 + 1 💧 + 1 ❄️).
+              <br>• <b>Opción B (Poder Monolítico):</b> 3 cartas del mismo elemento (ej: 💧💧💧).
+              <br>• <i>Nota: 3 cartas mixtas (como 2 agua y 1 fuego) NO otorgan victoria.</i>
+            </li>
+            <li><b>Estudio "Mi Ninja":</b> Personaliza gi, máscara (Kitsune, Oni, Cyber), ojos, cinturón, arma y aura elemental. Se guardan y reflejan automáticamente en combate.</li>
           </ul>
         </div>
 
@@ -1496,7 +1561,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.5', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.8.6', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
