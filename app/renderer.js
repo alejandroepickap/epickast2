@@ -225,7 +225,7 @@ function modalVault(initialTab = 'roulette') {
     }
   } catch {}
 
-  const currentVer = cfg.APP_VERSION || '1.9.1';
+  const currentVer = cfg.APP_VERSION || '1.9.2';
   if (dData.version !== currentVer) {
     dData.version = currentVer;
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
@@ -568,9 +568,9 @@ function modalVault(initialTab = 'roulette') {
     const unlockedCount = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
     const pctUnlocked = Math.round((unlockedCount / Math.max(1, totalCosmetics)) * 100);
 
-    const renderTabIco = (key) => {
+    const renderTabIco = (key, scale = 1) => {
       if (window.EKSprites && window.EKSprites.renderSpriteHtml) {
-        return window.EKSprites.renderSpriteHtml(key, 15);
+        return window.EKSprites.renderSpriteHtml(key, scale);
       }
       return '⭐';
     };
@@ -581,7 +581,7 @@ function modalVault(initialTab = 'roulette') {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v${currentVer}</h2>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.2</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
           </div>
         </div>
@@ -589,19 +589,19 @@ function modalVault(initialTab = 'roulette') {
         <!-- 5 Pestañas Modulares con Sprites Pixel-Art -->
         <div style="display:flex;background:#0b0e14;padding:3px;border-radius:8px;border:1px solid #1a2233;gap:4px;margin-left:auto;flex-wrap:wrap;">
           <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#1e2638':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_roulette')} <span>Ruleta y Cofres</span>
+            ${renderTabIco('tab_roulette', 1)} <span>Ruleta y Cofres</span>
           </button>
           <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#1e2638':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_armory')} <span>Mi Armario (${unlockedCount}/${totalCosmetics})</span>
+            ${renderTabIco('tab_armory', 1)} <span>Mi Armario (${unlockedCount}/${totalCosmetics})</span>
           </button>
           <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#1e2638':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_dojo')} <span>Dojo Elemental</span>
+            ${renderTabIco('tab_dojo', 1)} <span>Dojo Elemental</span>
           </button>
           <button id="vTabBtnRacer" style="background:${activeTab==='racer'?'#1e2638':'transparent'};color:${activeTab==='racer'?'#fff':'#94a3b8'};border:${activeTab==='racer'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_racer')} <span>Turbo Core</span>
+            ${renderTabIco('tab_racer', 1)} <span>Turbo Core</span>
           </button>
           <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#1e2638':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_ninja')} <span>Mi Ninja</span>
+            ${renderTabIco('tab_ninja', 1)} <span>Mi Ninja</span>
           </button>
         </div>
 
@@ -613,11 +613,11 @@ function modalVault(initialTab = 'roulette') {
       <div style="background:#131826;border:1px solid #1f273b;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
           <div style="display:flex;gap:14px;align-items:center;font-size:12.5px;">
-            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('coin')} <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('coin', 1)} <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
             <span style="color:#334155;">|</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('essence')} <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('essence', 1)} <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
             <span style="color:#334155;">|</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;color:#94a3b8;">${renderTabIco('pity_star')} Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
+            <span style="display:inline-flex;align-items:center;gap:5px;color:#94a3b8;">${renderTabIco('pity_star', 1)} Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
           </div>
 
           <div style="display:flex;gap:8px;align-items:center;">
@@ -625,7 +625,7 @@ function modalVault(initialTab = 'roulette') {
               <span>ⓘ</span> Probabilidades
             </button>
             <button id="vBtnOpenKeyShop" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;box-shadow:0 2px 8px rgba(37,99,235,0.4);display:flex;align-items:center;gap:6px;">
-              ${renderTabIco('shop_cart')} <span>Comprar Llaves con Monedas</span>
+              ${renderTabIco('shop_cart', 1)} <span>Comprar Llaves con Monedas</span>
             </button>
           </div>
         </div>
@@ -636,10 +636,10 @@ function modalVault(initialTab = 'roulette') {
             <span>🗝️</span> TUS LLAVES DISPONIBLES:
           </div>
           <div style="display:flex;gap:14px;align-items:center;font-weight:800;">
-            <span style="color:#d97706;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_copper')} Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
-            <span style="color:#cbd5e1;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_silver')} Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
-            <span style="color:#fbbf24;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_gold')} Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
-            <span style="color:#c084fc;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_obsidian')} Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
+            <span style="color:#d97706;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_copper', 1)} Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
+            <span style="color:#cbd5e1;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_silver', 1)} Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
+            <span style="color:#fbbf24;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_gold', 1)} Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
+            <span style="color:#c084fc;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_obsidian', 1)} Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
           </div>
         </div>
       </div>
@@ -655,7 +655,7 @@ function modalVault(initialTab = 'roulette') {
             const color = { copper: '#d97706', silver: '#cbd5e1', gold: '#fbbf24', obsidian: '#a855f7' }[tier];
             return `
               <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? '#1a2233' : '#111622'};border:1.5px solid ${isSel ? color : '#20283a'};border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:0.15s;">
-                <span>${renderTabIco(keySprite)}</span>
+                <span style="display:flex;align-items:center;justify-content:center;height:24px;">${renderTabIco(keySprite, 1.2)}</span>
                 <span style="font-size:12px;font-weight:800;color:${isSel ? '#fff' : '#94a3b8'};">${names[tier]}</span>
                 <span style="font-size:10px;font-weight:700;color:${color};">${count} Llaves</span>
               </button>
@@ -2107,7 +2107,7 @@ $('bTogglePass')?.addEventListener('click', (e) => {
 });
 
 // ---------- avatares y contraste WCAG AA (Bloques A4, A5) ----------
-const PALETTE = ['#7c5cff', '#ff5d8f', '#ff9f43', '#2ed573', '#1e90ff', '#e056fd', '#00d2d3', '#ffa502', '#f59e0b', '#10b981', '#a855f7'];
+const PALETTE = ['#7c5cff', '#38bdf8', '#10b981', '#f59e0b', '#f43f5e', '#a855f7', '#ec4899', '#64748b'];
 
 function parseHexToRgb(hex) {
   const clean = String(hex || '').trim().replace(/^#/, '');
@@ -2335,6 +2335,18 @@ const ringer = {
       } catch {}
     };
     play(); this.timer = setInterval(play, kind === 'in' ? 2200 : 3200);
+  },
+  playDm() {
+    // Tono distintivo para mensajes directos privados (doble campana suave cristalina)
+    this.beep([880, 1318], 0.055, 0.14);
+  },
+  playMsgSend() {
+    // Sonido sutil al enviar mensaje con éxito (burbuja/pop táctil rápido)
+    this.beep([520, 680], 0.035, 0.08);
+  },
+  playAction() {
+    // Tono positivo para acciones completadas
+    this.beep([600, 900], 0.04, 0.09);
   },
   stop() { clearInterval(this.timer); this.timer = null; },
 };
@@ -2879,6 +2891,8 @@ async function refreshServer(id) {
   if (S.view.sid === id) { renderSide(); renderMembers(); }
 }
 
+const dmKey = (a, b) => `d${Math.min(a, b)}_${Math.max(a, b)}`;
+
 // ---------- navegación ----------
 function goHome() { S.view = { kind: 'home', sid: null }; S.chan = null; render(); }
 async function openServer(id) {
@@ -3416,7 +3430,11 @@ function onChatMsg(m) {
 
       if (!isCurrentChannel || windowUnfocused) {
         if (settings.chatSound !== false) {
-          ringer.beep([880, 1174], 0.04, 0.07);
+          if (isDm) {
+            ringer.playDm();
+          } else {
+            ringer.beep([880, 1174], 0.04, 0.07);
+          }
         }
 
         window.epic?.flash?.();
@@ -3749,7 +3767,7 @@ $('composer').addEventListener('submit', (e) => {
     }
   });
   hideMentionPopup();
-  rpc('msg.send', { channel: S.chan, text: t, replyTo, mentions: mentionIds }).catch((er) => toast(er.message));
+  rpc('msg.send', { channel: S.chan, text: t, replyTo, mentions: mentionIds }).then(() => { if (settings.chatSound !== false) ringer.playMsgSend(); }).catch((er) => toast(er.message));
 });
 
 // ---------- Mensajes Fijados (estilo Slack / Linear) ----------
@@ -4234,9 +4252,9 @@ function modalMemberCard(sd, m) {
   const btnDm = card.querySelector('#profBtnSendDm');
   if (btnDm) btnDm.onclick = () => {
     closeModal();
-    const dmK = dmKey(S.me.id, m.id);
+    const targetDmKey = (m.dm) ? m.dm : dmKey(S.me.id, m.id);
     goHome();
-    openChannel(dmK, 'dm', m.name);
+    openChannel(targetDmKey, 'dm', m.name);
   };
   const btnCj = card.querySelector('#profBtnCardJitsu');
   if (btnCj) btnCj.onclick = () => {
@@ -4728,7 +4746,7 @@ function modalProfile() {
     reader.onerror = () => toast('No se pudo leer el archivo');
     reader.readAsDataURL(f);
   } });
-  const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
+  const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; localStorage.setItem('epickast.equipped_color', c); sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
   
   // Cosméticos Desbloqueados de la Bóveda (Colores, Marcos, Banners y Títulos)
   let unlockedCosmeticColors = [];
@@ -4880,6 +4898,7 @@ function modalProfile() {
       S.me.title = selectedTitle;
       S.me.banner = banner;
       S.me.color = color;
+      localStorage.setItem('epickast.equipped_color', color);
       localStorage.setItem('epickast.status', selectedStatus);
       await syncActivity();
       await safe(rpc('status.set', { status: selectedStatus, customStatus: bio.value }));

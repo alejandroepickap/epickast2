@@ -1,5 +1,5 @@
 // ============================================================================
-// EPICKAST: TURBO CORE — CARRERAS PIXEL-NEON DEL NÚCLEO (v1.9.1)
+// EPICKAST: TURBO CORE — CARRERAS PIXEL-NEON DEL NÚCLEO (v1.9.2)
 // Bloques A1, A3, C, D, G: Lifecycle, Separación de Karts, Synthwave Parallax,
 // Postes Laterales, Líneas de Velocidad, Cámara Shake, Podio 1º-4º y Taller.
 // ============================================================================
@@ -350,7 +350,7 @@
       const upgradesMeta = getUpgradesMeta();
       const ch = chassisList.find(c => c.id === this.save.chassis) || chassisList[0];
       const clearedCount = tracks.filter(t => !!this.save.clearedTracks[t.id]).length;
-      const appVer = CFG().APP_VERSION || '1.9.1';
+      const appVer = CFG().APP_VERSION || '1.9.2';
 
       const renderUpgradeCard = (key) => {
         const meta = upgradesMeta[key];

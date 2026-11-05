@@ -1,7 +1,7 @@
 ﻿{
-    "version":  "1.9.1",
-    "asarSha256":  "f3ec69fb1f10a0b75413252801d2580a23d6bf36cd83129703a5bbe30fab02fb",
-    "asarSize":  10745817,
-    "updatedAt":  "2026-11-05T05:54:23.399Z",
-    "notes":  "EpicKast v1.9.1 - Dojo Elemental Pixel-Art, Turbo Core, Hilos, Estados y Certificacion Microsoft Store"
+    "version":  "1.9.2",
+    "asarSha256":  "0670879df62cf2d29a989fe6ce42469576a04f2f4f01ddbca300b14fb0034283",
+    "asarSize":  10746674,
+    "updatedAt":  "2026-11-05T06:58:22.546Z",
+    "notes":  "EpicKast v1.9.2 - Proporciones de Tienda y Boveda corregidas, Navegacion a DMs desde perfil reparada, Paleta base optimizada y Nuevos sonidos de chat"
 }

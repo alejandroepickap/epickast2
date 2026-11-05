@@ -13,7 +13,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  const APP_VERSION = '1.9.1';
+  const APP_VERSION = '1.9.2';
 
   const RARITY_TOKENS = {
     common: {
