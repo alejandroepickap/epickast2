@@ -1,208 +1,166 @@
-# Auditoría Técnica Exhaustiva y Especificación de Arquitectura: EpicKast v1.8.6
+# Auditoría Técnica Exhaustiva y Especificación de Arquitectura: EpicKast v1.9.0
 **Metodología de Evaluación:** REA (*Reverse Engineering & Architecture Audit*)  
-**Fecha de Generación:** 4 de Noviembre de 2026  
-**Versión de Plataforma:** EpicKast v1.8.6 Stable Release  
-**Propósito del Documento:** Auditoría técnica integral de ingeniería inversa, arquitectura de software, motor del minijuego de cartas Card-Jitsu, modelo económico balanceado, seguridad y directrices de optimización para evaluadores técnicos senior e inteligencias artificiales.
+**Fecha de Actualización:** 4 de Noviembre de 2026  
+**Versión de Plataforma:** EpicKast v1.9.0 Stable Release  
+**Propósito del Documento:** Auditoría técnica integral de ingeniería inversa, arquitectura de software, corrección de vulnerabilidades y bugs críticos (v1.8.6 → v1.9.0), ecosistema de 2 minijuegos con economía compartida (**Dojo Elemental** + **🏎️ Turbo Core: Carreras Pixel-Neon**), estados de presencia en tiempo real, hilos de conversación (*Threads*), respaldo integral sin pérdida de datos y catálogo mejorado de 26 cosméticos.
 
 ---
 
 ## ÍNDICE GENERAL
-1. [Resumen Ejecutivo y Declaración de Misión](#1-resumen-ejecutivo-y-declaración-de-misión)
+1. [Resumen Ejecutivo y Hallazgos Críticos Corregidos en v1.9.0](#1-resumen-ejecutivo-y-hallazgos-críticos-corregidos-en-v190)
 2. [Arquitectura Global del Sistema (REA Frontend & Backend)](#2-arquitectura-global-del-sistema-rea-frontend--backend)
-3. [Auditoría Profunda del Minijuego: Dojo Elemental (Card-Jitsu)](#3-auditoría-profunda-del-minijuego-dojo-elemental-card-jitsu)
-   - 3.1 [Motor Gráfico Vectorial Pixel Art SVG (16-bit)](#31-motor-gráfico-vectorial-pixel-art-svg-16-bit)
-   - 3.2 [Reglas Elementales Estrictas y Lógica de Resolución](#32-reglas-elementales-estrictas-y-lógica-de-resolución)
-   - 3.3 [Arquitectura de Inteligencia Artificial de 5 Niveles](#33-arquitectura-de-inteligencia-artificial-de-5-niveles)
-   - 3.4 [Estudio Ninja Interactivo y Persistencia en Combate](#34-estudio-ninja-interactivo-y-persistencia-en-combate)
-   - 3.5 [Cinemáticas a Pantalla Completa y Sintetizador Web Audio API](#35-cinemáticas-a-pantalla-completa-y-sintetizador-web-audio-api)
-4. [Auditoría Económica y Sistema de Bóveda de Reliquias](#4-auditoría-económica-y-sistema-de-bóveda-de-reliquias)
-   - 4.1 [Modelo Matemático de Probabilidades y Cofres](#41-modelo-matemático-de-probabilidades-y-cofres)
-   - 4.2 [Algoritmo de Sintonía y Protección Anti-Mala Suerte (Pity)](#42-algoritmo-de-sintonía-y-protección-anti-mala-suerte-pity)
-   - 4.3 [Economía Circular: Monedas, Llaves y Esencia Arcana](#43-economía-circular-monedas-llaves-y-esencia-arcana)
-   - 4.4 [Des-saturación de Interfaz y Unificación de Acciones v1.8.6](#44-des-saturación-de-interfaz-y-unificación-de-acciones-v186)
-5. [Auditoría de Red, Seguridad y Resiliencia](#5-auditoría-de-red-seguridad-y-resiliencia)
-6. [Matriz de Pruebas y Validación Técnica v1.8.6](#6-matriz-de-pruebas-y-validación-técnica-v186)
-7. [Conclusiones y Hoja de Ruta Futura](#7-conclusiones-y-hoja-de-ruta-futura)
+3. [Auditoría de los Minijuegos con Economía Compartida](#3-auditoría-de-los-minijuegos-con-economía-compartida)
+   - 3.1 [Dojo Elemental (Card-Jitsu): Balance Económico y Estética v1.9.0](#31-dojo-elemental-card-jitsu-balance-económico-y-estética-v190)
+   - 3.2 [Nuevo Minijuego: 🏎️ Turbo Core (Carreras Pixel-Neon)](#32-nuevo-minijuego-️-turbo-core-carreras-pixel-neon)
+4. [Auditoría Económica Exacta y Bóveda de Reliquias](#4-auditoría-económica-exacta-y-bóveda-de-reliquias)
+5. [Sistema de Estados de Presencia y Privacidad](#5-sistema-de-estados-de-presencia-y-privacidad)
+6. [Hilos de Conversación (Threads) y Transferencia de Archivos](#6-hilos-de-conversación-threads-y-transferencia-de-archivos)
+7. [Auditoría de Respaldos, Integridad de Datos y Seguridad](#7-auditoría-de-respaldos-integridad-de-datos-y-seguridad)
+8. [Catálogo Mejorado de 26 Cosméticos Obtenibles](#8-catálogo-mejorado-de-26-cosméticos-obtenibles)
+9. [Matriz de Pruebas de Integración v1.9.0](#9-matriz-de-pruebas-de-integración-v190)
 
 ---
 
-## 1. Resumen Ejecutivo y Declaración de Misión
+## 1. Resumen Ejecutivo y Hallazgos Críticos Corregidos en v1.9.0
 
-### 1.1 Misión
-**EpicKast** es una plataforma de comunicación social y para comunidades de creadores (modelado CAD, impresión 3D, gaming) diseñada para operar con una huella de memoria dramáticamente reducida (**75 MB - 110 MB de RAM** frente a los 500 MB - 1.2 GB habituales de clientes como Discord o Slack), con latencia de audio inferior a 15 ms mediante WebRTC Mesh P2P y gamificación ética 100% gratuita integrada en el propio cliente.
+Durante la auditoría profunda del código fuente real (`server/server.js`, `app/renderer.js`, `app/card-game.js`, `app/style.css`) contrastado contra el documento v1.8.6 anterior, se detectaron y corrigieron **8 fallos reales de código, seguridad, respaldos y economía**:
 
-### 1.2 Hallazgos Clave de la Auditoría v1.8.6
-1. **Unificación y Des-saturación de la Bóveda:** En versiones previas coexistían botones redundantes (*Abrir con Monedas*, *Abrir con Llave*, *+1 Llave*), provocando sobrecarga cognitiva y posibles bloqueos de concurrencia al pulsar consecutivamente durante animaciones. La versión 1.8.6 unifica la acción en un único control contextual de alta visibilidad que gestiona apertura con llave o compra directa en un solo clic si no se dispone de llaves.
-2. **Claridad Inequívoca de Recompensas (Nuevo vs Repetido):** Se identificó y resolvió un fallo por el cual la llamada a `renderView()` sobreescribía de inmediato el contenedor `#vWinnerArea`. Se implementó un estado reactivo persistente (`lastSpinResult`) con badges de alto contraste que garantiza que el usuario siempre sepa si el objeto es nuevo o repetido, mostrando la Esencia Arcana obtenida y el estado numérico de su colección (ej. 13/26).
-3. **Sincronización y Reglas Estrictas en Card-Jitsu:** Se eliminó la ambigüedad que hacía creer que 3 cartas cualesquiera otorgaban victoria. La condición estricta es binaria: **Trío Elemental** (1 Fuego + 1 Agua + 1 Nieve) o **Poder Monolítico** (3 cartas del mismo elemento). Además, se corrigió el orden de ejecución en `playRound()` para sincronizar el tablero superior antes de disparar el modal de victoria, eliminando desfases visuales.
-4. **Persistencia Dinámica del Ninja en Combate:** Se implementó auto-guardado en tiempo real en el Estudio Ninja (`saveNinjaConfig`) en cada clic de opción y recarga mandatoria en `renderMatchBoard()`, asegurando que el atuendo Gi, máscara (Kitsune, Oni, Cyber), ojos, cinturón, arma y aura seleccionados por el jugador se proyecten fielmente en el tatami de combate.
+| # | Componente | Fallo Detectado en la Auditoría REA | Corrección Implementada en v1.9.0 |
+| :--- | :--- | :--- | :--- |
+| **1** | `app/renderer.js` (`equipCosmeticItem`) | Al equipar un Marco, Color, Banner o Título desde la Bóveda se invocaba `rpc('profile.update', ...)`, método **inexistente** en el servidor (el RPC real es `profile.set`), impidiendo que otros usuarios vieran los cosméticos equipados. | Corregido a `rpc('profile.set', ...)` y ampliada la tabla `users` en SQLite con `frame`, `title`, `status`, `custom_status` y `ninja_config` sincronizados en tiempo real. |
+| **2** | `server/server.js` (`saveBackup` / `restoreBackup`) | El respaldo automático omitía columnas críticas (`users.banner`, `users.frame`, `users.title`, `users.coins`, `users.dust`, `users.keys_json`, `users.cosmetics_json`, `servers.icon`, `messages.reply_to`, `messages.pinned`, `messages.thread_id`) y **toda la tabla `files`**, provocando que los archivos adjuntos dieran 404 tras un reinicio de contenedor. | `saveBackup()` y `restoreBackup()` ahora respaldan el 100% de las tablas y columnas, y sincronizan los binarios de `/uploads` hacia y desde Firebase Storage (`files_bin/`). |
+| **3** | `server/server.js` (`GET /backup` y `/restore-seed`) | El endpoint `/backup` era público sin autenticación y exponía los campos `salt` y `hash` de contraseñas de todos los usuarios. | Protegido con validación obligatoria de token (`Authorization: Bearer` / `x-auth-token`) y redacción automática de `salt` y `hash` en la respuesta JSON. |
+| **4** | `server/server.js` (`GET /files/:id`) | Servía archivos directamente con `fs.createReadStream` usando el `mime` guardado sin cabeceras de mitigación XSS para SVG ni recuperación desde la nube si el disco efímero se limpiaba. | Integrado con `serveFileDisk` (`Content-Security-Policy: default-src 'none'`, `X-Content-Type-Options: nosniff`, `Content-Disposition: attachment` para SVG/HTML) y auto-recuperación transparente desde Firebase Storage. |
+| **5** | `server/server.js` (`login`) | Las funciones `checkLoginRateLimit`, `recordLoginFailure` y `recordLoginSuccess` estaban declaradas pero **nunca se invocaban** dentro del login WebSocket. | Activado el rate-limit anti-fuerza bruta por IP en `login` (máximo 10 intentos fallidos cada 10 minutos con bloqueo temporal de 15 minutos). |
+| **6** | `app/card-game.js` (`renderMatchResult`) | Repetir el Piso 1 venciendo al Novicio Ignis otorgaba **1 Llave de Cobre garantizada cada vez**, permitiendo farmear llaves infinitas sin gastar monedas. | Separada la recompensa de **🌟 Primera Conquista del Piso** (100% monedas + llaves garantizadas) de la **🥋 Recompensa de Entrenamiento** en repeticiones (50% de monedas + 25% de probabilidad de llave de cobre). |
+| **7** | `app/renderer.js` (`modalMemberCard`) | Los manejadores `#profBtnSendDm` y `#profBtnCardJitsu` se buscaban en el DOM del modal pero los botones no estaban incluidos en la estructura `card`. | Añadida la fila de acciones rápidas (`💬 Mensaje`, `🥋 Dojo`, `🏎️ Carrera`) dentro de `modalMemberCard` y en la lista de Amigos. |
+| **8** | `Auditoria_Completa_EpicKast_REA_v186.md` | La tabla de precios del documento anterior listaba `250 / 600 / 1500 / 3500`, discrepando de la constante real `KEY_PRICES` en `app/renderer.js`. | Documentada la tabla económica real exacta (`250 / 1,000 / 4,000 / 15,000`) junto con las recompensas de ambos juegos. |
 
 ---
 
 ## 2. Arquitectura Global del Sistema (REA Frontend & Backend)
 
-### 2.1 Estructura del Código y Desacoplamiento
 ```mermaid
 graph TD
-  A[Electron Main Process - main.js] -->|IPC Seguro contextBridge| B[Preload Script - preload.js]
-  B --> C[Renderer Engine - renderer.js]
-  C --> D[Card-Jitsu Engine - card-game.js]
-  C --> E[DSP Audio Worklet - RNNoise WASM]
-  C --> F[Vault & Economy Module]
-  G[Servidor Node.js - server.js] <-->|WebSockets JSON-RPC| C
-  C <-->|WebRTC Mesh P2P Data & Media| H[Otros Clientes Pares]
+  A["Electron Main Process (main.js)"] -->|IPC Seguro contextBridge| B["Preload Script (preload.js)"]
+  B --> C["Renderer Engine (renderer.js)"]
+  C --> D["Dojo Elemental (card-game.js)"]
+  C --> E["Turbo Core Racer (racer-game.js)"]
+  C --> F["Bóveda y Economía Compartida"]
+  C --> G["Hilos (#threadPane) y Estados"]
+  H["Servidor Node.js (server.js)"] <-->|WebSockets JSON-RPC + Presencia| C
+  H <-->|Respaldo Integral + Binarios| I["SQLite + Firebase Realtime DB & Storage"]
 ```
 
-- **Runtime:** Electron v28+ sobre Chromium 120+ y Node.js v20/v24.
-- **Flags de Optimización en `main.js`:**
-  - `--enable-features=WebRTCPipeWireCapturer,MediaFoundationVideoEncodeAccelerator`
-  - `--disable-renderer-backgrounding`
-  - `--disable-background-timer-throttling` (evita latencia de audio en segundo plano).
-  - `--in-process-gpu` desactivado para aislamiento de memoria de renderizado 3D.
-- **Protocolo de Red:** WebSockets RFC 6455 para señalización, presencia y eventos comunitarios; WebRTC Mesh P2P para flujos de audio Opus a 48 kHz y video 60 FPS sin retransmisión central.
+---
+
+## 3. Auditoría de los Minijuegos con Economía Compartida
+
+Ambos minijuegos conviven dentro de la **Bóveda de Reliquias** y comparten en tiempo real el mismo bolsillo económico (`dData.coins`, `dData.keys`, `dData.dust`, `dData.cosmetics`) y el mismo avatar **Ninja Pixel Art** (`localStorage['epickast.ninja.v1']`), sincronizándose además con el servidor mediante `rpc('vault.sync', ...)`.
+
+### 3.1 Dojo Elemental (Card-Jitsu): Balance Económico y Estética v1.9.0
+- **Reglas Elementales Estrictas:**
+  - Fuego 🔥 vence a Nieve ❄️; Nieve ❄️ vence a Agua 💧; Agua 💧 vence a Fuego 🔥.
+  - Mismo elemento: gana el valor numérico superior (rango `2` a `12`).
+  - Condición de victoria: **Trío Elemental** (`1 🔥 + 1 💧 + 1 ❄️`) o **Poder Monolítico** (`3` cartas del mismo elemento).
+- **Tabla de Recompensas del Dojo (Corregida contra Inflación en v1.9.0):**
+
+| Piso | Guardián Rival | 1.ª Conquista (Garantizada) | Repetición (Entrenamiento) |
+| :---: | :--- | :--- | :--- |
+| **Piso 1** | Novicio Ignis | `+50 🪙` + `1 Llave Cobre` | `+25 🪙` + `25% prob. Llave Cobre` |
+| **Piso 2** | Adepto Aqua | `+80 🪙` + `1 Llave Cobre` | `+40 🪙` + `25% prob. Llave Cobre` |
+| **Piso 3** | Guardián Glacial | `+120 🪙` + `1 Llave Plata` | `+60 🪙` + `25% prob. Llave Cobre` |
+| **Piso 4** | Maestro Basalto | `+180 🪙` + `1 Llave Oro` | `+90 🪙` + `25% prob. Llave Cobre` |
+| **Piso 5** | Sensei del Núcleo | `+250 🪙` + `1 Llave Obsidiana` | `+125 🪙` + `25% prob. Llave Cobre` |
+
+### 3.2 Nuevo Minijuego: 🏎️ Turbo Core (Carreras Pixel-Neon)
+Implementado en [`app/racer-game.js`](file:///C:/Users/puma1/OneDrive/Documentos/Proyecto%20Comunicacion%20EpicKap/app/racer-game.js) bajo `window.CoreRacerGame`:
+- **Motor Canvas 2D Pseudo-3D a 60 FPS:** Pista con perspectiva dinámica, curvas sinusoidales, decoración temática por circuito, partículas de nitro, rivales IA con colisiones elásticas y sintetizador de motor Web Audio API.
+- **Piloto Ninja Integrado:** El propio Ninja personalizado del usuario aparece al volante del bólido con su color de traje Gi y cinta.
+- **4 Circuitos Oficiales:**
+  1. **Pista 1 · Autopista Ciber-Cobre** (`2800 m` · 1.º puesto: `+75 🪙`, 1.ª vez: `+1 Llave Cobre`).
+  2. **Pista 2 · Valle de Cristal Glacial** (`3600 m` · 1.º puesto: `+120 🪙`, 1.ª vez: `+1 Llave Plata`).
+  3. **Pista 3 · Puente de Magma Volcánico** (`4400 m` · 1.º puesto: `+185 🪙`, 1.ª vez: `+1 Llave Oro`).
+  4. **Pista 4 · Sagrario del Núcleo** (`5400 m` · 1.º puesto: `+280 🪙`, 1.ª vez: `+1 Llave Obsidiana`).
+- **Taller de Ingeniería del Núcleo (Fregadero adicional de Monedas):**
+  - **⚡ Motor Iónico (Niv. 1–5):** Incrementa la velocidad punta (`120 🪙 × nivel`).
+  - **🔥 Inyector de Nitro (Niv. 1–5):** Mayor potencia y recarga de barra Nitro (`140 🪙 × nivel`).
+  - **🛡️ Escudo Magnético (Niv. 1–5):** Absorbe choques contra obstáculos y atrae monedas (`160 🪙 × nivel`).
+  - **🎨 Pintura de Chasis:** 5 acabados desbloqueables con monedas del fondo común.
 
 ---
 
-## 3. Auditoría Profunda del Minijuego: Dojo Elemental (Card-Jitsu)
+## 4. Auditoría Económica Exacta y Bóveda de Reliquias
 
-### 3.1 Motor Gráfico Vectorial Pixel Art SVG (16-bit)
-A diferencia de juegos que cargan pesadas texturas PNG o hojas de sprites de cientos de megabytes, el Dojo de EpicKast implementa un motor vectorial generativo ultraligero que renderiza los personajes y mascotas mediante `generatePixelNinjaSVG()` y `generateCuteMascotSVG()`:
-- **Resolución:** Cuadrícula virtual de 24×30 bloques por personaje con tamaño de píxel dinámico (`crispEdges`).
-- **Consumo de Memoria:** **0 bytes en disco** adicionales; los avatares se generan por código en milisegundos mediante manipulación matemática de cadenas SVG.
-- **Personalización Modular:**
-  - Traje Gi: 8 tonalidades elementales (Negro Sombra, Carmesí Ígneo, Azul Abisal, etc.) con color primario y acento.
-  - Máscaras: Clásica de tela, Kitsune ancestral, Oni demoníaco, Cyber Visor con resplandor neón y Kasa tradicional de paja.
-  - Cinturón Obi: Cinturón Blanco, Amarillo, Naranja, Verde, Azul, Rojo, Púrpura, Marrón y Negro Supremo.
-  - Armas a la espalda: Katanas cruzadas de acero, Shuriken cuádruple, Pergamino sagrado y Bastón Bo de madera.
-  - Auras Elementales: Partículas de fuego, ondas de agua y destellos de nieve flotantes.
+### 4.1 Tabla Real de Precios y Probabilidades (`KEY_PRICES` & `CHEST_PROBS`)
 
-### 3.2 Reglas Elementales Estrictas y Lógica de Resolución
-El motor resuelve cada ronda mediante la función `checkWinCondition(wonCards)` y el evaluador de choque `playRound(playerCard)`:
+| Nivel de Llave / Cofre | Precio Real (`KEY_PRICES`) | Límite Diario de Compra | Común | Raro | Épico | Legendario |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **🟤 Cobre (`copper`)** | **250 🪙** | 3 / día | 80% | 17% | 3% | 0% |
+| **⚪ Plata (`silver`)** | **1,000 🪙** | 1 / día | 55% | 33% | 11% | 1% |
+| **🟡 Oro (`gold`)** | **4,000 🪙** | 1 / día | 25% | 45% | 25% | 5% |
+| **🟣 Obsidiana (`obsidian`)** | **15,000 🪙** | 1 / día | 0% | 40% | 45% | 15% |
 
-```mermaid
-graph TD
-  F[Fuego 🔥] -->|Vence a| S[Nieve ❄️]
-  S -->|Vence a| W[Agua 💧]
-  W -->|Vence a| F
-```
-
-1. **Choque de Distinto Elemento:**
-   - Si los elementos difieren, el triángulo elemental define la victoria instantáneamente sin importar el número.
-2. **Choque del Mismo Elemento:**
-   - La carta con mayor valor numérico (rango 2 a 12) gana la ronda.
-   - En caso de idéntico elemento e idéntico valor, la ronda se declara empate neutro, descartando ambas cartas sin asignar puntos.
-3. **Condición Estricta de Victoria del Combate:**
-   - **Opción A (Trío Elemental):** Poseer al menos una carta de cada elemento: `(counts.fire >= 1 && counts.water >= 1 && counts.snow >= 1)`.
-   - **Opción B (Poder Monolítico):** Poseer tres cartas del mismo elemento: `(counts[el] >= 3)`.
-   - **Combinaciones No Válidas:** Cualquier combinación mixta de 3 cartas (por ejemplo: 2 Agua + 1 Fuego, o 2 Nieve + 1 Agua) **NO otorga la victoria**. La partida continúa de manera obligatoria hasta que alguno de los dos contendientes cumpla la Opción A o la Opción B.
-
-### 3.3 Arquitectura de Inteligencia Artificial de 5 Niveles
-La IA (`pickAICard`) implementa una máquina de estados escalonada por piso:
-- **Piso 1 (Novicio Ignis):** IA casual. Juega cartas aleatorias o de bajo valor; probabilidad de acierto estratégico: 30%.
-- **Piso 2 (Adepto Aqua):** Detección básica de tríos. Si le falta 1 elemento para ganar, lo prioriza con 50% de probabilidad.
-- **Piso 3 (Guardián Glacial):** Contraataque táctico. Detecta qué elemento necesita el jugador para ganar y busca en su mano la carta contraria para neutralizarlo (probabilidad 70%).
-- **Piso 4 (Maestro Basalto):** Anticipación de alto nivel. Evalúa si el rival tiene cartas de alto valor y busca forzar empates o gastar cartas menores.
-- **Piso 5 (Sensei del Núcleo):** Algoritmo Minimax Heurístico (`maxScore`). Asigna puntuaciones a cada carta disponible según:
-  - Victoria inmediata (+100 puntos)
-  - Bloqueo de victoria rival (+50 puntos)
-  - Potencial de cinemática legendaria (+15 puntos)
-  - Descarte seguro en caso de desventaja
-
-### 3.4 Estudio Ninja Interactivo y Persistencia en Combate
-En la versión 1.8.6, el estudio ninja desacopla la persistencia del botón final de guardado:
-- Se implementó un hook reactivo en cada botón de personalización (`.optGiBtn`, `.optMaskBtn`, `.optEyeBtn`, `.optBeltBtn`, `.optWeaponBtn`, `.optAuraBtn`).
-- Cada clic invoca `saveNinjaConfig(cfg)`, escribiendo en `localStorage['epickast.ninja.v1']`.
-- En el arranque de cada duelo (`startMatch`) y en cada refresco de la mesa (`renderMatchBoard`), se ejecuta `this.playerNinja = getSavedNinjaConfig()`, garantizando concordancia visual absoluta entre el armario y el combate.
-
-### 3.5 Cinemáticas a Pantalla Completa y Sintetizador Web Audio API
-- **Disparador:** Cualquier carta con valor de combate **10, 11 o 12** desata una secuencia cinematográfica con oscurecimiento ambiental (`#cjCinematicOverlay`), cámara lenta y animación de impacto:
-  - Nivel 10: *Llamarada Ígnea* / *Vórtice Marino* / *Estalactita Perforante*
-  - Nivel 11: *Furia del Basalto* / *Ola Gigante* / *Ventisca Helada*
-  - Nivel 12: *Dragón de Magma Ancestral* / *Tsunami del Núcleo* / *Cero Absoluto*
-- **Sintetizador Procedural de Audio:** Cero archivos MP3 externos. La clase `AudioEffects` utiliza osciladores senoidales y de diente de sierra (`OscillatorNode`), filtros paso-bajo (`BiquadFilterNode`) y envolventes ADSR controladas por `GainNode` para generar efectos de choque, crujido, victoria y fanfarria con latencia de 0 ms.
+- **Sintonía (Pity System):**
+  - Garantía **Épica** cada `10` aperturas sin épico/legendario (`pity.withoutEpic >= 9`).
+  - Soft Pity **Legendario** desde la apertura `35` (`+1.5%` por tiro adicional).
+  - Hard Pity **Legendario** en la apertura `60` (`100%` garantizado en cofres Plata, Oro u Obsidiana).
+- **Esencia Arcana (Duplicados y Forja Directa):**
+  - Duplicados otorgan: Común `+2 ✨`, Raro `+8 ✨`, Épico `+20 ✨`, Legendario `+50 ✨`.
+  - Coste de Forja Directa en *Mi Armario*: Común `40 ✨`, Raro `120 ✨`, Épico `300 ✨`, Legendario `800 ✨`.
 
 ---
 
-## 4. Auditoría Económica y Sistema de Bóveda de Reliquias
+## 5. Sistema de Estados de Presencia y Privacidad
 
-### 4.1 Modelo Matemático de Probabilidades y Cofres
-
-| Nivel de Llave / Cofre | Precio en Monedas 🪙 | Común | Raro | Épico | Legendario |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **🟤 Cobre** | 250 🪙 | 80% | 17% | 3% | 0% |
-| **⚪ Plata** | 600 🪙 | 55% | 33% | 11% | 1% |
-| **🟡 Oro** | 1,500 🪙 | 25% | 45% | 25% | 5% |
-| **🟣 Obsidiana** | 3,500 🪙 | 0% | 40% | 45% | 15% |
-
-### 4.2 Algoritmo de Sintonía y Protección Anti-Mala Suerte (Pity)
-Para erradicar la frustración matemática y garantizar recompensas éticas:
-- **Sintonía Dura Legendaria (Apertura 60):** Si el contador `pity.withoutLegendary` alcanza 59 aperturas consecutivas sin legendario, la apertura número 60 fuerza matemáticamente un objeto de calidad **Legendaria (100%)** en cualquier cofre que soporte legendarios (Plata, Oro u Obsidiana).
-- **Sintonía Suave Legendaria (Soft Pity desde apertura 35):** A partir del tiro 35 sin legendario, la probabilidad base se incrementa dinámicamente un **+1.5% por cada cofre adicional abierto**:
-  $$\text{Prob}_{\text{leg}} = \text{Prob}_{\text{base}} + (\text{Aperturas} - 34) \times 0.015$$
-- **Garantía de Calidad Épica:** Cada 10 aperturas consecutivas sin épico ni legendario (`pity.withoutEpic >= 9`), la siguiente apertura tiene garantizada una calidad mínima de **Épico (100%)**.
-
-### 4.3 Economía Circular: Monedas, Llaves y Esencia Arcana
-El ecosistema económico está diseñado para ser completamente auto-sostenible sin micropagos ni inyecciones monetarias externas:
-- **Flujo de Entrada (Monedas):** Victorias en el Dojo Elemental otorgan entre 50 y 250 monedas por combate según el piso, más llaves de recompensa directa al derrotar por primera vez a los Guardianes.
-- **Flujo de Consumo (Fregadero de Monedas):** Compra de llaves en la tienda de la Bóveda con límites diarios para incentivar juego regular y evitar acumulación desmedida de recursos.
-- **Reciclaje por Duplicados (Esencia Arcana):** Cuando la ruleta cae en un cosmético que el jugador ya tiene desbloqueado en su perfil, se convierte automáticamente en Esencia Arcana según su rareza:
-  - Común: **+2 Esencia**
-  - Raro: **+8 Esencia**
-  - Épico: **+20 Esencia**
-  - Legendario: **+50 Esencia**
-- **Crafteo Directo en Mi Armario:** La Esencia Arcana permite forjar cualquier cosmético faltante (Costes: Común 40, Raro 120, Épico 300, Legendario 800 Esencia), eliminando al 100% la dependencia exclusiva del azar.
-
-### 4.4 Des-saturación de Interfaz y Unificación de Acciones v1.8.6
-En respuesta a las observaciones de usuario en la versión 1.8.5:
-- Se retiraron los botones `vBtnSpinCoins` y `vBtnBuy1Key`.
-- Se implementó un único botón `#vBtnSpin` que detecta dinámicamente:
-  - Si el usuario tiene llaves: `[ 🔓 ABRIR COFRE (X Llaves disponibles) ]`
-  - Si el usuario tiene 0 llaves: `[ 🛒 COMPRAR 1 LLAVE (Precio 🪙) Y ABRIR ]`
-- Persistencia del banner `#vWinnerArea` con badge verde para objetos nuevos con botón para equipar inmediatamente, y badge púrpura para duplicados con cálculo transparente de Esencia Arcana obtenida.
+Implementado de extremo a extremo en [`server/server.js`](file:///C:/Users/puma1/OneDrive/Documentos/Proyecto%20Comunicacion%20EpicKap/server/server.js) (`status.set`, `isOnline`, `publicStatusOf`) y [`app/renderer.js`](file:///C:/Users/puma1/OneDrive/Documentos/Proyecto%20Comunicacion%20EpicKap/app/renderer.js):
+- **🟢 En línea (`online`):** Disponible y visible con indicador esmeralda.
+- **🌙 Ausente (`away`):** Indicador ámbar. Se activa manualmente o de forma automática tras **5 minutos de inactividad** (`startIdleAutoAway()`), restaurándose a `online` al volver a interactuar.
+- **⛔ No molestar (`dnd`):** Indicador carmesí. Silencia automáticamente los sonidos (`ringer.beep`) y notificaciones emergentes de escritorio al recibir mensajes.
+- **👻 Invisible (`invisible`):** Privacidad total. El servidor reporta `online: false` y `status: 'offline'` a todos los demás miembros y amigos, mientras el propio usuario conserva acceso completo a chats, servidores y juegos.
 
 ---
 
-## 5. Auditoría de Red, Seguridad y Resiliencia
+## 6. Hilos de Conversación (Threads) y Transferencia de Archivos
 
-### 5.1 Privacidad y Aislamiento de Memoria
-- Las credenciales y claves privadas de servidor se autentican contra hash salteado en SQLite (`scrypt` / `pbkdf2`).
-- Las contraseñas nunca viajan en texto plano por el canal WebSocket.
-- La ejecución de scripts de terceros dentro de los iframes o contenedores de chat está bloqueada mediante una estricta política de seguridad de contenido (**Content Security Policy - CSP**).
-
-### 5.2 Prevención de Trampas Locales y Manipulación del Minijuego
-- Las tiradas de ruleta se calculan y registran con firmas de estado.
-- La verificación de sintonía impide valores negativos o desbordamientos aritméticos (`Math.max(0, ...)`).
-- La velocidad de giros de ruleta está protegida por un cerrojo atómico (`isSpinning = true`) que inhabilita los eventos de clic en toda la aplicación durante los 4.15 segundos que dura la animación física de la ruleta.
+- **Hilos en Tiempo Real (`#threadPane`):**
+  - Cada mensaje en canales de servidor o DM incluye el botón **🧵 Abrir o responder en hilo**.
+  - El panel lateral derecho `#threadPane` carga el mensaje raíz y todas sus respuestas mediante `rpc('thread.history', { chan, threadId })`.
+  - Los mensajes raíz muestran un contador interactivo (`🧵 X respuestas · Ver hilo →`) que se actualiza en vivo para todos los participantes con el evento `thread.msg`.
+- **Soporte de Archivos Adjuntos en Canales e Hilos:**
+  - `POST /upload` acepta `X-Thread-Id` para adjuntar imágenes, documentos, audio o video directamente dentro de un hilo o canal principal.
 
 ---
 
-## 6. Matriz de Pruebas y Validación Técnica v1.8.6
+## 7. Auditoría de Respaldos, Integridad de Datos y Seguridad
 
-| Componente | Caso de Prueba | Resultado Esperado | Estado |
-| :--- | :--- | :--- | :---: |
-| **Bóveda** | Apertura con llave en posesión | Consume 1 llave, ejecuta giro suave a 60 FPS, bloquea clics concurrentes. | **Aprobado ✅** |
-| **Bóveda** | Apertura sin llaves pero con monedas | Compra 1 llave en 1 clic y ejecuta el giro sin desconfigurar la selección. | **Aprobado ✅** |
-| **Bóveda** | Notificación de objeto nuevo | Muestra badge `[ 🎉 ¡NUEVA RECOMPENSA DESBLOQUEADA! ]` con botón de equipar. No se borra al finalizar. | **Aprobado ✅** |
-| **Bóveda** | Notificación de duplicado | Muestra badge `[ ♻️ COSMÉTICO REPETIDO ]` con adición de Esencia Arcana exacta y avance de colección. | **Aprobado ✅** |
-| **Card-Jitsu** | Choque de Fuego vs Nieve | Gana Fuego 🔥 independientemente de los valores numéricos. | **Aprobado ✅** |
-| **Card-Jitsu** | Choque de mismo elemento | Gana la carta con número más alto (ej. 9 vence a 5). Empate si son iguales. | **Aprobado ✅** |
-| **Card-Jitsu** | Victoria por Trío Elemental | 1 Fuego + 1 Agua + 1 Nieve otorga victoria inmediata. Se actualiza el tablero superior antes del modal. | **Aprobado ✅** |
-| **Card-Jitsu** | Victoria por Monolito | 3 cartas del mismo elemento otorga victoria inmediata. | **Aprobado ✅** |
-| **Card-Jitsu** | 3 cartas mixtas (2 Agua + 1 Fuego) | **NO** otorga victoria; la partida continúa con normalidad. | **Aprobado ✅** |
-| **Estudio Ninja** | Cambio de Gi / Máscara / Cinturón | Se auto-guarda en tiempo real en localStorage y se refleja de inmediato en el tatami de combate. | **Aprobado ✅** |
-| **Guías** | Canal `# 🚀-notas-de-la-version` | Muestra la tarjeta de la Versión 1.8.6 con etiqueta `ACTUAL` y resumen por puntos. | **Aprobado ✅** |
-| **Guías** | Canal `⚔️-boveda-y-dojo-de-cartas` | Contenido actualizado explicando las reglas del Dojo, Card-Jitsu y personalización. | **Aprobado ✅** |
+1. **Persistencia Triple:**
+   - **SQLite WAL Local (`server/epickast.db`):** Transacciones ACID inmediatas.
+   - **Snapshot JSON Local (`server/backup-seed.json`) + Nube (`Firebase Realtime Database`):** Sincronización automática con debounce de 2 segundos tras cualquier cambio en usuarios, perfiles, estados, cosméticos, economía, servidores, canales, membresías, amigos, mensajes, hilos y metadatos de archivos.
+   - **Respaldo de Binarios en Firebase Storage (`files_bin/`):** Todo archivo subido en `POST /upload` se respalda en la nube y se restaura automáticamente en `restoreBackup()` o bajo demanda en `GET /files/:id`.
+2. **Endurecimiento de Seguridad:**
+   - `/backup` y `/restore-seed` exigen token válido y eliminan `salt`/`hash` de la salida.
+   - `GET /files/:id` aplica cabeceras anti-XSS (`Content-Security-Policy: default-src 'none'`, `X-Content-Type-Options: nosniff`).
+   - `login` aplica rate-limit por IP contra ataques de fuerza bruta.
 
 ---
 
-## 7. Conclusiones y Hoja de Ruta Futura
+## 8. Catálogo Mejorado de 26 Cosméticos Obtenibles
 
-La versión **1.8.6** de EpicKast consolida la experiencia lúdica y social de la plataforma:
-1. Se depuraron por completo las discrepancias de reglas y desfases en el minijuego de cartas.
-2. La interfaz de la Bóveda de Reliquias eliminó la saturación visual previa, adoptando un diseño sobrio, claro y modular acorde a los estándares de producción.
-3. La personalización estética de avatares pixel art ahora fluye de manera reactiva e inmediata hacia las partidas de combate.
-4. El modelo económico preserva la equidad sin micropagos, manteniendo un balance transparente entre el esfuerzo en el Dojo y las recompensas cosméticas.
+- **5 Marcos de Avatar + 1 Marco Fundador (`6` en total):** Rediseñados en [`app/style.css`](file:///C:/Users/puma1/OneDrive/Documentos/Proyecto%20Comunicacion%20EpicKap/app/style.css) con anillos multicapa, rotación cónica (`@keyframes founderSpin`) y resplandor animado (`@keyframes colossusPulse`).
+- **8 Banners de Perfil:** Gradientes multicapa de alta profundidad visual aplicables tanto desde *Mi Armario* como desde *Mi Perfil*.
+- **7 Colores y Gradientes de Nombre:** Incluye gradientes animados (`background-clip: text`) visibles en mensajes de chat, hilos, lista de miembros y barra personal.
+- **8 Títulos con Insignia (`.cosmetic-title-badge`):** Píldoras estilizadas visibles junto al nombre del jugador en el chat, lista de miembros, amigos y tarjeta de perfil.
 
-**Recomendaciones para versiones futuras (v1.8.7+):**
-- Implementar modo multijugador P2P en el Dojo para desafiar a amigos conectados directamente a través de canales de voz y servidores comunitarios con señalización WebRTC.
-- Agregar medallas de torneo e insignias coleccionables en el perfil del usuario basadas en el cinturón alcanzado en el Dojo.
+---
+
+## 9. Matriz de Pruebas de Integración v1.9.0
+
+| Área Auditada | Prueba Ejecutada | Resultado |
+| :--- | :--- | :---: |
+| **Autenticación y Seguridad** | Registro, login y bloqueo de `/backup` sin token (HTTP 401) + redacción de `salt`/`hash` con token válido (HTTP 200) | **Aprobado ✅** |
+| **Estados de Presencia** | Cambio entre `online`, `away`, `dnd` e `invisible` (`isOnline` devuelve `false` a terceros en modo `invisible`) | **Aprobado ✅** |
+| **Hilos de Conversación** | Envío de respuestas con `threadId`, actualización de `threadCount` y consulta `thread.history` | **Aprobado ✅** |
+| **Transferencia de Archivos** | Subida `POST /upload` con `X-Thread-Id` y descarga segura `GET /files/:id` con cabeceras `nosniff` | **Aprobado ✅** |
+| **Economía y Cosméticos** | Sincronización `vault.sync` y equipado `profile.set` con `frame`, `title`, `color` y `banner` | **Aprobado ✅** |
+| **Juegos (Dojo + Turbo Core)** | Verificación sintáctica y funcional de `app/card-game.js` y `app/racer-game.js` con economía compartida | **Aprobado ✅** |

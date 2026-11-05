@@ -868,18 +868,33 @@
       const floor = FLOORS[this.currentFloor - 1];
 
       if (playerWon) {
-        let rewText = `+${floor.reward.coins} 🪙 Monedas`;
-        if (floor.reward.keys) {
-          const kParts = [];
-          if (floor.reward.keys.copper) kParts.push(`${floor.reward.keys.copper} Cobre 🟤`);
-          if (floor.reward.keys.silver) kParts.push(`${floor.reward.keys.silver} Plata ⚪`);
-          if (floor.reward.keys.gold) kParts.push(`${floor.reward.keys.gold} Oro 🟡`);
-          if (floor.reward.keys.obsidian) kParts.push(`${floor.reward.keys.obsidian} Obsidiana 🟣`);
-          rewText += ` · ` + kParts.join(', ');
+        const isFirstClear = !this.claimedFloors[floor.level];
+        let actualReward;
+        let rewTitle;
+        let rewText;
+
+        if (isFirstClear) {
+          actualReward = floor.reward;
+          rewTitle = '🌟 ¡PRIMERA CONQUISTA DEL PISO!';
+          rewText = `+${actualReward.coins} 🪙 Monedas`;
+          if (actualReward.keys) {
+            const kParts = [];
+            if (actualReward.keys.copper) kParts.push(`${actualReward.keys.copper} Cobre 🟤`);
+            if (actualReward.keys.silver) kParts.push(`${actualReward.keys.silver} Plata ⚪`);
+            if (actualReward.keys.gold) kParts.push(`${actualReward.keys.gold} Oro 🟡`);
+            if (actualReward.keys.obsidian) kParts.push(`${actualReward.keys.obsidian} Obsidiana 🟣`);
+            if (kParts.length) rewText += ` · ` + kParts.join(', ');
+          }
+        } else {
+          const trainCoins = Math.max(20, Math.round(floor.reward.coins * 0.5));
+          const bonusCopper = Math.random() < 0.25 ? 1 : 0;
+          actualReward = { coins: trainCoins, keys: bonusCopper ? { copper: 1 } : {} };
+          rewTitle = '🥋 Recompensa de Entrenamiento';
+          rewText = `+${trainCoins} 🪙 Monedas` + (bonusCopper ? ' · +1 Llave de Cobre 🟤 (Bonus)' : '');
         }
 
         if (this.options.onReward) {
-          this.options.onReward(floor.reward);
+          this.options.onReward(actualReward);
         }
 
         this.claimedFloors[floor.level] = true;
@@ -892,8 +907,9 @@
             <div style="font-size:12.5px;color:#e2e8f0;margin-bottom:6px;">${reasonDesc}</div>
             <div style="font-size:11.5px;color:#94a3b8;font-style:italic;margin-bottom:12px;">"${floor.quotes?.defeat || 'Bien jugado.'}"</div>
 
-            <div style="font-size:12px;font-weight:800;color:#fde047;background:rgba(0,0,0,0.6);border:1px solid rgba(253,224,71,0.3);padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:14px;">
-              🎁 Recompensas obtenidas: ${rewText}
+            <div style="font-size:12px;font-weight:800;color:#fde047;background:rgba(0,0,0,0.65);border:1px solid rgba(253,224,71,0.35);padding:8px 14px;border-radius:8px;display:inline-block;margin-bottom:14px;">
+              <div style="font-size:10px;color:#34d399;text-transform:uppercase;margin-bottom:2px;">${rewTitle}</div>
+              🎁 ${rewText}
             </div>
 
             <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
@@ -1158,32 +1174,40 @@
     // SALÓN PRINCIPAL DEL DOJO (LOBBY)
     // ==========================================
     initUI() {
+      const clearedCount = FLOORS.filter(f => !!this.claimedFloors[f.level]).length;
+      const myNinja = getSavedNinjaConfig();
       this.container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:14px;">
-          <!-- Encabezado con Botón a Personalización Ninja -->
-          <div style="background:linear-gradient(135deg, #0e121a, #161b26);border:1px solid #202636;border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div>
-              <div style="font-size:15px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:8px;">
-                <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.8.6
+          <!-- Encabezado con Vista Previa de Ninja, Rango de Cinturón y Botones -->
+          <div style="background:linear-gradient(135deg, #0c1018 0%, #151c2c 100%);border:1px solid #243048;border-radius:12px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.35);">
+            <div style="display:flex;align-items:center;gap:14px;">
+              <div style="width:54px;height:54px;border-radius:12px;background:rgba(15,23,42,0.9);border:1.5px solid #38bdf8;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 0 14px rgba(56,189,248,0.2);">
+                ${generatePixelNinjaSVG(myNinja, true, 46, 52)}
               </div>
-              <div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">
-                Duelos tácticos Card-Jitsu con Ninjas Pixel Art, fondos interactivos y combate cinemático.
+              <div>
+                <div style="font-size:15px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:8px;">
+                  <span>🥋</span> DOJO ELEMENTAL DEL NÚCLEO · v1.9.0
+                  <span style="font-size:10px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;padding:2px 8px;border-radius:10px;font-weight:800;">${clearedCount}/5 Pisos Dominados</span>
+                </div>
+                <div style="font-size:11.5px;color:#94a3b8;margin-top:3px;">
+                  Duelos tácticos Card-Jitsu con Ninjas Pixel Art, economía sincronizada y poderes cinemáticos.
+                </div>
               </div>
             </div>
 
             <div style="display:flex;gap:8px;align-items:center;">
-              <button id="dojoBtnCustomNinja" style="background:linear-gradient(135deg, #7c3aed, #6d28d9);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-weight:800;font-size:11.5px;cursor:pointer;box-shadow:0 4px 10px rgba(124,58,237,0.3);display:flex;align-items:center;gap:6px;">
+              <button id="dojoBtnCustomNinja" style="background:linear-gradient(135deg, #7c3aed, #6d28d9);color:#fff;border:none;padding:7px 14px;border-radius:8px;font-weight:800;font-size:11.5px;cursor:pointer;box-shadow:0 4px 10px rgba(124,58,237,0.3);display:flex;align-items:center;gap:6px;">
                 <span>🥷</span> Personalizar Mi Ninja
               </button>
-              <button id="dojoBtnHowToPlay" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;padding:6px 12px;border-radius:6px;font-weight:700;font-size:11.5px;cursor:pointer;">
-                ¿Cómo Jugar?
+              <button id="dojoBtnHowToPlay" style="background:#1e2433;border:1px solid #3b4660;color:#cbd5e1;padding:7px 12px;border-radius:8px;font-weight:700;font-size:11.5px;cursor:pointer;">
+                📖 Reglas
               </button>
             </div>
           </div>
 
           <!-- Tutorial Desplegable -->
           <div id="dojoTutorialBox" style="display:${this.showTutorial ? 'block' : 'none'};background:#090d14;border:1px solid #1a2233;border-radius:10px;padding:14px 18px;animation: cjCardFlipIn 0.25s ease;">
-            <div style="font-size:13px;font-weight:900;color:#f8fafc;margin-bottom:8px;">Reglas del Dojo:</div>
+            <div style="font-size:13px;font-weight:900;color:#f8fafc;margin-bottom:8px;">Reglas Oficiales del Dojo:</div>
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:10px;font-size:12px;color:#cbd5e1;">
               <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
                 <b style="color:#ef4444;">1. Triángulo Elemental:</b><br>
@@ -1197,8 +1221,8 @@
                 • ¡Las cartas <b>10 o más</b> desatan cinemáticas legendarias de impacto!
               </div>
               <div style="background:#111520;border:1px solid #1e2433;border-radius:8px;padding:10px;">
-                <b style="color:#10b981;">3. Cómo Ganar:</b><br>
-                • <b>Trío Elemental:</b> 1 de cada elemento (1 🔥 + 1 💧 + 1 ❄️).<br>                • <b>Monolito:</b> 3 cartas del mismo elemento (3 🔥, 3 💧 o 3 ❄️).<br>                • <i>Regla estricta: 3 cartas mixtas (ej: 2 agua y 1 fuego) NO otorgan victoria.</i>
+                <b style="color:#10b981;">3. Cómo Ganar la Partida:</b><br>
+                • <b>Trío Elemental:</b> 1 de cada elemento (1 🔥 + 1 💧 + 1 ❄️).<br>                • <b>Monolito:</b> 3 cartas del mismo elemento (3 🔥, 3 💧 o 3 ❄️).<br>                • <i>3 cartas mixtas (ej: 2 agua y 1 fuego) NO dan victoria.</i>
               </div>
             </div>
           </div>
@@ -1207,28 +1231,32 @@
           <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:12px;">
             ${FLOORS.map(f => {
               const isCleared = !!this.claimedFloors[f.level];
+              const trainCoins = Math.max(20, Math.round(f.reward.coins * 0.5));
+              const keyDesc = f.reward.keys?.copper ? `${f.reward.keys.copper} Cobre` : f.reward.keys?.silver ? `${f.reward.keys.silver} Plata` : f.reward.keys?.gold ? `${f.reward.keys.gold} Oro` : `${f.reward.keys?.obsidian || 1} Obsidiana`;
               return `
-                <div style="background:#0e121a;border:1.5px solid ${isCleared ? '#10b981' : '#202636'};border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;position:relative;transition:0.15s;box-shadow:0 4px 12px rgba(0,0,0,0.4);">
-                  ${isCleared ? `<div style="position:absolute;top:8px;right:8px;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#10b981;font-size:10px;font-weight:900;padding:2px 8px;border-radius:10px;">✓ VENCIDO</div>` : ''}
+                <div style="background:linear-gradient(160deg, #0f141f 0%, #0b0e16 100%);border:1.5px solid ${isCleared ? '#10b981' : '#222b3d'};border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;position:relative;transition:0.18s;box-shadow:0 6px 16px rgba(0,0,0,0.45);">
+                  ${isCleared ? `<div style="position:absolute;top:8px;right:8px;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#34d399;font-size:10px;font-weight:900;padding:2px 8px;border-radius:10px;">✓ DOMINADO</div>` : `<div style="position:absolute;top:8px;right:8px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.4);color:#fbbf24;font-size:9.5px;font-weight:900;padding:2px 7px;border-radius:10px;">1ª RECOMPENSA</div>`}
 
                   <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:50px;height:50px;border-radius:10px;background:url('${f.avatarImg}') center/cover no-repeat;border:2px solid ${f.color};box-shadow:0 0 14px ${f.color}40;flex-shrink:0;"></div>
+                    <div style="width:52px;height:52px;border-radius:10px;background:url('${f.avatarImg}') center/cover no-repeat;border:2px solid ${f.color};box-shadow:0 0 14px ${f.color}40;flex-shrink:0;"></div>
                     <div>
                       <div style="font-size:10.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;">Piso ${f.level} · ${f.belt}</div>
                       <div style="font-size:14px;font-weight:900;color:#f8fafc;">${f.name}</div>
                     </div>
                   </div>
 
-                  <div style="font-size:11.5px;color:#94a3b8;line-height:1.4;">
+                  <div style="font-size:11.5px;color:#94a3b8;line-height:1.4;flex:1;">
                     ${f.desc}
                   </div>
 
-                  <div style="font-size:11px;font-weight:700;color:#fbbf24;background:#090d14;border:1px solid #1a2233;padding:5px 8px;border-radius:6px;">
-                    🎁 Botín: +${f.reward.coins} Monedas + Llaves
+                  <div style="font-size:11px;font-weight:700;color:${isCleared ? '#6ee7b7' : '#fbbf24'};background:#090d14;border:1px solid #1a2233;padding:6px 9px;border-radius:7px;">
+                    ${isCleared
+                      ? `🥋 Entrenamiento: +${trainCoins} 🪙 + 25% Llave Cobre`
+                      : `🎁 1ª Conquista: +${f.reward.coins} 🪙 + ${keyDesc}`}
                   </div>
 
-                  <button class="dojo-btn-challenge" data-floor="${f.level}" style="background:#2563eb;color:#fff;border:none;padding:8px 14px;border-radius:6px;font-weight:800;font-size:12px;cursor:pointer;transition:0.15s;box-shadow:0 4px 10px rgba(37,99,235,0.3);">
-                    ⚔️ Desafiar Piso ${f.level}
+                  <button class="dojo-btn-challenge" data-floor="${f.level}" style="background:${isCleared ? 'linear-gradient(135deg,#059669,#047857)' : 'linear-gradient(135deg,#2563eb,#1d4ed8)'};color:#fff;border:none;padding:8px 14px;border-radius:7px;font-weight:800;font-size:12px;cursor:pointer;transition:0.15s;box-shadow:0 4px 10px rgba(0,0,0,0.3);">
+                    ⚔️ ${isCleared ? `Entrenar en Piso ${f.level}` : `Desafiar Piso ${f.level}`}
                   </button>
                 </div>
               `;

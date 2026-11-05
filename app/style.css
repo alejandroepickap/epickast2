@@ -1185,3 +1185,237 @@ details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-directio
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
   50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
 }
+
+
+/* =========================================================================
+   v1.9.0 — ESTADOS DE USUARIO, HILOS DE CONVERSACIÓN Y COSMÉTICOS MEJORADOS
+   ========================================================================= */
+
+/* Indicadores de Estado en Avatares (.st) */
+.av .st {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid #0e1017;
+  box-sizing: border-box;
+  z-index: 3;
+}
+.av .st.on {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+.av .st.away {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
+}
+.av .st.dnd {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.8);
+}
+.av .st.dnd::after {
+  content: '';
+  position: absolute;
+  left: 1.5px;
+  right: 1.5px;
+  top: 50%;
+  height: 1.6px;
+  margin-top: -0.8px;
+  background: #fff;
+  border-radius: 1px;
+}
+.av .st.inv,
+.av .st.off {
+  background: #64748b;
+  border: 2px solid #0e1017;
+}
+.av .st.inv::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: #0e1017;
+}
+
+/* Menú emergente de selección rápida de estado en #meBar */
+#meBar {
+  position: relative;
+}
+.status-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 10px;
+  width: 230px;
+  background: #111520;
+  border: 1px solid #28324a;
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.75);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.status-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s;
+}
+.status-opt:hover,
+.status-opt.active {
+  background: rgba(59, 130, 246, 0.15);
+}
+.status-opt .s-desc {
+  display: block;
+  font-size: 10px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Panel Lateral de Hilos de Conversación (#threadPane) */
+#threadPane {
+  width: 340px;
+  min-width: 300px;
+  max-width: 380px;
+  background: #0d1018;
+  border-left: 1px solid #1e2536;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  z-index: 25;
+}
+#threadPane.hidden {
+  display: none !important;
+}
+.thread-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #1e2536;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #111521;
+}
+.thread-root-box {
+  padding: 12px 14px;
+  background: rgba(30, 41, 59, 0.35);
+  border-bottom: 1px solid #1e2536;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.thread-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.thread-composer {
+  padding: 10px 12px;
+  border-top: 1px solid #1e2536;
+  display: flex;
+  gap: 6px;
+  background: #10141f;
+}
+.thread-composer input {
+  flex: 1;
+  background: #171d2b;
+  border: 1px solid #28324a;
+  color: #f8fafc;
+  padding: 8px 11px;
+  border-radius: 8px;
+  font-size: 12.5px;
+}
+.thread-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.thread-pill:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+/* Cosméticos Mejorados v1.9.0: Marcos de Avatar Animados y Títulos */
+@keyframes framePulseGold {
+  0%, 100% { box-shadow: 0 0 0 2px #fbbf24, 0 0 12px rgba(245, 158, 11, 0.8), inset 0 0 6px rgba(254, 240, 138, 0.6); }
+  50% { box-shadow: 0 0 0 2.5px #fef08a, 0 0 18px rgba(251, 191, 36, 1), inset 0 0 10px rgba(254, 240, 138, 0.85); }
+}
+@keyframes framePulseColossus {
+  0%, 100% { box-shadow: 0 0 0 2px #ef4444, 0 0 12px rgba(220, 38, 38, 0.85), 0 0 20px rgba(249, 115, 22, 0.5); }
+  50% { box-shadow: 0 0 0 2.5px #fb923c, 0 0 18px rgba(239, 68, 68, 1), 0 0 24px rgba(251, 191, 36, 0.75); }
+}
+@keyframes framePulseRunic {
+  0%, 100% { box-shadow: 0 0 0 2px #ec4899, 0 0 11px rgba(236, 72, 153, 0.75); }
+  50% { box-shadow: 0 0 0 2px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.85); }
+}
+
+.av.frame-founder {
+  animation: framePulseGold 2.6s infinite ease-in-out;
+  border: 2px solid #fef08a !important;
+}
+.av.frame-colossus-legend {
+  animation: framePulseColossus 2.2s infinite ease-in-out;
+  border: 2px solid #fca5a5 !important;
+}
+.av.frame-runic {
+  animation: framePulseRunic 3s infinite ease-in-out;
+  border: 2px solid #f472b6 !important;
+}
+.av.frame-amethyst {
+  box-shadow: 0 0 0 2px #a855f7, 0 0 10px rgba(168, 85, 247, 0.7);
+  border: 1.5px solid #e9d5ff !important;
+}
+.av.frame-silver {
+  box-shadow: 0 0 0 2px #94a3b8, 0 0 9px rgba(148, 163, 184, 0.65);
+  border: 1.5px solid #f1f5f9 !important;
+}
+.av.frame-copper {
+  box-shadow: 0 0 0 2px #ea580c, 0 0 8px rgba(234, 88, 12, 0.55);
+  border: 1.5px solid #fed7aa !important;
+}
+
+.cosmetic-title-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 9px;
+  margin-left: 6px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.18), rgba(37, 99, 235, 0.18));
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #c4b5fd;
+  vertical-align: middle;
+  letter-spacing: 0.2px;
+}
+.cosmetic-title-badge.legendary {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(220, 38, 38, 0.22));
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fde047;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.25);
+}

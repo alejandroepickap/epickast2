@@ -175,7 +175,7 @@ function handleAppSplash() {
 
 handleAppSplash();
 
-function modalVault() {
+function modalVault(initialTab = 'roulette') {
   const m = $('modal');
   if (!m) return;
   m.classList.remove('hidden');
@@ -271,7 +271,7 @@ function modalVault() {
   const DUST_DUPLICATE = { common: 2, rare: 8, epic: 20, legendary: 50 };
   const DUST_CRAFT = { common: 40, rare: 120, epic: 300, legendary: 800 };
 
-  let activeTab = 'roulette'; // 'roulette' | 'collection' | 'dojo'
+  let activeTab = (typeof initialTab === 'string' && ['roulette', 'collection', 'dojo', 'racer', 'ninja'].includes(initialTab)) ? initialTab : 'roulette';
   let activeFilter = 'all';    // 'all' | 'frame' | 'banner' | 'color' | 'title'
   let selectedTier = 'copper';
   if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
@@ -280,9 +280,24 @@ function modalVault() {
 
   let isSpinning = false;
   let lastSpinResult = null;
+  let activeRacerInstance = null;
 
   const saveState = () => {
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
+    if (typeof rpc === 'function' && S.ws && S.ws.readyState === 1) {
+      let ninjaCfg = {};
+      try { ninjaCfg = JSON.parse(localStorage.getItem('epickast.ninja.v1') || '{}'); } catch {}
+      const unlockedList = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]);
+      if (dData.founderFrameUnlocked && !unlockedList.includes('founder_frame')) unlockedList.push('founder_frame');
+      rpc('vault.sync', {
+        coins: dData.coins || 0,
+        dust: dData.dust || 0,
+        keys: dData.keys || { copper: 0, silver: 0, gold: 0, obsidian: 0 },
+        pity: dData.pity || { withoutEpic: 0, withoutLegendary: 0 },
+        unlockedCosmetics: unlockedList,
+        ninjaConfig: ninjaCfg
+      }).catch(() => {});
+    }
   };
 
   const rollRarity = (tier) => {
@@ -322,22 +337,22 @@ function modalVault() {
     if (item.type === 'frame') {
       localStorage.setItem('epickast.equipped_frame', item.val);
       if (S.me) S.me.frame = item.val;
-      if (typeof rpc === 'function') rpc('profile.update', { frame: item.val }).catch(() => {});
-      toast('🖼️ ¡Marco equipado!');
+      if (typeof rpc === 'function') rpc('profile.set', { frame: item.val }).catch(() => {});
+      toast('🖼️ ¡Marco equipado y sincronizado!');
     } else if (item.type === 'color') {
       localStorage.setItem('epickast.equipped_color', item.val);
       if (S.me) S.me.color = item.val;
-      if (typeof rpc === 'function') rpc('profile.update', { color: item.val }).catch(() => {});
+      if (typeof rpc === 'function') rpc('profile.set', { color: item.val }).catch(() => {});
       toast('🎨 ¡Color de perfil equipado!');
     } else if (item.type === 'banner') {
       localStorage.setItem('epickast.equipped_banner', item.val);
       if (S.me) S.me.banner = item.val;
-      if (typeof rpc === 'function') rpc('profile.update', { banner: item.val }).catch(() => {});
+      if (typeof rpc === 'function') rpc('profile.set', { banner: item.val }).catch(() => {});
       toast('🏷️ ¡Banner equipado!');
     } else if (item.type === 'title') {
       localStorage.setItem('epickast.equipped_title', item.val);
       if (S.me) S.me.title = item.val;
-      if (typeof rpc === 'function') rpc('profile.update', { title: item.val }).catch(() => {});
+      if (typeof rpc === 'function') rpc('profile.set', { title: item.val }).catch(() => {});
       toast('👑 ¡Título equipado!');
     }
     render();
@@ -349,6 +364,10 @@ function modalVault() {
   wrap.style.cssText = 'box-sizing:border-box;width:96%;max-width:960px;max-height:90vh;overflow-y:auto;background:#11141c;border:1px solid #282f40;border-radius:12px;padding:20px;box-shadow:0 12px 36px rgba(0,0,0,0.6);font-family:system-ui,-apple-system,sans-serif;color:#e2e8f0;margin:auto;position:relative;';
 
   const renderView = () => {
+    if (activeRacerInstance && activeTab !== 'racer') {
+      try { activeRacerInstance.destroy(); } catch {}
+      activeRacerInstance = null;
+    }
     wrap.innerHTML = '';
 
     const unlockedCount = Object.keys(dData.cosmetics || {}).length + (dData.founderFrameUnlocked ? 1 : 0);
@@ -356,27 +375,30 @@ function modalVault() {
 
     wrap.innerHTML = `
       <!-- Cabecera Discreta y Navegación Modular por Pestañas -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222938;padding-bottom:14px;margin-bottom:14px;gap:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222938;padding-bottom:14px;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.8.6</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Cosméticos permanentes para perfil, chat y llamadas · Dojo de Cartas</p>
+            <h2 style="font-size:16px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.0</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:2px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
           </div>
         </div>
 
-        <!-- 3 Pestañas Modulares tipo Pill -->
-        <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;margin-left:auto;">
-          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+        <!-- 5 Pestañas Modulares tipo Pill -->
+        <div style="display:flex;background:#0d1017;padding:3px;border-radius:8px;border:1px solid #202636;gap:4px;margin-left:auto;flex-wrap:wrap;">
+          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#232a3b':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🎁 Ruleta y Cofres
           </button>
-          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#232a3b':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#232a3b':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🎨 Mi Armario (${unlockedCount}/26)
           </button>
-          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#232a3b':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🥋 Dojo Elemental
           </button>
-          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#232a3b':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b4660':'1px solid transparent'};padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+          <button id="vTabBtnRacer" style="background:${activeTab==='racer'?'#232a3b':'transparent'};color:${activeTab==='racer'?'#fff':'#94a3b8'};border:${activeTab==='racer'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
+            🏎️ Turbo Core
+          </button>
+          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#232a3b':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b4660':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;transition:0.15s;">
             🥷 Mi Ninja
           </button>
         </div>
@@ -535,6 +557,9 @@ function modalVault() {
       <!-- VISTA 3: DOJO ELEMENTAL (MINIJUEGO) -->
       <div id="vViewDojo" style="display:${activeTab==='dojo'?'block':'none'};width:100%;"></div>
 
+      <!-- VISTA 3B: TURBO CORE (CARRERAS PIXEL-NEON CON ECONOMÍA COMPARTIDA) -->
+      <div id="vViewRacer" style="display:${activeTab==='racer'?'block':'none'};width:100%;"></div>
+
       <!-- VISTA 4: PERSONALIZACIÓN DE NINJA PIXEL ART -->
       <div id="vViewNinja" style="display:${activeTab==='ninja'?'block':'none'};width:100%;"></div>
     `;
@@ -543,11 +568,12 @@ function modalVault() {
     const tabRoulette = wrap.querySelector('#vTabBtnRoulette');
     const tabCollection = wrap.querySelector('#vTabBtnCollection');
     const tabDojo = wrap.querySelector('#vTabBtnDojo');
-
+    const tabRacer = wrap.querySelector('#vTabBtnRacer');
     const tabNinja = wrap.querySelector('#vTabBtnNinja');
     if (tabRoulette) tabRoulette.onclick = () => { if (isSpinning) return; activeTab = 'roulette'; renderView(); populatePreview(); };
     if (tabCollection) tabCollection.onclick = () => { if (isSpinning) return; activeTab = 'collection'; renderView(); renderCosmeticsGrid(); };
     if (tabDojo) tabDojo.onclick = () => { if (isSpinning) return; activeTab = 'dojo'; renderView(); mountDojo(); };
+    if (tabRacer) tabRacer.onclick = () => { if (isSpinning) return; activeTab = 'racer'; renderView(); mountRacer(); };
     if (tabNinja) tabNinja.onclick = () => { if (isSpinning) return; activeTab = 'ninja'; renderView(); mountNinja(); };
 
     // Filtros de colección
@@ -561,7 +587,11 @@ function modalVault() {
 
     // Cerrar modal
     const closeBtn = wrap.querySelector('#vCloseBtn');
-    if (closeBtn) closeBtn.onclick = () => { m.classList.add('hidden'); m.replaceChildren(); };
+    if (closeBtn) closeBtn.onclick = () => {
+      if (activeRacerInstance) { try { activeRacerInstance.destroy(); } catch {} activeRacerInstance = null; }
+      m.classList.add('hidden');
+      m.replaceChildren();
+    };
 
     // Botones de canje
     // Handlers de la Tienda de Llaves y Apertura con Monedas
@@ -1027,6 +1057,7 @@ function modalVault() {
     if (!dojoContainer) return;
     if (window.CardJitsuGame) {
       new window.CardJitsuGame(dojoContainer, {
+        playerName: S.me?.name || 'Tú',
         onReward: (reward) => {
           if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
           if (reward.keys) {
@@ -1044,11 +1075,47 @@ function modalVault() {
     }
   };
 
+  const mountRacer = () => {
+    const racerContainer = wrap.querySelector('#vViewRacer');
+    if (!racerContainer) return;
+    if (window.CoreRacerGame) {
+      if (activeRacerInstance) { try { activeRacerInstance.destroy(); } catch {} }
+      activeRacerInstance = new window.CoreRacerGame(racerContainer, {
+        playerName: S.me?.name || 'Tú',
+        getCoins: () => dData.coins || 0,
+        spendCoins: (amt) => {
+          if ((dData.coins || 0) < amt) {
+            toast('🪙 Monedas insuficientes para esta mejora');
+            return false;
+          }
+          dData.coins -= amt;
+          saveState();
+          toast(`🔧 ¡Mejora instalada en tu Hover-Kart (-${amt} 🪙)!`);
+          return true;
+        },
+        onReward: (reward) => {
+          if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
+          if (reward.keys) {
+            if (reward.keys.copper) dData.keys.copper = (dData.keys.copper || 0) + reward.keys.copper;
+            if (reward.keys.silver) dData.keys.silver = (dData.keys.silver || 0) + reward.keys.silver;
+            if (reward.keys.gold) dData.keys.gold = (dData.keys.gold || 0) + reward.keys.gold;
+            if (reward.keys.obsidian) dData.keys.obsidian = (dData.keys.obsidian || 0) + reward.keys.obsidian;
+          }
+          saveState();
+          toast(`🏎️ ¡Botín de carrera acreditado (+${reward.coins} 🪙)!`);
+        }
+      });
+    } else {
+      racerContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Turbo Core...</div>';
+    }
+  };
+
   const mountNinja = () => {
     const ninjaContainer = wrap.querySelector('#vViewNinja');
     if (!ninjaContainer) return;
     if (window.CardJitsuGame && window.CardJitsuGame.renderNinjaCustomizer) {
       window.CardJitsuGame.renderNinjaCustomizer(ninjaContainer, () => {
+        saveState();
         activeTab = 'dojo';
         renderView();
         mountDojo();
@@ -1061,6 +1128,7 @@ function modalVault() {
   m.appendChild(wrap);
   renderView();
   if (activeTab === 'ninja') mountNinja();
+  else if (activeTab === 'racer') mountRacer();
   else if (activeTab === 'dojo') mountDojo();
   else if (activeTab === 'collection') renderCosmeticsGrid();
   else populatePreview();
@@ -1089,14 +1157,61 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-                        <!-- ==================== VERSIÓN 1.8.6 (ACTUAL) ==================== -->
+        <!-- ==================== VERSIÓN 1.9.0 (ACTUAL) ==================== -->
         <div style="border:2px solid #10b981;border-radius:12px;padding:20px;margin-bottom:24px;background:#0d1814;box-shadow:0 8px 24px rgba(16,185,129,0.18);">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1c3629;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="background:#059669;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
-              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.8.6</h2>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.0</h2>
             </div>
-            <span style="font-size:12px;color:#6ee7b7;font-weight:700;">Lanzamiento Estable</span>
+            <span style="font-size:12px;color:#6ee7b7;font-weight:700;">Lanzamiento Mayor Estable</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#38bdf8;">🏎️ Nuevo Minijuego con Economía Compartida — Turbo Core (Carreras Pixel-Neon):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Nuevo modo de carreras arcade a 60 FPS integrado en la Bóveda de Reliquias con 4 circuitos progresivos (Autopista de Cobre, Cañón de Cristales, Puente de Magma e Hipernúcleo Obsidiana).</li>
+                <li>Tu Ninja personalizado pilota el Hover-Kart. Comparte el mismo saldo de Monedas del Núcleo y otorga Llaves de Reliquia en tu primera conquista de cada circuito.</li>
+                <li>Incluye el <b>Taller de Ingeniería del Núcleo</b> para mejorar Motor Iónico, Inyector Nitro y Escudo Magnético.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#6ee7b7;">🟢 Estados de Presencia de Usuario (En línea, Ausente, No Molestar, Invisible):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Selector rápido desde la barra inferior de usuario y el modal de Perfil: <b>🟢 En línea</b>, <b>🌙 Ausente</b> (con detección automática tras 5 min de inactividad), <b>⛔ No molestar</b> (silencia alertas sonoras) y <b>👻 Invisible</b> (apareces desconectado ante los demás mientras usas la app con total privacidad).</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#fbbf24;">🧵 Hilos de Conversación (Threads en Tiempo Real):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Haz clic en el botón <b>🧵</b> de cualquier mensaje para abrir un panel lateral de hilo dedicado con soporte de respuestas en vivo, contador de mensajes y subida de archivos adjuntos sin saturar el canal principal.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#e879f9;">👑 Mejora Visual y Sincronización Global de los 26 Cosméticos:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Marcos animados multicapa (Fundador, Núcleo del Coloso, Partículas Rúnicas, Geoda Amatista), insignias de Títulos visibles junto a tu nombre en el chat y lista de miembros, y sincronización completa con el servidor.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#c084fc;">🛡️ Seguridad, Privacidad y Respaldos Cloud Completos:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Respaldo automático integral de usuarios, servidores, iconos, mensajes, hilos y archivos adjuntos con sincronización en Firebase Storage y protección de endpoints sensibles.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.8.6 ==================== -->
+        <div style="background:#130e22;border:1px solid #2d1d44;border-radius:10px;padding:18px 20px;margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #281b3d;padding-bottom:8px;">
+            <h2 style="font-size:16px;font-weight:800;color:#fff;margin:0;">Versión 1.8.6</h2>
+            <span style="font-size:11px;color:#94a3b8;">Versión Anterior</span>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
@@ -1520,33 +1635,12 @@ function renderGuideContent(chKey) {
 }
 
 function modalMinigame() {
-  const m = $('modal');
-  if (!m) return;
-  m.classList.remove('hidden');
-  m.replaceChildren();
-
-  const wrap = h('div');
-  m.appendChild(wrap);
-
-  if (window.CyberDefenseGame) {
-    new window.CyberDefenseGame(wrap, S.ws, S.chan || S.callKey || 'global', S.me, {
-      inviteAll: () => {
-        window.epicBroadcastGameInvite?.(S.chan || S.callKey || 'global');
-      }
-    });
-    const chk = setInterval(() => {
-      if (!wrap.children.length) {
-        clearInterval(chk);
-        m.classList.add('hidden');
-        m.replaceChildren();
-      }
-    }, 200);
-  }
+  modalVault('racer');
 }
 
-window.epicBroadcastGameInvite = (roomKey) => {
+window.epicBroadcastGameInvite = () => {
   const myName = S.me?.name || 'Un amigo';
-  const inviteMsg = `🎮 ¡${myName} te ha invitado a jugar a EpicStrike 2D! Haz clic para unirte: epickast://game/join`;
+  const inviteMsg = `🏎️ ¡${myName} te ha invitado a competir en Turbo Core / Dojo Elemental! Haz clic para unirte: epickast://game/join`;
   if (S.chan) {
     rpc('msg.send', { channel: S.chan, text: inviteMsg }).catch(() => {});
   }
@@ -1561,11 +1655,11 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: '1.8.6', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: '1.9.0', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
-  stageCollapsed: false,
+  stageCollapsed: false, activeThread: null, autoAwayActive: false
 };
 
 window.epic.version?.().then((v) => { if (v) { S.appVer = v; renderRail(); } }).catch(() => {});
@@ -1631,14 +1725,41 @@ function nameColorStyle(col) {
 
 const colorFor = (u) => u?.color || PALETTE[(u?.id || 0) % PALETTE.length];
 const avCache = new Map(); const avWait = new Set();
+
+function statusDotClass(u, online) {
+  const isMe = u && S.me && (u.id === S.me.id);
+  const st = isMe ? (S.me?.status || u?.status || 'online') : (u?.status || (online ? 'online' : 'offline'));
+  if (!isMe && (!online || st === 'offline' || st === 'invisible')) return ' off';
+  if (st === 'away') return ' away';
+  if (st === 'dnd') return ' dnd';
+  if (st === 'invisible') return ' inv';
+  return ' on';
+}
+
+function statusBadgeText(u) {
+  const isMe = u && S.me && (u.id === S.me.id);
+  const st = isMe ? (S.me?.status || u?.status || 'online') : (u?.status || (u?.online ? 'online' : 'offline'));
+  if (!isMe && (!u?.online || st === 'offline' || st === 'invisible')) return '⚫ Desconectado';
+  if (st === 'away') return '🌙 Ausente';
+  if (st === 'dnd') return '⛔ No molestar';
+  if (st === 'invisible') return '👻 Invisible';
+  return '🟢 En línea';
+}
+
+function titleBadgeEl(titleVal) {
+  if (!titleVal) return null;
+  const isLeg = titleVal === 'Coloso Caído';
+  return h('span', { class: 'cosmetic-title-badge' + (isLeg ? ' legendary' : ''), title: `Título de Reliquia: ${titleVal}` }, `👑 ${titleVal}`);
+}
+
 function avatar(u, size = 32, online) {
   const isMe = u && S.me && (u.id === S.me.id);
-  const myFrame = isMe ? localStorage.getItem('epickast.equipped_frame') : u?.frame;
+  const myFrame = isMe ? (localStorage.getItem('epickast.equipped_frame') || u?.frame) : u?.frame;
   let frameClass = '';
   if (myFrame === 'founder_blue') frameClass = ' frame-founder';
   else if (myFrame && myFrame.startsWith('frame-')) frameClass = ' ' + myFrame;
   const el = h('div', { class: 'avatar' + frameClass, style: `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.45)}px;background-color:${colorFor(u)}`, 'data-uid': u?.id ?? 0, 'data-av': u?.av || 0 }, (u?.name || '?')[0].toUpperCase());
-  if (online !== undefined) el.append(h('span', { class: 'st' + (online ? ' on' : '') }));
+  if (online !== undefined) el.append(h('span', { class: 'st' + statusDotClass(u, online) }));
   paintAvatar(el); return el;
 }
 function paintAvatar(el) {
@@ -1658,7 +1779,7 @@ function paintAvatar(el) {
 const ringer = {
   ctx: null, timer: null,
   beep(freqs, dur = 0.09, gain = 0.12) {
-    if (settings.dnd) return;
+    if (settings.dnd || S.me?.status === 'dnd') return;
     try {
       const c = (this.ctx = this.ctx || new AudioContext()); const now = c.currentTime;
       freqs.forEach((f, idx) => {
@@ -1752,15 +1873,44 @@ function onMsg(ev) {
   if (m.r) { const p = S.pend.get(m.r); if (p) { S.pend.delete(m.r); m.ok ? p.res(m.data) : p.rej(new Error(m.error)); } return; }
   switch (m.t) {
     case 'presence': {
-      if (S.me && m.id === S.me.id) { S.me.activity = m.activity || null; renderMe(); }
-      for (const f of S.friends.friends) if (f.id === m.id) { f.online = m.online; if (m.activity !== undefined) f.activity = m.activity; }
-      for (const sd of S.sdata.values()) for (const mem of sd.members) if (mem.id === m.id) { mem.online = m.online; if (m.activity !== undefined) mem.activity = m.activity; }
+      if (S.me && m.id === S.me.id) {
+        S.me.activity = m.activity || null;
+        if (m.myStatus || m.status) S.me.status = m.myStatus || m.status;
+        if (m.customStatus !== undefined) S.me.customStatus = m.customStatus;
+        renderMe();
+      }
+      for (const f of S.friends.friends) {
+        if (f.id === m.id) {
+          f.online = m.online;
+          if (m.status !== undefined) f.status = m.status;
+          if (m.customStatus !== undefined) f.customStatus = m.customStatus;
+          if (m.activity !== undefined) f.activity = m.activity;
+        }
+      }
+      for (const sd of S.sdata.values()) {
+        for (const mem of sd.members) {
+          if (mem.id === m.id) {
+            mem.online = m.online;
+            if (m.status !== undefined) mem.status = m.status;
+            if (m.customStatus !== undefined) mem.customStatus = m.customStatus;
+            if (m.activity !== undefined) mem.activity = m.activity;
+          }
+        }
+      }
       renderSide(); renderMembers(); renderHome(); break;
     }
     case 'friends.changed': loadFriends(); break;
     case 'servers.changed': loadServers(); break;
     case 'server.changed': if (S.sdata.has(m.id) || S.view.sid === m.id) refreshServer(m.id); break;
     case 'msg': onChatMsg(m); break;
+    case 'thread.msg': onThreadMsg(m); break;
+    case 'cardjitsu.invite': {
+      const fromName = m.from?.name || 'Un amigo';
+      const targetTab = m.game === 'racer' ? 'racer' : 'dojo';
+      toast(`🥋 ¡${fromName} te ha desafiado en la Bóveda de Reliquias!`);
+      ringer.beep([659, 880, 1046], 0.06, 0.12);
+      break;
+    }
     case 'msg.pinned': onMsgPinned(m); break;
     case 'msg.edited': {
       if (m.channel === S.chan) {
@@ -1998,10 +2148,79 @@ async function autoLogin() {
 async function bootstrap() {
   $('login').classList.add('hidden'); $('main').classList.remove('hidden');
   S.lastSentActivity = '';
+  // Sincronizar cosméticos equipados y economía de la Bóveda con el servidor
+  try {
+    const eqFrame = localStorage.getItem('epickast.equipped_frame');
+    const eqColor = localStorage.getItem('epickast.equipped_color');
+    const eqBanner = localStorage.getItem('epickast.equipped_banner');
+    const eqTitle = localStorage.getItem('epickast.equipped_title');
+    if (eqFrame || eqColor || eqBanner || eqTitle) {
+      rpc('profile.set', {
+        frame: eqFrame || S.me?.frame || undefined,
+        color: eqColor || S.me?.color || undefined,
+        banner: eqBanner || S.me?.banner || undefined,
+        title: eqTitle || S.me?.title || undefined
+      }).catch(() => {});
+    }
+    const rawVault = JSON.parse(localStorage.getItem('epickast.dungeon.v1') || '{}');
+    const rawNinja = JSON.parse(localStorage.getItem('epickast.ninja.v1') || '{}');
+    const unlockedList = Object.keys(rawVault.cosmetics || {}).filter(k => rawVault.cosmetics[k]);
+    rpc('vault.sync', {
+      coins: rawVault.coins,
+      dust: rawVault.dust,
+      keys: rawVault.keys,
+      pity: rawVault.pity,
+      unlockedCosmetics: unlockedList,
+      ninjaConfig: rawNinja
+    }).then((srvVault) => {
+      if (srvVault && srvVault.ok) {
+        const merged = {
+          ...rawVault,
+          coins: Math.max(rawVault.coins || 0, srvVault.coins || 0),
+          dust: Math.max(rawVault.dust || 0, srvVault.dust || 0),
+          keys: {
+            copper: Math.max(rawVault.keys?.copper || 0, srvVault.keys?.copper || 0),
+            silver: Math.max(rawVault.keys?.silver || 0, srvVault.keys?.silver || 0),
+            gold: Math.max(rawVault.keys?.gold || 0, srvVault.keys?.gold || 0),
+            obsidian: Math.max(rawVault.keys?.obsidian || 0, srvVault.keys?.obsidian || 0)
+          },
+          cosmetics: { ...(rawVault.cosmetics || {}) }
+        };
+        (srvVault.unlockedCosmetics || []).forEach(cid => { merged.cosmetics[cid] = true; });
+        localStorage.setItem('epickast.dungeon.v1', JSON.stringify(merged));
+      }
+    }).catch(() => {});
+  } catch {}
   await Promise.all([loadFriends(), loadServers(), checkServerUpdate()]);
   if (S.view.kind === 'server') await refreshServer(S.view.sid);
   render();
   startGameDetection();
+  startIdleAutoAway();
+}
+
+let idleTimeout = null;
+function startIdleAutoAway() {
+  const resetIdle = () => {
+    clearTimeout(idleTimeout);
+    if (S.autoAwayActive && S.me && S.me.status === 'away') {
+      S.autoAwayActive = false;
+      S.me.status = 'online';
+      rpc('status.set', { status: 'online' }).catch(() => {});
+      renderMe();
+    }
+    idleTimeout = setTimeout(() => {
+      if (S.me && (!S.me.status || S.me.status === 'online') && !S.call) {
+        S.autoAwayActive = true;
+        S.me.status = 'away';
+        rpc('status.set', { status: 'away' }).catch(() => {});
+        renderMe();
+      }
+    }, 5 * 60 * 1000); // 5 minutos de inactividad -> Ausente automático
+  };
+  ['mousemove', 'keydown', 'mousedown', 'touchstart'].forEach(ev => {
+    window.addEventListener(ev, resetIdle, { passive: true });
+  });
+  resetIdle();
 }
 async function syncActivity() {
   if (!S.ws || S.ws.readyState !== 1 || !S.me) return;
@@ -2155,6 +2374,7 @@ async function openServer(id) {
   if (first) openChannel(first.key, 'text', first.name);
 }
 async function openChannel(key, type, name) {
+  if (S.chan !== key) closeThread();
   S.chan = key; S.chanType = type; S.chanName = name; S.unread.delete(key); S.oldest = null;
   clearReply();
   cancelEditMsg();
@@ -2346,25 +2566,35 @@ function renderMsgText(text) {
   );
 }
 
-const msgEl = (m) => {
+const msgEl = (m, isThreadItem = false) => {
   const isMentioned = (m.mentions && m.mentions.includes(S.me?.id)) || (m.text && m.text.includes('@' + S.me?.name)) || m.highlight;
+  const uTitle = m.title || (m.userId === S.me?.id ? localStorage.getItem('epickast.equipped_title') : null);
+  const uColor = (m.userId === S.me?.id ? (localStorage.getItem('epickast.equipped_color') || m.color) : m.color);
+  const tCount = Number(m.threadCount) || 0;
   const el = h('div', { class: 'm' + (isMentioned ? ' mention-highlight' : ''), style: isMentioned ? 'background:rgba(245,158,11,0.08);border-left:3px solid #f59e0b;' : '', 'data-mid': m.id },
-    avatar({ id: m.userId, name: m.name, color: m.color, av: m.av, frame: m.frame }, 36),
+    avatar({ id: m.userId, name: m.name, color: m.color, av: m.av, frame: m.frame }, isThreadItem ? 30 : 36),
     h('div', { class: 'mb' },
       m.replyId ? h('div', { class: 'quote', onclick: () => jumpToMsg(m.replyId), title: 'Ir al mensaje original' },
         h('b', null, `↩ ${m.replyName || 'Mensaje'}:`),
         h('span', null, m.replyText || '📎 Archivo adjunto')
       ) : null,
       h('div', { class: 'mhead' },
-        h('b', null, m.name),
+        h('b', { style: nameColorStyle(uColor) }, m.name),
+        titleBadgeEl(uTitle),
         h('i', null, fmtTime(m.ts)),
         m.pinned ? h('span', { class: 'pin-tag' }, '📌 Fijado') : null
       ),
       m.text ? renderMsgText(m.text) : null,
-      attachmentEl(m)
+      attachmentEl(m),
+      (!isThreadItem && tCount > 0) ? h('button', {
+        type: 'button',
+        class: 'thread-pill',
+        onclick: () => openThread(m)
+      }, `🧵 ${tCount} ${tCount === 1 ? 'respuesta' : 'respuestas'} · Ver hilo →`) : null
     ),
-    h('div', { class: 'macts' },
+    !isThreadItem ? h('div', { class: 'macts' },
       h('button', { title: 'Responder a este mensaje', onclick: () => setReply(m) }, '↩'),
+      h('button', { title: 'Abrir hilo de conversación (Thread)', onclick: () => openThread(m) }, '🧵'),
       h('button', { title: 'Fijar / Desfijar mensaje', onclick: () => rpc('msg.pin', { id: m.id }).catch((e) => toast(e.message)) }, '📌'),
       (m.userId === S.me?.id && m.text) ?
         h('button', { class: 'edit-msg-btn', title: 'Editar mensaje', onclick: () => startEditMsg(m) }, '✏️') : null,
@@ -2378,11 +2608,140 @@ const msgEl = (m) => {
             }
           }
         }, '🗑️') : null
-    )
+    ) : null
   );
   el._msg = m;
   return el;
 };
+
+async function openThread(rootMsg) {
+  if (!rootMsg || !S.chan) return;
+  const pane = $('threadPane');
+  if (!pane) return;
+  S.activeThread = { id: rootMsg.id, channel: S.chan, root: rootMsg };
+  pane.classList.remove('hidden');
+  pane.innerHTML = `<div style="padding:20px;color:#94a3b8;text-align:center;">Cargando hilo de conversación…</div>`;
+
+  let data = { root: rootMsg, replies: [] };
+  try {
+    data = await rpc('thread.history', { channel: S.chan, threadId: rootMsg.id });
+  } catch (e) {
+    toast(e.message || 'No se pudo cargar el hilo');
+  }
+
+  if (!S.activeThread || S.activeThread.id !== rootMsg.id) return;
+  pane.replaceChildren();
+
+  const header = h('div', { class: 'thread-header' },
+    h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0;' },
+      h('span', { style: 'font-size:16px;' }, '🧵'),
+      h('div', { style: 'min-width:0;' },
+        h('div', { style: 'font-size:13px;font-weight:900;color:#f8fafc;' }, 'Hilo de conversación'),
+        h('div', { style: 'font-size:10.5px;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' }, `Mensaje de ${data.root?.name || rootMsg.name}`)
+      )
+    ),
+    h('button', {
+      class: 'btn-ico',
+      title: 'Cerrar hilo',
+      onclick: closeThread
+    }, '✕')
+  );
+
+  const rootBox = h('div', { class: 'thread-root-box' }, msgEl(data.root || rootMsg, true));
+  const list = h('div', { id: 'threadList', class: 'thread-list' });
+  if (!data.replies || !data.replies.length) {
+    list.append(h('div', { id: 'threadEmptyHint', style: 'padding:18px 10px;text-align:center;color:#64748b;font-size:12px;' }, 'Sé el primero en responder en este hilo.'));
+  } else {
+    data.replies.forEach(r => list.append(msgEl(r, true)));
+  }
+
+  const tFileInput = h('input', {
+    type: 'file',
+    multiple: true,
+    class: 'hidden',
+    onchange: (e) => {
+      if (e.target.files?.length) uploadFiles(e.target.files, rootMsg.id);
+      e.target.value = '';
+    }
+  });
+  const tAttachBtn = h('button', {
+    type: 'button',
+    title: 'Adjuntar archivo al hilo',
+    style: 'background:#1e293b;border:1px solid #334155;color:#e2e8f0;padding:0 10px;border-radius:8px;cursor:pointer;',
+    onclick: () => tFileInput.click()
+  }, '📎');
+  const tInput = h('input', {
+    id: 'threadMsgInput',
+    placeholder: 'Responder en el hilo…',
+    maxlength: 2000,
+    autocomplete: 'off'
+  });
+  const tSendBtn = h('button', {
+    type: 'submit',
+    class: 'primary',
+    style: 'padding:0 12px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;'
+  }, 'Enviar');
+
+  const form = h('form', {
+    class: 'thread-composer',
+    onsubmit: (e) => {
+      e.preventDefault();
+      const txt = tInput.value.trim();
+      if (!txt || !S.chan) return;
+      tInput.value = '';
+      rpc('msg.send', { channel: S.chan, text: txt, threadId: rootMsg.id }).catch(er => toast(er.message));
+    }
+  }, tAttachBtn, tFileInput, tInput, tSendBtn);
+
+  pane.append(header, rootBox, list, form);
+  list.scrollTop = 1e9;
+  tInput.focus();
+}
+
+function closeThread() {
+  S.activeThread = null;
+  const pane = $('threadPane');
+  if (pane) {
+    pane.classList.add('hidden');
+    pane.replaceChildren();
+  }
+}
+
+function onThreadMsg(m) {
+  if (m.channel === S.chan) {
+    const rootEl = document.querySelector(`[data-mid="${m.threadId}"]`);
+    if (rootEl) {
+      if (rootEl._msg) rootEl._msg.threadCount = m.threadCount || 1;
+      const mb = rootEl.querySelector('.mb');
+      if (mb) {
+        let pill = mb.querySelector('.thread-pill');
+        const cnt = m.threadCount || 1;
+        const label = `🧵 ${cnt} ${cnt === 1 ? 'respuesta' : 'respuestas'} · Ver hilo →`;
+        if (pill) {
+          pill.textContent = label;
+        } else {
+          pill = h('button', {
+            type: 'button',
+            class: 'thread-pill',
+            onclick: () => openThread(rootEl._msg || { id: m.threadId, name: m.lastAuthor || 'Hilo' })
+          }, label);
+          mb.append(pill);
+        }
+      }
+    }
+  }
+  if (S.activeThread && S.activeThread.id === m.threadId && S.chan === m.channel) {
+    const list = $('threadList');
+    if (list) {
+      const empty = $('threadEmptyHint');
+      if (empty) empty.remove();
+      list.append(msgEl(m.msg, true));
+      list.scrollTop = 1e9;
+    }
+  } else if (m.msg?.userId !== S.me?.id && !settings.dnd && S.me?.status !== 'dnd') {
+    ringer.beep([784, 1046], 0.04, 0.06);
+  }
+}
 
 function onMsgPinned(m) {
   if (m.channel !== S.chan) return;
@@ -2425,7 +2784,7 @@ function onChatMsg(m) {
     const preview = m.msg.text || (m.msg.fileName ? `📎 ${m.msg.fileName}` : 'Nuevo mensaje');
 
     // Notificar si no está silenciado el servidor ni está en No Molestar
-    if (!isServerMuted && !settings.dnd) {
+    if (!isServerMuted && !settings.dnd && S.me?.status !== 'dnd') {
       const windowUnfocused = !document.hasFocus();
 
       if (!isCurrentChannel || windowUnfocused) {
@@ -2465,14 +2824,15 @@ function onChatMsg(m) {
   }
 }
 
-async function uploadFiles(fileList) {
+async function uploadFiles(fileList, threadId = null) {
   if (!S.chan || S.chanType === 'voice') return toast('Abre un chat de texto o mensaje directo primero');
   const files = [...(fileList || [])];
   if (!files.length) return;
-  const caption = $('msgInput').value.trim();
-  const replyId = S.replyTo?.id || '';
-  $('msgInput').value = '';
-  clearReply();
+  const captionInput = threadId ? $('threadMsgInput') : $('msgInput');
+  const caption = captionInput ? captionInput.value.trim() : '';
+  const replyId = !threadId ? (S.replyTo?.id || '') : '';
+  if (captionInput) captionInput.value = '';
+  if (!threadId) clearReply();
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
     if (f.size > 25 * 1024 * 1024) { toast(`"${f.name}" supera los 25 MB`); continue; }
@@ -2484,6 +2844,7 @@ async function uploadFiles(fileList) {
         mime: f.type || 'application/octet-stream',
         text: i === 0 ? caption : '',
         replyTo: i === 0 && replyId ? String(replyId) : '',
+        threadId: threadId ? String(threadId) : '',
       });
       const res = await fetch(`${httpBase()}/upload?${qs}`, {
         method: 'POST',
@@ -2701,16 +3062,66 @@ async function modalGallery() {
 function render() { renderRail(); renderSide(); renderMembers(); renderCenter(); renderHome(); renderStage(); renderMe(); }
 function renderMe() {
   const bar = $('meBar'); if (!S.me) return;
-  const actTxt = S.me.activity?.name ? `🎮 ${S.me.activity.name}` : (S.me.bio || 'Editar perfil y actividad');
+  const stVal = S.me.status || localStorage.getItem('epickast.status') || 'online';
+  const stIcon = stVal === 'away' ? '🌙' : stVal === 'dnd' ? '⛔' : stVal === 'invisible' ? '👻' : '🟢';
+  const stLabel = stVal === 'away' ? 'Ausente' : stVal === 'dnd' ? 'No molestar' : stVal === 'invisible' ? 'Invisible' : 'En línea';
+  const actTxt = S.me.activity?.name ? `🎮 ${S.me.activity.name}` : (S.me.customStatus || S.me.bio || stLabel);
+  const eqTitle = localStorage.getItem('epickast.equipped_title') || S.me.title;
+
+  const toggleStatusPopover = (e) => {
+    e.stopPropagation();
+    const existing = bar.querySelector('.status-popover');
+    if (existing) { existing.remove(); return; }
+    const opts = [
+      { id: 'online', icon: '🟢', label: 'En línea', sub: 'Visible y disponible para todos' },
+      { id: 'away', icon: '🌙', label: 'Ausente', sub: 'Temporalmente lejos del teclado' },
+      { id: 'dnd', icon: '⛔', label: 'No molestar', sub: 'Silencia alertas y sonidos de chat' },
+      { id: 'invisible', icon: '👻', label: 'Invisible', sub: 'Apareces desconectado para los demás' }
+    ];
+    const pop = h('div', { class: 'status-popover' },
+      h('div', { style: 'font-size:10px;font-weight:800;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.6px' }, 'Estado de presencia'),
+      ...opts.map(o => h('button', {
+        class: 'status-opt' + (stVal === o.id ? ' sel' : ''),
+        onclick: async (ev) => {
+          ev.stopPropagation();
+          S.me.status = o.id;
+          S.autoAwayActive = false;
+          localStorage.setItem('epickast.status', o.id);
+          pop.remove();
+          renderMe();
+          await safe(rpc('status.set', { status: o.id, customStatus: S.me.customStatus || '' }));
+          toast(`${o.icon} Estado cambiado a: ${o.label}`);
+        }
+      },
+        h('span', { style: 'font-size:14px' }, o.icon),
+        h('div', { style: 'display:flex;flex-direction:column;text-align:left' },
+          h('span', { style: 'font-weight:700;color:#f8fafc;font-size:12px' }, o.label),
+          h('span', { style: 'font-size:10px;color:#94a3b8' }, o.sub)
+        )
+      ))
+    );
+    bar.style.position = 'relative';
+    bar.appendChild(pop);
+    const closeDoc = () => { pop.remove(); document.removeEventListener('click', closeDoc); };
+    setTimeout(() => document.addEventListener('click', closeDoc), 10);
+  };
+
   bar.replaceChildren(
-    h('div', { class: 'who', title: 'Editar perfil y estado de juego', onclick: modalProfile },
+    h('div', { class: 'who', title: 'Editar perfil, cosméticos y actividad', onclick: modalProfile },
       avatar(S.me, 34, true),
       h('div', { style: 'min-width:0' },
-        h('b', { style: nameColorStyle(localStorage.getItem('epickast.equipped_color') || S.me.color) }, S.me.name),
+        h('div', { style: 'display:flex;align-items:center;gap:4px;overflow:hidden' },
+          h('b', { style: nameColorStyle(localStorage.getItem('epickast.equipped_color') || S.me.color) }, S.me.name),
+          titleBadgeEl(eqTitle)
+        ),
         h('small', { class: S.me.activity?.name ? 'act-live' : '' }, actTxt)
       )
     ),
-    h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16)));
+    h('div', { style: 'display:flex;gap:4px;align-items:center' },
+      h('button', { class: 'btn-ico', title: `Cambiar estado (${stLabel})`, style: 'font-size:13px;padding:4px 6px', onclick: toggleStatusPopover }, stIcon),
+      h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16))
+    )
+  );
 }
 function renderRail() {
   const r = $('rail'); r.replaceChildren();
@@ -2748,12 +3159,19 @@ function renderRail() {
   }, verTxt));
 }
 function userItem(u, onclick, extra) {
+  const stSub = u.online
+    ? (u.activity?.name ? `🎮 ${u.activity.name}` : (u.customStatus || (u.status === 'away' ? '🌙 Ausente' : u.status === 'dnd' ? '⛔ No molestar' : '')))
+    : '';
   return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : ''), onclick },
     h('span', { class: 'l' },
       avatar(u, 28, u.online),
       h('div', { class: 'u-stack' },
-        h('span', { class: 'nm' }, u.name, S.unread.has(u.dm) ? ' ●' : ''),
-        u.online && u.activity?.name ? h('small', { class: 'u-act' }, `🎮 ${u.activity.name}`) : null
+        h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
+          h('span', { style: nameColorStyle(u.color) }, u.name),
+          titleBadgeEl(u.title),
+          S.unread.has(u.dm) ? ' ●' : ''
+        ),
+        stSub ? h('small', { class: u.activity?.name ? 'u-act' : 'u-bio' }, stSub) : null
       )
     ),
     extra
@@ -2858,13 +3276,18 @@ function renderMembers() {
   const renderRow = (m) => {
     const rKey = m.role || (m.id === sd.owner ? 'owner' : 'member');
     const rInfo = ROLES[rKey] || ROLES.member;
-    const subTxt = m.online && m.activity?.name ? `🎮 ${m.activity.name}` : (m.bio || '');
+    const subTxt = m.online
+      ? (m.activity?.name ? `🎮 ${m.activity.name}` : (m.customStatus || m.bio || (m.status === 'away' ? '🌙 Ausente' : m.status === 'dnd' ? '⛔ No molestar' : '')))
+      : (m.bio || '');
+    const mColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || rInfo.color || '');
+    const mTitle = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_title')) ? localStorage.getItem('epickast.equipped_title') : m.title;
     return h('div', { class: 'item mem-row' + (m.online ? '' : ' off'), onclick: () => modalMemberCard(sd, m), title: 'Clic para ver perfil o asignar rango' },
       h('span', { class: 'l' },
         avatar(m, 30, m.online),
         h('div', { class: 'u-stack' },
-          h('span', { class: 'nm', style: rInfo.color ? `color:${rInfo.color};font-weight:600` : '' },
-            m.name,
+          h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
+            h('span', { style: nameColorStyle(mColor) + (rInfo.color && !m.color ? `;font-weight:600` : '') }, m.name),
+            titleBadgeEl(mTitle),
             rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null
           ),
           subTxt ? h('small', { class: m.online && m.activity?.name ? 'u-act' : 'u-bio' }, subTxt) : null
@@ -2936,6 +3359,7 @@ function modalMemberCard(sd, m) {
 
   const bannerBg = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_banner')) ? localStorage.getItem('epickast.equipped_banner') : (m.banner || (m.id === S.me?.id ? S.me?.banner : null) || m.color || 'linear-gradient(135deg, #7c5cff, #4f46e5)');
   const memberNameColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || (m.id === S.me?.id ? S.me?.color : null) || rInfo.color || 'var(--tx)');
+  const memberTitle = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_title')) ? localStorage.getItem('epickast.equipped_title') : m.title;
 
   const card = h('div', { class: 'prof-card' },
     h('div', { class: 'prof-banner', style: `background:${bannerBg}` }),
@@ -2949,15 +3373,21 @@ function modalMemberCard(sd, m) {
         }, icoSvg('userPlus', 13), ' Agregar') : null
       ),
       h('div', { class: 'prof-meta' },
-        h('div', { style: `font-size:18px;font-weight:700;color:${memberNameColor}` },
-          m.name,
-          rInfo.badge ? h('span', { class: 'role-badge', style: 'margin-left:6px', title: rInfo.label }, rInfo.badge) : null
+        h('div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' },
+          h('span', { style: `font-size:18px;font-weight:700;${nameColorStyle(memberNameColor)}` }, m.name),
+          titleBadgeEl(memberTitle),
+          rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null
         ),
-        h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${m.online ? '🟢 En línea' : '⚫ Desconectado'}`),
+        h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${statusBadgeText(m)}`),
         m.activity?.name ? h('div', { class: 'act-pill', style: 'margin-top:2px' }, `🎮 Jugando a ${m.activity.name}`) : null,
         userVoiceName ? h('div', { class: 'hint', style: 'color:#a29bfe;margin-top:2px' }, `🔊 En llamada: ${userVoiceName}`) : null,
         m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null
       ),
+      m.id !== S.me.id ? h('div', { style: 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px' },
+        h('button', { id: 'profBtnSendDm', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700' }, '💬 Mensaje'),
+        h('button', { id: 'profBtnCardJitsu', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700;background:rgba(99,102,241,0.18);border-color:rgba(99,102,241,0.45);color:#c7d2fe' }, '🥋 Dojo'),
+        h('button', { id: 'profBtnRacer', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700;background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.45);color:#6ee7b7' }, '🏎️ Carrera')
+      ) : null,
       canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
       (canKick || canBan || userVoiceKey) ? h('div', { class: 'mod-box' },
         h('div', { class: 'mod-title' }, '⚖️ Herramientas de Moderación'),
@@ -3032,8 +3462,15 @@ function modalMemberCard(sd, m) {
   if (btnCj) btnCj.onclick = () => {
     closeModal();
     modalVault('dojo');
-    toast(`¡Has desafiado a ${m.name} al Dojo!`);
-    safe(rpc('cardjitsu.challenge', { toUserId: m.id }));
+    toast(`¡Has desafiado a ${m.name} al Dojo Elemental!`);
+    safe(rpc('cardjitsu.challenge', { toUserId: m.id, game: 'dojo' }));
+  };
+  const btnRc = card.querySelector('#profBtnRacer');
+  if (btnRc) btnRc.onclick = () => {
+    closeModal();
+    modalVault('racer');
+    toast(`¡Has retado a ${m.name} en Turbo Core!`);
+    safe(rpc('cardjitsu.challenge', { toUserId: m.id, game: 'racer' }));
   };
 }
 function applyPanelsLayout() {
@@ -3069,9 +3506,10 @@ function renderCenter() {
   );
 
   const guideTitles = {
+    notas_version: '🚀-notas-de-la-version',
     como_funciona: '📖-como-funciona',
     servidores: '🏰-guia-de-servidores',
-    mazmorras: '⚔️-mazmorras-y-recompensas'
+    mazmorras: '⚔️-boveda-y-dojo-de-cartas'
   };
 
   const centerTitleText = isGuide 
@@ -3135,19 +3573,25 @@ function renderHome() {
   }
   for (const u of S.friends.friends) {
     const statusLine = u.online
-      ? (u.activity?.name ? `🎮 Jugando a ${u.activity.name}` : (u.bio ? `En línea · ${u.bio}` : 'En línea'))
-      : 'Desconectado';
+      ? (u.activity?.name ? `${statusBadgeText(u)} · 🎮 Jugando a ${u.activity.name}` : (u.bio ? `${statusBadgeText(u)} · ${u.bio}` : statusBadgeText(u)))
+      : '⚫ Desconectado';
+    const statusColor = !u.online ? '' : (u.activity?.name ? 'color:#a29bfe;font-weight:600' : u.status === 'away' ? 'color:#f59e0b' : u.status === 'dnd' ? 'color:#ef4444' : 'color:var(--ok)');
     H.append(h('div', { class: 'friend-card' },
       h('span', { class: 'l', style: 'cursor:pointer', onclick: () => openChannel(u.dm, 'dm', u.name) },
         avatar(u, 38, u.online),
         h('span', { class: 'nm' },
-          h('div', { style: 'font-weight:600;color:var(--tx)' }, u.name),
-          h('div', { class: 'hint', style: u.online ? (u.activity?.name ? 'color:#a29bfe;font-weight:600' : 'color:var(--ok)') : '' }, statusLine)
+          h('div', { style: 'display:flex;align-items:center;gap:6px;font-weight:600;color:var(--tx)' },
+            h('span', { style: nameColorStyle(u.color) }, u.name),
+            titleBadgeEl(u.title)
+          ),
+          h('div', { class: 'hint', style: statusColor }, statusLine)
         )
       ),
       h('div', { class: 'f-actions' },
         h('button', { class: 'btn-act', title: `Abrir chat con ${u.name}`, onclick: () => openChannel(u.dm, 'dm', u.name) }, icoSvg('chat', 15), 'Mensaje'),
         h('button', { class: 'btn-act call', title: `Llamar a ${u.name}`, onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name); } }, icoSvg('phone', 15), 'Llamar'),
+        h('button', { class: 'btn-act', title: `Desafiar a ${u.name} al Dojo Elemental`, onclick: () => { modalVault('dojo'); toast(`¡Reto de Dojo enviado a ${u.name}!`); safe(rpc('cardjitsu.challenge', { toUserId: u.id, game: 'dojo' })); } }, '🥋 Dojo'),
+        h('button', { class: 'btn-act', title: `Retar a ${u.name} en Turbo Core`, onclick: () => { modalVault('racer'); toast(`¡Reto de Carrera enviado a ${u.name}!`); safe(rpc('cardjitsu.challenge', { toUserId: u.id, game: 'racer' })); } }, '🏎️ Carrera'),
         S.servers.length ? h('button', { class: 'btn-act', title: `Invitar a ${u.name} a un servidor`, onclick: () => modalInviteFriendToAnyServer(u) }, '🏰 Invitar') : null,
         h('button', { class: 'btn-ico del', title: 'Eliminar amigo', onclick: () => confirm(`¿Eliminar a ${u.name}?`) && rpc('friends.remove', { id: u.id }) }, icoSvg('close', 16))
       )
@@ -3506,8 +3950,11 @@ function modalProfile() {
   } });
   const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
   
-  // Cosméticos Desbloqueados de la Bóveda (Colores y Gradientes Prémium)
+  // Cosméticos Desbloqueados de la Bóveda (Colores, Marcos, Banners y Títulos)
   let unlockedCosmeticColors = [];
+  let unlockedFrames = [];
+  let unlockedBanners = [];
+  let unlockedTitles = [];
   try {
     const rawVault = localStorage.getItem('epickast.dungeon.v1');
     if (rawVault) {
@@ -3521,12 +3968,44 @@ function modalProfile() {
         { id: 'color_cyan', name: 'Cian Neón', val: '#06b6d4' },
         { id: 'color_magma', name: 'Rojo Magma', val: '#ef4444' }
       ];
+      const VAULT_FRAMES = [
+        { id: 'founder_blue', name: '★ Marco de Avatar: Fundador del Núcleo' },
+        { id: 'frame-colossus-legend', name: '★ Marco: Núcleo del Coloso' },
+        { id: 'frame-runic', name: 'Marco: Partículas Rúnicas' },
+        { id: 'frame-amethyst', name: 'Marco: Cristal de Amatista' },
+        { id: 'frame-silver', name: 'Marco: Plata Rúnica' },
+        { id: 'frame-copper', name: 'Marco: Cobre Forjado' }
+      ];
+      const VAULT_BANNERS = [
+        { id: 'banner_colossus_awakening', name: '★ Banner: Despertar del Coloso', val: 'linear-gradient(135deg, #450a0a 0%, #b91c1c 45%, #f59e0b 100%)' },
+        { id: 'banner_molten_lava', name: 'Banner: Lava Fundida', val: 'linear-gradient(135deg, #7f1d1d 0%, #ea580c 50%, #facc15 100%)' },
+        { id: 'banner_void_storm', name: 'Banner: Tormenta del Vacío', val: 'linear-gradient(135deg, #090d16 0%, #3b0764 55%, #7e22ce 100%)' },
+        { id: 'banner_magma_mines', name: 'Banner: Minas de Magma', val: 'linear-gradient(135deg, #27120b 0%, #7c2d12 100%)' },
+        { id: 'banner_amethyst_galleries', name: 'Banner: Galerías de Amatista', val: 'linear-gradient(135deg, #1e1b4b 0%, #581c87 100%)' },
+        { id: 'banner_ancestral_crypt', name: 'Banner: Cripta Ancestral', val: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' },
+        { id: 'banner_lava_bridges', name: 'Banner: Puentes de Lava', val: 'linear-gradient(135deg, #431407 0%, #9a3412 100%)' },
+        { id: 'banner_core_sanctum', name: 'Banner: Sagrario del Núcleo', val: 'linear-gradient(135deg, #111827 0%, #4f46e5 55%, #9333ea 100%)' }
+      ];
+      const VAULT_TITLES = [
+        { id: 'title_colossus_slayer', name: '★ Coloso Carmesí' },
+        { id: 'title_abyss_guardian', name: '⚔️ Guardián del Abismo' },
+        { id: 'title_rune_master', name: '✨ Maestro Rúnico' },
+        { id: 'title_flame_herald', name: '🔥 Heraldo de la Llama' },
+        { id: 'title_core_explorer', name: '🧭 Explorador del Núcleo' },
+        { id: 'title_shadow_hunter', name: '🗡️ Cazador de Sombras' },
+        { id: 'title_crypt_sentinel', name: '🛡️ Centinela de la Cripta' },
+        { id: 'title_novice_delver', name: '⛏️ Aventurero de las Minas' }
+      ];
       unlockedCosmeticColors = VAULT_COLORS.filter(vc => vData.cosmetics && vData.cosmetics[vc.id]);
+      unlockedFrames = VAULT_FRAMES.filter(vf => vData.cosmetics && vData.cosmetics[vf.id]);
+      unlockedBanners = VAULT_BANNERS.filter(vb => vData.cosmetics && vData.cosmetics[vb.id]);
+      unlockedTitles = VAULT_TITLES.filter(vt => vData.cosmetics && vData.cosmetics[vt.id]);
     }
   } catch {}
 
   const vaultColorSwatches = unlockedCosmeticColors.length > 0 ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;' },
     unlockedCosmeticColors.map(vc => h('button', {
+      type: 'button',
       style: `background:${vc.val};color:#fff;border:1.5px solid ${color === vc.val ? '#fff' : 'rgba(255,255,255,0.3)'};padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);text-shadow:0 1px 2px rgba(0,0,0,0.8);`,
       onclick: () => {
         color = vc.val;
@@ -3536,7 +4015,9 @@ function modalProfile() {
       }
     }, '★ ' + vc.name))
   ) : null;
+
   const BANNER_PRESETS = [
+    ...unlockedBanners.map(b => ({ name: '🎁 ' + b.name, val: b.val })),
     { name: '💜 Púrpura Imperial', val: 'linear-gradient(135deg, #7c5cff, #4f46e5)' },
     { name: '🌊 Océano Cyan', val: 'linear-gradient(135deg, #06b6d4, #2563eb)' },
     { name: '🌲 Esmeralda Cyber', val: 'linear-gradient(135deg, #10b981, #047857)' },
@@ -3544,19 +4025,64 @@ function modalProfile() {
     { name: '⚡ Ámbar Sunset', val: 'linear-gradient(135deg, #f59e0b, #b45309)' },
     { name: '🌑 Obsidiana Gamer', val: 'linear-gradient(135deg, #334155, #0f172a)' }
   ];
-  let banner = me.banner || BANNER_PRESETS[0].val;
+  let banner = localStorage.getItem('epickast.equipped_banner') || me.banner || BANNER_PRESETS[0].val;
   const bannerPreview = h('div', { class: 'prof-banner', style: `background:${banner};margin-bottom:8px` });
   const bannerSelect = h('select', {
     onchange: (e) => {
       banner = e.target.value;
       bannerPreview.style.background = banner;
+      localStorage.setItem('epickast.equipped_banner', banner);
     }
   }, BANNER_PRESETS.map((b) => h('option', { value: b.val, selected: banner === b.val }, b.name)));
-  const bio = h('input', { value: me.bio || '', maxlength: 120, placeholder: 'Estado o frase (opcional)' });
+
+  let selectedFrame = eqF || '';
+  const frameSelect = h('select', {
+    onchange: (e) => {
+      selectedFrame = e.target.value;
+      pv.className = 'avatar' + (selectedFrame === 'founder_blue' ? ' frame-founder' : (selectedFrame ? ' ' + selectedFrame : '')) + (pv.style.backgroundImage ? ' img' : '');
+      localStorage.setItem('epickast.equipped_frame', selectedFrame);
+    }
+  },
+    h('option', { value: '', selected: !selectedFrame }, 'Sin marco de avatar'),
+    ...unlockedFrames.map(f => h('option', { value: f.id, selected: selectedFrame === f.id }, f.name))
+  );
+
+  let selectedTitle = localStorage.getItem('epickast.equipped_title') || me.title || '';
+  const titleSelect = h('select', {
+    onchange: (e) => {
+      selectedTitle = e.target.value;
+      localStorage.setItem('epickast.equipped_title', selectedTitle);
+    }
+  },
+    h('option', { value: '', selected: !selectedTitle }, 'Sin título equipado'),
+    ...unlockedTitles.map(t => h('option', { value: t.name, selected: selectedTitle === t.name }, t.name))
+  );
+
+  let selectedStatus = me.status || localStorage.getItem('epickast.status') || 'online';
+  const statusSelect = h('select', {
+    onchange: (e) => { selectedStatus = e.target.value; }
+  },
+    h('option', { value: 'online', selected: selectedStatus === 'online' }, '🟢 En línea (Disponible)'),
+    h('option', { value: 'away', selected: selectedStatus === 'away' }, '🌙 Ausente'),
+    h('option', { value: 'dnd', selected: selectedStatus === 'dnd' }, '⛔ No molestar (Silencia notificaciones)'),
+    h('option', { value: 'invisible', selected: selectedStatus === 'invisible' }, '👻 Invisible (Apareces desconectado)')
+  );
+
+  const bio = h('input', { value: me.bio || '', maxlength: 120, placeholder: 'Estado o frase de perfil (opcional)' });
   const customAct = h('input', { value: settings.customActivity || '', maxlength: 60, placeholder: S.detectedGame ? `Detectado automáticamente: ${S.detectedGame}` : 'Ej. VALORANT, Minecraft, Diseñando en 3D… (vacío = automático)' });
   const autoChk = h('input', { type: 'checkbox', style: 'width:auto', checked: settings.autoGameDetect !== false });
-  modal('Mi perfil y actividad',
-    h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' }, h('button', { onclick: () => file.click() }, '📷 Subir foto'), h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'), file)),
+  modal('Mi perfil, presencia y cosméticos',
+    h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
+      h('button', { onclick: () => file.click() }, '📷 Subir foto'),
+      h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'),
+      h('button', { style: 'background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.4);color:#fde047;font-size:11.5px', onclick: () => { closeModal(); modalVault('armory'); } }, '🎁 Abrir Mi Armario'),
+      file
+    )),
+    h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
+      h('label', null, '🚦 Estado de presencia', statusSelect),
+      h('label', null, '👑 Título de jugador', titleSelect)
+    ),
+    unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar (Bóveda)', frameSelect) : null,
     h('label', null, 'Color del avatar y nombre (Paleta Base)', sws),
     vaultColorSwatches ? h('label', null, '✨ Colores y Gradientes Desbloqueados en la Bóveda', vaultColorSwatches) : null,
     h('label', null, 'Banner de perfil estilo Discord', bannerPreview, bannerSelect),
@@ -3564,16 +4090,23 @@ function modalProfile() {
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
     h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
     h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-4px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).'),
-    h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-4px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).'),
     h('button', { class: 'primary', onclick: async () => {
       settings.customActivity = customAct.value.trim();
       settings.autoGameDetect = autoChk.checked;
       saveSettings();
       S.lastSentActivity = '__force__';
+      S.me.status = selectedStatus;
+      S.me.frame = selectedFrame;
+      S.me.title = selectedTitle;
+      S.me.banner = banner;
+      S.me.color = color;
+      localStorage.setItem('epickast.status', selectedStatus);
       await syncActivity();
-      await safe(rpc('profile.set', { color, banner, bio: bio.value, avatar: avatarData }));
+      await safe(rpc('status.set', { status: selectedStatus, customStatus: bio.value }));
+      await safe(rpc('profile.set', { color, banner, bio: bio.value, avatar: avatarData, frame: selectedFrame, title: selectedTitle }));
       closeModal();
-      toast('Perfil y actividad actualizados');
+      render();
+      toast('Perfil, estado y cosméticos actualizados');
     } }, 'Guardar'));
 }
 

@@ -61,10 +61,11 @@ CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, reporter_id INTEGER, 
 CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER, blocked_id INTEGER, ts INTEGER, PRIMARY KEY(blocker_id, blocked_id));
 
 `);
-for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT']) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT', "status TEXT DEFAULT 'online'", "custom_status TEXT DEFAULT ''", "ninja_config TEXT DEFAULT '{}'"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 for (const col of ["coins INTEGER DEFAULT 0","dust INTEGER DEFAULT 0","keys_copper INTEGER DEFAULT 0","keys_silver INTEGER DEFAULT 0","keys_gold INTEGER DEFAULT 0","keys_obsidian INTEGER DEFAULT 0","pity_epic INTEGER DEFAULT 0","pity_legendary INTEGER DEFAULT 0","daily_keys_date TEXT DEFAULT ''","daily_keys_count INTEGER DEFAULT 0","daily_exchange_date TEXT DEFAULT ''","daily_exchange_copper INTEGER DEFAULT 0","daily_exchange_silver INTEGER DEFAULT 0","unlocked_cosmetics TEXT DEFAULT '[]'","weekly_boss_claimed_week INTEGER DEFAULT 0"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 
-for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
+for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0', 'thread_id INTEGER DEFAULT NULL']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
+try { db.exec('CREATE INDEX IF NOT EXISTS msg_thread ON messages(thread_id, id)'); } catch {}
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE servers ADD COLUMN icon TEXT'); } catch {}
@@ -94,76 +95,108 @@ try {
 
 function saveBackup() {
   try {
-    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week FROM users');
+    const users = all('SELECT id,name,salt,hash,avatar,color,banner,bio,av,frame,title,status,custom_status,ninja_config,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week FROM users');
     const friends = all('SELECT a,b,status FROM friends');
-    const servers = all('SELECT id,name,owner,invite,created FROM servers');
+    const servers = all('SELECT id,name,owner,invite,icon,created FROM servers');
     const members = all('SELECT server_id,user_id,role FROM members');
     const channels = all('SELECT id,server_id,name,type,user_limit FROM channels');
     const bans = all('SELECT server_id,user_id,reason,banned_by,created FROM bans');
     const blocks = all('SELECT blocker_id,blocked_id,ts FROM blocks');
     const reports = all('SELECT id,reporter_id,reported_user_id,message_id,channel,reason,ts,status FROM reports');
-    const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports };
+    const files = all('SELECT id,channel,user_id,name,mime,size,disk,ts FROM files ORDER BY id DESC LIMIT 1000').reverse();
+    const messages = all('SELECT id,channel,user_id,text,ts,file_id,reply_to,pinned,thread_id FROM messages ORDER BY id DESC LIMIT 2000').reverse();
+    const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports, files, messages };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
-    // Sincronizar en la nube con Firebase (sin almacenar hashes en git)
     if (!process.env.EPICKAST_TEST) { firebaseAdapter.syncDatabaseToFirebase(DATA, state).catch(() => {}); }
   } catch (e) {
     console.error('[backup] Error al guardar respaldo:', e);
   }
 }
 
+function applyBackupDataset(data, isAuthoritative = false) {
+  if (!data || typeof data !== 'object') return;
+  if (Array.isArray(data.users)) {
+    for (const u of data.users) {
+      run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,status,custom_status,ninja_config,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        u.id ?? null, u.name ?? '', u.salt ?? '', u.hash ?? '', u.avatar ?? null, u.color ?? null, u.banner ?? null, u.bio ?? null, u.av ?? 0, u.frame ?? null, u.title ?? null,
+        u.status ?? 'online', u.custom_status ?? '', u.ninja_config ?? '{}', u.created ?? Date.now(),
+        u.coins ?? 250, u.dust ?? 0, u.keys_copper ?? 1, u.keys_silver ?? 0, u.keys_gold ?? 0, u.keys_obsidian ?? 0,
+        u.pity_epic ?? 0, u.pity_legendary ?? 0, u.daily_keys_date ?? '', u.daily_keys_count ?? 0,
+        u.daily_exchange_date ?? '', u.daily_exchange_copper ?? 0, u.daily_exchange_silver ?? 0,
+        u.unlocked_cosmetics ?? '[]', u.weekly_boss_claimed_week ?? 0
+      );
+      if (isAuthoritative && u.id) {
+        run('UPDATE users SET avatar=COALESCE(?,avatar), color=COALESCE(?,color), banner=COALESCE(?,banner), bio=COALESCE(?,bio), av=COALESCE(?,av), frame=COALESCE(?,frame), title=COALESCE(?,title), status=COALESCE(?,status), custom_status=COALESCE(?,custom_status), ninja_config=COALESCE(?,ninja_config), coins=MAX(coins, ?), dust=MAX(dust, ?), unlocked_cosmetics=CASE WHEN length(?) > length(COALESCE(unlocked_cosmetics,\'[]\')) THEN ? ELSE unlocked_cosmetics END WHERE id=?',
+          u.avatar ?? null, u.color ?? null, u.banner ?? null, u.bio ?? null, u.av ?? 0, u.frame ?? null, u.title ?? null, u.status ?? 'online', u.custom_status ?? '', u.ninja_config ?? '{}',
+          u.coins ?? 0, u.dust ?? 0, u.unlocked_cosmetics ?? '[]', u.unlocked_cosmetics ?? '[]', u.id);
+      }
+    }
+  }
+  if (Array.isArray(data.servers)) {
+    for (const s of data.servers) {
+      run('INSERT OR IGNORE INTO servers(id,name,owner,invite,icon,created) VALUES(?,?,?,?,?,?)', s.id ?? null, s.name ?? '', s.owner ?? null, s.invite ?? '', s.icon ?? null, s.created ?? Date.now());
+      if (s.icon && s.id) run('UPDATE servers SET icon=COALESCE(icon, ?) WHERE id=?', s.icon, s.id);
+    }
+  }
+  if (Array.isArray(data.friends)) {
+    for (const f of data.friends) {
+      run('INSERT OR IGNORE INTO friends(a,b,status) VALUES(?,?,?)', f.a ?? null, f.b ?? null, f.status ?? 'accepted');
+    }
+  }
+  if (Array.isArray(data.members)) {
+    for (const m of data.members) {
+      run('INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,?)', m.server_id ?? null, m.user_id ?? null, m.role ?? 'member');
+    }
+  }
+  if (Array.isArray(data.channels)) {
+    for (const c of data.channels) {
+      run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id ?? null, c.server_id ?? null, c.name ?? '', c.type ?? 'text', c.user_limit ?? 0);
+    }
+  }
+  if (Array.isArray(data.bans)) {
+    for (const b of data.bans) {
+      run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id ?? null, b.user_id ?? null, b.reason ?? '', b.banned_by ?? null, b.created ?? Date.now());
+    }
+  }
+  if (Array.isArray(data.blocks)) {
+    for (const blk of data.blocks) {
+      run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id ?? null, blk.blocked_id ?? null, blk.ts ?? Date.now());
+    }
+  }
+  if (Array.isArray(data.reports)) {
+    for (const r of data.reports) {
+      run('INSERT OR IGNORE INTO reports(id,reporter_id,reported_user_id,message_id,channel,reason,ts,status) VALUES(?,?,?,?,?,?,?,?)', r.id ?? null, r.reporter_id ?? null, r.reported_user_id ?? null, r.message_id ?? null, r.channel ?? null, r.reason ?? '', r.ts ?? Date.now(), r.status ?? 'pending');
+    }
+  }
+  if (Array.isArray(data.files)) {
+    for (const f of data.files) {
+      run('INSERT OR IGNORE INTO files(id,channel,user_id,name,mime,size,disk,ts) VALUES(?,?,?,?,?,?,?,?)', f.id ?? null, f.channel ?? '', f.user_id ?? null, f.name ?? 'archivo', f.mime ?? 'application/octet-stream', f.size ?? 0, f.disk ?? '', f.ts ?? Date.now());
+    }
+  }
+  if (Array.isArray(data.messages)) {
+    for (const m of data.messages) {
+      run('INSERT OR IGNORE INTO messages(id,channel,user_id,text,ts,file_id,reply_to,pinned,thread_id) VALUES(?,?,?,?,?,?,?,?,?)', m.id ?? null, m.channel ?? '', m.user_id ?? null, m.text ?? '', m.ts ?? Date.now(), m.file_id ?? null, m.reply_to ?? null, m.pinned ?? 0, m.thread_id ?? null);
+    }
+  }
+}
+
 async function restoreBackup() {
   try {
-    // 1. Intentar restaurar desde Firebase si está disponible
-    let cloudState = null;
-    try { cloudState = await firebaseAdapter.restoreDatabaseFromFirebase(DATA); } catch {}
-
-    const seedData = fs.existsSync(SEED_FILE) ? JSON.parse(fs.readFileSync(SEED_FILE, "utf8")) : null;
+    // 1. Restaurar síncronamente respaldo local y semilla para disponibilidad inmediata
     const localBackup = fs.existsSync(BACKUP_FILE) ? JSON.parse(fs.readFileSync(BACKUP_FILE, "utf8")) : null;
-    const sources = [cloudState, localBackup, seedData].filter(Boolean);
-    for (const data of sources) {
-// clean restore
-      if (Array.isArray(data.users)) {
-        for (const u of data.users) {
-          run('INSERT OR IGNORE INTO users(id,name,salt,hash,avatar,color,banner,bio,av,frame,title,created,coins,dust,keys_copper,keys_silver,keys_gold,keys_obsidian,pity_epic,pity_legendary,daily_keys_date,daily_keys_count,daily_exchange_date,daily_exchange_copper,daily_exchange_silver,unlocked_cosmetics,weekly_boss_claimed_week) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            u.id ?? null, u.name ?? '', u.salt ?? '', u.hash ?? '', u.avatar ?? null, u.color ?? null, u.banner ?? null, u.bio ?? null, u.av ?? 0, u.frame ?? null, u.title ?? null, u.created ?? Date.now(),
-            u.coins ?? 0, u.dust ?? 0, u.keys_copper ?? 0, u.keys_silver ?? 0, u.keys_gold ?? 0, u.keys_obsidian ?? 0,
-            u.pity_epic ?? 0, u.pity_legendary ?? 0, u.daily_keys_date ?? '', u.daily_keys_count ?? 0,
-            u.daily_exchange_date ?? '', u.daily_exchange_copper ?? 0, u.daily_exchange_silver ?? 0,
-            u.unlocked_cosmetics ?? '[]', u.weekly_boss_claimed_week ?? 0
-          );
+    const seedData = fs.existsSync(SEED_FILE) ? JSON.parse(fs.readFileSync(SEED_FILE, "utf8")) : null;
+    if (localBackup) applyBackupDataset(localBackup, true);
+    if (seedData) applyBackupDataset(seedData, false);
+
+    // 2. Restaurar desde Firebase si está configurado
+    if (!process.env.EPICKAST_TEST) {
+      try {
+        const cloudState = await firebaseAdapter.restoreDatabaseFromFirebase(DATA);
+        if (cloudState) {
+          applyBackupDataset(cloudState, true);
+          console.log(`[backup] Nube sincronizada: ${cloudState.users?.length || 0} usuarios, ${cloudState.messages?.length || 0} mensajes.`);
         }
-      }
-      if (Array.isArray(data.bans)) {
-        for (const b of data.bans) {
-          run('INSERT OR IGNORE INTO bans(server_id,user_id,reason,banned_by,created) VALUES(?,?,?,?,?)', b.server_id ?? null, b.user_id ?? null, b.reason ?? '', b.banned_by ?? null, b.created ?? Date.now());
-        }
-      }
-      if (Array.isArray(data.friends)) {
-        for (const f of data.friends) {
-          run('INSERT OR IGNORE INTO friends(a,b,status) VALUES(?,?,?)', f.a ?? null, f.b ?? null, f.status ?? 'accepted');
-        }
-      }
-      if (Array.isArray(data.servers)) {
-        for (const s of data.servers) {
-          run('INSERT OR IGNORE INTO servers(id,name,owner,invite,created) VALUES(?,?,?,?,?)', s.id ?? null, s.name ?? '', s.owner ?? null, s.invite ?? '', s.created ?? Date.now());
-        }
-      }
-      if (Array.isArray(data.members)) {
-        for (const m of data.members) {
-          run('INSERT OR IGNORE INTO members(server_id,user_id,role) VALUES(?,?,?)', m.server_id ?? null, m.user_id ?? null, m.role ?? 'member');
-        }
-      }
-      if (Array.isArray(data.channels)) {
-        for (const c of data.channels) {
-          run('INSERT OR IGNORE INTO channels(id,server_id,name,type,user_limit) VALUES(?,?,?,?,?)', c.id ?? null, c.server_id ?? null, c.name ?? '', c.type ?? 'text', c.user_limit ?? 0);
-        }
-      }
-      if (Array.isArray(data.blocks)) {
-        for (const blk of data.blocks) {
-          run('INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,ts) VALUES(?,?,?)', blk.blocker_id ?? null, blk.blocked_id ?? null, blk.ts ?? Date.now());
-        }
-      }
-      console.log(`[backup] Origen procesado: ${data.users?.length || 0} usuarios y ${data.servers?.length || 0} servidores.`);
+      } catch {}
     }
   } catch (e) {
     console.error('[backup] Error al restaurar respaldo:', e);
@@ -181,7 +214,18 @@ const fail = (m) => { const e = new Error(m); e.user = true; throw e; };
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const toUser = (id, o) => { const s = conns.get(id); if (s) for (const w of s) send(w, o); };
 const toUsers = (ids, o) => { for (const id of new Set(ids)) toUser(id, o); };
-const isOnline = (id) => (conns.get(id)?.size || 0) > 0;
+const rawConnOnline = (id) => (conns.get(id)?.size || 0) > 0;
+const getUserStatusRow = (id) => get('SELECT status, custom_status FROM users WHERE id=?', id) || { status: 'online', custom_status: '' };
+const isOnline = (id) => {
+  if (!rawConnOnline(id)) return false;
+  const st = getUserStatusRow(id).status || 'online';
+  return st !== 'invisible';
+};
+const publicStatusOf = (id) => {
+  if (!rawConnOnline(id)) return 'offline';
+  const st = getUserStatusRow(id).status || 'online';
+  return st === 'invisible' ? 'offline' : st;
+};
 const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const newToken = () => crypto.randomBytes(24).toString('hex');
 const clean = (s, n) => String(s ?? '').trim().slice(0, n);
@@ -225,8 +269,14 @@ function presenceAudience(uid) {
   return [...s, ...friendIds(uid)];
 }
 
-const selfView = (id) => ({ ...get('SELECT id,name,color,banner,bio,frame,title,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id), activity: activities.get(id) || null });
-const profileOf = (id) => ({ ...(get('SELECT color,banner,frame,title,av FROM users WHERE id=?', id) || {}), activity: activities.get(id) || null });
+const selfView = (id) => {
+  const row = get('SELECT id,name,color,banner,bio,frame,title,status,custom_status customStatus,ninja_config ninjaConfig,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
+  return { ...row, status: row.status || 'online', customStatus: row.customStatus || '', activity: activities.get(id) || null };
+};
+const profileOf = (id) => {
+  const row = get('SELECT color,banner,frame,title,status,custom_status customStatus,CASE WHEN avatar IS NULL THEN 0 ELSE av END av FROM users WHERE id=?', id) || {};
+  return { ...row, status: publicStatusOf(id), customStatus: row.customStatus || '', activity: activities.get(id) || null };
+};
 function roomUsers(key) {
   const r = rooms.get(key);
   return r ? [...r.entries()].map(([id, v]) => ({ id, name: v.name, state: v.state, ...profileOf(id) })) : [];
@@ -365,19 +415,21 @@ const serverView = (sid, uid) => {
       partyTrack: c.type === 'voice' ? (parties.get(key)?.current?.title || null) : undefined,
     };
   });
-  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
-    id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, av: m.av,
+  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.status,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
+    id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, frame: m.frame || null, title: m.title || null, av: m.av,
     role: m.id === s.owner ? 'owner' : (m.role || 'member'),
     online: isOnline(m.id),
+    status: publicStatusOf(m.id),
+    customStatus: m.customStatus || '',
     activity: activities.get(m.id) || null,
   }));
   return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
-  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
+  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.status ustatus,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
   const out = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
-    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, av: r.av, online: isOnline(r.uid), activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
+    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, frame: r.frame || null, title: r.title || null, av: r.av, online: isOnline(r.uid), status: publicStatusOf(r.uid), customStatus: r.customStatus || '', activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
     if (r.status === 'accepted') out.friends.push(u); else if (r.b === uid) out.incoming.push(u); else out.outgoing.push(u);
   }
   return out;
@@ -581,9 +633,26 @@ const H = {
       activities.delete(ws.user.id);
     }
     const act = activities.get(ws.user.id) || null;
-    toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'presence', id: ws.user.id, online: true, activity: act });
+    const pubOnline = isOnline(ws.user.id);
+    const pubSt = publicStatusOf(ws.user.id);
+    const stRow = getUserStatusRow(ws.user.id);
+    toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'presence', id: ws.user.id, online: pubOnline, status: pubSt, customStatus: stRow.custom_status || '', activity: pubOnline ? act : null });
     if (ws.room) broadcastRoom(ws.room);
     return { activity: act };
+  },
+  'status.set': (ws, d) => {
+    const allowed = ['online', 'away', 'dnd', 'invisible'];
+    const cur = getUserStatusRow(ws.user.id);
+    const nextStatus = (d?.status && allowed.includes(d.status)) ? d.status : (cur.status || 'online');
+    const nextCustom = d?.customStatus !== undefined ? clean(d.customStatus, 80) : (cur.custom_status || '');
+    run('UPDATE users SET status=?, custom_status=? WHERE id=?', nextStatus, nextCustom, ws.user.id);
+    const pubOnline = isOnline(ws.user.id);
+    const pubSt = publicStatusOf(ws.user.id);
+    const act = pubOnline ? (activities.get(ws.user.id) || null) : null;
+    toUsers(presenceAudience(ws.user.id), { t: 'presence', id: ws.user.id, online: pubOnline, status: pubSt, customStatus: pubOnline ? nextCustom : '', activity: act });
+    toUser(ws.user.id, { t: 'presence', id: ws.user.id, online: pubOnline, status: nextStatus, myStatus: nextStatus, customStatus: nextCustom, activity: activities.get(ws.user.id) || null });
+    setTimeout(saveBackup, 300);
+    return { status: nextStatus, customStatus: nextCustom, online: pubOnline };
   },
   'party.get': (ws, d) => {
     const key = d?.key || ws.room;
@@ -701,20 +770,51 @@ const H = {
       const rm = get('SELECT m.id,m.text,f.name fname,u.name uname FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id WHERE m.id=? AND m.channel=?', Number(d.replyTo), d.channel);
       if (rm) { replyTo = rm.id; replyName = rm.uname; replyText = rm.text || (rm.fname ? `📎 ${rm.fname}` : ''); }
     }
+    let threadId = null;
+    if (d.threadId) {
+      const rootMsg = get('SELECT id, thread_id FROM messages WHERE id=? AND channel=?', Number(d.threadId), d.channel);
+      if (!rootMsg) fail('El hilo de conversación no existe en este canal');
+      threadId = rootMsg.thread_id || rootMsg.id;
+    }
     const ts = Date.now();
-    const id = Number(run('INSERT INTO messages(channel,user_id,text,ts,reply_to) VALUES(?,?,?,?,?)', d.channel, ws.user.id, text, ts, replyTo).lastInsertRowid);
-    toUsers(a.audience, { t: 'msg', channel: d.channel, msg: { id, userId: ws.user.id, name: ws.user.name, text, ts, replyId: replyTo, replyName, replyText, pinned: false, ...profileOf(ws.user.id) } });
-    return { id };
+    const id = Number(run('INSERT INTO messages(channel,user_id,text,ts,reply_to,thread_id) VALUES(?,?,?,?,?,?)', d.channel, ws.user.id, text, ts, replyTo, threadId).lastInsertRowid);
+    const payloadMsg = { id, userId: ws.user.id, name: ws.user.name, text, ts, replyId: replyTo, replyName, replyText, threadId, threadCount: 0, pinned: false, ...profileOf(ws.user.id) };
+    if (threadId) {
+      const tStats = get('SELECT COUNT(*) cnt FROM messages WHERE thread_id=?', threadId);
+      const threadCount = tStats?.cnt || 1;
+      toUsers(a.audience, { t: 'thread.msg', channel: d.channel, threadId, msg: payloadMsg, threadCount, lastAuthor: ws.user.name, lastTs: ts });
+    } else {
+      toUsers(a.audience, { t: 'msg', channel: d.channel, msg: payloadMsg });
+    }
+    setTimeout(saveBackup, 500);
+    return { id, threadId };
   },
   'msg.history': (ws, d) => {
     authorize(d.channel, ws.user.id);
     const before = Number(d.before) || Number.MAX_SAFE_INTEGER;
-    return all(`SELECT m.id,m.user_id userId,u.name,u.color,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
+    return all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
+      (SELECT COUNT(*) FROM messages tm WHERE tm.thread_id=m.id) threadCount,
+      (SELECT MAX(tm.ts) FROM messages tm WHERE tm.thread_id=m.id) threadLastTs,
       f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize,
       rm.id replyId,ru.name replyName,COALESCE(NULLIF(rm.text,''), CASE WHEN rf.name IS NOT NULL THEN '📎 '||rf.name ELSE '' END) replyText
       FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
       LEFT JOIN messages rm ON rm.id=m.reply_to LEFT JOIN users ru ON ru.id=rm.user_id LEFT JOIN files rf ON rf.id=rm.file_id
-      WHERE m.channel=? AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse();
+      WHERE m.channel=? AND m.thread_id IS NULL AND m.id<? ORDER BY m.id DESC LIMIT 50`, d.channel, before).reverse();
+  },
+  'thread.history': (ws, d) => {
+    authorize(d.channel, ws.user.id);
+    const tid = Number(d.threadId);
+    if (!tid) fail('Hilo inválido');
+    const root = get(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
+      f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize
+      FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
+      WHERE m.id=? AND m.channel=?`, tid, d.channel);
+    if (!root) fail('Mensaje raíz del hilo no encontrado');
+    const replies = all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,m.thread_id threadId,
+      f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize
+      FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
+      WHERE m.channel=? AND m.thread_id=? ORDER BY m.id ASC LIMIT 200`, d.channel, tid);
+    return { root, replies };
   },
   'msg.edit': (ws, d) => {
     const id = Number(d.id);
@@ -758,7 +858,7 @@ const H = {
   },
   'msg.pins': (ws, d) => {
     authorize(d.channel, ws.user.id);
-    return all(`SELECT m.id,m.user_id userId,u.name,u.color,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
+    return all(`SELECT m.id,m.user_id userId,u.name,u.color,u.frame,u.title,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.text,m.ts,m.pinned,
       f.id fileId,f.name fileName,f.mime fileMime,f.size fileSize
       FROM messages m JOIN users u ON u.id=m.user_id LEFT JOIN files f ON f.id=m.file_id
       WHERE m.channel=? AND m.pinned=1 ORDER BY m.id DESC LIMIT 100`, d.channel);
@@ -811,13 +911,14 @@ const H = {
       else fail('Imagen inválida o demasiado grande');
     }
     const color = d.color !== undefined ? ((/^#[0-9a-f]{6}$/i.test(d.color) || /^linear-gradient\([^;]+\)$/i.test(d.color)) ? clean(d.color, 140) : fail('Color inválido')) : cur.color;
-    const banner = d.banner !== undefined ? (d.banner ? clean(d.banner, 160) : null) : (cur.banner || null);
+    const banner = d.banner !== undefined ? (d.banner ? clean(d.banner, 420) : null) : (cur.banner || null);
     const bio = d.bio !== undefined ? clean(d.bio, 120) : cur.bio;
     const frame = d.frame !== undefined ? (d.frame ? clean(d.frame, 40) : null) : (cur.frame || null);
     const title = d.title !== undefined ? (d.title ? clean(d.title, 60) : null) : (cur.title || null);
     run('UPDATE users SET avatar=?,color=?,banner=?,bio=?,frame=?,title=?,av=? WHERE id=?', avatar, color, banner, bio, frame, title, av, ws.user.id);
     const pub = { id: ws.user.id, name: ws.user.name, color, banner, bio, frame, title, av: avatar ? av : 0 };
     toUsers([ws.user.id, ...presenceAudience(ws.user.id)], { t: 'profile.changed', profile: pub });
+    setTimeout(saveBackup, 300);
     return pub;
   },
   'profile.get': (ws, d) => {
@@ -883,6 +984,37 @@ const H = {
     send(to.ws, { t: 'rtc.signal', from: ws.user.id, data: d.data });
   },
   'app.version': () => releaseInfo(),
+  'vault.sync': (ws, d) => {
+    const cur = get('SELECT coins, dust, keys_copper, keys_silver, keys_gold, keys_obsidian, pity_epic, pity_legendary, unlocked_cosmetics, ninja_config FROM users WHERE id=?', ws.user.id);
+    if (!cur) fail('Usuario no encontrado');
+    let serverUnlocked = [];
+    try { serverUnlocked = JSON.parse(cur.unlocked_cosmetics || '[]'); } catch {}
+    const clientUnlocked = Array.isArray(d?.unlockedCosmetics) ? d.unlockedCosmetics.filter(x => typeof x === 'string' && x.length < 40) : [];
+    const mergedUnlocked = [...new Set([...serverUnlocked, ...clientUnlocked])];
+
+    const coins = d?.coins !== undefined ? Math.max(0, Math.min(250000, Math.floor(Number(d.coins) || 0))) : (cur.coins || 0);
+    const dust = d?.dust !== undefined ? Math.max(0, Math.min(50000, Math.floor(Number(d.dust) || 0))) : (cur.dust || 0);
+    const kCop = d?.keys?.copper !== undefined ? Math.max(0, Math.min(500, Math.floor(Number(d.keys.copper) || 0))) : (cur.keys_copper || 0);
+    const kSil = d?.keys?.silver !== undefined ? Math.max(0, Math.min(500, Math.floor(Number(d.keys.silver) || 0))) : (cur.keys_silver || 0);
+    const kGol = d?.keys?.gold !== undefined ? Math.max(0, Math.min(500, Math.floor(Number(d.keys.gold) || 0))) : (cur.keys_gold || 0);
+    const kObs = d?.keys?.obsidian !== undefined ? Math.max(0, Math.min(500, Math.floor(Number(d.keys.obsidian) || 0))) : (cur.keys_obsidian || 0);
+    const pEpic = d?.pity?.withoutEpic !== undefined ? Math.max(0, Math.min(10, Math.floor(Number(d.pity.withoutEpic) || 0))) : (cur.pity_epic || 0);
+    const pLeg = d?.pity?.withoutLegendary !== undefined ? Math.max(0, Math.min(60, Math.floor(Number(d.pity.withoutLegendary) || 0))) : (cur.pity_legendary || 0);
+    const ninjaCfg = (d?.ninjaConfig && typeof d.ninjaConfig === 'object') ? JSON.stringify(d.ninjaConfig).slice(0, 600) : (cur.ninja_config || '{}');
+
+    run('UPDATE users SET coins=?, dust=?, keys_copper=?, keys_silver=?, keys_gold=?, keys_obsidian=?, pity_epic=?, pity_legendary=?, unlocked_cosmetics=?, ninja_config=? WHERE id=?',
+      coins, dust, kCop, kSil, kGol, kObs, pEpic, pLeg, JSON.stringify(mergedUnlocked), ninjaCfg, ws.user.id);
+    setTimeout(saveBackup, 400);
+    return {
+      ok: true,
+      coins,
+      dust,
+      keys: { copper: kCop, silver: kSil, gold: kGol, obsidian: kObs },
+      pity: { withoutEpic: pEpic, withoutLegendary: pLeg },
+      unlockedCosmetics: mergedUnlocked,
+      ninjaConfig: JSON.parse(ninjaCfg || '{}')
+    };
+  },
 
   // ---- Bóveda de Reliquias (Server Authoritative) ----
   'vault.get': (ws) => {
@@ -1184,12 +1316,20 @@ const H = {
     return { ok: true, unblockedId: targetId };
   },
 
-  // Card-Jitsu 1v1 PvP
+  // Card-Jitsu 1v1 PvP & Turbo Core Challenges
   'cardjitsu.challenge': (ws, d) => {
     const toId = Number(d.toUserId);
-    if (!toId) fail('Usuario inválido');
-    toUser(toId, { t: 'cardjitsu.invite', from: { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) } });
-    return { ok: true };
+    if (!toId || toId === ws.user.id) fail('Usuario inválido');
+    const gameName = d?.game === 'racer' ? 'Turbo Core (Carreras)' : 'Dojo Elemental (Card-Jitsu)';
+    const dm = dmKey(ws.user.id, toId);
+    const msgText = `🥋 ¡${ws.user.name} te ha desafiado a un duelo en **${gameName}**! Abre la Bóveda de Reliquias (🎁) para competir.`;
+    const ts = Date.now();
+    const id = Number(run('INSERT INTO messages(channel,user_id,text,ts) VALUES(?,?,?,?)', dm, ws.user.id, msgText, ts).lastInsertRowid);
+    const fullMsg = { id, channel: dm, userId: ws.user.id, name: ws.user.name, text: msgText, ts, ...profileOf(ws.user.id) };
+    toUsers([ws.user.id, toId], { t: 'msg', channel: dm, msg: fullMsg });
+    toUser(toId, { t: 'cardjitsu.invite', from: { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) }, game: d?.game || 'dojo' });
+    setTimeout(saveBackup, 300);
+    return { ok: true, id };
   },
   'cardjitsu.accept': (ws, d) => {
     const fromId = Number(d.fromUserId);
@@ -1333,14 +1473,34 @@ const httpServer = http.createServer((req, res) => {
   if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end('{"ok":true,"app":"EpicKast"}'); }
   if (u.pathname === '/version') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(releaseInfo())); }
   if (u.pathname === '/backup') {
+    const bearer = String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
+    const authTok = String(req.headers['x-token'] || bearer || u.searchParams.get('t') || '');
+    const adminSecret = process.env.BACKUP_SECRET || '';
+    const usr = authTok ? get('SELECT u.id,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?', authTok) : null;
+    if (!usr && (!adminSecret || authTok !== adminSecret)) {
+      res.writeHead(401, { 'content-type': 'application/json' });
+      return res.end('{"error":"Acceso restringido al respaldo. Autenticación requerida."}');
+    }
     saveBackup();
     if (fs.existsSync(BACKUP_FILE)) {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      return fs.createReadStream(BACKUP_FILE).pipe(res);
+      try {
+        const raw = JSON.parse(fs.readFileSync(BACKUP_FILE, 'utf8'));
+        const safeUsers = (raw.users || []).map(({ salt, hash, ...rest }) => rest);
+        res.writeHead(200, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify({ ...raw, users: safeUsers }));
+      } catch {}
     }
     res.writeHead(200, { 'content-type': 'application/json' });
-    return res.end('{}'); }
+    return res.end('{}');
+  }
   if (u.pathname === '/restore-seed') {
+    const bearer = String(req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
+    const authTok = String(req.headers['x-token'] || bearer || u.searchParams.get('t') || '');
+    const usr = authTok ? get('SELECT u.id,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?', authTok) : null;
+    if (!usr) {
+      res.writeHead(401, { 'content-type': 'application/json' });
+      return res.end('{"error":"Autenticación requerida"}');
+    }
     restoreBackup();
     res.writeHead(200, { 'content-type': 'application/json' });
     return res.end(JSON.stringify({ ok: true, msg: 'Restaurado con exito' }));
@@ -1478,10 +1638,24 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
           const rm = get('SELECT m.id, u.name, m.text FROM messages m JOIN users u ON u.id=m.user_id WHERE m.id=? AND m.channel=?', replyTo, channel);
           if (rm) replyInfo = { replyId: rm.id, replyName: rm.name, replyText: (rm.text || '').slice(0, 120) };
         }
+        let threadId = u.searchParams.get('threadId') ? Number(u.searchParams.get('threadId')) : null;
+        if (threadId) {
+          const rootM = get('SELECT id, thread_id FROM messages WHERE id=? AND channel=?', threadId, channel);
+          threadId = rootM ? (rootM.thread_id || rootM.id) : null;
+        }
         const fileId = Number(run('INSERT INTO files(channel,user_id,name,mime,size,disk,ts) VALUES(?,?,?,?,?,?,?)', channel, usr.id, name, mime, size, disk, ts).lastInsertRowid);
-        const msgId = Number(run('INSERT INTO messages(channel,user_id,text,ts,file_id,reply_to) VALUES(?,?,?,?,?,?)', channel, usr.id, text, ts, fileId, replyInfo ? replyTo : null).lastInsertRowid);
-        const msg = { id: msgId, userId: usr.id, name: usr.name, text, ts, fileId, fileName: name, fileMime: mime, fileSize: size, ...(replyInfo || {}), ...profileOf(usr.id) };
-        toUsers(auth.audience, { t: 'msg', channel, msg });
+        const msgId = Number(run('INSERT INTO messages(channel,user_id,text,ts,file_id,reply_to,thread_id) VALUES(?,?,?,?,?,?,?)', channel, usr.id, text, ts, fileId, replyInfo ? replyTo : null, threadId).lastInsertRowid);
+        const msg = { id: msgId, userId: usr.id, name: usr.name, text, ts, fileId, fileName: name, fileMime: mime, fileSize: size, threadId, threadCount: 0, ...(replyInfo || {}), ...profileOf(usr.id) };
+        if (threadId) {
+          const tStats = get('SELECT COUNT(*) cnt FROM messages WHERE thread_id=?', threadId);
+          toUsers(auth.audience, { t: 'thread.msg', channel, threadId, msg, threadCount: tStats?.cnt || 1, lastAuthor: usr.name, lastTs: ts });
+        } else {
+          toUsers(auth.audience, { t: 'msg', channel, msg });
+        }
+        if (!process.env.EPICKAST_TEST) {
+          firebaseAdapter.syncAttachmentToFirebase(DATA, disk, destPath, mime).catch(() => {});
+        }
+        setTimeout(saveBackup, 400);
         res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ ok: true, fileId, msg }));
       });
     });
@@ -1505,17 +1679,16 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
   const fm = /^\/files\/(\d+)/.exec(u.pathname);
   if (req.method === 'GET' && fm) {
     const f = get('SELECT id,name,mime,size,disk FROM files WHERE id=?', Number(fm[1]));
-    const fp = f ? path.join(UPLOADS, f.disk) : null;
-    if (!f || !fs.existsSync(fp)) { res.writeHead(404); return res.end('Archivo no encontrado'); }
-    const inline = SAFE_MIMES.test(f.mime) && u.searchParams.get('dl') !== '1';
-    res.writeHead(200, {
-      'content-type': SAFE_MIMES.test(f.mime) ? f.mime : 'application/octet-stream',
-      'content-length': f.size,
-      'cache-control': 'public, max-age=31536000, immutable',
-      'content-disposition': `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(f.name)}"`,
-      'x-content-type-options': 'nosniff',
-    });
-    return fs.createReadStream(fp).pipe(res);
+    if (!f || !f.disk || /[\/\\]/.test(f.disk)) { res.writeHead(404); return res.end('Archivo no encontrado'); }
+    const fp = path.join(UPLOADS, f.disk);
+    if (!fs.existsSync(fp)) {
+      firebaseAdapter.fetchAttachmentFromFirebase(DATA, f.disk, fp).then((ok) => {
+        if (!ok || !fs.existsSync(fp)) { res.writeHead(404); return res.end('Archivo no encontrado'); }
+        serveFileDisk(res, f, fp, u);
+      }).catch(() => { res.writeHead(404); res.end('Archivo no encontrado'); });
+      return;
+    }
+    return serveFileDisk(res, f, fp, u);
   }
   res.writeHead(404); res.end();
 });
@@ -1549,7 +1722,10 @@ function login(ws, userId, name) {
   ws.user = { id: userId, name };
   let s = conns.get(userId); if (!s) conns.set(userId, (s = new Set()));
   s.add(ws);
-  if (s.size === 1) toUsers(presenceAudience(userId), { t: 'presence', id: userId, online: true, activity: activities.get(userId) || null });
+  if (s.size === 1 && isOnline(userId)) {
+    const stRow = getUserStatusRow(userId);
+    toUsers(presenceAudience(userId), { t: 'presence', id: userId, online: true, status: publicStatusOf(userId), customStatus: stRow.custom_status || '', activity: activities.get(userId) || null });
+  }
 }
 
 wss.on('connection', (ws, req) => {
@@ -1577,8 +1753,14 @@ wss.on('connection', (ws, req) => {
             saveBackup();
             login(ws, id, name); return reply(true, { token, user: selfView(id), ice: iceServers() });
           }
+          const ip = req.socket?.remoteAddress || 'local';
+          checkLoginRateLimit(ip, name);
           const u = get('SELECT id,name,salt,hash FROM users WHERE name=?', name);
-          if (!u || !crypto.timingSafeEqual(Buffer.from(u.hash, 'hex'), Buffer.from(hashPw(pw, u.salt), 'hex'))) fail('Usuario o contraseña incorrectos');
+          if (!u || !crypto.timingSafeEqual(Buffer.from(u.hash, 'hex'), Buffer.from(hashPw(pw, u.salt), 'hex'))) {
+            recordLoginFailure(ip, name);
+            fail('Usuario o contraseña incorrectos');
+          }
+          recordLoginSuccess(ip, name);
           const token = newToken(); run('INSERT INTO sessions VALUES(?,?,?)', token, u.id, Date.now());
           login(ws, u.id, u.name); return reply(true, { token, user: selfView(u.id), ice: iceServers() });
         }
