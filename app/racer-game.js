@@ -1,6 +1,6 @@
 // ============================================================================
-// EPICKAST: TURBO CORE — CARRERAS PIXEL-NEON DEL NÚCLEO (v1.9.2)
-// Bloques A1, A3, C, D, G: Lifecycle, Separación de Karts, Synthwave Parallax,
+// EPICKAST: TURBO CORE — CARRERAS ARCADE 2D (v1.9.3)
+// Pistas 2D con Rampas de Salto, Aceite, Barreras, Turbos e IA Equilibrada
 // Postes Laterales, Líneas de Velocidad, Cámara Shake, Podio 1º-4º y Taller.
 // ============================================================================
 
@@ -79,6 +79,14 @@
     coin(scope) { this.tone(scope, 987, 'sine', 0.09, 0.08, 1318); },
     boost(scope) { this.tone(scope, 210, 'sawtooth', 0.38, 0.09, 860); },
     crash(scope) { this.tone(scope, 140, 'sawtooth', 0.30, 0.12, 42); },
+    ramp(scope) {
+      [349, 440, 523, 698].forEach((f, i) => {
+        const fn = () => this.tone(scope, f, 'sine', 0.12, 0.08);
+        if (scope) scope.timeout(fn, i * 45);
+        else setTimeout(fn, i * 45);
+      });
+    },
+    oil(scope) { this.tone(scope, 180, 'sawtooth', 0.22, 0.08, 90); },
     win(scope) {
       [523, 659, 784, 1046].forEach((f, i) => {
         const fn = () => this.tone(scope, f, 'triangle', 0.22, 0.1);
@@ -350,7 +358,7 @@
       const upgradesMeta = getUpgradesMeta();
       const ch = chassisList.find(c => c.id === this.save.chassis) || chassisList[0];
       const clearedCount = tracks.filter(t => !!this.save.clearedTracks[t.id]).length;
-      const appVer = CFG().APP_VERSION || '1.9.2';
+      const appVer = CFG().APP_VERSION || '1.9.3';
 
       const renderUpgradeCard = (key) => {
         const meta = upgradesMeta[key] || {};
@@ -623,7 +631,7 @@
       const canvas = this.container.querySelector('#racerCanvas');
       const ctx = canvas.getContext('2d');
 
-      const maxSpd = 9.3 + (this.save.engine - 1) * 0.75;
+      const maxSpd = 9.4 + (this.save.engine - 1) * 0.7;
       this.raceState = {
         countdown: 3,
         startedAt: 0,
@@ -637,32 +645,40 @@
         maxSpeed: maxSpd,
         nitro: 100,
         nitroActive: 0,
+        jumpTimer: 0,
+        jumpHeight: 0,
+        skidTimer: 0,
         shakeFrames: 0,
         crashFlash: 0,
         coinsCollected: 0,
         items: [],
-        speedLines: Array.from({ length: 8 }, (_, i) => ({
+        speedLines: Array.from({ length: 10 }, (_, i) => ({
           side: i % 2 === 0 ? -1 : 1,
-          y: 120 + (i * 33) % 250,
-          len: 35 + (i * 17) % 45,
-          phase: i * 0.13
+          y: 30 + (i * 35) % 320,
+          len: 30 + (i * 14) % 45,
+          phase: i * 0.1
         })),
         rivals: [
-          { name: 'Kenshin-X', x: -0.58, targetX: -0.58, dist: 24, speed: track.aiSpeed * 0.94, color: '#ef4444' },
-          { name: 'Valkyria-9', x: 0.0, targetX: 0.0, dist: 48, speed: track.aiSpeed * 0.99, color: '#eab308' },
-          { name: 'Sensei-GT', x: 0.58, targetX: 0.58, dist: 72, speed: track.aiSpeed * 1.03, color: '#a855f7' }
+          { name: 'Kenshin-X', x: -0.45, targetX: -0.45, dist: 28, baseSpeed: 9.1, speed: 9.1, color: '#ef4444', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Valkyria-9', x: 0.0, targetX: 0.0, dist: 54, baseSpeed: 9.35, speed: 9.35, color: '#eab308', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Sensei-GT', x: 0.45, targetX: 0.45, dist: 80, baseSpeed: 9.65, speed: 9.65, color: '#a855f7', jumpTimer: 0, jumpHeight: 0 }
         ]
       };
 
-      for (let d = 220; d < this.raceState.totalDist - 200; d += 140) {
-        const lane = [-0.65, -0.22, 0.22, 0.65][Math.floor(Math.random() * 4)];
+      // Generación procedural de circuito 2D: Monedas, Rampas de Salto, Turbos, Aceite y Barreras
+      for (let d = 160; d < this.raceState.totalDist - 160; d += 90) {
+        const lane = [-0.62, -0.21, 0.21, 0.62][Math.floor(Math.random() * 4)];
         const roll = Math.random();
-        if (roll < 0.48) {
+        if (roll < 0.30) {
           this.raceState.items.push({ type: 'coin', dist: d, x: lane, taken: false });
-        } else if (roll < 0.68) {
-          this.raceState.items.push({ type: 'boost', dist: d, x: lane, taken: false });
-        } else {
+        } else if (roll < 0.52) {
+          this.raceState.items.push({ type: 'ramp', dist: d, x: lane, triggered: false });
+        } else if (roll < 0.70) {
+          this.raceState.items.push({ type: 'oil', dist: d, x: lane, hit: false });
+        } else if (roll < 0.86) {
           this.raceState.items.push({ type: 'hazard', dist: d, x: lane, hit: false });
+        } else {
+          this.raceState.items.push({ type: 'boost', dist: d, x: lane, taken: false });
         }
       }
 
@@ -729,79 +745,123 @@
       const right = this.keyState['d'] || this.keyState['arrowright'];
       const brake = this.keyState['s'] || this.keyState['arrowdown'];
 
-      if (left) st.vx = Math.max(st.vx - 0.0085, -0.032);
-      else if (right) st.vx = Math.min(st.vx + 0.0085, 0.032);
-      else st.vx *= 0.82;
+      if (st.skidTimer > 0) {
+        st.skidTimer--;
+        st.vx += Math.sin(st.skidTimer * 0.9) * 0.006;
+      }
 
-      st.x = Math.max(-0.82, Math.min(0.82, st.x + st.vx));
+      if (left) st.vx = Math.max(st.vx - 0.009, -0.034);
+      else if (right) st.vx = Math.min(st.vx + 0.009, 0.034);
+      else st.vx *= 0.80;
 
-      const boostBonus = st.nitroActive > 0 ? (3.3 + (this.save.turbo - 1) * 0.45) : 0;
+      st.x = Math.max(-0.84, Math.min(0.84, st.x + st.vx));
+
+      if (st.jumpTimer > 0) {
+        st.jumpTimer--;
+        st.jumpHeight = Math.sin(((36 - st.jumpTimer) / 36) * Math.PI) * 26;
+      } else {
+        st.jumpHeight = 0;
+      }
+
+      const boostBonus = st.nitroActive > 0 ? (3.4 + (this.save.turbo - 1) * 0.45) : 0;
       if (st.nitroActive > 0) st.nitroActive--;
-      else st.nitro = Math.min(100, st.nitro + 0.13 + (this.save.turbo - 1) * 0.03);
+      else st.nitro = Math.min(100, st.nitro + 0.14 + (this.save.turbo - 1) * 0.03);
 
       if (st.shakeFrames > 0) st.shakeFrames--;
       if (st.crashFlash > 0) st.crashFlash--;
 
-      const targetSpd = brake ? st.maxSpeed * 0.55 : (st.maxSpeed + boostBonus);
-      st.speed += (targetSpd - st.speed) * 0.085;
+      const targetSpd = brake ? st.maxSpeed * 0.52 : (st.maxSpeed + boostBonus);
+      st.speed += (targetSpd - st.speed) * 0.09;
       st.dist += st.speed;
 
-      // Bloque G1: IA con separación mínima longitudinal y lateral (nunca se apilan ni tapan al jugador)
-      const lanes = [-0.62, -0.20, 0.20, 0.62];
+      // IA equilibrada y visible: los competidores compiten de verdad sin desaparecer
+      const lanes = [-0.62, -0.21, 0.21, 0.62];
       st.rivals.forEach((r, idx) => {
-        if (Math.floor(st.dist / 90 + idx * 3) % 7 === 0) {
-          r.targetX = lanes[(idx + Math.floor(st.dist / 260)) % lanes.length];
+        if (Math.floor(st.dist / 70 + idx * 3) % 6 === 0) {
+          r.targetX = lanes[(idx + Math.floor(st.dist / 220)) % lanes.length];
         }
         r.x += (r.targetX - r.x) * 0.04;
-        const rubberband = (st.dist - r.dist) * 0.0011;
-        r.dist += Math.max(5.5, r.speed + rubberband + Math.sin(st.dist * 0.02 + idx) * 0.18);
+
+        if (r.jumpTimer > 0) {
+          r.jumpTimer--;
+          r.jumpHeight = Math.sin(((36 - r.jumpTimer) / 36) * Math.PI) * 26;
+        } else {
+          r.jumpHeight = 0;
+        }
+
+        // Rubberband justo: asegura emoción y carrera reñida
+        const diff = r.dist - st.dist;
+        let rubberband = 0;
+        if (diff > 120) rubberband = -0.65;
+        else if (diff > 60) rubberband = -0.30;
+        else if (diff < -120) rubberband = 0.55;
+        else if (diff < -50) rubberband = 0.25;
+
+        r.speed = r.baseSpeed + rubberband + Math.sin(st.dist * 0.015 + idx * 1.5) * 0.18;
+        r.dist += r.speed;
+
+        // Rivales saltan si tocan una rampa
+        if (r.jumpTimer <= 0) {
+          const hitRamp = st.items.find(it => it.type === 'ramp' && !it.triggered && Math.abs(it.x - r.x) < 0.22 && Math.abs(it.dist - r.dist) < 20);
+          if (hitRamp) {
+            r.jumpTimer = 36;
+          }
+        }
       });
 
       // Resolver repulsión entre rivales y contra el jugador
       for (let i = 0; i < st.rivals.length; i++) {
         const a = st.rivals[i];
-        // Separación respecto al jugador si está muy cerca en Z
-        if (Math.abs(a.dist - st.dist) < 34 && Math.abs(a.x - st.x) < 0.30) {
+        if (Math.abs(a.dist - st.dist) < 26 && Math.abs(a.x - st.x) < 0.26) {
           const pushDir = a.x >= st.x ? 1 : -1;
-          a.x = Math.max(-0.78, Math.min(0.78, a.x + pushDir * 0.045));
+          a.x = Math.max(-0.80, Math.min(0.80, a.x + pushDir * 0.035));
         }
-        // Separación entre rivales IA
         for (let j = i + 1; j < st.rivals.length; j++) {
           const b = st.rivals[j];
           const dz = b.dist - a.dist;
           const dx = b.x - a.x;
-          if (Math.abs(dz) < 30 && Math.abs(dx) < 0.28) {
+          if (Math.abs(dz) < 24 && Math.abs(dx) < 0.24) {
             const latDir = dx >= 0 ? 1 : -1;
-            a.x = Math.max(-0.78, Math.min(0.78, a.x - latDir * 0.03));
-            b.x = Math.max(-0.78, Math.min(0.78, b.x + latDir * 0.03));
-            if (Math.abs(dz) < 16) {
-              b.dist += dz >= 0 ? 2.5 : -2.5;
-            }
+            a.x = Math.max(-0.80, Math.min(0.80, a.x - latDir * 0.025));
+            b.x = Math.max(-0.80, Math.min(0.80, b.x + latDir * 0.025));
           }
         }
       }
 
-      // Colisiones con objetos cercanos
+      // Colisiones con objetos 2D
+      const isJumping = st.jumpTimer > 0;
       const magnetRadius = 0.16 + (this.save.shield - 1) * 0.025;
       for (const item of st.items) {
         const dz = item.dist - st.dist;
-        if (dz < -30 || dz > 45) continue;
+        if (dz < -25 || dz > 40) continue;
         const dx = Math.abs(item.x - st.x);
 
         if (item.type === 'coin' && !item.taken && dx < magnetRadius) {
           item.taken = true;
           st.coinsCollected += 5;
           RacerAudio.coin(this.scope);
-        } else if (item.type === 'boost' && !item.taken && dx < 0.18) {
+        } else if (item.type === 'boost' && !item.taken && dx < 0.20) {
           item.taken = true;
           st.nitro = Math.min(100, st.nitro + 25);
-          st.nitroActive = Math.max(st.nitroActive, 34);
+          st.nitroActive = Math.max(st.nitroActive, 38);
           RacerAudio.boost(this.scope);
-        } else if (item.type === 'hazard' && !item.hit && dx < 0.15 && Math.abs(dz) < 22) {
+        } else if (item.type === 'ramp' && !item.triggered && dx < 0.24 && Math.abs(dz) < 22) {
+          item.triggered = true;
+          st.jumpTimer = 36;
+          st.nitroActive = Math.max(st.nitroActive, 48);
+          st.nitro = Math.min(100, st.nitro + 20);
+          RacerAudio.ramp(this.scope);
+        } else if (!isJumping && item.type === 'oil' && !item.hit && dx < 0.20 && Math.abs(dz) < 18) {
+          item.hit = true;
+          st.skidTimer = 26;
+          st.speed *= 0.70;
+          st.shakeFrames = 8;
+          RacerAudio.oil(this.scope);
+        } else if (!isJumping && item.type === 'hazard' && !item.hit && dx < 0.18 && Math.abs(dz) < 18) {
           item.hit = true;
           const dmgReduction = 0.44 + (this.save.shield - 1) * 0.1;
-          st.speed *= Math.min(0.88, dmgReduction);
-          st.shakeFrames = 14;
+          st.speed *= Math.min(0.85, dmgReduction);
+          st.shakeFrames = 15;
           st.crashFlash = 10;
           RacerAudio.crash(this.scope);
         }
@@ -819,17 +879,18 @@
       if (lapEl) lapEl.textContent = `VUELTA ${curLap}/${track.laps}`;
       if (posEl) {
         posEl.textContent = `POS ${rank}º/4`;
-        posEl.style.color = rank === 1 ? '#10b981' : rank === 2 ? '#38bdf8' : '#fbbf24';
+        if (posEl.style) posEl.style.color = rank === 1 ? '#10b981' : rank === 2 ? '#38bdf8' : '#fbbf24';
       }
       if (coinEl) coinEl.innerHTML = `${renderSpr('coin', 1.1)} +${st.coinsCollected}`;
 
       const filledSegs = Math.floor(st.nitro / 10);
       const isFull = st.nitro >= 99.5;
       if (nitroLbl) {
-        nitroLbl.textContent = st.nitroActive > 0 ? '⚡ TURBO' : (isFull ? '¡LISTO!' : 'NITRO');
-        nitroLbl.style.color = isFull ? '#fde047' : '#38bdf8';
+        nitroLbl.textContent = st.jumpTimer > 0 ? '✈️ ¡SALTO!' : (st.nitroActive > 0 ? '⚡ TURBO' : (isFull ? '¡LISTO!' : 'NITRO'));
+        if (nitroLbl.style) nitroLbl.style.color = st.jumpTimer > 0 ? '#34d399' : (isFull ? '#fde047' : '#38bdf8');
       }
       segs.forEach((seg, idx) => {
+        if (!seg || !seg.style) return;
         if (idx < filledSegs) {
           seg.style.background = st.nitroActive > 0 ? '#fde047' : (isFull ? '#22d3ee' : '#06b6d4');
           seg.style.boxShadow = isFull ? '0 0 6px #22d3ee' : 'none';
@@ -849,239 +910,346 @@
       const st = this.raceState;
       ctx.save();
 
-      // Bloque G2: Camera shake al chocar y ligero FOV zoom en Nitro
+      // Camera shake al chocar
       if (st.shakeFrames > 0) {
-        const mag = (st.shakeFrames / 14) * 6;
+        const mag = (st.shakeFrames / 15) * 5;
         ctx.translate((Math.random() - 0.5) * mag * 2, (Math.random() - 0.5) * mag * 2);
       }
-      if (st.nitroActive > 0) {
-        ctx.translate(W / 2, H / 2);
-        ctx.scale(1.035, 1.035);
-        ctx.translate(-W / 2, -H / 2);
-      }
 
-      ctx.fillStyle = track.theme.sky;
+      // Fondo general
+      ctx.fillStyle = track.theme.sky || '#080c18';
       ctx.fillRect(0, 0, W, H);
 
-      const horizon = 118;
-      const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
-      skyGrad.addColorStop(0, track.theme.sky);
-      skyGrad.addColorStop(1, '#162038');
-      ctx.fillStyle = skyGrad;
-      ctx.fillRect(0, 0, W, horizon);
+      const roadW = 440;
+      const roadLeft = (W - roadW) / 2; // 160
+      const roadRight = roadLeft + roadW; // 600
+      const roadCenterX = W / 2; // 380
 
-      // Bloque G2: Sol Synthwave con franjas horizontales recortadas
-      ctx.save();
-      const sunX = W / 2 - st.x * 18;
-      const sunY = horizon - 8;
-      const sunR = 54;
-      const sunGrad = ctx.createLinearGradient(sunX, sunY - sunR, sunX, sunY);
-      sunGrad.addColorStop(0, '#fde047');
-      sunGrad.addColorStop(0.55, track.theme.accent);
-      sunGrad.addColorStop(1, track.theme.border);
-      ctx.fillStyle = sunGrad;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, sunR, Math.PI, 0);
-      ctx.fill();
-      // Franjas horizontales synthwave sobre el sol
-      ctx.fillStyle = '#131b2e';
-      for (let sy = sunY - 28; sy < sunY; sy += 7) {
-        const stripeH = Math.max(2, (sy - (sunY - 32)) * 0.12);
-        ctx.fillRect(sunX - sunR - 2, sy, sunR * 2 + 4, stripeH);
-      }
-      ctx.restore();
-
-      // Bloque G2: 2 capas de montañas con parallax
-      const drawMountainLayer = (parallaxOffset, baseColor, strokeColor, peaks, amp) => {
+      // Paisaje lateral 2D animado según el circuito (Left: 0..160, Right: 600..760)
+      const drawSideScenery = () => {
         ctx.save();
-        ctx.fillStyle = baseColor;
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, horizon);
-        for (let px = 0; px <= W; px += 38) {
-          const worldX = px + parallaxOffset;
-          const h = Math.abs(Math.sin(worldX * 0.012) * amp + Math.cos(worldX * 0.027) * (amp * 0.55));
-          ctx.lineTo(px, horizon - 6 - h);
+        const scY = (st.dist * 0.4) % 60;
+        if (track.id === 'magma_canyon') {
+          // Río de lava candente en los márgenes
+          ctx.fillStyle = '#1c0a05';
+          ctx.fillRect(0, 0, roadLeft, H);
+          ctx.fillRect(roadRight, 0, W - roadRight, H);
+          ctx.fillStyle = '#ea580c';
+          for (let y = -60 + scY; y < H + 60; y += 40) {
+            ctx.beginPath();
+            ctx.arc(60 + Math.sin(y * 0.05) * 16, y, 22, 0, Math.PI * 2);
+            ctx.arc(roadRight + 70 + Math.cos(y * 0.05) * 16, y, 22, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#fbbf24';
+          for (let y = -60 + scY; y < H + 60; y += 40) {
+            ctx.beginPath();
+            ctx.arc(60 + Math.sin(y * 0.05) * 16, y, 10, 0, Math.PI * 2);
+            ctx.arc(roadRight + 70 + Math.cos(y * 0.05) * 16, y, 10, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (track.id === 'glacier_summit') {
+          // Nieve y cristales de hielo
+          ctx.fillStyle = '#061a29';
+          ctx.fillRect(0, 0, roadLeft, H);
+          ctx.fillRect(roadRight, 0, W - roadRight, H);
+          ctx.fillStyle = '#38bdf8';
+          for (let y = -60 + scY; y < H + 60; y += 48) {
+            ctx.fillRect(30, y, 8, 18);
+            ctx.fillRect(90, y + 20, 10, 24);
+            ctx.fillRect(roadRight + 30, y + 10, 10, 22);
+            ctx.fillRect(roadRight + 80, y + 30, 8, 16);
+          }
+        } else if (track.id === 'obsidian_core') {
+          // Runas y monolitos arcanos
+          ctx.fillStyle = '#0f081d';
+          ctx.fillRect(0, 0, roadLeft, H);
+          ctx.fillRect(roadRight, 0, W - roadRight, H);
+          ctx.fillStyle = '#a855f7';
+          for (let y = -60 + scY; y < H + 60; y += 50) {
+            ctx.fillRect(40, y, 14, 28);
+            ctx.fillRect(roadRight + 50, y + 15, 14, 28);
+          }
+          ctx.fillStyle = '#fbbf24';
+          for (let y = -60 + scY; y < H + 60; y += 50) {
+            ctx.fillRect(44, y + 8, 6, 12);
+            ctx.fillRect(roadRight + 54, y + 23, 6, 12);
+          }
+        } else {
+          // Ciber-Neón: Rascacielos y ventanas luminosas
+          ctx.fillStyle = '#0b0f1a';
+          ctx.fillRect(0, 0, roadLeft, H);
+          ctx.fillRect(roadRight, 0, W - roadRight, H);
+          for (let y = -60 + scY; y < H + 60; y += 32) {
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(15, y, 45, 26);
+            ctx.fillRect(75, y + 8, 55, 22);
+            ctx.fillRect(roadRight + 15, y, 50, 24);
+            ctx.fillRect(roadRight + 75, y + 10, 40, 20);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(25, y + 6, 6, 6);
+            ctx.fillRect(45, y + 6, 6, 6);
+            ctx.fillRect(85, y + 12, 6, 6);
+            ctx.fillRect(roadRight + 25, y + 6, 6, 6);
+            ctx.fillRect(roadRight + 45, y + 6, 6, 6);
+          }
         }
-        ctx.lineTo(W, horizon);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
         ctx.restore();
       };
-      drawMountainLayer(st.x * 24 + st.dist * 0.015, '#0b101d', 'rgba(148,163,184,0.22)', 12, 26);
-      drawMountainLayer(st.x * 52 + st.dist * 0.04, '#11182b', track.theme.border + '66', 16, 16);
+      drawSideScenery();
 
-      // Carretera con perspectiva trapezoidal
-      const roadTopW = 152;
-      const roadBotW = 566;
-      const cx = W / 2 - st.x * 78;
+      // Pianos / Bordillos bicolores laterales
+      const curbW = 16;
+      const curbStep = 24;
+      const curbOffset = (st.dist * 1.6) % curbStep;
+      for (let y = -curbStep + curbOffset; y < H + curbStep; y += curbStep) {
+        const isAlt = Math.floor((y - curbOffset) / curbStep) % 2 === 0;
+        ctx.fillStyle = isAlt ? (track.theme.accent || '#38bdf8') : '#f8fafc';
+        ctx.fillRect(roadLeft - curbW, y, curbW, curbStep);
+        ctx.fillRect(roadRight, y, curbW, curbStep);
+      }
 
-      ctx.fillStyle = track.theme.road;
-      ctx.beginPath();
-      ctx.moveTo(cx - roadTopW / 2, horizon);
-      ctx.lineTo(cx + roadTopW / 2, horizon);
-      ctx.lineTo(W / 2 + roadBotW / 2, H);
-      ctx.lineTo(W / 2 - roadBotW / 2, H);
-      ctx.closePath();
-      ctx.fill();
+      // Asfalto Central 2D
+      ctx.fillStyle = track.theme.road || '#101726';
+      ctx.fillRect(roadLeft, 0, roadW, H);
 
-      // Líneas horizontales de movimiento + postes laterales en perspectiva (Bloque G2)
-      const stripeOffset = (st.dist / 35) % 2;
-      for (let i = 0; i < 14; i++) {
-        const t0 = ((i + (1 - (stripeOffset % 1))) % 14) / 14;
-        const p = Math.pow(t0, 1.55);
-        const y = horizon + p * (H - horizon);
-        const xCenter = cx + (W / 2 - cx) * t0;
-        const w = roadTopW + (roadBotW - roadTopW) * p;
-
-        ctx.strokeStyle = track.theme.grid;
-        ctx.lineWidth = 1.5;
+      // Líneas de cuadrícula cibernética sutiles
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.lineWidth = 1;
+      const gridOffset = (st.dist * 1.2) % 36;
+      for (let y = -36 + gridOffset; y < H + 36; y += 36) {
         ctx.beginPath();
-        ctx.moveTo(xCenter - w / 2, y);
-        ctx.lineTo(xCenter + w / 2, y);
+        ctx.moveTo(roadLeft, y);
+        ctx.lineTo(roadRight, y);
         ctx.stroke();
+      }
 
-        // Divisor central de carril
-        if (i % 2 === 0) {
-          ctx.fillStyle = 'rgba(255,255,255,0.24)';
-          ctx.fillRect(xCenter - 2.5 * (0.4 + p), y, 5 * (0.4 + p), Math.max(4, 14 * p));
-        }
-
-        // Postes neón laterales en perspectiva a ambos lados
-        if (i % 2 === 1 && p > 0.06) {
-          const postH = 10 + p * 34;
-          const postW = Math.max(2, p * 5);
-          const leftPostX = xCenter - w / 2 - 12 * p;
-          const rightPostX = xCenter + w / 2 + 12 * p;
-          ctx.fillStyle = track.theme.border;
-          ctx.fillRect(leftPostX - postW / 2, y - postH, postW, postH);
-          ctx.fillRect(rightPostX - postW / 2, y - postH, postW, postH);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(leftPostX - postW / 2, y - postH, postW, Math.max(2, postH * 0.22));
-          ctx.fillRect(rightPostX - postW / 2, y - postH, postW, Math.max(2, postH * 0.22));
+      // Líneas divisoras discontinuas de 4 carriles (3 divisores)
+      const dashStep = 44;
+      const dashH = 24;
+      const dashOffset = (st.dist * 1.8) % dashStep;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      const laneDividers = [roadLeft + roadW * 0.25, roadLeft + roadW * 0.50, roadLeft + roadW * 0.75];
+      for (const lx of laneDividers) {
+        for (let y = -dashStep + dashOffset; y < H + dashStep; y += dashStep) {
+          ctx.fillRect(lx - 2, y, 4, dashH);
         }
       }
 
-      // Bordes laterales luminosos
-      ctx.strokeStyle = track.theme.border;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(cx - roadTopW / 2, horizon);
-      ctx.lineTo(W / 2 - roadBotW / 2, H);
-      ctx.moveTo(cx + roadTopW / 2, horizon);
-      ctx.lineTo(W / 2 + roadBotW / 2, H);
-      ctx.stroke();
+      // Línea de Meta / Cuadros de llegada si estamos cerca del final de la carrera
+      const distToFinish = st.totalDist - st.dist;
+      if (distToFinish < 250 && distToFinish > -80) {
+        const fy = 300 - distToFinish * 2.4;
+        const checkSz = 16;
+        for (let cx = roadLeft; cx < roadRight; cx += checkSz) {
+          for (let cy = fy - 16; cy < fy + 16; cy += checkSz) {
+            const isWhite = (Math.floor((cx - roadLeft) / checkSz) + Math.floor((cy - fy) / checkSz)) % 2 === 0;
+            ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
+            ctx.fillRect(cx, cy, checkSz, checkSz);
+          }
+        }
+      }
 
-      // Dibujar objetos en pista (de lejos a cerca)
-      const viewDist = 480;
-      const visibleItems = st.items.filter(it => !it.taken && it.dist > st.dist - 20 && it.dist < st.dist + viewDist);
-      visibleItems.sort((a, b) => b.dist - a.dist);
+      // Dibujar Objetos en pista (Monedas, Rampas, Turbos, Aceite, Barreras)
+      const py = 300;
+      for (const item of st.items) {
+        const dz = item.dist - st.dist;
+        if (dz < -70 || dz > 160) continue;
+        const iy = py - dz * 2.4;
+        const ix = roadCenterX + item.x * (roadW * 0.42);
 
-      for (const it of visibleItems) {
-        const rel = 1 - (it.dist - st.dist) / viewDist;
-        const p = Math.max(0, Math.min(1, Math.pow(rel, 1.45)));
-        const y = horizon + p * (H - horizon - 55);
-        const roadW = roadTopW + (roadBotW - roadTopW) * p;
-        const roadCenter = cx + (W / 2 - cx) * p;
-        const x = roadCenter + it.x * (roadW * 0.44);
-        const sz = 8 + p * 22;
-
-        if (it.type === 'coin') {
+        if (item.type === 'coin' && !item.taken) {
+          ctx.save();
           ctx.fillStyle = '#fbbf24';
           ctx.beginPath();
-          ctx.arc(x, y, sz * 0.55, 0, Math.PI * 2);
+          ctx.arc(ix, iy, 12, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = '#fef08a';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+          ctx.fillStyle = '#78350f';
+          ctx.font = '900 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('🪙', ix, iy);
+          ctx.restore();
+        } else if (item.type === 'boost' && !item.taken) {
+          ctx.save();
+          ctx.fillStyle = '#0284c7';
+          ctx.fillRect(ix - 24, iy - 12, 48, 24);
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(ix - 24, iy - 12, 48, 24);
+          ctx.fillStyle = '#f8fafc';
+          ctx.font = '900 13px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('▲ ▲ ▲', ix, iy);
+          ctx.restore();
+        } else if (item.type === 'ramp') {
+          // Rampa Neón de salto elevada
+          ctx.save();
+          const rGrad = ctx.createLinearGradient(ix, iy - 16, ix, iy + 16);
+          rGrad.addColorStop(0, '#f59e0b');
+          rGrad.addColorStop(0.5, '#d97706');
+          rGrad.addColorStop(1, '#78350f');
+          ctx.fillStyle = rGrad;
+          ctx.fillRect(ix - 30, iy - 16, 60, 32);
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(ix - 30, iy - 16, 60, 32);
+
+          // Flechas animadas fluorescentes
+          ctx.fillStyle = item.triggered ? '#64748b' : '#fef08a';
+          ctx.font = '900 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('▲ ▲ ▲', ix, iy);
+
+          // Rótulo RAMPA
+          ctx.font = 'bold 9px monospace';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('RAMPA', ix, iy - 20);
+          ctx.restore();
+        } else if (item.type === 'oil' && !item.hit) {
+          // Charco de aceite ciber
+          ctx.save();
+          ctx.fillStyle = '#0f0d1a';
+          ctx.beginPath();
+          ctx.ellipse(ix, iy, 26, 14, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#a855f7';
           ctx.lineWidth = 2;
           ctx.stroke();
-        } else if (it.type === 'boost') {
-          ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(x - sz * 0.8, y - sz * 0.3, sz * 1.6, sz * 0.6);
-          ctx.strokeStyle = '#e0f2fe';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(x - sz * 0.8, y - sz * 0.3, sz * 1.6, sz * 0.6);
-        } else if (it.type === 'hazard') {
-          ctx.fillStyle = it.hit ? '#475569' : '#ef4444';
+          ctx.fillStyle = 'rgba(168, 85, 247, 0.4)';
           ctx.beginPath();
-          ctx.moveTo(x, y - sz * 0.7);
-          ctx.lineTo(x + sz * 0.7, y + sz * 0.5);
-          ctx.lineTo(x - sz * 0.7, y + sz * 0.5);
-          ctx.closePath();
+          ctx.ellipse(ix - 5, iy - 3, 14, 6, 0, 0, Math.PI * 2);
           ctx.fill();
+          ctx.restore();
+        } else if (item.type === 'hazard' && !item.hit) {
+          // Barrera láser electrificada
+          ctx.save();
+          // Dos conos
+          ctx.fillStyle = '#f97316';
+          ctx.fillRect(ix - 24, iy - 10, 10, 20);
+          ctx.fillRect(ix + 14, iy - 10, 10, 20);
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(ix - 24, iy - 4, 10, 6);
+          ctx.fillRect(ix + 14, iy - 4, 10, 6);
+          // Láser rojo pulsante
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ix - 14, iy);
+          ctx.lineTo(ix + 14, iy);
+          ctx.stroke();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
         }
       }
 
-      // Posición en pantalla del jugador (Bloque G1: dibujado siempre el último y a escala x1.35)
-      const px = W / 2 + st.vx * 900;
-      const py = H - 50;
-
-      // Ordenar rivales de lejos a cerca (mayor dist primero) para z-order limpio
-      const visibleRivals = st.rivals
-        .filter(r => (r.dist - st.dist) >= -30 && (r.dist - st.dist) <= viewDist)
-        .sort((a, b) => b.dist - a.dist)
-        .map(r => {
-          const diff = r.dist - st.dist;
-          const rel = 1 - diff / viewDist;
-          const p = Math.max(0.05, Math.min(1, Math.pow(rel, 1.45)));
-          const y = horizon + p * (H - horizon - 55);
-          const roadW = roadTopW + (roadBotW - roadTopW) * p;
-          const roadCenter = cx + (W / 2 - cx) * p;
-          const x = roadCenter + r.x * (roadW * 0.44);
-          const scale = 0.34 + p * 0.68;
-          return { r, x, y, scale };
-        });
-
-      for (let i = 0; i < visibleRivals.length; i++) {
-        const vr = visibleRivals[i];
-        // Atenuar/ocultar etiqueta si se solapa con el jugador o con otro rival más cercano
-        const nearPlayer = Math.hypot(vr.x - px, vr.y - py) < 62;
-        const nearOther = visibleRivals.slice(i + 1).some(o => Math.hypot(vr.x - o.x, vr.y - o.y) < 52);
-        const labelAlpha = (nearPlayer || nearOther) ? 0.18 : 0.92;
-        this.drawKart(ctx, vr.x, vr.y, vr.scale, vr.r.color, '#ffffff', vr.r.name, false, labelAlpha);
+      // Dibujar Rivales (Kenshin-X, Valkyria-9, Sensei-GT)
+      for (const r of st.rivals) {
+        const ry = py - (r.dist - st.dist) * 2.4;
+        const rx = roadCenterX + r.x * (roadW * 0.42);
+        if (ry >= -60 && ry <= H + 60) {
+          this.drawKart(ctx, rx, ry - (r.jumpHeight || 0), 1.25, r.color, '#ffffff', r.name, false, 0.95, r.jumpHeight || 0);
+        }
       }
 
-      // Dibujar SIEMPRE al último el coche del jugador con escala x1.35 (Bloque G1)
-      this.drawKart(ctx, px, py, 1.35, ch.primary, ch.glow, this.options.playerName || 'Tú', st.nitroActive > 0, 1.0);
+      // Dibujar Coche del Jugador
+      const px = roadCenterX + st.x * (roadW * 0.42);
+      this.drawKart(ctx, px, py - st.jumpHeight, 1.35, ch.primary, ch.glow, this.options.playerName || 'Tú', st.nitroActive > 0, 1.0, st.jumpHeight);
 
-      // Bloque G2: 8 líneas de velocidad blancas/cian laterales durante NITRO
+      // Líneas de velocidad durante NITRO
       if (st.nitroActive > 0) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(125, 211, 252, 0.85)';
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
         ctx.lineWidth = 2.5;
         st.speedLines.forEach((ln, idx) => {
-          const progress = ((st.dist * 0.045 + ln.phase) % 1);
-          const sx = W / 2 + ln.side * (90 + progress * (W * 0.42));
-          const sy = horizon + 15 + progress * (H - horizon - 20);
-          const ex = sx + ln.side * ln.len;
-          const ey = sy + ln.len * 0.42;
-          ctx.strokeStyle = idx % 2 === 0 ? 'rgba(255,255,255,0.85)' : 'rgba(56,189,248,0.9)';
+          const progress = ((st.dist * 0.05 + ln.phase) % 1);
+          const lx = roadCenterX + ln.side * (roadW * 0.48);
+          const ly = progress * H;
           ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(ex, ey);
+          ctx.moveTo(lx, ly);
+          ctx.lineTo(lx, ly + ln.len);
           ctx.stroke();
         });
         ctx.restore();
       }
 
-      // Flash rojo breve al chocar (Bloque G2)
+      // Flash de colisión
       if (st.crashFlash > 0) {
         ctx.fillStyle = `rgba(239, 68, 68, ${(st.crashFlash / 10) * 0.32})`;
         ctx.fillRect(0, 0, W, H);
       }
 
+      // Minimapa / Barra Vertical de Progreso de Carrera (Lateral Derecho)
+      const mapX = 736;
+      const mapTop = 40;
+      const mapBot = 350;
+      const mapH = mapBot - mapTop;
+
+      ctx.save();
+      // Fondo barra
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(mapX - 10, mapTop - 15, 20, mapH + 30);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(mapX - 10, mapTop - 15, 20, mapH + 30);
+
+      // Línea de progreso
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(mapX, mapTop);
+      ctx.lineTo(mapX, mapBot);
+      ctx.stroke();
+
+      // Bandera de Meta y Salida
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🏁', mapX, mapTop - 2);
+      ctx.fillText('🚦', mapX, mapBot + 12);
+
+      // Puntos de los rivales
+      st.rivals.forEach(r => {
+        const frac = Math.max(0, Math.min(1, r.dist / st.totalDist));
+        const dotY = mapBot - frac * mapH;
+        ctx.fillStyle = r.color;
+        ctx.beginPath();
+        ctx.arc(mapX, dotY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Punto del jugador (más grande y con aro brillante)
+      const playerFrac = Math.max(0, Math.min(1, st.dist / st.totalDist));
+      const playerDotY = mapBot - playerFrac * mapH;
+      ctx.fillStyle = ch.glow;
+      ctx.beginPath();
+      ctx.arc(mapX, playerDotY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.restore();
       ctx.restore();
     }
 
-    drawKart(ctx, x, y, scale, bodyColor, glowColor, label, isBoosting, labelAlpha = 1.0) {
+    drawKart(ctx, x, y, scale, bodyColor, glowColor, label, isBoosting, labelAlpha = 1.0, jumpHeight = 0) {
       ctx.save();
+
+      // Sombra inferior (permanece en la superficie de la pista)
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      const shadowScale = scale * Math.max(0.65, 1 - (jumpHeight || 0) / 60);
+      ctx.fillRect(x - 26 * shadowScale, y + (jumpHeight || 0) + 14 * scale, 52 * shadowScale, 9 * shadowScale);
+
+      // Elevar kart según el salto
       ctx.translate(x, y);
       ctx.scale(scale, scale);
-
-      // Sombra inferior
-      ctx.fillStyle = 'rgba(0,0,0,0.58)';
-      ctx.fillRect(-30, 14, 60, 10);
 
       // Llamas de Nitro
       if (isBoosting) {
@@ -1118,7 +1286,7 @@
       ctx.fillRect(-7, -18, 4, 3);
       ctx.fillRect(3, -18, 4, 3);
 
-      // Etiqueta de piloto 14px arriba del coche (Bloque G1)
+      // Etiqueta de piloto 14px arriba del coche
       if (label && labelAlpha > 0.05) {
         ctx.save();
         ctx.globalAlpha = labelAlpha;

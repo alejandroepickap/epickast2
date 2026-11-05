@@ -225,7 +225,7 @@ function modalVault(initialTab = 'roulette') {
     }
   } catch {}
 
-  const currentVer = cfg.APP_VERSION || '1.9.2';
+  const currentVer = cfg.APP_VERSION || '1.9.3';
   if (dData.version !== currentVer) {
     dData.version = currentVer;
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
@@ -581,7 +581,7 @@ function modalVault(initialTab = 'roulette') {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.2</h2>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.3</h2>
             <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
           </div>
         </div>

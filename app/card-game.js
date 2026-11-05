@@ -1,5 +1,5 @@
 /**
- * EpicKast v1.9.2 — DOJO ELEMENTAL DE CARTAS (Card-Jitsu Tactical Engine) & ESTUDIO "MI NINJA"
+ * EpicKast v1.9.3 — DOJO ELEMENTAL DE CARTAS (Card-Jitsu Tactical Engine) & ESTUDIO "MI NINJA"
  * Bloques A1, A2, A3, C, D, E, F integrados con `window.EKLifecycle`, `window.EKGameConfig` y `window.EKSprites`.
  */
 (function () {
