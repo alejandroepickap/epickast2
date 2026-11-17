@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 const $ = (id) => document.getElementById(id);
 function h(tag, props, ...kids) {
   const e = document.createElement(tag);
@@ -191,7 +191,60 @@ function modalVault(initialTab = 'roulette') {
   m.replaceChildren();
 
   const cfg = window.EKGameConfig || {};
-  const PROFILE_COSMETICS = cfg.COSMETICS || [];
+  // Sistema de Rango Creador y Catálogo Personalizado (Exclusivo para EpicKap y usuarios con rango Creador otorgado)
+  if (!window.EKCreatorSystem) {
+    window.EKCreatorSystem = {
+      isMasterCreator(u) {
+        if (!u) return false;
+        const n = String(u.name || '').trim().toLowerCase();
+        return n === 'epickap' || Number(u.id) === 1;
+      },
+      getGrantedCreators() {
+        try { return JSON.parse(localStorage.getItem('epickast.creators.v1') || '[]'); } catch { return []; }
+      },
+      setCreatorRole(userObj, grant = true) {
+        if (!userObj) return;
+        let list = this.getGrantedCreators();
+        const uid = Number(userObj.id);
+        const uname = String(userObj.name || '').trim();
+        list = list.filter((c) => Number(c.id) !== uid && String(c.name || '').toLowerCase() !== uname.toLowerCase());
+        if (grant) list.push({ id: uid || Date.now(), name: uname, grantedAt: Date.now() });
+        try { localStorage.setItem('epickast.creators.v1', JSON.stringify(list)); } catch {}
+        return list;
+      },
+      isCreator(u) {
+        if (!u) return false;
+        if (this.isMasterCreator(u)) return true;
+        const n = String(u.name || '').trim().toLowerCase();
+        return this.getGrantedCreators().some((c) => (u.id && Number(c.id) === Number(u.id)) || (n && String(c.name || '').toLowerCase() === n));
+      },
+      getCustomRewards() {
+        try { return JSON.parse(localStorage.getItem('epickast.creator_rewards.v1') || '[]'); } catch { return []; }
+      },
+      saveCustomReward(item) {
+        const list = this.getCustomRewards().filter((x) => x.id !== item.id);
+        list.unshift(item);
+        try { localStorage.setItem('epickast.creator_rewards.v1', JSON.stringify(list)); } catch {}
+        return list;
+      },
+      deleteCustomReward(id) {
+        const list = this.getCustomRewards().filter((x) => x.id !== id);
+        try { localStorage.setItem('epickast.creator_rewards.v1', JSON.stringify(list)); } catch {}
+        return list;
+      },
+      getCustomDojoCards() {
+        try { return JSON.parse(localStorage.getItem('epickast.creator_dojo_cards.v1') || '{}'); } catch { return {}; }
+      },
+      saveCustomDojoCard(cardNo, data) {
+        const map = this.getCustomDojoCards();
+        map[String(cardNo)] = data;
+        try { localStorage.setItem('epickast.creator_dojo_cards.v1', JSON.stringify(map)); } catch {}
+        return map;
+      }
+    };
+  }
+  const getProfileCosmeticsList = () => [...window.EKCreatorSystem.getCustomRewards(), ...(cfg.COSMETICS || [])];
+  let PROFILE_COSMETICS = getProfileCosmeticsList();
   const RARITY_COLORS = cfg.RARITY_TOKENS ? {
     common: cfg.RARITY_TOKENS.common.color,
     rare: cfg.RARITY_TOKENS.rare.color,
@@ -231,7 +284,7 @@ function modalVault(initialTab = 'roulette') {
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
   }
 
-  let activeTab = (typeof initialTab === 'string' && ['roulette', 'collection', 'dojo', 'racer', 'ninja'].includes(initialTab)) ? initialTab : 'roulette';
+  let activeTab = (typeof initialTab === 'string' && ['roulette', 'collection', 'dojo', 'racer', 'ninja', 'creator'].includes(initialTab)) ? initialTab : 'roulette';
   let activeFilter = 'all'; // 'all' | 'frame' | 'banner' | 'color' | 'title' | 'nameplate' | 'profile_fx'
   let activeRarityFilter = 'all'; // 'all' | 'common' | 'rare' | 'epic' | 'legendary'
   let sortNewestFirst = true;
@@ -336,6 +389,12 @@ function modalVault(initialTab = 'roulette') {
     if (activeTab === 'collection') renderCosmeticsGrid();
   };
 
+  const MINIMAL_EYE_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+
+  // Los banners ahora usan ilustraciones HD reales (Anime, Streetwear Urbano, Fantasía Oscura) o gradientes limpios sin stickers de mascotas
+  const renderBannerExclusiveArtSvg = () => '';
+  window.renderBannerExclusiveArtSvg = renderBannerExclusiveArtSvg;
+
   // Previsualizador en vivo estilo Nitro
   const openCosmeticLivePreviewModal = (item) => {
     const prevWrap = document.createElement('div');
@@ -356,16 +415,17 @@ function modalVault(initialTab = 'roulette') {
 
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2638;padding-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:18px;">👁️</span>
-          <b style="font-size:14px;letter-spacing:0.3px;">Vista Previa de Perfil Nitro</b>
+        <div style="display:flex;align-items:center;gap:8px;color:#38bdf8;">
+          ${MINIMAL_EYE_SVG}
+          <b style="font-size:14px;letter-spacing:0.3px;color:#f8fafc;">Vista Previa de Perfil Nitro</b>
         </div>
         <button id="closePreviewBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
       </div>
 
       <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#0b0e14;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-        <!-- Banner con efecto de partículas si aplica -->
-        <div class="preview-banner-box ${isAnimatedBanner ? 'banner-animated' : ''}" style="height:90px;background:${eqBanner};background-size:cover;position:relative;">
+        <!-- Banner con personaje/mascota exclusiva y partículas -->
+        <div class="preview-banner-box ${isAnimatedBanner ? 'banner-animated' : ''}" style="height:90px;background:${eqBanner};background-size:cover;position:relative;overflow:hidden;">
+          ${renderBannerExclusiveArtSvg(item.type === 'banner' ? (item.id + ' ' + item.name) : eqBanner)}
           <canvas id="prevFxCanvas" width="390" height="90" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
         </div>
 
@@ -564,6 +624,8 @@ function modalVault(initialTab = 'roulette') {
     }
 
     wrap.innerHTML = '';
+    PROFILE_COSMETICS = getProfileCosmeticsList();
+    const isCreatorUser = window.EKCreatorSystem?.isCreator(S.me);
     const totalCosmetics = PROFILE_COSMETICS.length;
     const unlockedCount = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
     const pctUnlocked = Math.round((unlockedCount / Math.max(1, totalCosmetics)) * 100);
@@ -581,8 +643,8 @@ function modalVault(initialTab = 'roulette') {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.4</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental 1v1 y Turbo Core 1v1</p>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.5</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Santuario Arcano · Cosméticos, Dojo Elemental HD 1v1 y Turbo Core 1v1</p>
           </div>
         </div>
 
@@ -603,6 +665,11 @@ function modalVault(initialTab = 'roulette') {
           <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#1e2638':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
             ${renderTabIco('tab_ninja', 1)} <span>Mi Ninja</span>
           </button>
+          ${isCreatorUser ? `
+            <button id="vTabBtnCreator" style="background:${activeTab==='creator'?'linear-gradient(135deg,#9333ea,#db2777)':'rgba(168,85,247,0.14)'};color:#fff;border:1px solid ${activeTab==='creator'?'#f472b6':'#a855f7'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+              <span>🎨</span> <span>Creador</span>
+            </button>
+          ` : ''}
         </div>
 
         <!-- Botón de Cerrar formal -->
@@ -649,18 +716,26 @@ function modalVault(initialTab = 'roulette') {
 
       <!-- VISTA 1: RULETA Y COFRES -->
       <div id="vViewRoulette" style="display:${activeTab==='roulette'?'flex':'none'};flex-direction:column;gap:12px;">
-        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;">
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;">
           ${['copper','silver','gold','obsidian'].map(tier => {
             const count = dData.keys[tier] || 0;
             const isSel = selectedTier === tier;
-            const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
+            const names = { copper: 'Cofre de Cobre', silver: 'Cofre de Plata', gold: 'Cofre de Oro', obsidian: 'Cofre de Obsidiana' };
+            const sub = { copper: 'Común · Raro · Épico', silver: '1% Legendario', gold: '5% Legendario', obsidian: '15% Legendario · 0% Común' }[tier];
             const keySprite = 'key_' + tier;
             const color = { copper: '#d97706', silver: '#cbd5e1', gold: '#fbbf24', obsidian: '#a855f7' }[tier];
+            const bgGrad = {
+              copper: 'radial-gradient(circle at 50% 25%, rgba(217,119,6,0.24), #111622 80%)',
+              silver: 'radial-gradient(circle at 50% 25%, rgba(203,213,225,0.22), #111622 80%)',
+              gold: 'radial-gradient(circle at 50% 25%, rgba(251,191,36,0.26), #111622 80%)',
+              obsidian: 'radial-gradient(circle at 50% 25%, rgba(168,85,247,0.28), #111622 80%)'
+            }[tier];
             return `
-              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? '#1a2233' : '#111622'};border:1.5px solid ${isSel ? color : '#20283a'};border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:0.15s;">
-                <span style="display:flex;align-items:center;justify-content:center;height:24px;">${renderTabIco(keySprite, 1.2)}</span>
-                <span style="font-size:12px;font-weight:800;color:${isSel ? '#fff' : '#94a3b8'};">${names[tier]}</span>
-                <span style="font-size:10px;font-weight:700;color:${color};">${count} Llaves</span>
+              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? bgGrad : '#111622'};border:${isSel ? '2px solid ' + color : '1.5px solid #20283a'};border-radius:10px;padding:10px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all 0.18s ease;box-shadow:${isSel ? '0 6px 18px ' + color + '33, inset 0 1px 0 rgba(255,255,255,0.2)' : 'none'};transform:${isSel ? 'translateY(-2px)' : 'none'};">
+                <span style="display:flex;align-items:center;justify-content:center;height:26px;filter:drop-shadow(0 2px 6px ${color}88);">${renderTabIco(keySprite, 1.35)}</span>
+                <span style="font-size:12px;font-weight:900;color:${isSel ? '#fff' : '#cbd5e1'};">${names[tier]}</span>
+                <span style="font-size:9.5px;color:#94a3b8;">${sub}</span>
+                <span style="font-size:10.5px;font-weight:800;color:${color};background:rgba(0,0,0,0.45);padding:2px 8px;border-radius:999px;border:1px solid ${color}55;margin-top:2px;">${count} Llave${count === 1 ? '' : 's'}</span>
               </button>
             `;
           }).join('')}
@@ -675,9 +750,10 @@ function modalVault(initialTab = 'roulette') {
         </div>
 
         <!-- Visor de la Ruleta Honesta -->
-        <div style="position:relative;background:#090d14;border:1px solid #1a2233;border-radius:8px;height:120px;overflow:hidden;box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
-          <div style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:#38bdf8;z-index:10;transform:translateX(-50%);box-shadow:0 0 8px #38bdf8;">
-            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid #38bdf8;"></div>
+        <div style="position:relative;background:radial-gradient(circle at 50% 50%, #131b2e 0%, #070a10 90%);border:1.5px solid #26334d;border-radius:10px;height:126px;overflow:hidden;box-shadow:inset 0 0 28px rgba(0,0,0,0.88), 0 6px 20px rgba(0,0,0,0.45);">
+          <div style="position:absolute;top:0;bottom:0;left:50%;width:2.5px;background:linear-gradient(180deg,#fbbf24,#38bdf8,#fbbf24);z-index:10;transform:translateX(-50%);box-shadow:0 0 12px #38bdf8;">
+            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fbbf24;"></div>
+            <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:8px solid #fbbf24;"></div>
           </div>
           <div id="vTrack" style="display:flex;height:100%;align-items:center;position:absolute;left:0;top:0;will-change:transform;"></div>
         </div>
@@ -718,6 +794,12 @@ function modalVault(initialTab = 'roulette') {
               ${lastSpinResult.winner.desc || ''}
             </div>
 
+            ${lastSpinResult.bonusDojoCard ? `
+              <div style="font-size:11.5px;color:#fde047;font-weight:800;background:rgba(245,158,11,0.14);border:1px solid rgba(251,191,36,0.45);border-radius:6px;padding:5px 12px;margin-bottom:6px;display:inline-block;">
+                🎴 ¡Bono de Mazo Dojo: Desbloqueaste la carta <b>${lastSpinResult.bonusDojoCard.code} · ${lastSpinResult.bonusDojoCard.name}</b> (Poder ${lastSpinResult.bonusDojoCard.power})!
+              </div>
+            ` : ''}
+
             ${lastSpinResult.isDuplicate ? `
               <div style="font-size:12px;color:#e9d5ff;font-weight:800;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);border-radius:6px;padding:6px 14px;display:inline-block;margin-bottom:4px;">
                 ✨ Duplicado convertido automáticamente en <b>+${lastSpinResult.dustAward} Esencia Arcana</b> (Saldo: ${dData.dust} Esencia)
@@ -727,8 +809,8 @@ function modalVault(initialTab = 'roulette') {
                 <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 2px 10px rgba(16,185,129,0.4);">
                   ✨ EQUIPAR EN MI PERFIL AHORA
                 </button>
-                <button id="vBtnPreviewWinner" style="background:#1e2638;border:1px solid #3b82f6;color:#93c5fd;font-weight:800;font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;">
-                  👁️ Probar en Perfil
+                <button id="vBtnPreviewWinner" style="background:#1e2638;border:1px solid #3b82f6;color:#93c5fd;font-weight:800;font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                  ${MINIMAL_EYE_SVG} <span>Probar en Perfil</span>
                 </button>
               </div>
             `}
@@ -814,6 +896,9 @@ function modalVault(initialTab = 'roulette') {
 
       <!-- VISTA 5: PERSONALIZACIÓN NINJA -->
       <div id="vViewNinja" style="display:${activeTab==='ninja'?'block':'none'};width:100%;"></div>
+
+      <!-- VISTA 6: ESTUDIO DE CREADOR (Exclusivo EpicKap y rango Creador) -->
+      <div id="vViewCreator" style="display:${activeTab==='creator'?'block':'none'};width:100%;"></div>
     `;
 
     // Eventos de Pestañas
@@ -840,6 +925,7 @@ function modalVault(initialTab = 'roulette') {
     bindTab('#vTabBtnDojo', 'dojo', mountDojo);
     bindTab('#vTabBtnRacer', 'racer', mountRacer);
     bindTab('#vTabBtnNinja', 'ninja', mountNinja);
+    bindTab('#vTabBtnCreator', 'creator', mountCreator);
 
     const closeBtn = wrap.querySelector('#vCloseBtn');
     if (closeBtn) closeBtn.onclick = closeVaultOrModal;
@@ -1093,10 +1179,10 @@ function modalVault(initialTab = 'roulette') {
       }
 
       return `
-        <div style="width:100px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
-          <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
+        <div style="width:100px;height:102px;flex-shrink:0;background:radial-gradient(circle at 50% 45%, ${rColor}22 0%, #111622 80%);border:1.5px solid ${rColor}88;border-top:3px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 4px;box-sizing:border-box;margin:0 2px;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+          <span style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:0.4px;background:rgba(0,0,0,0.45);padding:1px 6px;border-radius:999px;">${item.rarity.toUpperCase()}</span>
           ${visualPreview}
-          <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
+          <span style="font-size:9.5px;font-weight:700;color:#e2e8f0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
         </div>
       `;
     }).join('');
@@ -1176,10 +1262,10 @@ function modalVault(initialTab = 'roulette') {
       }
 
       return `
-        <div style="width:${cardWidth}px;height:95px;flex-shrink:0;background:#141822;border:1px solid #242b3b;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;margin:0 2px;">
-          <span style="font-size:8.5px;font-weight:800;color:${rColor};text-transform:uppercase;">${item.rarity.toUpperCase()}</span>
+        <div style="width:${cardWidth}px;height:102px;flex-shrink:0;background:radial-gradient(circle at 50% 45%, ${rColor}22 0%, #111622 80%);border:1.5px solid ${rColor}88;border-top:3px solid ${rColor};border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 4px;box-sizing:border-box;margin:0 2px;box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+          <span style="font-size:8px;font-weight:900;color:${rColor};text-transform:uppercase;letter-spacing:0.4px;background:rgba(0,0,0,0.45);padding:1px 6px;border-radius:999px;">${item.rarity.toUpperCase()}</span>
           ${visualPreview}
-          <span style="font-size:9.5px;font-weight:700;color:#cbd5e1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
+          <span style="font-size:9.5px;font-weight:700;color:#e2e8f0;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:92%;">${item.name}</span>
         </div>
       `;
     }).join('');
@@ -1253,12 +1339,19 @@ function modalVault(initialTab = 'roulette') {
         previewHtml = '<span style="font-size:20px;vertical-align:middle;">⭐</span>';
       }
 
+      let bonusDojoCard = null;
+      if (window.DojoCardCollection && (winner.rarity === 'epic' || winner.rarity === 'legendary' || Math.random() < 0.45)) {
+        const resCard = window.DojoCardCollection.unlockRandomDojoCard(winner.rarity === 'epic' || winner.rarity === 'legendary');
+        if (resCard && resCard.card) bonusDojoCard = resCard.card;
+      }
+
       lastSpinResult = {
         winner,
         isDuplicate,
         dustAward,
         unlockedCount: currentUnlocked,
-        previewHtml
+        previewHtml,
+        bonusDojoCard
       };
 
       renderView();
@@ -1350,8 +1443,11 @@ function modalVault(initialTab = 'roulette') {
           </div>
         `;
       } else {
+        const isAnimB = c.rarity === 'legendary' || c.rarity === 'epic';
         preview = `
-          <div style="height:28px;border-radius:5px;background:${c.val};border:1px solid rgba(255,255,255,0.15);"></div>
+          <div class="${isAnimB ? 'banner-animated' : ''}" style="position:relative;height:46px;border-radius:6px;background:${c.val};background-size:200% 200%;border:1px solid rgba(255,255,255,0.18);overflow:hidden;box-shadow:inset 0 0 12px rgba(0,0,0,0.45);">
+            ${renderBannerExclusiveArtSvg(c.id + ' ' + c.name)}
+          </div>
         `;
       }
 
@@ -1360,23 +1456,23 @@ function modalVault(initialTab = 'roulette') {
         actionHtml = '<button style="width:100%;background:#0f291e;border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:default;">✓ Equipado en Perfil</button>';
       } else if (isUnlocked) {
         actionHtml = `
-          <div style="display:flex;gap:4px;">
+          <div style="display:flex;gap:5px;">
             <button class="vEqBtn" style="flex:1;background:#2563eb;border:1px solid #3b82f6;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;">Equipar</button>
-            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
           </div>
         `;
       } else if (canCraft) {
         actionHtml = `
-          <div style="display:flex;gap:4px;">
+          <div style="display:flex;gap:5px;">
             <button class="vCraftBtn" style="flex:1;background:#2a2040;border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;" title="Fabricar permanente">🔨 Fabricar (${craftCost} ✨)</button>
-            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
           </div>
         `;
       } else {
         actionHtml = `
-          <div style="display:flex;gap:4px;">
+          <div style="display:flex;gap:5px;">
             <button disabled style="flex:1;background:#151922;border:1px solid #202634;color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:5px;cursor:not-allowed;">🔒 Bloqueado (${craftCost} ✨)</button>
-            <button class="vPrevBtn" style="background:#1e2638;border:1px solid #3b4660;color:#cbd5e1;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;" title="Probar en perfil">👁️</button>
+            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
           </div>
         `;
       }
@@ -1546,9 +1642,244 @@ function modalVault(initialTab = 'roulette') {
     }
   };
 
+  let creatorUploadDataUrl = '';
+  const mountCreator = () => {
+    const cBox = wrap.querySelector('#vViewCreator');
+    if (!cBox) return;
+    if (!window.EKCreatorSystem?.isCreator(S.me)) {
+      cBox.innerHTML = '<div style="padding:24px;text-align:center;color:#f87171;">Acceso restringido a EpicKap y usuarios con rango Creador.</div>';
+      return;
+    }
+    const isMaster = window.EKCreatorSystem.isMasterCreator(S.me);
+    const customList = window.EKCreatorSystem.getCustomRewards();
+    const creatorsList = window.EKCreatorSystem.getGrantedCreators();
+    const dojoCatalog = window.DojoCardCollection?.CATALOG || [];
+
+    cBox.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <!-- Cabecera Estudio de Creador -->
+        <div style="background:linear-gradient(135deg,rgba(147,51,234,0.22),rgba(219,39,119,0.18));border:1.5px solid #a855f7;border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-size:15px;font-weight:900;color:#fff;display:flex;align-items:center;gap:8px;">
+              <span>🎨 ESTUDIO OFICIAL DE CREADOR DE RECOMPENSAS</span>
+              <span style="background:#db2777;color:#fff;font-size:9.5px;padding:2px 8px;border-radius:999px;">EXCLUSIVO EPICKAP & CREADORES</span>
+            </div>
+            <p style="margin:4px 0 0;font-size:12px;color:#e2e8f0;">Sube y nombra tus propios Banners (Anime, Urbano, Abstracto, GIF), Ilustraciones para Cartas del Dojo (#001–#024), Marcos o Títulos. También puedes colocarlos en la carpeta local <code>recompensas-creador/</code>.</p>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;">
+          <!-- Formulario para subir y nombrar recompensa o carta -->
+          <div style="background:#131826;border:1px solid #263147;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:13px;font-weight:900;color:#fbbf24;">➕ Subir y Nombrar Nueva Recompensa / Carta</div>
+
+            <label style="font-size:11.5px;color:#cbd5e1;font-weight:700;">1. Categoría de Recompensa
+              <select id="crTypeSel" style="margin-top:4px;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:7px;font-size:12px;">
+                <option value="banner">🏷️ Banner de Perfil (800×240 px · PNG/JPG/WEBP/GIF)</option>
+                <option value="dojo_card">🎴 Ilustración de Carta del Dojo (36 base + 24 desbloqueables · 1:1)</option>
+                <option value="title">👑 Título Exclusivo de Perfil</option>
+                <option value="color">🎨 Color / Gradiente de Nombre</option>
+              </select>
+            </label>
+
+            <div id="crDojoCardRow" style="display:none;">
+              <label style="font-size:11.5px;color:#38bdf8;font-weight:700;">Seleccionar Carta Numerada del Dojo 
+                <select id="crDojoCardNo" style="margin-top:4px;background:#090d16;border:1px solid #38bdf8;color:#fff;padding:8px 10px;border-radius:7px;font-size:12px;">
+                  ${dojoCatalog.map((c) => `<option value="${c.no}">${c.code} · ${c.name} (${c.element.toUpperCase()} Poder ${c.power})</option>`).join('')}
+                </select>
+              </label>
+            </div>
+
+            <label style="font-size:11.5px;color:#cbd5e1;font-weight:700;">2. Nombre de la Recompensa / Carta
+              <input id="crNameInp" type="text" placeholder="Ej: Banner: Samurai Urbano / Dragón Carmesí..." style="margin-top:4px;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:7px;font-size:12px;" />
+            </label>
+
+            <label style="font-size:11.5px;color:#cbd5e1;font-weight:700;">3. Rareza en la Bóveda
+              <select id="crRaritySel" style="margin-top:4px;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:7px;font-size:12px;">
+                <option value="legendary">🟡 Legendario</option>
+                <option value="epic" selected>🟣 Épico</option>
+                <option value="rare">🔵 Raro</option>
+                <option value="common">⚪ Común</option>
+              </select>
+            </label>
+
+            <label style="font-size:11.5px;color:#cbd5e1;font-weight:700;">4. Descripción corta
+              <input id="crDescInp" type="text" placeholder="Ej: Diseño exclusivo creado por EpicKap..." style="margin-top:4px;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:7px;font-size:12px;" />
+            </label>
+
+            <div id="crImageUploadWrap" style="display:flex;flex-direction:column;gap:8px;">
+              <label style="font-size:11.5px;color:#cbd5e1;font-weight:700;">5. Archivo de Imagen (.png, .jpg, .webp, .gif)</label>
+              <input id="crFileInp" type="file" accept="image/*" style="background:#090d16;border:1px dashed #6366f1;color:#cbd5e1;padding:8px;border-radius:7px;font-size:11.5px;cursor:pointer;" />
+              <div id="crImgPreview" style="height:68px;border-radius:8px;background:#090d16;border:1px solid #1e293b;display:flex;align-items:center;justify-content:center;font-size:11px;color:#64748b;background-size:cover;background-position:center;">
+                Vista previa de la imagen seleccionada
+              </div>
+            </div>
+
+            <button id="crBtnPublish" style="background:linear-gradient(135deg,#10b981,#059669);border:none;color:#fff;padding:10px 16px;border-radius:8px;font-size:12.5px;font-weight:900;cursor:pointer;margin-top:4px;box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+              ✨ Publicar y Desbloquear en la Bóveda
+            </button>
+          </div>
+
+          <!-- Columna Derecha: Tus Recompensas Subidas + Gestión de Rango Creador -->
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div style="background:#131826;border:1px solid #263147;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <div style="font-size:13px;font-weight:900;color:#38bdf8;">📦 Tus Recompensas Personalizadas (${customList.length})</div>
+              <div style="max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+                ${customList.length === 0
+                  ? '<div style="font-size:11.5px;color:#64748b;padding:8px 0;">Aún no has subido recompensas personalizadas desde este panel.</div>'
+                  : customList.map((item) => `
+                    <div style="background:#090d16;border:1px solid #1e293b;border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                      <div style="min-width:0;">
+                        <div style="font-size:12px;font-weight:800;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.name}</div>
+                        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;">${item.type} · ${item.rarity}</div>
+                      </div>
+                      <button class="crDelRewardBtn" data-id="${item.id}" style="background:rgba(239,68,68,0.18);border:1px solid #ef4444;color:#fca5a5;padding:4px 8px;border-radius:5px;font-size:10.5px;font-weight:800;cursor:pointer;">Eliminar</button>
+                    </div>
+                  `).join('')}
+              </div>
+            </div>
+
+            ${isMaster ? `
+              <div style="background:#131826;border:1px solid #a855f7;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+                <div style="font-size:13px;font-weight:900;color:#c084fc;">👑 Gestión de Rango Creador (Solo EpicKap)</div>
+                <p style="margin:0;font-size:11px;color:#94a3b8;">Otorga o revoca el rango <b>🎨 Creador</b> a otros usuarios para que puedan subir y nombrar diseños en la Bóveda.</p>
+                <div style="display:flex;gap:6px;">
+                  <input id="crGrantUserInp" type="text" placeholder="Nombre exacto del usuario (ej. katy)..." style="flex:1;background:#090d16;border:1px solid #334155;color:#fff;padding:7px 10px;border-radius:6px;font-size:11.5px;" />
+                  <button id="crBtnGrantUser" style="background:#9333ea;border:none;color:#fff;padding:7px 12px;border-radius:6px;font-size:11.5px;font-weight:800;cursor:pointer;">+ Dar Rango</button>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
+                  <span style="background:rgba(251,191,36,0.16);border:1px solid #fbbf24;color:#fde047;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;">👑 EpicKap (Creador Maestro)</span>
+                  ${creatorsList.map((c) => `
+                    <span style="background:rgba(168,85,247,0.18);border:1px solid #a855f7;color:#e9d5ff;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;">
+                      <span>🎨 ${c.name}</span>
+                      <button class="crRevokeUserBtn" data-name="${c.name}" style="background:transparent;border:none;color:#f87171;font-size:11px;cursor:pointer;padding:0;font-weight:900;" title="Quitar rango">✕</button>
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+
+    const typeSel = cBox.querySelector('#crTypeSel');
+    const dojoRow = cBox.querySelector('#crDojoCardRow');
+    const fileInp = cBox.querySelector('#crFileInp');
+    const prevBox = cBox.querySelector('#crImgPreview');
+
+    if (typeSel && dojoRow) {
+      typeSel.onchange = () => {
+        dojoRow.style.display = typeSel.value === 'dojo_card' ? 'block' : 'none';
+      };
+    }
+
+    if (fileInp && prevBox) {
+      fileInp.onchange = () => {
+        const f = fileInp.files?.[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          creatorUploadDataUrl = String(ev.target?.result || '');
+          prevBox.style.backgroundImage = `url('${creatorUploadDataUrl}')`;
+          prevBox.textContent = '';
+        };
+        reader.readAsDataURL(f);
+      };
+    }
+
+    const pubBtn = cBox.querySelector('#crBtnPublish');
+    if (pubBtn) {
+      pubBtn.onclick = () => {
+        const type = typeSel?.value || 'banner';
+        const name = cBox.querySelector('#crNameInp')?.value?.trim();
+        const rarity = cBox.querySelector('#crRaritySel')?.value || 'epic';
+        const desc = cBox.querySelector('#crDescInp')?.value?.trim() || `Diseño exclusivo creado por ${S.me?.name || 'EpicKap'}.`;
+
+        if (type === 'dojo_card') {
+          const cardNo = Number(cBox.querySelector('#crDojoCardNo')?.value || 1);
+          if (!creatorUploadDataUrl && !name) {
+            toast('Selecciona una imagen o escribe un nuevo nombre para la carta');
+            return;
+          }
+          window.EKCreatorSystem.saveCustomDojoCard(cardNo, {
+            name: name || undefined,
+            imgUrl: creatorUploadDataUrl || undefined
+          });
+          toast(`🎴 ¡Carta #${String(cardNo).padStart(3, '0')} actualizada con tu diseño personalizado!`);
+          creatorUploadDataUrl = '';
+          mountCreator();
+          return;
+        }
+
+        if (!name) {
+          toast('Escribe un nombre para la recompensa');
+          return;
+        }
+        if (type === 'banner' && !creatorUploadDataUrl) {
+          toast('Selecciona un archivo de imagen para el Banner');
+          return;
+        }
+
+        const newId = `creator_${type}_${Date.now()}`;
+        const val = type === 'banner'
+          ? `url("${creatorUploadDataUrl}") center/cover no-repeat`
+          : (name.replace(/^Título:\s*/i, ''));
+        const item = {
+          id: newId,
+          name: type === 'banner' && !name.toLowerCase().startsWith('banner') ? `Banner: ${name}` : name,
+          type,
+          val,
+          rarity,
+          animated: true,
+          desc
+        };
+        window.EKCreatorSystem.saveCustomReward(item);
+        if (!dData.cosmetics) dData.cosmetics = {};
+        dData.cosmetics[newId] = true;
+        saveState();
+        creatorUploadDataUrl = '';
+        toast(`✨ ¡Recompensa "${item.name}" publicada y desbloqueada en tu Armario!`);
+        renderView();
+        mountCreator();
+      };
+    }
+
+    cBox.querySelectorAll('.crDelRewardBtn').forEach((btn) => {
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-id');
+        window.EKCreatorSystem.deleteCustomReward(id);
+        toast('Recompensa eliminada del catálogo personalizado');
+        renderView();
+        mountCreator();
+      };
+    });
+
+    const grantBtn = cBox.querySelector('#crBtnGrantUser');
+    if (grantBtn) {
+      grantBtn.onclick = () => {
+        const uname = cBox.querySelector('#crGrantUserInp')?.value?.trim();
+        if (!uname) return;
+        window.EKCreatorSystem.setCreatorRole({ name: uname }, true);
+        toast(`🎨 ¡Rango Creador otorgado a ${uname}!`);
+        mountCreator();
+      };
+    }
+
+    cBox.querySelectorAll('.crRevokeUserBtn').forEach((btn) => {
+      btn.onclick = () => {
+        const uname = btn.getAttribute('data-name');
+        window.EKCreatorSystem.setCreatorRole({ name: uname }, false);
+        toast(`Rango Creador revocado a ${uname}`);
+        mountCreator();
+      };
+    });
+  };
+
   m.appendChild(wrap);
   renderView();
-  if (activeTab === 'ninja') mountNinja();
+  if (activeTab === 'creator') mountCreator();
+  else if (activeTab === 'ninja') mountNinja();
   else if (activeTab === 'racer') mountRacer();
   else if (activeTab === 'dojo') mountDojo();
   else if (activeTab === 'collection') renderCosmeticsGrid();
@@ -1579,11 +1910,58 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.9.4 (ACTUAL · AUDIO PRO, ADMIN & CÁMARAS FLOTANTES) ==================== -->
+        <!-- ==================== VERSIÓN 1.9.5 (ACTUAL · DOJO ELEMENTAL HD, 60 CARTAS + INVENTARIO CLASH ROYALE & SANTUARIO ARCANO) ==================== -->
+        <div style="border:2px solid #f59e0b;border-radius:12px;padding:18px;margin-bottom:24px;background:#14111f;box-shadow:0 8px 24px rgba(245,158,11,0.2);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #33274a;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#d97706;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.5</h2>
+            </div>
+            <span style="font-size:12px;color:#fcd34d;font-weight:700;">60 Cartas del Dojo (36 Base + 24 Desbloqueables), Inventario Estilo Clash Royale & Ventana Flotante Limpia</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#fbbf24;">🎴 Colección de 60 Cartas e Inventario Estilo Clash Royale:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>36 Cartas Base Ilustradas (Poder 1 al 12 en Fuego, Agua y Nieve):</b> disponibles por defecto para todos los jugadores desde el primer combate (desde <i>Fogata</i>, <i>Gotas</i> y <i>Escarcha</i> hasta <i>Maestro de Fuego</i>, <i>Maestro de Agua</i> y <i>Maestro de Hielo</i>).</li>
+                <li><b>24 Cartas Desbloqueables Exclusivas (<code>X01–X24</code>):</b> variantes coleccionables con carátulas únicas que se obtienen en Sobres Elementales y en la Ruleta de la Bóveda, con seguimiento de copias repetidas (<code>×2</code>, <code>×3</code>) y rarezas.</li>
+                <li><b>Cartas Especiales (Poder &gt; 10 · Niveles 11 y 12):</b> marco dorado con pulso luminoso, barrido holográfico animado, partículas elementales flotantes (brasas, burbujas o copos de nieve) e invocación cinemática a pantalla completa al ganar un choque.</li>
+                <li><b>Inventario Estilo Clash Royale:</b> barra de progreso de colección (<code>60 cartas</code>), filtros rápidos por elemento y origen (Base / Desbloqueables), cuadrícula de cartas obtenidas vs. por descubrir y vista de inspección detallada al tocar cualquier carta.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#fbbf24;">🏯 Dojo Elemental HD (Inspirado en el Card-Jitsu Original):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Pilas Visuales de Cartas en Cascada:</b> tanto tus puntos como los del rival ahora se organizan en <b>3 columnas elementales (Fuego, Agua, Nieve)</b> mostrando cada carta ganada apilada en cascada con su color de borde, número y contador <code>×2 / ×3</code>, además de alerta luminosa <b>⚠️ ¡A 1 CARTA!</b> en punto de partido.</li>
+                <li><b>Escenario Tatami Tradicional, Ninjas Vectoriales HD y Mano Oculta del Rival:</b> dojo japonés ilustrado con puertas <i>shoji</i>, linternas cálidas y Amuleto Elemental; ninjas detallados con cinturón Obi real de tu rango y cinemáticas con desenfoque profundo.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#c084fc;">🏛️ Bóveda "Santuario Arcano" & Turbo Core Plasma:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Cofres y Ruleta Renovados:</b> tarjetas de llaves con acabado metálico radial (Cobre, Plata, Oro, Obsidiana) y riel de ruleta con bordes luminosos por rareza.</li>
+                <li><b>Turbo Core v1.9.5:</b> halo radial <i>Warp</i> de velocidad y estelas dobles de plasma azul al activar el Nitro.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">🪟 Ventana Flotante y Enfoque de Cámara sin Distracciones:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Barra Superior Auto-Ocultable:</b> al enfocar una cámara o usar la ventana flotante, la barra superior y los botones de acción se ocultan automáticamente para dejar el video 100% limpio, y se despliegan suavemente al hacer clic/seleccionar la cámara o pasar el cursor por la parte superior.</li>
+                <li><b>Botón Restaurar Compacto:</b> alineación en una sola línea sin saltos de texto en resoluciones reducidas.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.4 ==================== -->
         <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:#0a1628;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.4</span>
               <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.4</h2>
             </div>
             <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Audio HD Anti-Eco, Moderación de Voz Pro & Cámaras Flotantes PiP</span>
@@ -1616,10 +1994,13 @@ function renderGuideContent(chKey) {
             </div>
 
             <div>
-              <b style="color:#34d399;">📹 Cámaras Flotantes PiP, Agrupación de Chat & Ajustes Pro:</b>
+              <b style="color:#34d399;">📹 Guía de Uso: Zoom de Cámaras, Ventana Flotante & Reconexión:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li><b>Cámaras Flotantes dentro de la app y al minimizar:</b> miniventana flotante arrastrable al cambiar de canal o automáticamente al minimizar EpicKast.</li>
-                <li><b>Estética Renovada:</b> agrupación limpia de mensajes consecutivos, anillos de voz animados con brillo neón, glassmorphism y botón <b>Ajustes Avanzados (Pro)</b>.</li>
+                <li><b>🔍 Zoom y Desplazamiento (Pan) en Cámaras:</b> gira la <b>rueda del ratón</b> sobre cualquier cámara o pantalla compartida (o pulsa el botón <code>1x / 1.5x / 2x</code> arriba a la derecha) para acercar hasta <code>3.5x</code>. Con zoom activo, <b>arrastra con clic izquierdo</b> para mover la vista.</li>
+                <li><b>📌 Destacar en Grande y ↔ Encuadre:</b> haz <b>doble clic</b> sobre una cámara (o pulsa el icono de chincheta) para destacarla en grande; usa el botón de encuadre para alternar entre imagen completa o rellenar sin bordes negros.</li>
+                <li><b>🪟 Ventana Flotante e Indicador de Voz Integrado:</b> la barra superior de llamada y la ventana flotante integran directamente las minicámaras y la pastilla luminosa de quién habla sin abrir ventanas extra ni encimar botones.</li>
+                <li><b>Reconectar Llamada tras Cierre Inesperado:</b> si la aplicación o la PC se cierra inesperadamente durante una llamada, al volver a abrir EpicKast aparece una barra superior para <b>Reconectar a la llamada</b> con un solo clic (además del botón minimalista de reconexión en los controles de voz).</li>
+                <li><b>Iconografía Minimalista de Audio:</b> junto al volumen de cada participante dispones del botón de <b>Filtro</b> (limpieza local anti-teclado en tu PC) y el botón de <b>Ajustes de Audio</b> con iconos monocromáticos limpios.</li>
               </ul>
             </div>
           </div>
@@ -2211,7 +2592,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.5', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -2220,7 +2601,7 @@ const S = {
 };
 
 function updateVersionBadges() {
-  const verTxt = 'v' + (S.appVer || '1.9.4');
+  const verTxt = 'v' + (S.appVer || '1.9.5');
   const badge = $('ekVersionBadge');
   if (badge) {
     badge.textContent = verTxt;
@@ -2234,6 +2615,22 @@ window.epic.version?.().then((v) => { if (v) { S.appVer = v; updateVersionBadges
 window.epic.onMiniChanged?.((val) => {
   S.mini = !!val;
   document.body.classList.toggle('mini-mode', S.mini);
+  if (S.mini) {
+    // Si estaba colapsado el escenario (en #voicePill), expandirlo para que en modo flotante se vean las cámaras
+    if (S.stageCollapsed) {
+      S.stageCollapsed = false;
+      $('stageWrap')?.classList.remove('collapsed');
+      $('voicePill')?.classList.add('hidden');
+    }
+    // Ocultar el overlay externo redundante porque la ventana flotante ya integra los nombres e indicadores de voz
+    if (S.overlayActive) {
+      S.wasOverlayBeforeMini = true;
+      toggleOverlay(false);
+    }
+  } else if (S.wasOverlayBeforeMini) {
+    S.wasOverlayBeforeMini = false;
+    toggleOverlay(true);
+  }
   updateDock();
   syncFloatingCam();
 });
@@ -2967,6 +3364,7 @@ async function autoLogin() {
 async function bootstrap() {
   $('login').classList.add('hidden'); $('main').classList.remove('hidden');
   S.lastSentActivity = '';
+  checkCrashReconnect();
   // Sincronizar cosméticos equipados y economía de la Bóveda con el servidor
   try {
     const eqFrame = localStorage.getItem('epickast.equipped_frame');
@@ -4470,8 +4868,10 @@ function modalMemberCard(sd, m) {
   const memberNameColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || (m.id === S.me?.id ? S.me?.color : null) || rInfo.color || 'var(--tx)');
   const memberTitle = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_title')) ? localStorage.getItem('epickast.equipped_title') : m.title;
 
+  const profBannerEl = h('div', { class: 'prof-banner banner-animated', style: `background:${bannerBg};background-size:200% 200%;position:relative;overflow:hidden` });
+  if (window.renderBannerExclusiveArtSvg) profBannerEl.innerHTML = window.renderBannerExclusiveArtSvg(bannerBg);
   const card = h('div', { class: 'prof-card' },
-    h('div', { class: 'prof-banner', style: `background:${bannerBg}` }),
+    profBannerEl,
     h('div', { class: 'prof-body' },
       h('div', { class: 'prof-avatar-row' },
         h('div', { class: 'prof-avatar-overlap' }, avatar(m, 72, m.online)),
@@ -4485,13 +4885,25 @@ function modalMemberCard(sd, m) {
         h('div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' },
           h('span', { style: `font-size:18px;font-weight:700;${nameColorStyle(memberNameColor)}` }, m.name),
           titleBadgeEl(memberTitle),
-          rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null
+          rInfo.badge ? h('span', { class: 'role-badge', title: rInfo.label }, rInfo.badge) : null,
+          window.EKCreatorSystem?.isCreator(m) ? h('span', { style: 'background:linear-gradient(135deg,#9333ea,#db2777);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;border:1px solid #f472b6;', title: 'Rango Oficial de Creador de Recompensas' }, '🎨 Creador') : null
         ),
         h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${statusBadgeText(m)}`),
         m.activity?.name ? h('div', { class: 'act-pill', style: 'margin-top:2px' }, `🎮 Jugando a ${m.activity.name}`) : null,
         userVoiceName ? h('div', { class: 'hint', style: 'color:#a29bfe;margin-top:2px' }, `🔊 En llamada: ${userVoiceName}`) : null,
         m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null
       ),
+      window.EKCreatorSystem?.isMasterCreator(S.me) && m.id !== S.me.id ? h('button', {
+        class: 'btn-act',
+        style: 'width:100%;justify-content:center;margin-top:6px;background:rgba(168,85,247,0.16);border-color:#a855f7;color:#e9d5ff;font-size:11.5px;font-weight:800',
+        onclick: () => {
+          const currentlyCreator = window.EKCreatorSystem.isCreator(m);
+          window.EKCreatorSystem.setCreatorRole(m, !currentlyCreator);
+          toast(!currentlyCreator ? `🎨 ¡Rango Creador otorgado a ${m.name}!` : `Rango Creador retirado a ${m.name}`);
+          closeModal();
+          showUserProfileModal(m, sid);
+        }
+      }, window.EKCreatorSystem?.isCreator(m) ? '🎨 Quitar Rango de Creador de Recompensas' : '🎨 Otorgar Rango de Creador de Recompensas') : null,
       m.id !== S.me.id ? h('div', { style: 'display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px' },
         h('button', { id: 'profBtnSendDm', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700' }, '💬 Mensaje'),
         h('button', { id: 'profBtnCardJitsu', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700;background:rgba(99,102,241,0.18);border-color:rgba(99,102,241,0.45);color:#c7d2fe' }, '🥋 Dojo'),
@@ -6050,6 +6462,7 @@ async function joinCall(key, label) {
     onSpeaking: (id, v, lv = 0) => {
       const k = id === 'me' ? 'me' : `p${id}`;
       document.querySelector(`[data-tile="${k}"]`)?.classList.toggle('speaking', v);
+      document.querySelector(`[data-vpill-chip="${k}"]`)?.classList.toggle('speaking', v);
       if (id === 'me') {
         S.meSpeaking = v;
         $('micLive').style.width = v ? Math.min(100, Math.round(lv * 180)) + '%' : '0%';
@@ -6076,6 +6489,8 @@ async function joinCall(key, label) {
     if (r.ringing) { S.outgoing = { key, name: label }; ringer.start('out'); } else ringer.beep([480, 640]);
   } catch (e) { call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return; }
   $('voiceDock').classList.remove('hidden'); $('stageWrap').classList.remove('hidden');
+  try { localStorage.setItem('epickast.activeCall', JSON.stringify({ key, label, ts: Date.now() })); } catch {}
+  $('reconnectCallBar')?.classList.add('hidden');
   updateDock(); renderCenter(); renderStage(); syncPartyTile(); updateStatTimer(); updatePingTimer(); pushState(); renderCallOverlay(); syncOverlay();
 }
 function leaveCall(silent) {
@@ -6083,8 +6498,13 @@ function leaveCall(silent) {
   if (document.pictureInPictureElement) document.exitPictureInPicture?.().catch(() => {});
   if (S.outgoing) { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
   if (!S.call) return;
-  if (!silent) { sendRaw('voice.leave', {}); ringer.beep([520, 360]); }
+  if (!silent) {
+    try { localStorage.removeItem('epickast.activeCall'); } catch {}
+    sendRaw('voice.leave', {});
+    ringer.beep([520, 360]);
+  }
   S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false; S.stageCollapsed = false; S.floatPipDismissed = false; S.floatPipForce = false;
+  document.body.classList.remove('spotlight-active', 'cam-ui-pinned');
   $('micLive').style.width = '0%';
   $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden');
   $('stageWrap').classList.remove('collapsed');
@@ -6122,6 +6542,9 @@ const ICONS = {
   game: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="6"/></svg>',
   overlay: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
   collapse: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  refresh: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>',
+  filter: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
+  sliders: '<svg width="{S}" height="{S}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>',
 };
 function getSvg(name, size = 16) {
   const tpl = ICONS[name] || '';
@@ -6151,6 +6574,7 @@ function toggleStageCollapse(force, quiet = false) {
   if (!S.call) return;
   S.stageCollapsed = force !== undefined ? !!force : !S.stageCollapsed;
   if (!S.stageCollapsed) S.floatPipDismissed = false;
+  document.body.classList.toggle('spotlight-active', !!S.focusTile && !S.stageCollapsed);
   $('stageWrap')?.classList.toggle('collapsed', S.stageCollapsed);
   $('stageResizer')?.classList.toggle('hidden', S.stageCollapsed);
   $('voicePill')?.classList.toggle('hidden', !S.stageCollapsed);
@@ -6194,38 +6618,12 @@ function syncFloatingCam() {
   });
 
   const isStageHidden = S.stageCollapsed || $('stageWrap')?.classList.contains('hidden') || $('stageWrap')?.classList.contains('collapsed');
-  const shouldShow = !!S.call && !S.mini && !S.floatPipDismissed && isStageHidden && (hasVideo || S.floatPipForce);
-  if (!shouldShow) {
-    dock.classList.add('hidden');
-    if (vid.srcObject) vid.srcObject = null;
-    return;
-  }
-
-  dock.classList.remove('hidden');
-  if (sources.length > 0) {
-    S.floatPipIndex = ((S.floatPipIndex || 0) % sources.length + sources.length) % sources.length;
-    const cur = sources[S.floatPipIndex];
-    if (vid.srcObject !== cur.stream) {
-      vid.srcObject = cur.stream;
-      vid.muted = true; // Siempre silenciado en PiP para evitar doble audio
-      vid.play?.().catch(() => {});
-    }
-    if (title) title.textContent = `📹 ${cur.name}${sources.length > 1 ? ` (${S.floatPipIndex + 1}/${sources.length})` : ''}`;
-    av?.classList.add('hidden');
-  } else {
-    if (vid.srcObject) vid.srcObject = null;
-    if (title) title.textContent = `🔊 ${S.callLabel || 'En llamada'}`;
-    if (av) {
-      av.textContent = (S.callLabel || 'EK').slice(0, 2).toUpperCase();
-      av.classList.remove('hidden');
-    }
-  }
-
-  if (prevBtn) prevBtn.style.display = sources.length > 1 ? '' : 'none';
-  if (nextBtn) nextBtn.style.display = sources.length > 1 ? '' : 'none';
-  if (muteBtn && S.call) {
-    muteBtn.classList.toggle('muted', !!S.call.muted);
-    muteBtn.textContent = S.call.muted ? '🔇' : '🎙️';
+  // Ya integramos las minicámaras e indicador de quién habla directamente en #voicePill (#vpillCamStrip),
+  // por lo que #floatingCamDock permanece oculto para no crear una ventana extra sobre el chat.
+  dock.classList.add('hidden');
+  if (vid.srcObject) vid.srcObject = null;
+  if (isStageHidden && S.call) {
+    updateVoicePill();
   }
 }
 
@@ -6261,21 +6659,78 @@ function syncFloatingCam() {
   $('floatCamPrev')?.addEventListener('click', () => { S.floatPipIndex = (S.floatPipIndex || 0) - 1; syncFloatingCam(); });
   $('floatCamNext')?.addEventListener('click', () => { S.floatPipIndex = (S.floatPipIndex || 0) + 1; syncFloatingCam(); });
   $('floatCamMute')?.addEventListener('click', () => $('bMute')?.click());
-  $('floatCamPopOut')?.addEventListener('click', async () => {
-    const vid = $('floatCamVideo');
-    if (vid && vid.srcObject && vid.readyState >= 1 && typeof vid.requestPictureInPicture === 'function') {
-      try {
-        if (document.pictureInPictureElement === vid) await document.exitPictureInPicture();
-        else await vid.requestPictureInPicture();
-        return;
-      } catch {}
-    }
+  $('floatCamPopOut')?.addEventListener('click', () => {
     window.epic?.toggleMini?.(true);
   });
   $('floatCamExpand')?.addEventListener('click', () => { S.floatPipDismissed = false; S.floatPipForce = false; toggleStageCollapse(false); });
   $('floatCamClose')?.addEventListener('click', () => { S.floatPipDismissed = true; S.floatPipForce = false; syncFloatingCam(); });
-  $('vpillFloat')?.addEventListener('click', () => { S.floatPipDismissed = false; S.floatPipForce = true; syncFloatingCam(); });
+  $('vpillFloat')?.addEventListener('click', () => {
+    if (window.epic?.toggleMini) window.epic.toggleMini();
+  });
 })();
+
+function checkCrashReconnect() {
+  const bar = $('reconnectCallBar');
+  if (!bar) return;
+  try {
+    const raw = localStorage.getItem('epickast.activeCall');
+    if (!raw || S.call) { bar.classList.add('hidden'); return; }
+    const saved = JSON.parse(raw);
+    if (!saved?.key || Date.now() - (saved.ts || 0) > 12 * 3600 * 1000) {
+      localStorage.removeItem('epickast.activeCall');
+      bar.classList.add('hidden');
+      return;
+    }
+    const ico = h('span', { style: 'display:inline-flex;align-items:center;color:var(--ac)' });
+    setSvg(ico, 'refresh', 15);
+    const reconBtn = h('button', {
+      class: 'primary',
+      style: 'padding:5px 12px;font-size:12px;display:inline-flex;align-items:center;gap:6px',
+      onclick: () => {
+        bar.classList.add('hidden');
+        joinCall(saved.key, saved.label || 'Llamada');
+      }
+    }, 'Reconectar a la llamada');
+    const closeBtn = h('button', {
+      style: 'padding:4px 8px;font-size:12px;background:transparent;border:1px solid rgba(255,255,255,0.12)',
+      title: 'Descartar aviso',
+      onclick: () => {
+        localStorage.removeItem('epickast.activeCall');
+        bar.classList.add('hidden');
+      }
+    }, '✕');
+    bar.replaceChildren(
+      h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
+        ico,
+        h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' },
+          'La llamada anterior se cerró inesperadamente: ',
+          h('b', { style: 'color:#fff' }, saved.label || 'Canal de voz')
+        )
+      ),
+      h('div', { style: 'display:flex;align-items:center;gap:6px;flex:none' }, reconBtn, closeBtn)
+    );
+    bar.classList.remove('hidden');
+  } catch {
+    bar.classList.add('hidden');
+  }
+}
+
+async function reconnectCall() {
+  if (!S.call || !S.callKey) return;
+  const key = S.callKey;
+  const label = S.callLabel;
+  const hadCam = !!S.call.camTrack;
+  const wasCollapsed = !!S.stageCollapsed;
+  toast('Reconectando llamada y audio…');
+  leaveCall(true);
+  await new Promise((r) => setTimeout(r, 220));
+  await joinCall(key, label);
+  if (hadCam && S.call) {
+    try { await S.call.setCamera(true); } catch {}
+    updateDock(); renderStage(); pushState();
+  }
+  if (wasCollapsed && S.call) toggleStageCollapse(true, true);
+}
 
 function updateVoicePill() {
   if (!S.call) {
@@ -6284,21 +6739,52 @@ function updateVoicePill() {
   }
   const c = S.call;
   const pillTitle = $('vpillTitle');
-  if (pillTitle) pillTitle.textContent = `🔊 ${S.callLabel || 'Llamada de voz'}`;
+  if (pillTitle) pillTitle.textContent = (S.callLabel || 'Llamada de voz').replace(/^🔊\s*/, '');
   const pillInfo = $('vpillInfo');
   if (pillInfo) {
     const total = 1 + c.peers.size;
-    pillInfo.textContent = `${total} ${total === 1 ? 'persona' : 'personas'} · ${c.muted ? '🔇 Silenciado' : '🎙️ En vivo'}`;
+    pillInfo.textContent = `${total} ${total === 1 ? 'persona' : 'personas'} · ${c.muted ? 'Silenciado' : 'En vivo'}`;
   }
   const muteBtn = $('vpillMute');
   if (muteBtn) {
     muteBtn.className = 'vpill-btn' + (c.muted ? ' off' : '');
-    muteBtn.textContent = c.muted ? '🔇 Muteado' : '🎙️ Hablando';
+    muteBtn.textContent = c.muted ? 'Silenciado' : 'Micro';
   }
   const deafBtn = $('vpillDeaf');
   if (deafBtn) {
     deafBtn.className = 'vpill-btn' + (c.deaf ? ' off' : '');
-    deafBtn.textContent = c.deaf ? '🔇 Sordo' : '🎧 Audio';
+    deafBtn.textContent = c.deaf ? 'Sordo' : 'Audio';
+  }
+  // Integrar minicámaras (SOLO pistas de video, 0 pistas de audio para jamás duplicar voz) e indicador de quién habla
+  const strip = $('vpillCamStrip');
+  if (strip) {
+    const chips = [];
+    for (const [k, t] of tiles) {
+      if (k === 'party') continue;
+      const isSp = t.el.classList.contains('speaking');
+      const chip = h('div', {
+        class: 'vpill-cam-chip' + (isSp ? ' speaking' : ''),
+        'data-vpill-chip': k,
+        title: 'Clic para ampliar las cámaras',
+        onclick: () => toggleStageCollapse(false)
+      });
+      const vTracks = t.hasVideo && t.video?.srcObject ? t.video.srcObject.getVideoTracks() : [];
+      if (vTracks.length > 0) {
+        const v = h('video', { autoplay: true, playsinline: true });
+        v.muted = true;
+        v.volume = 0;
+        v.srcObject = new MediaStream(vTracks);
+        v.play?.().catch(() => {});
+        chip.append(v);
+      } else {
+        const micIco = h('span', { style: 'display:inline-flex;align-items:center;padding-left:4px;opacity:0.75' });
+        setSvg(micIco, 'mic', 11);
+        chip.append(micIco);
+      }
+      chip.append(h('span', null, (t.nm?.textContent || '').replace(/\s*\(.*\)$/, '')));
+      chips.push(chip);
+    }
+    strip.replaceChildren(...chips);
   }
 }
 
@@ -6661,6 +7147,7 @@ function updateDock() {
   const hasParty = !!S.party?.current;
   setQ('bMute', c.muted ? 'off' : '', c.muted ? 'micOff' : 'mic');
   setQ('bDeaf', c.deaf ? 'off' : '', c.deaf ? 'deafOff' : 'deaf');
+  setQ('bReconnect', '', 'refresh');
   setQ('bDockMore', S.dockOpen ? 'on' : '', S.dockOpen ? 'chevronDown' : 'chevronUp');
   setQ('bLeave', '', 'hangup');
 
@@ -6679,8 +7166,14 @@ function updateDock() {
   setM('mDeaf', c.deaf ? 'off' : '', c.deaf ? 'deafOff' : 'deaf');
   setM('mCam', c.camTrack ? 'on' : '', c.camTrack ? 'cam' : 'camOff');
   setM('mScreen', c.screenStream ? 'on' : '', 'screen');
+  setM('mReconnect', '', 'refresh');
   setM('mMore', '', 'more');
   setSvg($('mLeaveIco'), 'hangup', 15);
+  if ($('winMiniReconnect')) setSvg($('winMiniReconnect'), 'refresh', 13);
+  if ($('winMiniMute')) {
+    $('winMiniMute').classList.toggle('off', !!c.muted);
+    setSvg($('winMiniMute'), c.muted ? 'micOff' : 'mic', 13);
+  }
   updateVoicePill();
 
   if (settings.voiceMode === 'ptt') {
@@ -6740,6 +7233,11 @@ if ($('bGameMode')) $('bGameMode').onclick = () => toggleGameMode();
 $('bOverlay').onclick = () => toggleOverlay();
 $('bMini').onclick = () => window.epic.toggleMini?.();
 if ($('bMiniExit')) $('bMiniExit').onclick = () => window.epic.toggleMini?.(false);
+if ($('bReconnect')) $('bReconnect').onclick = () => reconnectCall();
+if ($('mReconnect')) $('mReconnect').onclick = () => reconnectCall();
+if ($('vpillReconnect')) $('vpillReconnect').onclick = () => reconnectCall();
+if ($('winMiniReconnect')) $('winMiniReconnect').onclick = () => reconnectCall();
+if ($('winMiniMute')) $('winMiniMute').onclick = () => $('bMute')?.click();
 if ($('mCollapse')) $('mCollapse').onclick = () => toggleStageCollapse();
 $('vpillExpand').onclick = () => toggleStageCollapse(false);
 $('vpillMute').onclick = () => $('bMute').click();
@@ -7030,22 +7528,30 @@ function applyTileVolume(t) {
   if (t.rxMode) {
     t.rxMode = false;
     cleanupTileAudio(t);
-    t.video.muted = !!S.call?.deaf;
   }
-  t.video.volume = Math.max(0, Math.min(1, vol));
-  if (vol > 1.01 && hasAudio) {
+  if (vol > 1.01 && hasAudio && !S.call?.deaf) {
+    // Cuando el volumen supera 100%, silenciar el elemento <video> y reproducir el 100% por WebAudio para no escuchar doble con desfase
+    t.video.muted = true;
+    t.video.volume = 0;
+    t.boostMuted = true;
     if (!t.boostCtx || t.boostStream !== t.video.srcObject) {
       cleanupTileAudio(t);
       const ctx = new AudioContext();
       const src = ctx.createMediaStreamSource(t.video.srcObject);
       const gain = ctx.createGain();
       src.connect(gain); gain.connect(ctx.destination);
+      if (settings.spk && typeof ctx.setSinkId === 'function') ctx.setSinkId(settings.spk).catch(() => {});
       t.boostCtx = ctx; t.boostGain = gain; t.boostStream = t.video.srcObject; t._boostSrc = src; t.rxMode = false;
     }
-    t.boostGain.gain.setTargetAtTime(vol - 1, t.boostCtx.currentTime, 0.015);
+    t.boostGain.gain.setTargetAtTime(Math.min(2, vol), t.boostCtx.currentTime, 0.015);
     if (t.boostCtx.state === 'suspended') t.boostCtx.resume().catch(() => {});
-  } else if (t.boostGain) {
-    t.boostGain.gain.setTargetAtTime(0, t.boostCtx.currentTime, 0.015);
+  } else {
+    if (t.boostMuted) {
+      t.boostMuted = false;
+      cleanupTileAudio(t);
+    }
+    t.video.muted = !!S.call?.deaf;
+    t.video.volume = Math.max(0, Math.min(1, vol));
   }
 }
 
@@ -7097,26 +7603,115 @@ function tile(key, label, user, withVol = false) {
   let t = tiles.get(key);
   if (!t) {
     const isCam = key === 'me' || /^p\d+$/.test(key);
-    const video = h('video', { autoplay: true, playsinline: true, onclick: () => toggleFocusTile(key), title: 'Clic para enfocar / ampliar esta cámara o transmisión' });
+    const video = h('video', { autoplay: true, playsinline: true, title: 'Doble clic: destacar en grande · Rueda del ratón: acercar/alejar zoom · Arrastrar: mover vista con zoom' });
     const nm = h('div', { class: 'nm' }); const av = h('div', { class: 'av' }, avatar(user, 72)); const stat = h('div', { class: 'stat' });
-    const pinBtn = h('button', { title: 'Enfocar / ampliar esta cámara (Spotlight)', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } });
+
+    // Estado de Zoom y Desplazamiento (Pan) intuitivo por cámara
+    let zoomScale = 1, panX = 0, panY = 0, panning = false, startX = 0, startY = 0;
+    const zoomBtn = h('button', {
+      title: 'Acercar / Restablecer Zoom (también puedes usar la rueda del ratón sobre la cámara)',
+      style: 'font-size:10.5px;font-weight:800;padding:0 6px;min-width:28px',
+      onclick: (e) => {
+        e.stopPropagation();
+        const steps = [1, 1.5, 2, 2.5];
+        const nextIdx = (steps.findIndex((s) => Math.abs(s - zoomScale) < 0.15) + 1) % steps.length;
+        applyZoom(steps[nextIdx], 0, 0);
+      }
+    }, '1x');
+    const applyZoom = (nextScale, nx = panX, ny = panY) => {
+      zoomScale = Math.max(1, Math.min(3.5, Math.round(nextScale * 100) / 100));
+      if (zoomScale <= 1.02) {
+        zoomScale = 1; panX = 0; panY = 0;
+        video.style.transform = '';
+        video.style.cursor = '';
+      } else {
+        const maxPan = (zoomScale - 1) * 160;
+        panX = Math.max(-maxPan, Math.min(maxPan, nx));
+        panY = Math.max(-maxPan, Math.min(maxPan, ny));
+        video.style.transform = `scale(${zoomScale}) translate(${panX / zoomScale}px, ${panY / zoomScale}px)`;
+        video.style.cursor = panning ? 'grabbing' : 'grab';
+      }
+      zoomBtn.textContent = `${zoomScale}x`;
+      zoomBtn.classList.toggle('on', zoomScale > 1);
+    };
+    let movedDuringPan = false;
+    video.addEventListener('click', (e) => {
+      if (movedDuringPan) { movedDuringPan = false; return; }
+      e.stopPropagation();
+      const willOpen = !el.classList.contains('cam-ui-open');
+      for (const [, other] of tiles) other.el.classList.remove('cam-ui-open');
+      el.classList.toggle('cam-ui-open', willOpen);
+      document.body.classList.toggle('cam-ui-pinned', willOpen);
+    });
+    video.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      toggleFocusTile(key);
+    });
+    video.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY < 0 ? 0.25 : -0.25;
+      applyZoom(zoomScale + delta);
+    }, { passive: false });
+    video.addEventListener('pointerdown', (e) => {
+      movedDuringPan = false;
+      if (zoomScale <= 1 || e.button !== 0) return;
+      e.preventDefault();
+      panning = true;
+      startX = e.clientX - panX;
+      startY = e.clientY - panY;
+      video.style.cursor = 'grabbing';
+      try { video.setPointerCapture?.(e.pointerId); } catch {}
+    });
+    video.addEventListener('pointermove', (e) => {
+      if (!panning) return;
+      movedDuringPan = true;
+      applyZoom(zoomScale, e.clientX - startX, e.clientY - startY);
+    });
+    const stopPan = () => {
+      if (!panning) return;
+      panning = false;
+      video.style.cursor = zoomScale > 1 ? 'grab' : '';
+    };
+    video.addEventListener('pointerup', stopPan);
+    video.addEventListener('pointercancel', stopPan);
+
+    const pinBtn = h('button', { title: 'Destacar esta cámara en grande (Spotlight) o volver a vista dividida', onclick: (e) => { e.stopPropagation(); toggleFocusTile(key); } });
     setSvg(pinBtn, 'pin', 13);
     const fitBtn = h('button', {
       class: '',
-      title: 'Alternar entre imagen completa (sin recortar cámara) o rellenar cuadro',
+      title: 'Encuadre: alternar entre ver imagen completa o rellenar todo el recuadro',
       onclick: (e) => {
         e.stopPropagation();
         el.classList.toggle('cover');
         const isCover = el.classList.contains('cover');
         fitBtn.classList.toggle('on', isCover);
         setSvg(fitBtn, isCover ? 'crop' : 'expand', 13);
-        toast(isCover ? 'Modo Rellenar (recorta bordes para llenar)' : 'Modo Completo (sin recortar cámara)');
+        toast(isCover ? 'Modo Rellenar (llena el cuadro sin bordes negros)' : 'Modo Completo (muestra toda la cámara sin recortar)');
       }
     });
     setSvg(fitBtn, 'expand', 13);
-    const pip = h('button', { title: 'Ventana sobre ventana (Picture-in-Picture)', onclick: (e) => { e.stopPropagation(); (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture?.()).catch(() => {}); } });
+    const pip = h('button', {
+      title: 'Ventana Flotante (con barra superior para moverla a otra pantalla)',
+      onclick: (e) => {
+        e.stopPropagation();
+        if (window.epic?.toggleMini) {
+          window.epic.toggleMini();
+        } else {
+          toggleStageCollapse(true);
+        }
+      }
+    });
     setSvg(pip, 'mini', 13);
-    const fs = h('button', { title: 'Pantalla completa', onclick: (e) => { e.stopPropagation(); video.requestFullscreen?.(); } });
+    const fs = h('button', {
+      title: 'Pantalla completa (con controles de llamada)',
+      onclick: (e) => {
+        e.stopPropagation();
+        const wrap = $('stageWrap') || el;
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        else wrap.requestFullscreen?.().catch(() => {});
+      }
+    });
     setSvg(fs, 'size', 13);
     let hidePrevBtn = null;
     if (key === 'me-screen') {
@@ -7132,7 +7727,7 @@ function tile(key, label, user, withVol = false) {
       });
       setSvg(hidePrevBtn, 'eye', 13);
     }
-    const tbtns = h('div', { class: 'tbtns' }, hidePrevBtn, pinBtn, fitBtn, pip, fs);
+    const tbtns = h('div', { class: 'tbtns' }, hidePrevBtn, zoomBtn, pinBtn, fitBtn, pip, fs);
     let volWrap = null;
     if (withVol && user?.id) {
       const cur = getUserVol(user.id);
@@ -7145,28 +7740,32 @@ function tile(key, label, user, withVol = false) {
       } });
       const rxBtn = h('button', {
         type: 'button',
-        title: 'Limpiar ruido de fondo que escuchas de este usuario (filtro local en tu PC)',
-        style: `background:${getUserRxClean(user.id) ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)'};border:1px solid ${getUserRxClean(user.id) ? '#22c55e' : 'rgba(255,255,255,0.16)'};color:#fff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;cursor:pointer`,
+        title: 'Filtro local anti-ruido y anti-teclado en tu PC',
+        style: `background:${getUserRxClean(user.id) ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.06)'};border:1px solid ${getUserRxClean(user.id) ? '#34d399' : 'rgba(255,255,255,0.16)'};color:#e2e8f0;border-radius:6px;padding:3px 7px;display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;cursor:pointer`,
         onclick: (e) => {
           e.stopPropagation();
           const next = !getUserRxClean(user.id);
           setUserRxClean(user.id, next);
-          rxBtn.style.background = next ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)';
-          rxBtn.style.borderColor = next ? '#22c55e' : 'rgba(255,255,255,0.16)';
+          rxBtn.style.background = next ? 'rgba(16,185,129,0.28)' : 'rgba(255,255,255,0.06)';
+          rxBtn.style.borderColor = next ? '#34d399' : 'rgba(255,255,255,0.16)';
           applyTileVolume(t);
-          toast(next ? `✨ Limpieza local de ruido activada para ${user.name}` : `Limpieza local desactivada para ${user.name}`);
+          toast(next ? `Filtro de ruido activado para ${user.name}` : `Filtro de ruido desactivado para ${user.name}`);
         }
-      }, '✨');
+      });
+      setSvg(rxBtn, 'filter', 11);
       const admBtn = h('button', {
         type: 'button',
-        title: `Ajustar configuración de audio de ${user.name} (Admin / Prueba)`,
-        style: 'background:rgba(124,92,255,0.22);border:1px solid rgba(124,92,255,0.45);color:#e9d5ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;cursor:pointer',
+        title: `Ajustar configuración de audio de ${user.name}`,
+        style: 'background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;border-radius:6px;padding:3px 7px;display:inline-flex;align-items:center;cursor:pointer',
         onclick: (e) => {
           e.stopPropagation();
           modalRemoteAudioEditor(user.id, user.name, S.callKey);
         }
-      }, '🎛️');
-      volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt, rxBtn, admBtn);
+      });
+      setSvg(admBtn, 'sliders', 11);
+      const spkIco = h('span', { style: 'display:inline-flex;align-items:center;opacity:0.75' });
+      setSvg(spkIco, 'sound', 12);
+      volWrap = h('div', { class: 'vol-wrap' }, spkIco, vRng, vTxt, rxBtn, admBtn);
     }
     const badgeOverlay = h('div', { class: 'tile-badges' });
     const el = h('div', { class: 'tile', 'data-tile': key }, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
@@ -7553,7 +8152,8 @@ function renderStage() {
   }
   const me = tile('me', 'Tú' + (c.serverMuted ? ' (Silenciado por Admin)' : (c.muted ? ' 🔇' : '')), S.me, false);
   keep.add('me');
-  setStream(me, c.main, !!c.camTrack, true);
+  // Pasar ÚNICAMENTE la pista de cámara (jamás la pista de micrófono propio) al tile 'me' para evitar oírse doble
+  setStream(me, c.camTrack ? new MediaStream([c.camTrack]) : null, !!c.camTrack, true);
   me.updateBadges?.({ muted: c.muted, deaf: c.deaf, serverMuted: c.serverMuted, cam: !!c.camTrack });
   if (c.screenStream) {
     const liveTracks = c.screenStream.getVideoTracks().filter((t) => t.readyState !== 'ended');
@@ -7608,6 +8208,8 @@ function renderStage() {
   const autoFocusKey = S.focusTile || (videoKeys.length === 1 ? videoKeys[0] : null);
   const stg = $('stage');
   const isSpotlight = !!autoFocusKey && tiles.has(autoFocusKey);
+  document.body.classList.toggle('spotlight-active', isSpotlight && !S.stageCollapsed);
+  if (!isSpotlight) document.body.classList.remove('cam-ui-pinned');
   stg.classList.toggle('spotlight', isSpotlight);
   stg.classList.toggle('solo', isSpotlight && visibleCount <= 1);
 
@@ -7645,8 +8247,11 @@ function renderStage() {
     stg.replaceChildren(...visibleTiles);
   }
 
-  // Reanudar reproducción de audio/video tras re-parentar en DOM (evita que Chromium pause el audio al entrar a un canal)
+  // Reanudar reproducción de audio/video tras re-parentar en DOM (manteniendo silenciados los que usan WebAudio o son propios)
   for (const [, t] of tiles) {
+    if (t.key === 'me' || t.key === 'me-screen' || t.rxMode || t.boostMuted || S.call?.deaf) {
+      t.video.muted = true;
+    }
     if (t.video?.srcObject && t.video.paused) {
       t.video.play?.().catch(() => {});
     }

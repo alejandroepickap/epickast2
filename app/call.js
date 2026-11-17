@@ -54,8 +54,7 @@ async function createMic(settings) {
 
   const audioConstraints = {
     echoCancellation: useAec,
-    // Evitar doble supresión de ruido (Chromium + RNNoise) que produce voz robotizada
-    noiseSuppression: mode === 'std',
+    noiseSuppression: mode !== 'off',
     autoGainControl: useAgc,
     channelCount: 1,
     sampleRate: 48000,
@@ -63,7 +62,7 @@ async function createMic(settings) {
     googEchoCancellation2: useAec,
     googDAEchoCancellation: useAec,
     googAutoGainControl: useAgc,
-    googNoiseSuppression: mode === 'std',
+    googNoiseSuppression: mode !== 'off',
     googHighpassFilter: true,
   };
 

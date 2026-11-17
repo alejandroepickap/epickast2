@@ -34,6 +34,9 @@
     <span class="win-title">EpicKast</span>
   </div>
   <div class="win-ctrls">
+    <button type="button" id="winMiniMute" class="mini-only" title="Silenciar / activar micrófono"></button>
+    <button type="button" id="winMiniReconnect" class="mini-only" title="Reconectar llamada"></button>
+    <button type="button" id="bMiniExit" class="mini-only" title="Volver a ventana normal">⤢ Restaurar</button>
     <button type="button" id="winMin" title="Minimizar">—</button>
     <button type="button" id="winMax" title="Maximizar / Restaurar">▢</button>
     <button type="button" id="winClose" title="Cerrar a segundo plano">✕</button>
@@ -79,6 +82,7 @@
         <div class="vquick">
           <button id="bMute" class="qbtn" title="Silenciar / activar micrófono (Alt+M)"><i></i><span>Micro</span></button>
           <button id="bDeaf" class="qbtn" title="Silenciar audio de la llamada (Alt+D)"><i></i><span>Audio</span></button>
+          <button id="bReconnect" class="qbtn" title="Reconectar llamada"><i></i></button>
           <button id="bDockMore" class="qbtn" title="Desplegar más controles de llamada"><i></i></button>
           <button id="bLeave" class="qbtn hang" title="Colgar llamada"><i></i><span>Colgar</span></button>
         </div>
@@ -98,6 +102,7 @@
   </aside>
   <section id="center">
     <div id="updateBar" class="hidden"></div>
+    <div id="reconnectCallBar" class="reconnect-bar hidden"></div>
     <header id="chTitle"></header>
     <div id="stageWrap" class="hidden">
       <div id="stage"></div>
@@ -106,6 +111,7 @@
         <button id="mDeaf" class="mbtn" title="Silenciar audio (Alt+D)"></button>
         <button id="mCam" class="mbtn" title="Encender / apagar cámara"></button>
         <button id="mScreen" class="mbtn" title="Compartir pantalla o ventana"></button>
+        <button id="mReconnect" class="mbtn" title="Reconectar llamada"></button>
         <div class="mmore-wrap">
           <button id="mMore" class="mbtn" title="Opciones avanzadas, vista, música y utilidades"></button>
           <div id="meetMenu" class="meet-menu hidden"></div>
@@ -119,10 +125,12 @@
         <span class="vpill-dot"></span>
         <span id="vpillTitle" class="vpill-title">Llamada de voz</span>
         <span id="vpillInfo" class="vpill-info">En llamada</span>
+        <div id="vpillCamStrip" class="vpill-cam-strip"></div>
       </div>
       <div class="vpill-acts">
-        <button type="button" id="vpillFloat" class="vpill-btn" title="Mostrar cámaras flotantes">📌 Flotar</button>
-        <button type="button" id="vpillExpand" class="vpill-btn" title="Mostrar cámaras / escenario de video">📹 Mostrar cámaras</button>
+        <button type="button" id="vpillReconnect" class="vpill-btn" title="Reconectar llamada">Reconectar</button>
+        <button type="button" id="vpillFloat" class="vpill-btn" title="Abrir en ventana flotante compacta">Flotante</button>
+        <button type="button" id="vpillExpand" class="vpill-btn" title="Mostrar cámaras / escenario de video">Cámaras</button>
         <button type="button" id="vpillMute" class="vpill-btn" title="Silenciar / activar micro">Micro</button>
         <button type="button" id="vpillDeaf" class="vpill-btn" title="Silenciar audio">Audio</button>
         <button type="button" id="vpillHang" class="vpill-btn vpill-hang" title="Colgar llamada">Colgar</button>
@@ -144,7 +152,6 @@
   <aside id="threadPane" class="hidden"></aside>
 </div>
 
-<button id="bMiniExit" title="Volver a ventana normal">⤢</button>
 <div id="floatingCamDock" class="hidden" aria-label="Cámaras flotantes">
   <div id="floatCamHead" class="float-cam-head">
     <span id="floatCamTitle" class="float-cam-title">📹 Cámara en vivo</span>
@@ -162,7 +169,7 @@
     <div id="floatCamAvatar" class="float-cam-av hidden"></div>
   </div>
 </div>
-<div id="ekVersionBadge" title="EpicKast · Ver notas de versión">v1.9.4</div>
+<div id="ekVersionBadge" title="EpicKast · Ver notas de versión">v1.9.5</div>
 <div id="callOverlay" class="hidden"></div>
 <div id="modal" class="hidden"></div>
 <div id="toast"></div>

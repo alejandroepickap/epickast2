@@ -1,7 +1,7 @@
 {
-  "version": "1.9.3",
-  "asarSha256": "c1a9a7799d8e95b138ee050aab6bcdb4c5dd61eb0fe590eba64602efd035ffc2",
-  "asarSize": 10758870,
-  "updatedAt": "2026-11-05T07:50:05.271Z",
-  "notes": "EpicKast v1.9.3 - Turbo Core 2D: camara alejada con vision panoramica, velocidad nivelada para maximo control, longitud de pistas ampliada (45-60s) y obstaculos con rampas de salto."
+    "version":  "1.9.5",
+    "asarSha256":  "73f583e621c9aceb78ffc5e63a3244ce848cbfcb80faa482bae7f659b19b89be",
+    "asarSize":  23760267,
+    "updatedAt":  "2026-11-17T22:30:28.571Z",
+    "notes":  "EpicKast v1.9.5 - Coleccion de 60 cartas del Dojo (36 base ilustradas + 24 desbloqueables), Inventario estilo Clash Royale, cartas especiales (poder 11-12) con animaciones y cinematicas, pilas visuales Card-Jitsu HD y ventana flotante auto-ocultable."
 }

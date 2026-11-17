@@ -394,6 +394,16 @@
 
       this.container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:14px;">
+          <!-- Selector de Modo Arcade 2D: Turbo Core (Carreras) · Metal Core (Contra/Metal Slug) · Batalla Naval -->
+          <div style="background:#090d16;border:1px solid #1e293b;border-radius:10px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span class="ek-pixel-font" style="font-size:10px;color:#fbbf24;">🕹️ SALA ARCADE 2D DEL NÚCLEO:</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button id="arcBtnModeRacer" style="background:linear-gradient(135deg,#2563eb,#1d4ed8);border:1.5px solid #60a5fa;color:#fff;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:900;cursor:pointer;">🏎️ Turbo Core (Carreras)</button>
+              <button id="arcBtnModeMetal" style="background:linear-gradient(135deg,#dc2626,#991b1b);border:1.5px solid #f87171;color:#fff;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:900;cursor:pointer;">🔫 Metal Core 2D (Contra / Metal Slug)</button>
+              <button id="arcBtnModeNaval" style="background:linear-gradient(135deg,#0284c7,#0369a1);border:1.5px solid #38bdf8;color:#fff;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:900;cursor:pointer;">🚢 Batalla Naval 2D</button>
+            </div>
+          </div>
+
           <!-- Cabecera Turbo Core -->
           <div style="background:linear-gradient(135deg, #0b101d 0%, #17132b 100%);border:1px solid #28324e;border-radius:12px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.4);">
             <div style="display:flex;align-items:center;gap:14px;">
@@ -464,7 +474,7 @@
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <select id="racerPvpTargetSel" style="background:#0b0e14;color:#f8fafc;border:1px solid #059669;border-radius:7px;padding:7px 10px;font-size:11.5px;font-weight:700;">
                 <option value="">Seleccionar jugador conectado…</option>
-                ${(this.opts.getOnlinePlayers ? this.opts.getOnlinePlayers() : []).map((u) => `<option value="${u.id}">🟢 ${u.name}</option>`).join('')}
+                ${(this.options?.getOnlinePlayers ? this.options.getOnlinePlayers() : []).map((u) => `<option value="${u.id}">🟢 ${u.name}</option>`).join('')}
               </select>
               <button id="racerBtnChallengePvp" class="ek-pixel-font" style="background:linear-gradient(135deg,#10b981,#2563eb);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.35);">
                 🏁 RETAR 1v1
@@ -561,9 +571,14 @@
           const uid = Number(pvpSel.value);
           if (!uid) return;
           RacerAudio.coin(this.scope);
-          this.opts.onChallengePlayer?.(uid, 'racer');
+          this.options?.onChallengePlayer?.(uid, 'racer');
         };
       }
+
+      const btnMetal = this.container.querySelector('#arcBtnModeMetal');
+      if (btnMetal) btnMetal.onclick = () => this.startMetalCore2D();
+      const btnNaval = this.container.querySelector('#arcBtnModeNaval');
+      if (btnNaval) btnNaval.onclick = () => this.startNavalBattle2D();
 
       if (window.__EK && typeof window.__EK.assertNoBadText === 'function') {
         window.__EK.assertNoBadText(this.container);
@@ -1250,18 +1265,24 @@
       const px = roadCenterX + st.x * (roadW * 0.42);
       this.drawKart(ctx, px, py - st.jumpHeight, 0.96, ch.primary, ch.glow, this.options.playerName || 'Tú', st.nitroActive > 0, 1.0, st.jumpHeight);
 
-      // Líneas de velocidad durante NITRO
+      // Líneas de velocidad radiales y halo warp durante NITRO (v1.9.5)
       if (st.nitroActive > 0) {
         ctx.save();
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+        const nGrad = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, W * 0.65);
+        nGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+        nGrad.addColorStop(1, 'rgba(37, 99, 235, 0.22)');
+        ctx.fillStyle = nGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.88)';
         ctx.lineWidth = 2.5;
         st.speedLines.forEach((ln, idx) => {
-          const progress = ((st.dist * 0.05 + ln.phase) % 1);
-          const lx = roadCenterX + ln.side * (roadW * 0.48);
+          const progress = ((st.dist * 0.055 + ln.phase) % 1);
+          const lx = roadCenterX + ln.side * (roadW * (0.44 + (idx % 3) * 0.04));
           const ly = progress * H;
           ctx.beginPath();
           ctx.moveTo(lx, ly);
-          ctx.lineTo(lx, ly + ln.len);
+          ctx.lineTo(lx, ly + ln.len * 1.35);
           ctx.stroke();
         });
         ctx.restore();
@@ -1338,14 +1359,23 @@
       ctx.translate(x, y);
       ctx.scale(scale, scale);
 
-      // Llamas de Nitro
+      // Llamas de Nitro Plasma (v1.9.5)
       if (isBoosting) {
+        const fl1 = 20 + Math.random() * 16;
+        const fl2 = 20 + Math.random() * 16;
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.beginPath();
+        ctx.arc(0, 26, 26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(-19, 17, 14, fl1);
+        ctx.fillRect(5, 17, 14, fl2);
         ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(-18, 18, 12, 16 + Math.random() * 12);
-        ctx.fillRect(6, 18, 12, 16 + Math.random() * 12);
-        ctx.fillStyle = '#e0f2fe';
-        ctx.fillRect(-15, 18, 6, 10);
-        ctx.fillRect(9, 18, 6, 10);
+        ctx.fillRect(-17, 17, 10, fl1 * 0.78);
+        ctx.fillRect(7, 17, 10, fl2 * 0.78);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-15, 17, 6, 11);
+        ctx.fillRect(9, 17, 6, 11);
       }
 
       // Ruedas / Propulsores Pixel
@@ -1495,6 +1525,425 @@
         const bLobby = overlay.querySelector('#racerBtnLobby');
         if (bLobby) bLobby.onclick = () => this.renderLobby();
       }
+    }
+
+    // --- MODO ARCADE 2: OPERACIÓN METAL CORE 2D (Acción Run & Gun estilo Contra / Metal Slug) ---
+    startMetalCore2D() {
+      if (this.destroyed) return;
+      this.inRace = true;
+      this.paused = false;
+
+      this.container.innerHTML = `
+        <div style="background:#090d16;border:2px solid #dc2626;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:#141926;padding:8px 14px;border-radius:8px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span class="ek-pixel-font" style="font-size:11px;color:#ef4444;">🔫 OPERACIÓN METAL CORE 2D</span>
+              <span id="mcHudHp" style="font-size:12px;font-weight:900;color:#4ade80;">❤️❤️❤️</span>
+              <span id="mcHudWpn" style="font-size:11px;font-weight:900;color:#fbbf24;background:rgba(251,191,36,0.16);padding:2px 8px;border-radius:6px;border:1px solid #fbbf24;">ARMA: HEAVY MACHINE GUN [H]</span>
+              <span id="mcHudScore" style="font-size:11.5px;font-weight:800;color:#38bdf8;">BAJAS: 0 / 20</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <span style="font-size:11px;color:#94a3b8;">A/D: Mover · W/Espacio: Saltar · J/Clic: Disparar · K: Granada</span>
+              <button id="mcBtnExit" style="background:#1e293b;border:1px solid #475569;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;">← Volver al Arcade</button>
+            </div>
+          </div>
+          <div style="position:relative;width:100%;display:flex;justify-content:center;background:#05070c;border-radius:10px;overflow:hidden;border:1px solid #1e293b;">
+            <canvas id="mcCanvas" width="760" height="360" style="width:100%;max-width:760px;height:auto;cursor:crosshair;display:block;"></canvas>
+            <div id="mcEndOverlay" style="display:none;position:absolute;inset:0;background:rgba(5,7,12,0.88);backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:20;"></div>
+          </div>
+        </div>
+      `;
+
+      const cvs = this.container.querySelector('#mcCanvas');
+      const ctx = cvs.getContext('2d');
+      const groundY = 296;
+      const st = {
+        px: 90, py: groundY, vx: 0, vy: 0, dir: 1, hp: 3, kills: 0, targetKills: 20,
+        wpn: 'H', fireCd: 0, grenCd: 0, invuln: 0, ended: false,
+        bullets: [], eBullets: [], enemies: [], particles: [], crates: [],
+        boss: null, spawnTimer: 0
+      };
+
+      const keys = {};
+      this.scope.listen(window, 'keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+      this.scope.listen(window, 'keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+      let mouseFiring = false;
+      cvs.addEventListener('pointerdown', () => { mouseFiring = true; });
+      window.addEventListener('pointerup', () => { mouseFiring = false; });
+
+      this.container.querySelector('#mcBtnExit').onclick = () => {
+        st.ended = true;
+        this.renderLobby();
+      };
+
+      const fireShot = () => {
+        RacerAudio.boost(this.scope);
+        if (st.wpn === 'S') {
+          [-0.25, 0, 0.25].forEach((ang) => {
+            st.bullets.push({ x: st.px + st.dir * 18, y: st.py - 24, vx: Math.cos(ang) * 9.5 * st.dir, vy: Math.sin(ang) * 9.5, color: '#ef4444', r: 5 });
+          });
+        } else {
+          st.bullets.push({ x: st.px + st.dir * 18, y: st.py - 24 + (Math.random() - 0.5) * 6, vx: 11 * st.dir, vy: 0, color: '#fbbf24', r: 4 });
+        }
+      };
+
+      const finishMission = (won) => {
+        if (st.ended) return;
+        st.ended = true;
+        this.inRace = false;
+        const coinsWon = won ? 160 : Math.min(80, st.kills * 5);
+        if (won) RacerAudio.win(this.scope); else RacerAudio.crash(this.scope);
+        if (typeof this.options?.onReward === 'function' && coinsWon > 0) {
+          this.options.onReward({ coins: coinsWon, keys: won ? { silver: 1 } : {}, source: 'metal_core' });
+        }
+        const ov = this.container.querySelector('#mcEndOverlay');
+        if (ov) {
+          ov.style.display = 'flex';
+          ov.innerHTML = `
+            <div style="background:#0f1422;border:2px solid ${won ? '#22c55e' : '#ef4444'};border-radius:12px;padding:20px 26px;text-align:center;max-width:380px;">
+              <div class="ek-pixel-font" style="font-size:14px;color:${won ? '#4ade80' : '#f87171'};margin-bottom:8px;">${won ? '🎖️ ¡MISIÓN COMPLETADA!' : '💥 CAÍDO EN COMBATE'}</div>
+              <div style="font-size:12px;color:#e2e8f0;margin-bottom:10px;">Enemigos abatidos: <b>${st.kills}</b> · Recompensa: <b style="color:#fbbf24;">+${coinsWon} 🪙 Monedas ${won ? '+ 1 Llave de Plata' : ''}</b></div>
+              <div style="display:flex;gap:10px;justify-content:center;">
+                <button id="mcBtnReplay" style="background:#dc2626;border:none;color:#fff;padding:8px 16px;border-radius:7px;font-weight:900;cursor:pointer;">🔄 Jugar de nuevo</button>
+                <button id="mcBtnBack" style="background:#1e293b;border:1px solid #475569;color:#fff;padding:8px 16px;border-radius:7px;font-weight:800;cursor:pointer;">🕹️ Sala Arcade</button>
+              </div>
+            </div>
+          `;
+          ov.querySelector('#mcBtnReplay').onclick = () => this.startMetalCore2D();
+          ov.querySelector('#mcBtnBack').onclick = () => this.renderLobby();
+        }
+      };
+
+      const step = () => {
+        if (this.destroyed || st.ended || !cvs.isConnected) return;
+        // Movimiento jugador
+        const left = keys['a'] || keys['arrowleft'];
+        const right = keys['d'] || keys['arrowright'];
+        const jump = keys['w'] || keys['arrowup'] || keys[' '];
+        const shoot = keys['j'] || keys['z'] || mouseFiring;
+
+        if (left) { st.vx = -4.4; st.dir = -1; }
+        else if (right) { st.vx = 4.4; st.dir = 1; }
+        else st.vx *= 0.75;
+
+        if (jump && st.py >= groundY - 1) {
+          st.vy = -10.5;
+        }
+        st.vy += 0.52;
+        st.px = Math.max(28, Math.min(732, st.px + st.vx));
+        st.py = Math.min(groundY, st.py + st.vy);
+        if (st.py >= groundY) st.vy = 0;
+
+        if (st.fireCd > 0) st.fireCd--;
+        if (shoot && st.fireCd <= 0) {
+          fireShot();
+          st.fireCd = st.wpn === 'H' ? 7 : 12;
+        }
+        if (st.invuln > 0) st.invuln--;
+
+        // Spawner de soldados y tanque jefe
+        st.spawnTimer++;
+        if (st.spawnTimer % 68 === 0 && st.enemies.length < 6 && st.kills < st.targetKills) {
+          const fromRight = Math.random() < 0.78;
+          const isTank = st.kills >= 12 && !st.enemies.some((e) => e.tank);
+          st.enemies.push({
+            x: fromRight ? 748 : 12,
+            y: groundY,
+            vx: fromRight ? -(1.5 + Math.random() * 1.2) : (1.5 + Math.random() * 1.2),
+            hp: isTank ? 8 : 2,
+            maxHp: isTank ? 8 : 2,
+            tank: isTank,
+            shootCd: 50 + Math.floor(Math.random() * 50)
+          });
+        }
+
+        // Actualizar balas jugador
+        for (let i = st.bullets.length - 1; i >= 0; i--) {
+          const b = st.bullets[i];
+          b.x += b.vx; b.y += b.vy;
+          if (b.x < 0 || b.x > 760 || b.y < 0 || b.y > 360) { st.bullets.splice(i, 1); continue; }
+          for (let j = st.enemies.length - 1; j >= 0; j--) {
+            const en = st.enemies[j];
+            const w = en.tank ? 34 : 16;
+            if (Math.abs(b.x - en.x) < w && Math.abs(b.y - (en.y - 22)) < 24) {
+              en.hp--;
+              st.bullets.splice(i, 1);
+              for (let k = 0; k < 5; k++) st.particles.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, c: '#fbbf24', life: 14 });
+              if (en.hp <= 0) {
+                st.enemies.splice(j, 1);
+                st.kills++;
+                RacerAudio.coin(this.scope);
+                if (st.kills % 5 === 0) {
+                  st.crates.push({ x: en.x, y: groundY - 12, type: st.wpn === 'H' ? 'S' : 'H' });
+                }
+                const scEl = this.container.querySelector('#mcHudScore');
+                if (scEl) scEl.textContent = `BAJAS: ${st.kills} / ${st.targetKills}`;
+                if (st.kills >= st.targetKills) { finishMission(true); return; }
+              }
+              break;
+            }
+          }
+        }
+
+        // Cajas de armas [S] Spread Shot / [H] Heavy Machine Gun
+        for (let i = st.crates.length - 1; i >= 0; i--) {
+          const cr = st.crates[i];
+          if (Math.abs(st.px - cr.x) < 24 && Math.abs(st.py - groundY) < 28) {
+            st.wpn = cr.type;
+            st.crates.splice(i, 1);
+            const wEl = this.container.querySelector('#mcHudWpn');
+            if (wEl) wEl.textContent = st.wpn === 'S' ? 'ARMA: SPREAD SHOT [S]' : 'ARMA: HEAVY MACHINE GUN [H]';
+          }
+        }
+
+        // Actualizar enemigos y disparos enemigos
+        for (const en of st.enemies) {
+          en.x += en.vx;
+          if (en.x < 24 || en.x > 736) en.vx *= -1;
+          en.shootCd--;
+          if (en.shootCd <= 0) {
+            en.shootCd = en.tank ? 55 : 85;
+            const d = st.px >= en.x ? 1 : -1;
+            st.eBullets.push({ x: en.x + d * 16, y: en.y - 22, vx: d * 4.8 });
+          }
+        }
+
+        for (let i = st.eBullets.length - 1; i >= 0; i--) {
+          const eb = st.eBullets[i];
+          eb.x += eb.vx;
+          if (eb.x < 0 || eb.x > 760) { st.eBullets.splice(i, 1); continue; }
+          if (st.invuln <= 0 && Math.abs(eb.x - st.px) < 14 && Math.abs(eb.y - (st.py - 20)) < 22) {
+            st.eBullets.splice(i, 1);
+            st.hp--;
+            st.invuln = 45;
+            RacerAudio.crash(this.scope);
+            const hpEl = this.container.querySelector('#mcHudHp');
+            if (hpEl) hpEl.textContent = '❤️'.repeat(Math.max(0, st.hp)) || '💀';
+            if (st.hp <= 0) { finishMission(false); return; }
+          }
+        }
+
+        // Renderizado 2D estilo Contra / Metal Slug
+        ctx.fillStyle = '#070b14';
+        ctx.fillRect(0, 0, 760, 360);
+        // Montañas y base militar de fondo
+        ctx.fillStyle = '#111827';
+        ctx.beginPath(); ctx.moveTo(0, 296); ctx.lineTo(140, 170); ctx.lineTo(310, 296); ctx.lineTo(520, 150); ctx.lineTo(760, 296); ctx.fill();
+        // Piso metálico y barricadas
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, groundY, 760, 64);
+        ctx.fillStyle = '#f59e0b';
+        for (let x = 0; x < 760; x += 38) ctx.fillRect(x, groundY, 20, 4);
+
+        // Dibujar Cajas de Armas [S] / [H]
+        for (const cr of st.crates) {
+          ctx.fillStyle = '#d97706';
+          ctx.fillRect(cr.x - 11, cr.y - 11, 22, 22);
+          ctx.strokeStyle = '#fde047';
+          ctx.strokeRect(cr.x - 11, cr.y - 11, 22, 22);
+          ctx.fillStyle = '#fff';
+          ctx.font = '900 12px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(cr.type, cr.x, cr.y + 4);
+        }
+
+        // Dibujar Soldado Ninja Jugador
+        ctx.save();
+        ctx.translate(st.px, st.py);
+        if (st.invuln % 4 < 2) {
+          ctx.fillStyle = '#2563eb';
+          ctx.fillRect(-10, -34, 20, 24);
+          ctx.fillStyle = '#ef4444'; // Cinta roja estilo Rambo/Contra
+          ctx.fillRect(-11, -38, 22, 5);
+          ctx.fillStyle = '#fde68a';
+          ctx.fillRect(-8, -33, 16, 7);
+          ctx.fillStyle = '#cbd5e1'; // Rifle pesado
+          ctx.fillRect(st.dir > 0 ? 4 : -24, -26, 20, 6);
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(-9, -10, 7, 10);
+          ctx.fillRect(2, -10, 7, 10);
+        }
+        ctx.restore();
+
+        // Dibujar Enemigos y Tanques
+        for (const en of st.enemies) {
+          ctx.save();
+          ctx.translate(en.x, en.y);
+          if (en.tank) {
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(-30, -32, 60, 24);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(-18, -44, 36, 14);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-32, -10, 64, 10);
+          } else {
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(-9, -34, 18, 24);
+            ctx.fillStyle = '#fde047';
+            ctx.fillRect(-6, -30, 12, 5);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-8, -10, 16, 10);
+          }
+          ctx.restore();
+        }
+
+        // Balas y partículas
+        for (const b of st.bullets) {
+          ctx.fillStyle = b.color;
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+        }
+        for (const eb of st.eBullets) {
+          ctx.fillStyle = '#f87171';
+          ctx.beginPath(); ctx.arc(eb.x, eb.y, 4, 0, Math.PI * 2); ctx.fill();
+        }
+        for (let i = st.particles.length - 1; i >= 0; i--) {
+          const p = st.particles[i];
+          p.x += p.vx; p.y += p.vy; p.life--;
+          ctx.fillStyle = p.c;
+          ctx.fillRect(p.x, p.y, 4, 4);
+          if (p.life <= 0) st.particles.splice(i, 1);
+        }
+
+        this.scope.raf(step);
+      };
+      this.scope.raf(step);
+    }
+
+    // --- MODO ARCADE 3: BATALLA NAVAL TÁCTICA 2D (Flota del Núcleo) ---
+    startNavalBattle2D() {
+      if (this.destroyed) return;
+      this.inRace = true;
+      const SIZE = 7;
+      const myGrid = Array.from({ length: SIZE * SIZE }, () => 0); // 0 agua, 1 barco, 2 impacto, 3 agua tocada
+      const aiGrid = Array.from({ length: SIZE * SIZE }, () => 0);
+
+      const placeFleet = (grid) => {
+        const lengths = [4, 3, 2, 2];
+        for (const len of lengths) {
+          let placed = false;
+          while (!placed) {
+            const horiz = Math.random() < 0.5;
+            const r = Math.floor(Math.random() * (horiz ? SIZE : SIZE - len));
+            const c = Math.floor(Math.random() * (horiz ? SIZE - len : SIZE));
+            let ok = true;
+            for (let k = 0; k < len; k++) {
+              const idx = (r + (horiz ? 0 : k)) * SIZE + (c + (horiz ? k : 0));
+              if (grid[idx] !== 0) ok = false;
+            }
+            if (ok) {
+              for (let k = 0; k < len; k++) {
+                const idx = (r + (horiz ? 0 : k)) * SIZE + (c + (horiz ? k : 0));
+                grid[idx] = 1;
+              }
+              placed = true;
+            }
+          }
+        }
+      };
+      placeFleet(myGrid);
+      placeFleet(aiGrid);
+
+      const totalShipCells = 11;
+      let myHits = 0;
+      let aiHits = 0;
+      let statusMsg = 'Haz clic en una coordenada del Radar Enemigo para lanzar un torpedo.';
+      let ended = false;
+
+      const drawNaval = () => {
+        this.container.innerHTML = `
+          <div style="background:#090d16;border:2px solid #0284c7;border-radius:12px;padding:16px;color:#f8fafc;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid #1e293b;padding-bottom:10px;">
+              <div>
+                <span class="ek-pixel-font" style="font-size:12px;color:#38bdf8;">🚢 BATALLA NAVAL TÁCTICA 2D</span>
+                <div style="font-size:11.5px;color:#94a3b8;margin-top:3px;">${statusMsg}</div>
+              </div>
+              <button id="nvBtnBack" style="background:#1e293b;border:1px solid #475569;color:#fff;padding:6px 12px;border-radius:7px;font-size:11px;font-weight:800;cursor:pointer;">← Volver al Arcade</button>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;justify-items:center;">
+              <!-- Radar Enemigo (Disparar aquí) -->
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span class="ek-pixel-font" style="font-size:10px;color:#f87171;">🎯 RADAR ENEMIGO (IMPACTOS: ${myHits}/${totalShipCells})</span>
+                <div style="display:grid;grid-template-columns:repeat(${SIZE},36px);gap:4px;background:#061326;padding:10px;border-radius:10px;border:1.5px solid #0284c7;">
+                  ${aiGrid.map((val, idx) => {
+                    const bg = val === 2 ? '#dc2626' : val === 3 ? '#1e293b' : '#0c2340';
+                    const txt = val === 2 ? '💥' : val === 3 ? '🌊' : '·';
+                    return `<button class="nvEnemyCell" data-idx="${idx}" style="width:36px;height:36px;border-radius:6px;background:${bg};border:1px solid #0369a1;color:#fff;font-size:14px;cursor:${val >= 2 || ended ? 'default' : 'crosshair'};display:flex;align-items:center;justify-content:center;">${txt}</button>`;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Tu Flota -->
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+                <span class="ek-pixel-font" style="font-size:10px;color:#38bdf8;">🛡️ TU FLOTA DEL NÚCLEO (DAÑO RECIBIDO: ${aiHits}/${totalShipCells})</span>
+                <div style="display:grid;grid-template-columns:repeat(${SIZE},36px);gap:4px;background:#061326;padding:10px;border-radius:10px;border:1.5px solid #334155;">
+                  ${myGrid.map((val) => {
+                    const bg = val === 2 ? '#dc2626' : val === 1 ? '#059669' : val === 3 ? '#1e293b' : '#0c2340';
+                    const txt = val === 2 ? '🔥' : val === 1 ? '🚢' : val === 3 ? '🌊' : '·';
+                    return `<div style="width:36px;height:36px;border-radius:6px;background:${bg};border:1px solid #1e293b;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;">${txt}</div>`;
+                  }).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        this.container.querySelector('#nvBtnBack').onclick = () => {
+          this.inRace = false;
+          this.renderLobby();
+        };
+
+        this.container.querySelectorAll('.nvEnemyCell').forEach((btn) => {
+          btn.onclick = () => {
+            if (ended) return;
+            const idx = Number(btn.getAttribute('data-idx'));
+            if (aiGrid[idx] >= 2) return;
+            if (aiGrid[idx] === 1) {
+              aiGrid[idx] = 2;
+              myHits++;
+              RacerAudio.coin(this.scope);
+              statusMsg = '💥 ¡IMPACTO DIRECTO en un acorazado enemigo!';
+            } else {
+              aiGrid[idx] = 3;
+              RacerAudio.boost(this.scope);
+              statusMsg = '🌊 Torpedo al agua. El Almirante rival contraataca…';
+            }
+
+            if (myHits >= totalShipCells) {
+              ended = true;
+              this.inRace = false;
+              RacerAudio.win(this.scope);
+              statusMsg = '🏆 ¡VICTORIA NAVAL! Hundiste toda la flota enemiga (+150 🪙 Monedas + 1 Llave de Cobre).';
+              if (typeof this.options?.onReward === 'function') {
+                this.options.onReward({ coins: 150, keys: { copper: 1 }, source: 'naval' });
+              }
+              drawNaval();
+              return;
+            }
+
+            // Turno del Almirante IA
+            const avail = myGrid.map((v, i) => (v < 2 ? i : -1)).filter((i) => i >= 0);
+            if (avail.length > 0) {
+              const pick = avail[Math.floor(Math.random() * avail.length)];
+              if (myGrid[pick] === 1) {
+                myGrid[pick] = 2;
+                aiHits++;
+              } else {
+                myGrid[pick] = 3;
+              }
+              if (aiHits >= totalShipCells) {
+                ended = true;
+                this.inRace = false;
+                RacerAudio.crash(this.scope);
+                statusMsg = '💀 Tu flota fue hundida. ¡Inténtalo de nuevo!';
+              }
+            }
+            drawNaval();
+          };
+        });
+      };
+
+      drawNaval();
     }
   }
 

@@ -143,6 +143,7 @@ let overlayWin = null;
 let isOverlayVisible = false;
 let pendingSource = null;
 let savedBounds = null;
+let savedMaximized = false;
 let isMiniMode = false;
 let callStatus = { inCall: false, hasVideo: false, autoFloat: true };
 
@@ -193,19 +194,35 @@ function setMiniMode(enable) {
   if (!win || win.isDestroyed()) return false;
   enable = !!enable;
   if (enable && !isMiniMode) {
-    if (win.isMaximized()) win.unmaximize();
-    savedBounds = win.getBounds();
-    const area = screen.getDisplayMatching(savedBounds).workArea;
-    const w = 380, h = 250;
-    win.setMinimumSize(220, 140);
+    savedMaximized = win.isMaximized();
+    if (savedMaximized) win.unmaximize();
+    const cur = win.getBounds();
+    if (cur.width >= 760 && cur.height >= 480) {
+      savedBounds = cur;
+    }
+    const area = screen.getDisplayMatching(cur).workArea;
+    const w = 420, h = 270;
+    win.setMinimumSize(260, 170);
     win.setBounds({ x: area.x + area.width - w - 20, y: area.y + area.height - h - 20, width: w, height: h });
     win.setAlwaysOnTop(true, 'screen-saver');
     isMiniMode = true;
   } else if (!enable && isMiniMode) {
+    isMiniMode = false;
     win.setAlwaysOnTop(false);
     win.setMinimumSize(820, 520);
-    if (savedBounds) win.setBounds(savedBounds);
-    isMiniMode = false;
+    const cur = win.getBounds();
+    const area = screen.getDisplayMatching(cur).workArea;
+    const w = Math.min(area.width, Math.max(820, savedBounds?.width || 1200));
+    const h = Math.min(area.height, Math.max(520, savedBounds?.height || 770));
+    let x = savedBounds ? savedBounds.x : (area.x + Math.round((area.width - w) / 2));
+    let y = savedBounds ? savedBounds.y : (area.y + Math.round((area.height - h) / 2));
+    // Asegurar que la ventana restaurada quede 100% dentro del monitor actual y con la barra superior visible
+    x = Math.max(area.x, Math.min(area.x + area.width - w, x));
+    y = Math.max(area.y, Math.min(area.y + area.height - h, y));
+    win.setBounds({ x, y, width: w, height: h });
+    if (savedMaximized) {
+      win.maximize();
+    }
   }
   win.webContents.send('window:mini-changed', isMiniMode);
   return isMiniMode;
@@ -228,6 +245,15 @@ function createWindow() {
   setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible()) win.show(); }, 1200);
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+
+  win.on('maximize', () => {
+    if (isMiniMode) {
+      isMiniMode = false;
+      win.setAlwaysOnTop(false);
+      win.setMinimumSize(820, 520);
+      win.webContents.send('window:mini-changed', false);
+    }
+  });
 
   win.on('minimize', () => {
     if (callStatus.inCall && callStatus.autoFloat !== false && !isMiniMode) {
@@ -388,6 +414,10 @@ app.whenReady().then(() => {
     });
   ipcMain.handle('window:maximize', () => {
     if (!win) return;
+    if (isMiniMode) {
+      setMiniMode(false);
+      return;
+    }
     if (win.isMaximized()) win.unmaximize();
     else win.maximize();
   });

@@ -1,0 +1,19 @@
+{
+  "name": "EpicKast",
+  "short_name": "EpicKast",
+  "description": "Comunicación ultraligera de baja latencia: chat, llamadas, servidores, amigos y minijuegos.",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "lang": "es",
+  "categories": ["social", "communication", "games"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

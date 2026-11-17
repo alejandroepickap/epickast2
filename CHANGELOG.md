@@ -4,6 +4,26 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ---
 
+## [1.9.5] - 2026-11-17
+
+### 🏯 Dojo Elemental HD (Estilo Card-Jitsu Original), Colección de 60 Cartas, Inventario Estilo Clash Royale, Santuario Arcano y Ventana Flotante Limpia
+- **Colección Ampliada a 60 Cartas (36 Base Ilustradas + 24 Desbloqueables) e Inventario Estilo Clash Royale (`app/card-game.js`, `app/style.css`, `app/assets/cards/std/`):**
+  - **36 Cartas Base por Defecto (Poder 1 al 12 en Fuego, Agua y Nieve):** Todos los jugadores cuentan desde el inicio con el set completo ilustrado de 36 cartas (`Fogata` a `Maestro de Fuego`, `Gotas` a `Maestro de Agua`, `Escarcha` a `Maestro de Hielo`).
+  - **24 Cartas Desbloqueables de Colección (`X01`–`X24`):** Carátulas exclusivas obtenibles en sobres elementales (`250 🪙`) y como bono en la Ruleta de la Bóveda, con contador de copias repetidas (`×2`, `×3`, etc.) y rarezas (`Común`, `Rara`, `★ Especial`).
+  - **Animaciones y Cinemáticas Exclusivas para Cartas > 10 (`Poder 11 y 12`):** Las cartas de poder 11 y 12 (tanto base como desbloqueables) lucen marco dorado pulsante, barrido holográfico continuo, insignia **`★ ESPECIAL`**, partículas elementales ascendentes/descendentes (brasas, burbujas o copos) e **invocación cinemática a pantalla completa** al ganar un choque.
+  - **Inventario de Cartas Estilo Clash Royale:** Nuevo modal de colección con barra de progreso global (`n/60`), filtros por elemento (`Todas`, `🔥 Fuego`, `💧 Agua`, `❄️ Nieve`, `★ Especiales`) y origen (`Base` / `Desbloqueables`), secciones **"Cartas desbloqueadas"** y **"Por descubrir"**, y vista detallada al hacer clic en cualquier carta.
+- **Pilas Visuales de Cartas en Cascada (`app/card-game.js`, `app/style.css`):**
+  - Marcador superior con **3 columnas elementales (`Fuego`, `Agua`, `Nieve`)** que apilan cada carta ganada como una mini-carta real en cascada vertical con su color de marco, elemento y número, más insignia **`×2` / `×3`** y alerta **`⚠️ ¡A 1 CARTA!`** en *Match Point*.
+- **Dojo Tradicional Ilustrado HD, Ninjas Vectoriales y Cartas 3D:**
+  - Escenario del tatami con puertas *shoji*, linternas cálidas, vigas de madera y Amuleto Elemental central.
+  - Ninjas vectoriales detallados con cinturón Obi y colas ondeantes en el color exacto de tu rango, armas detalladas (Katana, Bastón Bo, Pergamino, Shuriken, Kunai) y mano oculta de 5 cartas boca abajo del rival.
+- **Bóveda "Santuario Arcano" & Turbo Core Plasma (`app/renderer.js`, `app/racer-game.js`):**
+  - Tarjetas de cofres/llaves con acabado metálico radial y riel de ruleta con iluminación por rareza; halo radial *Warp* y llamas de plasma en **Turbo Core**.
+- **Ventana Flotante y Enfoque de Cámara Auto-Ocultable (`app/style.css`, `app/renderer.js`):**
+  - Botón `⤢ Restaurar` compacto en una sola línea, y ocultamiento automático de la barra superior y controles de cámara al enfocar una cámara o usar modo flotante, desplegándose al seleccionar/hacer clic en la cámara o pasar el cursor arriba.
+
+---
+
 ## [1.9.4] - 2026-11-17
 
 ### 🎙️ Audio HD, Anti-Doble-Voz, Multijugador 1v1, Controles de Admin y Cámaras Flotantes
@@ -13,7 +33,12 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 - **Overlay Gamer Automático:** Activación automática del Overlay flotante al detectar la apertura de un juego compatible (`autoOverlayOnGame`), con opción para deshabilitarlo en Ajustes.
 - **Controles de Administrador en Canales de Voz:** Añadido **Ensordecer** (`voice.serverDeafen`), **Asistencia Remota de Audio** (`voice.assistAudio`: Anti-Eco, Voz Clara HD, Subir Micro) además de Silenciar y Mover de Canal de Voz.
 - **Interfaz Simple + Ajustes Avanzados (Pro) + Mejoras Estéticas:** Configuración simplificada por defecto con botón **"Ajustes Avanzados (Pro)"**, agrupación limpia de mensajes consecutivos en el chat, anillos de voz con brillo neón y efectos *glassmorphism*.
-- **Cámaras Flotantes PiP (Dentro de la App y al Minimizar) + Insignia `v1.9.4`:** Miniventana flotante arrastrable al navegar por la app y modo flotante automático al minimizar en llamada, más insignia `v1.9.4` en la esquina inferior derecha.
+- **Cámaras Flotantes Unificadas, Zoom y Panorámica Interactiva:**
+  - **Rueda del ratón (`1x` a `3.5x`)** o botón **`1x / 1.5x / 2x / 2.5x`** sobre cualquier cámara para acercar y **clic + arrastrar** para mover el encuadre; **doble clic** para fijar en grande (*Spotlight*).
+  - **Mini-cámaras integradas en la barra de llamada (`#voicePill`)** al cambiar de canal sin ventanas encimadas, y **Modo Ventana Flotante (`mini-mode`)** con controles integrados en la barra superior (`#winBar`), indicador luminoso de quién habla y recuperación automática de posición entre monitores.
+- **Reconexión de Llamada tras Cierre Inesperado + Iconografía Minimalista:**
+  - Banner superior inteligente (**"Reconectar a la llamada"**) al reabrir EpicKast tras un cierre inesperado, además de botón de resincronización WebRTC en vivo.
+  - Sustitución de emojis genéricos por **iconos vectoriales monocromáticos (SVG)** minimalistas y eliminación de cualquier duplicación de audio local (`c.camTrack` solo-video en vistas previas y silenciamiento estricto al usar amplificación `>100%` o filtro receptor anti-teclado).
 
 ## [1.9.3] - 2026-11-05
 
