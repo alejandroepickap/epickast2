@@ -452,6 +452,26 @@
             </div>
           </div>
 
+          <!-- Carrera Multijugador 1v1 en Vivo -->
+          <div style="background:linear-gradient(135deg,rgba(16,185,129,0.16),rgba(37,99,235,0.16));border:1px solid rgba(52,211,153,0.45);border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:12.5px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                <span>🏎️ CARRERA MULTIJUGADOR 1v1 EN VIVO</span>
+                <span style="background:#059669;color:#fff;font-size:9px;padding:2px 6px;border-radius:999px;">PVP ONLINE</span>
+              </div>
+              <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">Compite en tiempo real contra tu pareja o amigos conectados en la misma pista.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <select id="racerPvpTargetSel" style="background:#0b0e14;color:#f8fafc;border:1px solid #059669;border-radius:7px;padding:7px 10px;font-size:11.5px;font-weight:700;">
+                <option value="">Seleccionar jugador conectado…</option>
+                ${(this.opts.getOnlinePlayers ? this.opts.getOnlinePlayers() : []).map((u) => `<option value="${u.id}">🟢 ${u.name}</option>`).join('')}
+              </select>
+              <button id="racerBtnChallengePvp" class="ek-pixel-font" style="background:linear-gradient(135deg,#10b981,#2563eb);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(16,185,129,0.35);">
+                🏁 RETAR 1v1
+              </button>
+            </div>
+          </div>
+
           <!-- Selección de Circuitos (Bloque A3: cabeceras flex-wrap sin solape y 4 tarjetas visibles) -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:12px;">
             ${tracks.map(t => {
@@ -529,13 +549,52 @@
         btn.onclick = () => {
           const tid = btn.dataset.track;
           const track = tracks.find(t => String(t.id) === String(tid)) || tracks[0];
+          this.pvp = null;
           this.startRace(track);
         };
       });
 
+      const pvpBtn = this.container.querySelector('#racerBtnChallengePvp');
+      const pvpSel = this.container.querySelector('#racerPvpTargetSel');
+      if (pvpBtn && pvpSel) {
+        pvpBtn.onclick = () => {
+          const uid = Number(pvpSel.value);
+          if (!uid) return;
+          RacerAudio.coin(this.scope);
+          this.opts.onChallengePlayer?.(uid, 'racer');
+        };
+      }
+
       if (window.__EK && typeof window.__EK.assertNoBadText === 'function') {
         window.__EK.assertNoBadText(this.container);
       }
+    }
+
+    startPvpRace(opponent, roomId, sendSync, trackId) {
+      if (this.destroyed) return;
+      const tracks = getTracks();
+      const track = tracks.find(t => Number(t.id) === Number(trackId)) || tracks[0];
+      this.pvp = {
+        opponent: { id: opponent?.id, name: opponent?.name || 'Rival' },
+        roomId,
+        sendSync,
+        frameTick: 0,
+        lastSyncAt: 0,
+        oppData: { dist: 0, x: 0.45, speed: 5.2, jumpHeight: 0 },
+      };
+      this.startRace(track);
+      if (this.raceState && this.raceState.rivals[2]) {
+        this.raceState.rivals[2].isPvp = true;
+        this.raceState.rivals[2].name = `⚡ ${this.pvp.opponent.name}`;
+        this.raceState.rivals[2].color = '#38bdf8';
+        this.raceState.rivals[2].dist = 0;
+      }
+    }
+
+    onOpponentSync(data) {
+      if (this.destroyed || !this.pvp || !data) return;
+      this.pvp.lastSyncAt = performance.now();
+      this.pvp.oppData = { ...this.pvp.oppData, ...data };
     }
 
     startRace(rawTrack) {
@@ -597,12 +656,13 @@
           </div>
 
           <!-- Controles Rápidos -->
-          <div style="display:flex;justify-content:space-between;align-items:center;background:#0b0f18;border:1px solid #1b2334;border-radius:10px;padding:8px 14px;flex-wrap:wrap;gap:8px;">
-            <div style="font-size:11.5px;color:#94a3b8;">
+          <div class="racer-controls" style="display:flex;justify-content:space-between;align-items:center;background:#0b0f18;border:1px solid #1b2334;border-radius:10px;padding:8px 14px;flex-wrap:wrap;gap:8px;">
+            <div class="racer-kbd-hint" style="font-size:11.5px;color:#94a3b8;">
               ⌨️ Controles: <b>A / D</b> o <b>◀ / ▶</b> Cambiar carril · <b>S / ▼</b> Frenar · <b>ESPACIO</b> Activar Turbo Nitro
             </div>
-            <div style="display:flex;gap:8px;">
+            <div class="racer-touch-pad" style="display:flex;gap:8px;">
               <button id="racerTouchLeft" style="background:#1e293b;color:#fff;border:1px solid #334155;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;">◀ Izquierda</button>
+              <button id="racerTouchBrake" class="racer-touch-only" style="background:#1e293b;color:#fca5a5;border:1px solid #334155;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;">▼ Freno</button>
               <button id="racerTouchNitro" style="background:linear-gradient(135deg,#0284c7,#2563eb);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;">⚡ NITRO</button>
               <button id="racerTouchRight" style="background:#1e293b;color:#fff;border:1px solid #334155;padding:6px 14px;border-radius:6px;font-weight:900;cursor:pointer;">Derecha ▶</button>
             </div>
@@ -616,17 +676,28 @@
       const btnExit = this.container.querySelector('#racerBtnExit');
       if (btnExit) btnExit.onclick = () => this.confirmExitRace();
 
+      // Controles táctiles + ratón unificados con Pointer Events (móvil, tablet y PC)
       const bindHold = (sel, key) => {
         const el = this.container.querySelector(sel);
         if (!el) return;
-        el.onmousedown = () => { this.keyState[key] = true; };
-        el.onmouseup = () => { this.keyState[key] = false; };
-        el.onmouseleave = () => { this.keyState[key] = false; };
+        el.style.touchAction = 'none';
+        const down = (e) => { e.preventDefault(); try { el.setPointerCapture?.(e.pointerId); } catch {} this.keyState[key] = true; };
+        const up = () => { this.keyState[key] = false; };
+        el.addEventListener('pointerdown', down);
+        el.addEventListener('pointerup', up);
+        el.addEventListener('pointercancel', up);
+        el.addEventListener('lostpointercapture', up);
+        el.addEventListener('contextmenu', (e) => e.preventDefault());
       };
       bindHold('#racerTouchLeft', 'arrowleft');
       bindHold('#racerTouchRight', 'arrowright');
+      bindHold('#racerTouchBrake', 'arrowdown');
       const btnNitro = this.container.querySelector('#racerTouchNitro');
-      if (btnNitro) btnNitro.onclick = () => this.activateNitro();
+      if (btnNitro) {
+        btnNitro.style.touchAction = 'none';
+        btnNitro.addEventListener('pointerdown', (e) => { e.preventDefault(); this.activateNitro(); });
+        btnNitro.addEventListener('contextmenu', (e) => e.preventDefault());
+      }
 
       const canvas = this.container.querySelector('#racerCanvas');
       const ctx = canvas.getContext('2d');
@@ -775,8 +846,26 @@
       st.dist += st.speed;
 
       // IA equilibrada y visible: los competidores compiten de verdad sin desaparecer
+      if (this.pvp) {
+        this.pvp.frameTick = (this.pvp.frameTick || 0) + 1;
+        if (this.pvp.frameTick % 6 === 0) {
+          this.pvp.sendSync?.({ dist: Math.round(st.dist), x: Number(st.x.toFixed(3)), speed: Number(st.speed.toFixed(2)), jumpHeight: Math.round(st.jumpHeight || 0) });
+        }
+      }
+
       const lanes = [-0.62, -0.21, 0.21, 0.62];
       st.rivals.forEach((r, idx) => {
+        if (r.isPvp && this.pvp && performance.now() - this.pvp.lastSyncAt < 3500) {
+          const od = this.pvp.oppData;
+          r.x += ((od.x ?? r.x) - r.x) * 0.25;
+          r.speed = od.speed ?? r.speed;
+          r.dist += r.speed;
+          if (typeof od.dist === 'number') {
+            r.dist += (od.dist - r.dist) * 0.22;
+          }
+          r.jumpHeight = od.jumpHeight || 0;
+          return;
+        }
         if (Math.floor(st.dist / 70 + idx * 3) % 6 === 0) {
           r.targetX = lanes[(idx + Math.floor(st.dist / 220)) % lanes.length];
         }

@@ -379,9 +379,15 @@
 
   // --- CLASE PRINCIPAL: CardJitsuGame ---
   class CardJitsuGame {
-    constructor(container, onReward, parentScope) {
+    constructor(container, onRewardOrOpts, parentScope) {
       this.container = container;
-      this.onReward = onReward;
+      if (onRewardOrOpts && typeof onRewardOrOpts === 'object') {
+        this.opts = onRewardOrOpts;
+        this.onReward = onRewardOrOpts.onReward;
+      } else {
+        this.opts = {};
+        this.onReward = onRewardOrOpts;
+      }
       this.scope = parentScope || (window.EKLifecycle ? window.EKLifecycle.create('dojo') : null);
       this.sfx = new DojoAudio(this.scope);
 
@@ -389,6 +395,7 @@
       this.paused = false;
       this.resumeCountdown = 0;
       this.rewardClaimed = false;
+      this.pvp = null;
 
       this.phase = 'lobby'; // 'lobby' | 'playing' | 'clash' | 'cinematic' | 'ended'
       this.selectedFloor = (CFG().DOJO_FLOORS || [])[0];
@@ -562,6 +569,26 @@
             </div>
           </div>
 
+          <!-- Modo Multijugador 1v1 en Vivo -->
+          <div style="background:linear-gradient(135deg,rgba(124,58,237,0.16),rgba(37,99,235,0.14));border:1px solid rgba(168,85,247,0.45);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div>
+              <div style="font-size:12.5px;font-weight:900;color:#f8fafc;display:flex;align-items:center;gap:6px;">
+                <span>⚔️ DUELO MULTIJUGADOR 1v1 EN VIVO</span>
+                <span style="background:#9333ea;color:#fff;font-size:9px;padding:2px 6px;border-radius:999px;">PVP ONLINE</span>
+              </div>
+              <div style="font-size:11px;color:#cbd5e1;margin-top:2px;">Desafía a tu pareja o amigos conectados en tiempo real y gana +180 Monedas + Llave de Plata.</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <select id="cjPvpTargetSel" style="background:#0b0e14;color:#f8fafc;border:1px solid #4c1d95;border-radius:7px;padding:7px 10px;font-size:11.5px;font-weight:700;">
+                <option value="">Seleccionar jugador conectado…</option>
+                ${(this.opts.getOnlinePlayers ? this.opts.getOnlinePlayers() : []).map((u) => `<option value="${u.id}">🟢 ${u.name}</option>`).join('')}
+              </select>
+              <button id="cjBtnChallengePvp" class="ek-pixel-font" style="background:linear-gradient(135deg,#9333ea,#6366f1);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:10px;font-weight:900;cursor:pointer;box-shadow:0 4px 12px rgba(147,51,234,0.4);">
+                ⚔️ RETÁR 1v1
+              </button>
+            </div>
+          </div>
+
           <!-- Selector de los Guardianes del Dojo (Insignias sin solapamiento A3 y Lore sin undefined A2) -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(168px, 1fr));gap:10px;">
             ${floors.map((f) => {
@@ -626,9 +653,21 @@
         btn.onclick = () => {
           const lvl = Number(btn.getAttribute('data-level'));
           this.sfx.selectCard();
+          this.pvp = null;
           this.startMatch(lvl);
         };
       });
+
+      const pvpBtn = this.container.querySelector('#cjBtnChallengePvp');
+      const pvpSel = this.container.querySelector('#cjPvpTargetSel');
+      if (pvpBtn && pvpSel) {
+        pvpBtn.onclick = () => {
+          const uid = Number(pvpSel.value);
+          if (!uid) return;
+          this.sfx.selectCard();
+          this.opts.onChallengePlayer?.(uid, 'dojo');
+        };
+      }
 
       window.__EK?.assertNoBadText(this.container);
     }
@@ -665,6 +704,66 @@
       this.renderMatchArena({ staggerHand: true });
       this.setSpeech(this.selectedFloor.quotes.start);
       this.startTurnTimer();
+    }
+
+    startPvpMatch(opponent, roomId, sendPlay) {
+      if (this.destroyed) return;
+      const oppName = opponent?.name || 'Rival';
+      this.pvp = {
+        opponent: { id: opponent?.id, name: oppName },
+        roomId,
+        sendPlay,
+        myPendingCard: null,
+        myPendingIdx: null,
+        oppPendingCard: null,
+        waitTimeout: null,
+      };
+      this.selectedFloor = {
+        level: 'PVP',
+        name: oppName,
+        belt: 'Duelo 1v1 en Vivo',
+        color: '#a855f7',
+        spriteKey: 'sensei_master',
+        aiSkill: 0.5,
+        ninjaConfig: opponent?.ninjaConfig || { suit: 'suit_shadow', belt: 'belt_black', weapon: 'wpn_katana', aura: 'aura_lightning' },
+        quotes: {
+          start: `¡Duelo 1v1 en vivo contra ${oppName}! Elige tu carta elemental.`,
+          winRound: `${oppName} gana este asalto elemental.`,
+          loseRound: `¡Tu carta venció a la de ${oppName}!`,
+          tie: '¡Choque de poder idéntico! Empate en este turno.',
+          winMatch: `¡Derrotaste a ${oppName} en duelo directo 1v1!`,
+          loseMatch: `${oppName} se lleva la victoria en este duelo.`
+        },
+        reward: { coins: 180, key: 'silver', keyLabel: '1 Llave de Plata (Victoria PvP)' }
+      };
+      this.phase = 'playing';
+      this.rewardClaimed = false;
+      this.roundLocked = false;
+      this.playerPose = 'idle';
+      this.aiPose = 'idle';
+      this.playerPoints = [];
+      this.aiPoints = [];
+      this.playerHand = Array.from({ length: 5 }, () => this.drawRandomCard());
+      this.aiHand = Array.from({ length: 5 }, () => this.drawRandomCard());
+
+      this.renderMatchArena({ staggerHand: true });
+      this.setSpeech(this.selectedFloor.quotes.start);
+      this.startTurnTimer();
+    }
+
+    onOpponentPlay(card) {
+      if (this.destroyed || !this.pvp || !card) return;
+      if (this.pvp.myPendingCard !== null) {
+        if (this.pvp.waitTimeout && this.scope) this.scope.clearTimeout(this.pvp.waitTimeout);
+        const myIdx = this.pvp.myPendingIdx;
+        const myCard = this.pvp.myPendingCard;
+        this.pvp.myPendingCard = null;
+        this.pvp.myPendingIdx = null;
+        this._executeRoundClash(myIdx, myCard, card);
+      } else {
+        this.pvp.oppPendingCard = card;
+        this.setSpeech(`⚡ ¡${this.pvp.opponent.name} ya eligió su carta! Elige la tuya.`);
+      }
     }
 
     startTurnTimer() {
@@ -1100,8 +1199,48 @@
       this.sfx.selectCard();
 
       const pCard = this.playerHand[playerCardIdx];
+      if (this.pvp) {
+        this.pvp.sendPlay?.(pCard);
+        if (this.pvp.oppPendingCard) {
+          const oppCard = this.pvp.oppPendingCard;
+          this.pvp.oppPendingCard = null;
+          this._executeRoundClash(playerCardIdx, pCard, oppCard, 0);
+          return;
+        }
+        this.pvp.myPendingIdx = playerCardIdx;
+        this.pvp.myPendingCard = pCard;
+        const table = this.container?.querySelector('#cjArenaTable');
+        if (table) {
+          table.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;">
+              ${renderCardHtml(pCard, 0)}
+              <div class="ek-pixel-font" style="font-size:10px;color:#c084fc;">⏳ ESPERANDO CARTA DE ${this.pvp.opponent.name.toUpperCase()}…</div>
+            </div>
+          `;
+        }
+        this.setSpeech(`Esperando la jugada de ${this.pvp.opponent.name}…`);
+        if (this.scope) {
+          this.pvp.waitTimeout = this.scope.timeout(() => {
+            if (!this.destroyed && this.pvp && this.pvp.myPendingCard) {
+              const fallbackCard = this.drawRandomCard();
+              const idx = this.pvp.myPendingIdx;
+              const mc = this.pvp.myPendingCard;
+              this.pvp.myPendingCard = null;
+              this.pvp.myPendingIdx = null;
+              this._executeRoundClash(idx, mc, fallbackCard, 0);
+            }
+          }, 16000);
+        }
+        return;
+      }
+
       const aiIdx = this.chooseAiCardIndex(pCard);
       const aCard = this.aiHand[aiIdx];
+      this._executeRoundClash(playerCardIdx, pCard, aCard, aiIdx);
+    }
+
+    _executeRoundClash(playerCardIdx, pCard, aCard, aiIdx = 0) {
+      if (this.destroyed) return;
       const outcome = this.resolveOutcome(pCard, aCard);
 
       const table = this.container?.querySelector('#cjArenaTable');
@@ -1259,13 +1398,13 @@
         this.rewardClaimed = true;
         this.sfx.winMatch();
         const claimed = this.getClaimedFloors();
-        isFirstClear = !claimed[f.level];
+        isFirstClear = this.pvp ? true : !claimed[f.level];
 
         if (isFirstClear) {
           coinsAwarded = f.reward.coins;
           keyAwarded = f.reward.key;
           keyLabel = f.reward.keyLabel;
-          this.markFloorClaimed(f.level);
+          if (!this.pvp) this.markFloorClaimed(f.level);
         } else {
           const rules = CFG().TRAINING_REWARD_RULES || { coinMultiplier: 0.5, copperKeyChance: 0.25 };
           coinsAwarded = Math.round(f.reward.coins * rules.coinMultiplier);

@@ -4,6 +4,35 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ---
 
+## [1.9.4] - 2026-11-17
+
+### 🎙️ Audio HD, Anti-Doble-Voz, Multijugador 1v1, Controles de Admin y Cámaras Flotantes
+- **Solución al silencio al entrar a canales de servidor:** Reanudación automática de reproducción de elementos `<video>` tras re-parentar el DOM en `renderStage()` y limpieza de `p.ignore` en colisiones WebRTC (*glare*).
+- **Filtro De-Hiss Anti-Ruido-Blanco y Guarda Anti-Eco:** Corte de estática aguda (`highshelf` `-3.5 dB` en `6.2 kHz`), piso mínimo de compuerta (`0.0045`) para que el AGC/Compresor no amplifique ruido térmico en silencio, y atenuación adaptativa del retorno de altavoces cuando otro habla.
+- **Minijuegos Multijugador 1v1 en Vivo (`Dojo Elemental` y `Turbo Core`) + Bono Diario:** Duelos de cartas 1v1 y carreras 1v1 en tiempo real contra amigos/pareja conectados (`cardjitsu.challenge`, `cardjitsu.accept`, `cardjitsu.play`, `minigame.sync`) con banner interactivo para aceptar retos y botón de **Bono Diario** en la Bóveda.
+- **Overlay Gamer Automático:** Activación automática del Overlay flotante al detectar la apertura de un juego compatible (`autoOverlayOnGame`), con opción para deshabilitarlo en Ajustes.
+- **Controles de Administrador en Canales de Voz:** Añadido **Ensordecer** (`voice.serverDeafen`), **Asistencia Remota de Audio** (`voice.assistAudio`: Anti-Eco, Voz Clara HD, Subir Micro) además de Silenciar y Mover de Canal de Voz.
+- **Interfaz Simple + Ajustes Avanzados (Pro) + Mejoras Estéticas:** Configuración simplificada por defecto con botón **"Ajustes Avanzados (Pro)"**, agrupación limpia de mensajes consecutivos en el chat, anillos de voz con brillo neón y efectos *glassmorphism*.
+- **Cámaras Flotantes PiP (Dentro de la App y al Minimizar) + Insignia `v1.9.4`:** Miniventana flotante arrastrable al navegar por la app y modo flotante automático al minimizar en llamada, más insignia `v1.9.4` en la esquina inferior derecha.
+
+## [1.9.3] - 2026-11-05
+
+### 📱 Nuevo: Versión Móvil (Android APK + PWA Multiplataforma) y Microsoft Store Certified
+- **Interfaz Responsiva y Táctil (`app/mobile.css`, `app/mobile.js`, `app/mobile-shim.js`):**
+  - Adaptación automática en pantallas `<= 820px` con cajones deslizables (`#rail` + `#side` a la izquierda y `#members` a la derecha), gestos swipe desde los bordes y soporte nativo del botón **Atrás** de Android.
+  - Tarjetas de amigos, Bóveda de Reliquias, Hilos y Guías Oficiales optimizadas para uso con una sola mano y soporte `safe-area-inset` para *notch* / isla dinámica.
+- **Llamadas WebRTC en Móvil (`app/call.js`):**
+  - Alternancia de cámara frontal/trasera en vivo (`switchCamera()` con `RTCRtpSender.replaceTrack`) sin renegociar ni cortar la llamada.
+  - Puente nativo en `MainActivity.java` para permisos de micrófono/cámara, enrutamiento a altavoz (`MODE_IN_COMMUNICATION`), desbloqueo de `AudioContext` y selector de archivos adjuntos (`📎`).
+- **Minijuegos Adaptados a Pantalla Táctil:**
+  - **Turbo Core (`app/racer-game.js`):** Controles táctiles multi-touch con `Pointer Events`, botón dedicado de freno, rampas, aceite, barreras láser y minimapa.
+  - **Dojo Elemental (`app/card-game.js`):** Tatami fluido sin recortes laterales y mano de cartas con desplazamiento horizontal táctil.
+- **Servidor & Persistencia (`server/server.js`, `server/firebase-adapter.js`):**
+  - Servidor web móvil en `/app/` (PWA instalable) y descarga directa del APK en `/apk`.
+  - Coalescing de respaldos cada 60s y deduplicación SHA-256 para proteger la cuota gratuita de Firebase Spark.
+
+---
+
 ## [1.9.1] - 2026-11-04
 
 ### 🚀 Correcciones (Bugs Críticos Bloque A)

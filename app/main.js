@@ -144,6 +144,7 @@ let isOverlayVisible = false;
 let pendingSource = null;
 let savedBounds = null;
 let isMiniMode = false;
+let callStatus = { inCall: false, hasVideo: false, autoFloat: true };
 
 function createOverlayWindow() {
   if (overlayWin && !overlayWin.isDestroyed()) return overlayWin;
@@ -227,6 +228,17 @@ function createWindow() {
   setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible()) win.show(); }, 1200);
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
+
+  win.on('minimize', () => {
+    if (callStatus.inCall && callStatus.autoFloat !== false && !isMiniMode) {
+      setImmediate(() => {
+        if (win && !win.isDestroyed()) {
+          win.restore();
+          setMiniMode(true);
+        }
+      });
+    }
+  });
 
   win.on('close', (e) => {
     if (!isQuitting) {
@@ -363,7 +375,17 @@ app.whenReady().then(() => {
     app.relaunch();
     app.exit(0);
   });
-    ipcMain.handle('window:minimize', () => win?.minimize());
+    ipcMain.handle('window:minimize', () => {
+      if (callStatus.inCall && callStatus.autoFloat !== false && !isMiniMode) {
+        return setMiniMode(true);
+      }
+      win?.minimize();
+    });
+    ipcMain.handle('call:status', (_e, st) => {
+      callStatus = { ...callStatus, ...(st || {}) };
+      if (!callStatus.inCall && isMiniMode) setMiniMode(false);
+      return callStatus;
+    });
   ipcMain.handle('window:maximize', () => {
     if (!win) return;
     if (win.isMaximized()) win.unmaximize();

@@ -5,6 +5,7 @@ COPY package.json ./
 COPY rewards.config.json ./
 RUN npm install --omit=dev --ignore-scripts ws && mkdir -p /app/data/uploads
 COPY server ./server
+COPY app ./app
 COPY rewards.config.json ./server/
 COPY release ./release
 ENV PORT=7777

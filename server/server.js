@@ -970,7 +970,16 @@ const H = {
   'voice.leave': (ws) => leaveRoom(ws),
   'voice.state': (ws, d) => {
     const r = rooms.get(ws.room); const me = r?.get(ws.user.id); if (!me) return;
-    me.state = { muted: !!d.muted, deaf: !!d.deaf, cam: !!d.cam, screen: d.screen ? clean(d.screen, 80) : null };
+    const serverMuted = !!me.state?.serverMuted;
+    const serverDeafened = !!me.state?.serverDeafened;
+    me.state = {
+      muted: serverMuted || serverDeafened ? true : !!d.muted,
+      deaf: serverDeafened ? true : !!d.deaf,
+      serverMuted,
+      serverDeafened,
+      cam: !!d.cam,
+      screen: d.screen ? clean(d.screen, 80) : null,
+    };
     for (const [id, v] of r) if (id !== ws.user.id) send(v.ws, { t: 'voice.peerstate', userId: ws.user.id, state: me.state });
     broadcastRoom(ws.room);
   },
@@ -993,6 +1002,55 @@ const H = {
       broadcastRoom(key);
     }
     return { ok: true, userId: targetId, muted: mute };
+  },
+  'voice.serverDeafen': (ws, d) => {
+    const key = clean(d.key, 40);
+    const targetId = Number(d.userId);
+    const deaf = !!d.deaf;
+    const auth = authorize(key, ws.user.id);
+    if (!auth.serverId) fail('Solo disponible en canales de servidor');
+    const myR = roleOf(auth.serverId, ws.user.id), tarR = roleOf(auth.serverId, targetId);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para ensordecer en servidor');
+    if (targetId !== ws.user.id && tarR && roleRank(myR) <= roleRank(tarR)) fail('No puedes ensordecer a alguien de igual o mayor rango');
+    const r = rooms.get(key);
+    const targetEntry = r?.get(targetId);
+    if (targetEntry) {
+      targetEntry.state.serverDeafened = deaf;
+      if (deaf) {
+        targetEntry.state.deaf = true;
+        targetEntry.state.muted = true;
+      }
+      send(targetEntry.ws, { t: 'voice.serverDeafened', key, deaf });
+      for (const [, v] of r) send(v.ws, { t: 'voice.peerstate', userId: targetId, state: targetEntry.state });
+      broadcastRoom(key);
+    }
+    return { ok: true, userId: targetId, deaf };
+  },
+  'voice.assistAudio': (ws, d) => {
+    const key = clean(d.key, 40);
+    const targetId = Number(d.userId);
+    const preset = clean(d.preset || 'custom', 30);
+    const auth = authorize(key, ws.user.id);
+    if (auth.serverId) {
+      const myR = roleOf(auth.serverId, ws.user.id), tarR = roleOf(auth.serverId, targetId);
+      if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para asistir en audio');
+      if (targetId !== ws.user.id && tarR && roleRank(myR) <= roleRank(tarR)) fail('No puedes ajustar el audio a alguien de igual o mayor rango');
+    }
+    const r = rooms.get(key);
+    const targetEntry = r?.get(targetId);
+    if (!targetEntry) fail('El usuario no está en la sala de voz');
+    const cfg = d.config && typeof d.config === 'object' ? {
+      noise: ['off', 'std', 'high'].includes(d.config.noise) ? d.config.noise : undefined,
+      micGain: d.config.micGain !== undefined ? Math.max(0.3, Math.min(2.5, Number(d.config.micGain) || 1)) : undefined,
+      voiceGate: d.config.voiceGate !== undefined ? Math.max(0, Math.min(0.08, Number(d.config.voiceGate) || 0)) : undefined,
+      antiEcho: d.config.antiEcho !== undefined ? !!d.config.antiEcho : undefined,
+      echoCancellation: d.config.echoCancellation !== undefined ? !!d.config.echoCancellation : undefined,
+      autoGainControl: d.config.autoGainControl !== undefined ? !!d.config.autoGainControl : undefined,
+      voiceClarity: d.config.voiceClarity !== undefined ? !!d.config.voiceClarity : undefined,
+      audioKbps: d.config.audioKbps !== undefined ? Math.max(32, Math.min(160, Number(d.config.audioKbps) || 96)) : undefined,
+    } : null;
+    send(targetEntry.ws, { t: 'voice.audioAssist', key, fromName: ws.user.name, preset, config: cfg });
+    return { ok: true, userId: targetId, preset };
   },
   'voice.moveUser': (ws, d) => {
     const curKey = clean(d.currentKey, 40);
@@ -1374,13 +1432,15 @@ const H = {
   },
   'cardjitsu.accept': (ws, d) => {
     const fromId = Number(d.fromUserId);
-    const roomId = 'cj_' + Math.min(ws.user.id, fromId) + '_' + Math.max(ws.user.id, fromId);
+    const game = d?.game === 'racer' ? 'racer' : 'dojo';
+    const trackId = Number(d?.trackId) || 1;
+    const roomId = 'pvp_' + game + '_' + Math.min(ws.user.id, fromId) + '_' + Math.max(ws.user.id, fromId) + '_' + Date.now();
     const myProfile = { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) };
     const oppUser = get('SELECT id, name FROM users WHERE id=?', fromId);
     const oppProfile = { id: fromId, name: oppUser ? oppUser.name : 'Rival', ...profileOf(fromId) };
-    toUser(fromId, { t: 'cardjitsu.start', roomId, opponent: myProfile });
-    toUser(ws.user.id, { t: 'cardjitsu.start', roomId, opponent: oppProfile });
-    return { ok: true, roomId };
+    toUser(fromId, { t: 'cardjitsu.start', roomId, game, trackId, isHost: true, opponent: myProfile });
+    toUser(ws.user.id, { t: 'cardjitsu.start', roomId, game, trackId, isHost: false, opponent: oppProfile });
+    return { ok: true, roomId, game };
   },
   'cardjitsu.decline': (ws, d) => {
     const toId = Number(d.toUserId);
@@ -1389,7 +1449,14 @@ const H = {
   },
   'cardjitsu.play': (ws, d) => {
     const toId = Number(d.toUserId);
-    toUser(toId, { t: 'cardjitsu.opponentPlay', roomId: d.roomId, card: d.card });
+    toUser(toId, { t: 'cardjitsu.opponentPlay', roomId: d.roomId, fromId: ws.user.id, card: d.card });
+    return { ok: true };
+  },
+  'minigame.sync': (ws, d) => {
+    const toId = Number(d.toUserId);
+    if (toId) {
+      toUser(toId, { t: 'minigame.sync', roomId: d.roomId, game: d.game, fromId: ws.user.id, data: d.data });
+    }
     return { ok: true };
   },
 
@@ -1550,23 +1617,68 @@ const httpServer = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'referrer-policy': 'origin-when-cross-origin' });
     return res.end(ytPlayerHtml(u.searchParams.get('v') || ''));
   }
+  if (u.pathname === '/mobile' || u.pathname === '/web' || u.pathname === '/app') {
+    res.writeHead(302, { Location: '/app/' });
+    return res.end();
+  }
+  if (u.pathname === '/rewards.config.json' || u.pathname.startsWith('/app/')) {
+    const appRoot = path.resolve(__dirname, '..', 'app');
+    let relPath = u.pathname === '/rewards.config.json'
+      ? path.resolve(__dirname, '..', 'rewards.config.json')
+      : path.resolve(appRoot, '.' + (u.pathname === '/app/' ? '/index.html' : u.pathname.slice(4)));
+    const allowedRoot = u.pathname === '/rewards.config.json' ? path.resolve(__dirname, '..') : appRoot;
+    if (relPath.startsWith(allowedRoot) && fs.existsSync(relPath) && fs.statSync(relPath).isFile()) {
+      const ext = path.extname(relPath).toLowerCase();
+      const WEB_MIMES = {
+        '.html': 'text/html; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.js': 'application/javascript; charset=utf-8',
+        '.json': 'application/json; charset=utf-8',
+        '.webmanifest': 'application/manifest+json; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp',
+        '.ico': 'image/x-icon',
+        '.wasm': 'application/wasm',
+      };
+      const mime = WEB_MIMES[ext] || 'application/octet-stream';
+      const stat = fs.statSync(relPath);
+      res.writeHead(200, {
+        'content-type': mime,
+        'content-length': stat.size,
+        'cache-control': (ext === '.html' || ext === '.webmanifest' || relPath.endsWith('sw.js')) ? 'no-cache' : 'public, max-age=3600',
+        'x-content-type-options': 'nosniff',
+      });
+      return fs.createReadStream(relPath).pipe(res);
+    }
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    return res.end('Recurso no encontrado');
+  }
   if (u.pathname === '/' || u.pathname === '/index.html') {
     const info = releaseInfo();
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    return res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>EpicKast — Descarga Oficial</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,#1d1b38 0%,#0e1015 70%);color:#eef0f6;font-family:system-ui,sans-serif;text-align:center;padding:20px}
-.box{background:#151821;border:1px solid rgba(255,255,255,.08);padding:34px;border-radius:20px;max-width:480px;box-shadow:0 20px 50px #000a}
+    return res.end(`<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EpicKast — Descarga Oficial y Versión Móvil</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,#1d1b38 0%,#0e1015 70%);color:#eef0f6;font-family:system-ui,sans-serif;text-align:center;padding:20px;box-sizing:border-box}
+.box{background:#151821;border:1px solid rgba(255,255,255,.08);padding:34px;border-radius:20px;max-width:480px;width:100%;box-shadow:0 20px 50px #000a;box-sizing:border-box}
 h1{margin:0 0 6px;font-size:28px}h1 span{color:#7c5cff}p{color:#8c93a8;font-size:14px;line-height:1.5}
-a.btn{display:inline-block;margin-top:14px;background:#7c5cff;color:#fff;text-decoration:none;font-weight:700;padding:13px 26px;border-radius:12px;font-size:15px}
+.btns{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+a.btn{display:inline-block;background:#7c5cff;color:#fff;text-decoration:none;font-weight:700;padding:13px 22px;border-radius:12px;font-size:15px}
+a.btn.mob{background:linear-gradient(135deg,#059669,#10b981)}
 .steps{text-align:left;background:#1e2230;padding:14px 18px;border-radius:12px;margin-top:18px;font-size:13px;color:#d0d5e6}
 .steps li{margin:6px 0}</style></head><body><div class="box">
 <h1>Epic<span>Kast</span> v${info.version}</h1>
 <p>Comunicación ultraligera de baja latencia · Servidor en línea 🟢</p>
-<a class="btn" href="/download/latest">⬇ Descargar para Windows (ZIP sin bloqueo)</a>
+<div class="btns">
+  <a class="btn mob" href="/download/apk">🤖 Descargar APK para Android (v${info.version})</a>
+  <a class="btn" style="background:#0284c7" href="/app/">📱 Abrir en Navegador / iPhone (PWA Instalable)</a>
+  <a class="btn" href="/download/latest">⬇ Descargar para Windows (ZIP sin bloqueo)</a>
+</div>
 <ol class="steps">
-<li>Descarga el archivo <b>.zip</b> de arriba y extráelo.</li>
-<li>Abre <b>Instalar-Sin-Bloqueo.bat</b> (elimina el aviso de SmartScreen automáticamente e instala EpicKast).</li>
-<li>¡Listo! Ya viene conectado por defecto a <b>wss://epickast-b9fd.onrender.com</b>.</li>
+<li><b>En Teléfono (Android / iPhone):</b> Pulsa el botón verde <b>Abrir en Teléfono</b> y en el menú del navegador elige <i>"Agregar a pantalla de inicio / Instalar aplicación"</i>.</li>
+<li><b>En Windows:</b> Descarga el archivo <b>.zip</b> o instálala desde la <b>Microsoft Store</b>.</li>
+<li>¡Listo! PC y Móvil comparten chat, voz, amigos y la Bóveda en tiempo real.</li>
 </ol></div></body></html>`);
   }
   if (u.pathname === '/privacy' || u.pathname === '/privacidad') {
@@ -1587,6 +1699,21 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
 <h2>4. Contacto</h2>
 <p>Para dudas sobre privacidad, soporte o solicitudes de eliminación de cuenta, contactar a través del repositorio oficial de EpicKast o con el editor <strong>epickap</strong>.</p>
 </div></body></html>`);
+  }
+  if (u.pathname === '/download/apk' || u.pathname === '/apk') {
+    const apkFile = path.join(__dirname, '..', 'release', 'EpicKast-Android-v1.9.3.apk');
+    if (fs.existsSync(apkFile)) {
+      const stat = fs.statSync(apkFile);
+      res.writeHead(200, {
+        'content-type': 'application/vnd.android.package-archive',
+        'content-length': stat.size,
+        'content-disposition': 'attachment; filename="EpicKast-Android-v1.9.3.apk"',
+        'x-content-type-options': 'nosniff',
+      });
+      return fs.createReadStream(apkFile).pipe(res);
+    }
+    res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+    return res.end('APK no encontrado en release/');
   }
   if (u.pathname === '/download/asar' || u.pathname === '/update/asar') {
     const asarFile = path.join(__dirname, '..', 'release', 'app.asar');

@@ -581,8 +581,8 @@ function modalVault(initialTab = 'roulette') {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.3</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental y Turbo Core</p>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.4</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Economía Compartida · Cosméticos, Dojo Elemental 1v1 y Turbo Core 1v1</p>
           </div>
         </div>
 
@@ -620,7 +620,10 @@ function modalVault(initialTab = 'roulette') {
             <span style="display:inline-flex;align-items:center;gap:5px;color:#94a3b8;">${renderTabIco('pity_star', 1)} Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
           </div>
 
-          <div style="display:flex;gap:8px;align-items:center;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button id="vBtnDailyBonus" style="background:linear-gradient(135deg, #d97706, #b45309);color:#fff;border:1px solid #fbbf24;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:5px;" title="Reclama tu recompensa diaria gratuita">
+              <span>🎁</span> <span>Bono Diario</span>
+            </button>
             <button id="vBtnProbabilities" style="background:#1e2638;color:#94a3b8;border:1px solid #2d3748;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:4px;" title="Ver tabla de probabilidades y sintonía">
               <span>ⓘ</span> Probabilidades
             </button>
@@ -843,6 +846,29 @@ function modalVault(initialTab = 'roulette') {
 
     const probBtn = wrap.querySelector('#vBtnProbabilities');
     if (probBtn) probBtn.onclick = openProbabilitiesModal;
+
+    const dailyBtn = wrap.querySelector('#vBtnDailyBonus');
+    if (dailyBtn) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const claimedToday = localStorage.getItem('epickast.daily_bonus_date') === todayKey;
+      if (claimedToday) {
+        dailyBtn.style.opacity = '0.55';
+        dailyBtn.innerHTML = '<span>✓</span> <span>Bono Diario Reclamado</span>';
+      }
+      dailyBtn.onclick = () => {
+        if (localStorage.getItem('epickast.daily_bonus_date') === todayKey) {
+          toast('⏳ Ya reclamaste tu Bono Diario de hoy. ¡Vuelve mañana!');
+          return;
+        }
+        localStorage.setItem('epickast.daily_bonus_date', todayKey);
+        dData.coins = (dData.coins || 0) + 150;
+        dData.dust = (dData.dust || 0) + 15;
+        dData.keys.copper = (dData.keys.copper || 0) + 1;
+        saveState();
+        toast('🎁 ¡Bono Diario reclamado: +150 Monedas, +1 Llave de Cobre y +15 Esencia Arcana!');
+        renderView();
+      };
+    }
 
     const chkSkip = wrap.querySelector('#vChkSkipAnim');
     if (chkSkip) {
@@ -1393,6 +1419,19 @@ function modalVault(initialTab = 'roulette') {
     });
   };
 
+  const getOnlinePlayableUsers = () => {
+    const map = new Map();
+    for (const f of (S.friends?.friends || [])) {
+      if (f.online && f.id !== S.me?.id) map.set(f.id, { id: f.id, name: f.name });
+    }
+    for (const sd of S.sdata.values()) {
+      for (const m of (sd.members || [])) {
+        if (m.online && m.id !== S.me?.id) map.set(m.id, { id: m.id, name: m.name });
+      }
+    }
+    return [...map.values()];
+  };
+
   const mountDojo = () => {
     const dojoContainer = wrap.querySelector('#vViewDojo');
     if (!dojoContainer) return;
@@ -1400,8 +1439,16 @@ function modalVault(initialTab = 'roulette') {
       if (activeDojoInstance) { try { activeDojoInstance.destroy(); } catch {} }
       activeDojoInstance = new window.CardJitsuGame(dojoContainer, {
         playerName: S.me?.name || 'Tú',
+        getOnlinePlayers: getOnlinePlayableUsers,
+        onChallengePlayer: (uid, game) => {
+          safe(rpc('cardjitsu.challenge', { toUserId: uid, game: game || 'dojo' }));
+          toast('⚔️ ¡Reto de Dojo 1v1 enviado! Esperando a que acepte…');
+        },
         onReward: (reward) => {
           if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
+          if (reward.key && reward.keyCount) {
+            dData.keys[reward.key] = (dData.keys[reward.key] || 0) + reward.keyCount;
+          }
           if (reward.keys) {
             if (reward.keys.copper) dData.keys.copper = (dData.keys.copper || 0) + reward.keys.copper;
             if (reward.keys.silver) dData.keys.silver = (dData.keys.silver || 0) + reward.keys.silver;
@@ -1412,6 +1459,14 @@ function modalVault(initialTab = 'roulette') {
           toast(`🎁 ¡Recompensas añadidas a tu Bóveda (+ ${reward.coins} 🪙)!`);
         }
       });
+      window._ekActiveDojo = activeDojoInstance;
+      if (S.pendingPvpMatch && S.pendingPvpMatch.game !== 'racer') {
+        const pm = S.pendingPvpMatch;
+        S.pendingPvpMatch = null;
+        activeDojoInstance.startPvpMatch(pm.opponent, pm.roomId, (card) => {
+          rpc('cardjitsu.play', { toUserId: pm.opponent.id, roomId: pm.roomId, card }).catch(() => {});
+        });
+      }
     } else {
       dojoContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Dojo Elemental...</div>';
     }
@@ -1425,6 +1480,11 @@ function modalVault(initialTab = 'roulette') {
       try {
         activeRacerInstance = new window.CoreRacerGame(racerContainer, {
           playerName: S.me?.name || 'Tú',
+          getOnlinePlayers: getOnlinePlayableUsers,
+          onChallengePlayer: (uid, game) => {
+            safe(rpc('cardjitsu.challenge', { toUserId: uid, game: game || 'racer' }));
+            toast('🏁 ¡Reto de Carrera 1v1 enviado! Esperando a que acepte…');
+          },
           getCoins: () => dData.coins || 0,
           spendCoins: (amt) => {
             if ((dData.coins || 0) < amt) {
@@ -1448,6 +1508,14 @@ function modalVault(initialTab = 'roulette') {
             toast(`🏎️ ¡Botín de carrera acreditado (+${reward.coins} 🪙)!`);
           }
         });
+        window._ekActiveRacer = activeRacerInstance;
+        if (S.pendingPvpMatch && S.pendingPvpMatch.game === 'racer') {
+          const pm = S.pendingPvpMatch;
+          S.pendingPvpMatch = null;
+          activeRacerInstance.startPvpRace(pm.opponent, pm.roomId, (data) => {
+            rpc('minigame.sync', { toUserId: pm.opponent.id, roomId: pm.roomId, game: 'racer', data }).catch(() => {});
+          }, pm.trackId || 1);
+        }
       } catch (err) {
         console.error('Error al iniciar Turbo Core:', err);
         racerContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#ef4444;">Error al iniciar Turbo Core: ' + (err.message || err) + '</div>';
@@ -1489,6 +1557,7 @@ function modalVault(initialTab = 'roulette') {
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
 function openOfficialGuide(chKey = 'notas_version') {
+  window.EKMobile?.closeDrawers?.();
   S.view = { kind: 'guide' };
   S.guideChannel = chKey;
   S.chan = null;
@@ -1510,11 +1579,94 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.9.1 (ACTUAL) ==================== -->
-        <div style="border:2px solid #38bdf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#0b1522;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2c44;padding-bottom:10px;">
+        <!-- ==================== VERSIÓN 1.9.4 (ACTUAL · AUDIO PRO, ADMIN & CÁMARAS FLOTANTES) ==================== -->
+        <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:#0a1628;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.4</h2>
+            </div>
+            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Audio HD Anti-Eco, Moderación de Voz Pro & Cámaras Flotantes PiP</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#38bdf8;">🎙️ Audio HD, Cero Doble Voz y Sin Ruido Blanco:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Corrección de audio al entrar a canales de servidor:</b> reanudación automática de pistas WebRTC tras cambios de layout y reseteo limpio de colisiones de oferta (<i>glare</i>).</li>
+                <li><b>Filtro De-Hiss Anti-Ruido-Blanco y Guarda Anti-Eco:</b> corte suave de estática aguda (&gt;6.2 kHz), piso mínimo de compuerta en silencio y atenuación automática del retorno de altavoces cuando otro habla.</li>
+                <li><b>Cadena Vocal Mejorada:</b> realce vocal en 2.8 kHz, limitador anti-saturación y Opus SDP con recuperación de paquetes (FEC) y reconexión ICE automática.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#f59e0b;">⚔️ Minijuegos Multijugador 1v1 en Vivo & Bono Diario:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Duelos 1v1 en Dojo Elemental y Carreras 1v1 en Turbo Core:</b> desafía a tu pareja o amigos conectados desde su perfil o directamente desde el lobby del minijugador con invitación interactiva en pantalla.</li>
+                <li><b>Bono Diario en la Bóveda:</b> reclama gratis cada día +150 Monedas, +1 Llave de Cobre y +15 de Esencia Arcana.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#c084fc;">🛡️ Controles de Administrador en Voz & Overlay Automático:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Silenciar, Ensordecer, Mover y Asistir Audio:</b> gestión en tiempo real y envío de ajustes recomendados (Anti-Eco, Voz Clara HD o Subir Micro) a usuarios con problemas de audio.</li>
+                <li><b>Overlay Gamer Automático:</b> se activa automáticamente al detectar que abriste un juego compatible (con opción para desactivarlo en Ajustes).</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#34d399;">📹 Cámaras Flotantes PiP, Agrupación de Chat & Ajustes Pro:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Cámaras Flotantes dentro de la app y al minimizar:</b> miniventana flotante arrastrable al cambiar de canal o automáticamente al minimizar EpicKast.</li>
+                <li><b>Estética Renovada:</b> agrupación limpia de mensajes consecutivos, anillos de voz animados con brillo neón, glassmorphism y botón <b>Ajustes Avanzados (Pro)</b>.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.3 ==================== -->
+        <div style="border:2px solid #a855f7;border-radius:12px;padding:18px;margin-bottom:24px;background:#130d24;box-shadow:0 8px 24px rgba(168,85,247,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #2e1d4d;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#9333ea;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.3</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.3</h2>
+            </div>
+            <span style="font-size:12px;color:#d8b4fe;font-weight:700;">Microsoft Store Certified + App Móvil Android & PWA</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#c084fc;">📱 Nueva Versión Móvil Completa (Android APK + PWA Multiplataforma):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Interfaz táctil responsiva con cajones laterales deslizables (gestos swipe desde los bordes para servidores, canales y miembros) y soporte completo para el botón Atrás de Android.</li>
+                <li>Llamadas WebRTC móviles con alternancia de cámara frontal/trasera en vivo (<code>🔄 Girar cámara</code>), desbloqueo automático de audio y filtro de voz con IA RNNoise.</li>
+                <li>Controles táctiles multi-touch (<code>Pointer Events</code> + botón de freno dedicado) en <b>Turbo Core</b> y tatami adaptable con mano deslizable en el <b>Dojo Elemental</b>.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">🏎️ Turbo Core v1.9.3 & Bóveda de Reliquias:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Cámara con mayor campo de visión, pistas extendidas con rampas de salto, manchas de aceite, barreras láser, minimapa en tiempo real e IA equilibrada.</li>
+                <li>Sincronización multiplataforma instantánea de Monedas, Llaves, Esencia Arcana y Mi Ninja entre PC (Microsoft Store) y Teléfono.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#34d399;">☁️ Persistencia Inteligente en la Nube (Protector de Cuota Spark):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li>Coalescing de respaldos cada 60s y deduplicación criptográfica SHA-256 para proteger la cuota gratuita de Firebase sin perder ni un solo mensaje o archivo.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.1 ==================== -->
+        <div style="border:2px solid #38bdf8;border-radius:12px;padding:20px;margin-bottom:24px;background:#0b1522;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e2c44;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.1</span>
               <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.1</h2>
             </div>
             <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Estabilidad, @ Menciones y Acabado Audiovisual</span>
@@ -2059,22 +2211,36 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.1', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.4', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
-  stageCollapsed: false, activeThread: null, autoAwayActive: false
+  stageCollapsed: false, activeThread: null, autoAwayActive: false,
+  floatPipIndex: 0, floatPipDismissed: false
 };
 
-window.epic.version?.().then((v) => { if (v) { S.appVer = v; renderRail(); } }).catch(() => {});
+function updateVersionBadges() {
+  const verTxt = 'v' + (S.appVer || '1.9.4');
+  const badge = $('ekVersionBadge');
+  if (badge) {
+    badge.textContent = verTxt;
+    badge.title = `EpicKast ${verTxt} · Clic para ver notas de la versión`;
+  }
+}
+$('ekVersionBadge')?.addEventListener('click', () => openOfficialGuide('notas_version'));
+updateVersionBadges();
+
+window.epic.version?.().then((v) => { if (v) { S.appVer = v; updateVersionBadges(); renderRail(); } }).catch(() => {});
 window.epic.onMiniChanged?.((val) => {
   S.mini = !!val;
   document.body.classList.toggle('mini-mode', S.mini);
   updateDock();
+  syncFloatingCam();
 });
 window.epic.onOverlayStatus?.((val) => {
   S.overlayActive = !!val;
   updateDock();
+  syncFloatingCam();
 });
 window.epic.onShortcut?.((act) => {
   if (act === 'overlay') {
@@ -2444,9 +2610,37 @@ function onMsg(ev) {
     case 'thread.msg': onThreadMsg(m); break;
     case 'cardjitsu.invite': {
       const fromName = m.from?.name || 'Un amigo';
-      const targetTab = m.game === 'racer' ? 'racer' : 'dojo';
-      toast(`🥋 ¡${fromName} te ha desafiado en la Bóveda de Reliquias!`);
+      const fromId = m.from?.id;
+      const game = m.game === 'racer' ? 'racer' : 'dojo';
+      const gameLabel = game === 'racer' ? '🏎️ Turbo Core (1v1)' : '🥋 Dojo Elemental (1v1)';
       ringer.beep([659, 880, 1046], 0.06, 0.12);
+      showMinigameInviteBanner({ fromId, fromName, game, gameLabel });
+      break;
+    }
+    case 'cardjitsu.start': {
+      S.pendingPvpMatch = {
+        roomId: m.roomId,
+        game: m.game === 'racer' ? 'racer' : 'dojo',
+        trackId: m.trackId || 1,
+        opponent: m.opponent,
+        isHost: !!m.isHost,
+      };
+      toast(`⚔️ ¡Duelo 1v1 iniciado contra ${m.opponent?.name || 'Rival'}!`);
+      modalVault(m.game === 'racer' ? 'racer' : 'dojo');
+      break;
+    }
+    case 'cardjitsu.declined': {
+      toast(`ℹ️ ${m.fromName || 'El jugador'} rechazó el duelo 1v1`);
+      break;
+    }
+    case 'cardjitsu.opponentPlay': {
+      window._ekActiveDojo?.onOpponentPlay?.(m.card);
+      break;
+    }
+    case 'minigame.sync': {
+      if (m.game === 'racer') {
+        window._ekActiveRacer?.onOpponentSync?.(m.data);
+      }
       break;
     }
     case 'msg.pinned': onMsgPinned(m); break;
@@ -2483,16 +2677,73 @@ function onMsg(ev) {
     }
     case 'voice.serverMuted': {
       if (S.call) {
+        S.call.serverMuted = !!m.muted;
         if (m.muted) {
-          if (!S.call.muted) {
-            S.call.setMute(true);
-            updateDock();
-            pushState();
-          }
-          toast('🔇 Fuiste silenciado por un moderador');
+          if (!S.call.muted) S.call.setMuted(true);
+          toast('🔇 Fuiste silenciado por un administrador');
         } else {
-          toast('🔊 Un moderador reactivó tu micrófono');
+          toast('🔊 Un administrador reactivó tu micrófono');
         }
+        updateDock();
+        renderStage();
+        pushState();
+      }
+      break;
+    }
+    case 'voice.serverDeafened': {
+      if (S.call) {
+        S.call.serverDeafened = !!m.deaf;
+        S.call.deaf = !!m.deaf;
+        S.call.setMuted(!!m.deaf || !!S.call.serverMuted);
+        updateDock();
+        renderStage();
+        syncPartyTile();
+        pushState();
+        toast(m.deaf ? '🎧❌ Fuiste ensordecido por un administrador' : '🎧 Un administrador reactivó tu audio');
+      }
+      break;
+    }
+    case 'voice.audioAssist': {
+      const preset = m.preset || 'custom';
+      const by = m.fromName || 'Administrador';
+      const cfg = m.config;
+      if (cfg && typeof cfg === 'object') {
+        if (cfg.noise !== undefined) settings.noise = cfg.noise;
+        if (cfg.micGain !== undefined) settings.micGain = cfg.micGain;
+        if (cfg.voiceGate !== undefined) settings.voiceGate = cfg.voiceGate;
+        if (cfg.antiEcho !== undefined) settings.antiEcho = cfg.antiEcho;
+        if (cfg.echoCancellation !== undefined) settings.echoCancellation = cfg.echoCancellation;
+        if (cfg.autoGainControl !== undefined) settings.autoGainControl = cfg.autoGainControl;
+        if (cfg.voiceClarity !== undefined) settings.voiceClarity = cfg.voiceClarity;
+        if (cfg.audioKbps !== undefined) settings.audioKbps = cfg.audioKbps;
+        toast(`🎛️ ${by} ajustó y guardó tu configuración de audio`);
+      } else if (preset === 'anti-echo') {
+        settings.echoCancellation = true;
+        settings.antiEcho = true;
+        settings.noise = 'high';
+        settings.voiceGate = Math.max(Number(settings.voiceGate || 0), 0.012);
+        settings.audioProfile = 'speakers';
+        toast(`🛡️ ${by} activó Anti-Eco para evitar doble voz en tu micrófono`);
+      } else if (preset === 'boost-mic') {
+        settings.micGain = Math.min(2.2, Math.max(1.25, Number(settings.micGain || 1) + 0.35));
+        settings.autoGainControl = true;
+        toast(`🎙️ ${by} subió la ganancia de tu micrófono a ${Math.round(settings.micGain * 100)}%`);
+      } else {
+        settings.noise = 'high';
+        settings.echoCancellation = true;
+        settings.autoGainControl = true;
+        settings.voiceClarity = true;
+        settings.antiEcho = true;
+        settings.audioKbps = Math.max(96, Number(settings.audioKbps || 96));
+        settings.audioProfile = 'auto';
+        toast(`✨ ${by} optimizó tu audio a Voz Clara HD (RNNoise + Anti-Eco)`);
+      }
+      saveSettings();
+      if (S.call) {
+        S.call.rebuildMic(settings).then(() => {
+          updateDock();
+          renderStage();
+        }).catch(() => {});
       }
       break;
     }
@@ -2569,6 +2820,36 @@ function onMsg(ev) {
     case 'call.stop': onCallStop(m); break;
     case 'profile.changed': onProfile(m.profile); break;
   }
+}
+
+function showMinigameInviteBanner({ fromId, fromName, game, gameLabel }) {
+  let banner = $('ekMinigameInviteBanner');
+  if (banner) banner.remove();
+  banner = h('div', {
+    id: 'ekMinigameInviteBanner',
+    style: 'position:fixed;top:48px;right:18px;z-index:95;background:linear-gradient(135deg,#18122b,#0f172a);border:2px solid #a855f7;border-radius:12px;padding:12px 16px;box-shadow:0 12px 32px rgba(0,0,0,0.75);color:#f8fafc;display:flex;flex-direction:column;gap:8px;max-width:320px;'
+  },
+    h('div', { style: 'font-size:13px;font-weight:800;color:#e9d5ff' }, `⚔️ ¡${fromName} te reta a un duelo!`),
+    h('div', { style: 'font-size:11.5px;color:#cbd5e1' }, `Juego: ${gameLabel}`),
+    h('div', { style: 'display:flex;gap:8px;margin-top:2px' },
+      h('button', {
+        style: 'flex:1;background:linear-gradient(135deg,#9333ea,#6366f1);color:#fff;border:0;border-radius:7px;padding:6px 10px;font-weight:800;font-size:11.5px;cursor:pointer',
+        onclick: () => {
+          banner.remove();
+          safe(rpc('cardjitsu.accept', { fromUserId: fromId, game }));
+        }
+      }, '✓ Aceptar 1v1'),
+      h('button', {
+        style: 'background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.15);border-radius:7px;padding:6px 10px;font-weight:700;font-size:11.5px;cursor:pointer',
+        onclick: () => {
+          banner.remove();
+          if (fromId) rpc('cardjitsu.decline', { toUserId: fromId }).catch(() => {});
+        }
+      }, '✕ Rechazar')
+    )
+  );
+  document.body.append(banner);
+  setTimeout(() => { if (banner && banner.parentNode) banner.remove(); }, 25000);
 }
 
 function onTyping(m) {
@@ -2762,6 +3043,7 @@ function startIdleAutoAway() {
 }
 async function syncActivity() {
   if (!S.ws || S.ws.readyState !== 1 || !S.me) return;
+  const prevGame = S.detectedGame;
   let actName = (settings.customActivity || '').trim();
   if (!actName && settings.autoGameDetect) {
     const det = await window.epic.detectGame?.().catch(() => null);
@@ -2769,6 +3051,17 @@ async function syncActivity() {
     actName = S.detectedGame || '';
   } else if (!settings.autoGameDetect) {
     S.detectedGame = null;
+  }
+  // Auto-activar Overlay flotante al entrar a un juego (si el usuario no deshabilitó la opción)
+  if (!prevGame && S.detectedGame && settings.autoOverlayOnGame !== false) {
+    if (!S.overlayActive && window.epic?.toggleOverlay) {
+      S.autoOpenedOverlay = true;
+      toggleOverlay(true);
+      toast(`🎮 Juego detectado (${S.detectedGame}) · Overlay activado`);
+    }
+  } else if (prevGame && !S.detectedGame && S.autoOpenedOverlay) {
+    S.autoOpenedOverlay = false;
+    if (S.overlayActive) toggleOverlay(false);
   }
   if (actName === S.lastSentActivity) return;
   S.lastSentActivity = actName;
@@ -2905,15 +3198,17 @@ async function refreshServer(id) {
 const dmKey = (a, b) => `d${Math.min(a, b)}_${Math.max(a, b)}`;
 
 // ---------- navegación ----------
-function goHome() { S.view = { kind: 'home', sid: null }; S.chan = null; render(); }
+function goHome() { S.view = { kind: 'home', sid: null }; S.chan = null; if (S.call && !S.stageCollapsed) toggleStageCollapse(true, true); render(); syncFloatingCam(); }
 async function openServer(id) {
   S.view = { kind: 'server', sid: id };
+  if (S.call && !S.stageCollapsed) toggleStageCollapse(true, true);
   if (!S.sdata.has(id)) await refreshServer(id);
   const sd = S.sdata.get(id); const first = sd?.channels.find((c) => c.type === 'text');
-  S.chan = null; render();
+  S.chan = null; render(); syncFloatingCam();
   if (first) openChannel(first.key, 'text', first.name);
 }
 async function openChannel(key, type, name) {
+  window.EKMobile?.closeDrawers?.();
   if (S.chan !== key) closeThread();
   S.chan = key; S.chanType = type; S.chanName = name; S.unread.delete(key); S.mentionsByChannel.delete(key); S.oldest = null;
   clearReply();
@@ -3392,7 +3687,12 @@ function onMsgPinned(m) {
 
 function addMsg(m, stick = true) {
   const box = $('msgs'); const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  box.append(msgEl(m));
+  const last = box.lastElementChild?._msg;
+  const el = msgEl(m);
+  if (last && last.userId === m.userId && !m.replyTo && !m.pinned && Math.abs((m.ts || 0) - (last.ts || 0)) < 300000) {
+    el.classList.add('grouped');
+  }
+  box.append(el);
   while (box.childElementCount > 300) box.firstElementChild.remove();
   if (stick && near) box.scrollTop = 1e9;
 }
@@ -4218,7 +4518,62 @@ function modalMemberCard(sd, m) {
               toast(`Silencio retirado a ${m.name}`);
               closeModal();
             }
-          }, '🔊 Desilenciar')
+          }, '🔊 Desilenciar'),
+          h('button', {
+            type: 'button',
+            class: 'mod-btn voice',
+            onclick: async () => {
+              await safe(rpc('voice.serverDeafen', { key: userVoiceKey, userId: m.id, deaf: true }));
+              toast(`${m.name} ensordecido en el canal`);
+              closeModal();
+            }
+          }, '🎧❌ Ensordecer'),
+          h('button', {
+            type: 'button',
+            class: 'mod-btn voice',
+            onclick: async () => {
+              await safe(rpc('voice.serverDeafen', { key: userVoiceKey, userId: m.id, deaf: false }));
+              toast(`Audio restaurado a ${m.name}`);
+              closeModal();
+            }
+          }, '🎧 Quitar sordera')
+        ) : null,
+        userVoiceKey ? h('div', { class: 'mod-row' },
+          h('label', { style: 'font-size:11px;color:var(--mu);margin-bottom:4px;display:block' }, '🎛️ Ayudar a mejorar su audio:'),
+          h('div', { class: 'mod-actions-grid' },
+            h('button', {
+              type: 'button',
+              class: 'mod-btn voice',
+              onclick: async () => {
+                await safe(rpc('voice.assistAudio', { key: userVoiceKey, userId: m.id, preset: 'anti-echo' }));
+                toast(`Anti-Eco aplicado al audio de ${m.name}`);
+              }
+            }, '🛡️ Quitar doble voz'),
+            h('button', {
+              type: 'button',
+              class: 'mod-btn voice',
+              onclick: async () => {
+                await safe(rpc('voice.assistAudio', { key: userVoiceKey, userId: m.id, preset: 'clean-voice' }));
+                toast(`Voz Clara HD aplicada a ${m.name}`);
+              }
+            }, '✨ Voz Clara HD'),
+            h('button', {
+              type: 'button',
+              class: 'mod-btn voice',
+              onclick: async () => {
+                await safe(rpc('voice.assistAudio', { key: userVoiceKey, userId: m.id, preset: 'boost-mic' }));
+                toast(`Volumen de micro subido a ${m.name}`);
+              }
+            }, '🎙️ Subir micro (+35%)'),
+            h('button', {
+              type: 'button',
+              class: 'mod-btn voice',
+              onclick: () => {
+                closeModal();
+                modalRemoteAudioEditor(m.id, m.name, userVoiceKey);
+              }
+            }, '🎛️ Editor Pro de Audio')
+          )
         ) : null,
         moveSel ? h('div', { class: 'mod-row' },
           h('label', { style: 'font-size:11px;color:var(--mu);margin-bottom:3px;display:block' }, '🔀 Mover a canal de voz:'),
@@ -4299,18 +4654,26 @@ function renderCenter() {
   const toggleSideBtn = h('button', {
     class: 'btn-ico' + (settings.hideSide ? ' on-pane' : ''),
     title: settings.hideSide ? 'Mostrar lista de contactos y canales' : 'Ocultar lista de contactos y canales (mantiene los servidores visibles)',
-    onclick: () => { settings.hideSide = !settings.hideSide; saveSettings(); renderCenter(); }
+    onclick: () => {
+      // Móvil: abre/cierra el cajón lateral (servidores + canales) en lugar de ocultar la columna
+      if (window.EKMobile?.isMobileLayout?.()) return window.EKMobile.toggleDrawer('left');
+      settings.hideSide = !settings.hideSide; saveSettings(); renderCenter();
+    }
   }, icoSvg('panelLeft', 16));
 
   const rightBtns = h('div', { style: 'display:flex;gap:8px;align-items:center' },
-    S.call ? h('button', { class: 'btn-act hdr' + (S.party?.current ? ' call' : ''), title: 'Abrir EpicBot DJ (YouTube & Playlists en conjunto)', onclick: modalParty }, '🎵 ', S.party?.current ? 'Bot DJ (Sonando)' : 'Bot DJ') : null,
+    S.call ? h('button', { class: 'btn-act hdr' + (S.party?.current ? ' call' : ''), title: 'Abrir EpicBot DJ (YouTube & Playlists en conjunto)', onclick: modalParty }, h('span', { class: 'hdr-emo' }, '🎵 '), S.party?.current ? 'Bot DJ (Sonando)' : 'Bot DJ') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver mensajes fijados en este canal', onclick: modalPins }, icoSvg('pin', 14), 'Fijados') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, icoSvg('gallery', 14), 'Galería') : null,
     dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null,
     isServer ? h('button', {
       class: 'btn-act hdr' + (!settings.hideMembers ? ' on-pane' : ''),
       title: settings.hideMembers ? 'Mostrar columna de miembros a la derecha' : 'Ocultar columna de miembros para ampliar la pantalla',
-      onclick: () => { settings.hideMembers = !settings.hideMembers; saveSettings(); renderCenter(); }
+      onclick: () => {
+        // Móvil: la lista de miembros se abre como cajón deslizable desde la derecha
+        if (window.EKMobile?.isMobileLayout?.()) return window.EKMobile.toggleDrawer('right');
+        settings.hideMembers = !settings.hideMembers; saveSettings(); renderCenter();
+      }
     }, icoSvg('users', 14), 'Miembros') : null
   );
 
@@ -5261,7 +5624,55 @@ async function modalSettings() {
   const noiseSel = h('select', { onchange: () => { settings.noise = noiseSel.value; saveSettings(); if (mic && ownMic) startTest(); else hint.textContent = 'Se aplicará en la próxima llamada.'; } },
     [['high', 'Alta — RNNoise + Filtro 115 Hz + Anti-Respiración (recomendada)'], ['std', 'Estándar — Chromium'], ['off', 'Desactivada']].map(([v, t]) => h('option', { value: v, selected: settings.noise === v }, t)));
   const audioQSel = h('select', { onchange: () => { settings.audioKbps = Number(audioQSel.value); saveSettings(); S.call?.peers.forEach((p) => p.senders.mic && S.call.tuneAudio(p.senders.mic)); } },
-    [[64, 'Voz Clara (64 kbps)'], [96, 'Voz HD (96 kbps — recomendada)'], [128, 'Estudio / Música (128 kbps)']].map(([v, t]) => h('option', { value: v, selected: Number(settings.audioKbps) === v }, t)));
+    [[64, 'Voz Clara (64 kbps)'], [96, 'Voz HD (96 kbps — recomendada)'], [128, 'Estudio / Música (128 kbps)'], [160, 'Ultra Studio (160 kbps)']].map(([v, t]) => h('option', { value: v, selected: Number(settings.audioKbps) === v }, t)));
+  const icePolicySel = h('select', { onchange: () => { settings.icePolicy = icePolicySel.value; saveSettings(); toast('Se aplicará en la próxima llamada'); } },
+    [['all', 'Directo P2P + Respaldo TURN (Recomendado)'], ['relay', 'Solo TURN / Relay (Para redes estrictas)']].map(([v, t]) => h('option', { value: v, selected: (settings.icePolicy || 'all') === v }, t)));
+
+  // Selector simple de perfil de audio para el usuario común
+  const applyAudioProfile = async (prof) => {
+    settings.audioProfile = prof;
+    if (prof === 'speakers') {
+      settings.noise = 'high';
+      settings.echoCancellation = true;
+      settings.autoGainControl = true;
+      settings.antiEcho = true;
+      settings.voiceClarity = true;
+      settings.voiceGate = Math.max(0.012, Number(settings.voiceGate || 0.012));
+      settings.audioKbps = 96;
+      toast('🔊 Perfil Altavoces activado (Anti-Doble-Voz reforzado)');
+    } else if (prof === 'headset') {
+      settings.noise = 'high';
+      settings.echoCancellation = true;
+      settings.autoGainControl = true;
+      settings.antiEcho = true;
+      settings.voiceClarity = true;
+      settings.voiceGate = 0.004;
+      settings.audioKbps = 128;
+      toast('🎧 Perfil Auriculares HD activado (128 kbps)');
+    } else {
+      settings.noise = 'high';
+      settings.echoCancellation = true;
+      settings.autoGainControl = true;
+      settings.antiEcho = true;
+      settings.voiceClarity = true;
+      settings.voiceGate = 0.006;
+      settings.audioKbps = 96;
+      toast('🤖 Perfil Voz Clara Automática activado');
+    }
+    saveSettings();
+    if (S.call) {
+      try { await S.call.rebuildMic(settings); } catch {}
+    } else if (mic && ownMic) {
+      startTest();
+    }
+  };
+  const simpleProfileSel = h('select', { onchange: (e) => applyAudioProfile(e.target.value) },
+    [
+      ['auto', '🤖 Voz Clara Automática (Recomendado)'],
+      ['headset', '🎧 Uso con Auriculares (Máxima Calidad HD)'],
+      ['speakers', '🔊 Uso con Altavoces (Anti-Doble-Voz Reforzado)'],
+    ].map(([v, t]) => h('option', { value: v, selected: (settings.audioProfile || 'auto') === v }, t))
+  );
   const micGainLbl = h('span', null, `${Math.round((settings.micGain || 1) * 100)}%`);
   const micGainInput = h('input', { type: 'range', min: 0.5, max: 2, step: 0.05, value: settings.micGain || 1, oninput: () => {
     settings.micGain = Number(micGainInput.value); saveSettings();
@@ -5426,13 +5837,20 @@ async function modalSettings() {
     ) : null
   );
 
-  // Acordeón 1: Ajustes avanzados de voz
-  const accAudio = acc('🎛️', 'Ajustes Avanzados de Micrófono y Supresión de Ruido', 'Sensibilidad, volumen, puerta de voz y calidad de llamada',
+  // Acordeón 1: Ajustes avanzados de voz y conexión
+  const accAudio = acc('🎛️', 'Audio Pro, Anti-Eco y Conexión', 'Ganancia, puerta de voz, cancelación de eco, bitrate Opus y red',
     h('label', null, h('span', null, 'Volumen del micrófono: ', micGainLbl), micGainInput),
     h('label', null, h('span', null, '🌬️ Filtro Anti-Respiración (Puerta de Voz): ', gateLbl), gateInput),
     h('label', null, 'Supresión de ruido por IA', noiseSel),
     hint,
-    h('label', null, 'Calidad de audio en llamada', audioQSel)
+    chk('antiEcho', '🛡️ Guarda Anti-Eco Inteligente (evita doble voz si hay micro abierto)', () => { S.call?.mic?.setAntiEcho?.(settings.antiEcho !== false); }),
+    chk('voiceClarity', '✨ Realce de Claridad Vocal (+2.2 dB en 3.2 kHz)', () => { S.call?.mic?.setClarity?.(settings.voiceClarity !== false); }),
+    chk('echoCancellation', 'Cancelación de eco por hardware (AEC)', () => { if (S.call) S.call.rebuildMic(settings).catch(() => {}); }),
+    chk('autoGainControl', 'Control automático de ganancia (AGC)', () => { if (S.call) S.call.rebuildMic(settings).catch(() => {}); }),
+    h('label', null, 'Calidad de audio en llamada (Opus)', audioQSel),
+    chk('opusFec', 'Recuperación de paquetes perdidos (Opus FEC — recomendado)'),
+    chk('opusDtx', 'Transmisión discontinua en silencio (Opus DTX — ahorra ancho de banda)'),
+    h('label', null, 'Modo de conexión WebRTC (ICE)', icePolicySel)
   );
 
   // Acordeón 2: Video y Pantalla
@@ -5453,6 +5871,9 @@ async function modalSettings() {
       if (S.call) S.call.setGameMode(settings.gameMode);
       S.gameMode = settings.gameMode;
       updateDock();
+    }),
+    chk('autoFloatOnMinimize', '📌 Activar cámara flotante automáticamente al minimizar en llamada', () => {
+      window.epic?.setCallStatus?.({ inCall: !!S.call, autoFloat: settings.autoFloatOnMinimize !== false });
     }),
     h('div', { style: 'display:flex;gap:8px;align-items:center;margin-top:4px' },
       h('button', {
@@ -5526,27 +5947,51 @@ async function modalSettings() {
   );
 
   // Acordeón 6: Acerca de EpicKast
-  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '1.8.1'} · Desarrollado por EpicKap`,
+  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '1.9.4'} · Desarrollado por EpicKap`,
     h('div', { style: 'font-size:12px;color:var(--mu);line-height:1.6;display:flex;flex-direction:column;gap:6px' },
-      h('div', null, h('b', { style: 'color:var(--tx)' }, 'EpicKast Comunicación Ultraligera')),
-      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '1.8.1'}`)),
+      h('div', null, h('b', { style: 'color:var(--tx)' }, 'EpicKast Comunicación Ultraligera (PC & Móvil)')),
+      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '1.9.4'}`)),
       h('div', null, 'Arquitectura WebRTC P2P directo y servidor en la nube de baja latencia.'),
       h('div', { style: 'font-size:11px;opacity:0.75' }, '© 2026 EpicKap Group. Todos los derechos reservados.')
     )
   );
 
-  modal(`Ajustes · EpicKast v${S.appVer}`,
-    diagBtn,
+  const simpleAudioCard = h('div', { class: 'settings-card' },
+    h('div', { class: 'settings-card-title' }, '✨ Perfil Rápido de Audio y Anti-Eco'),
+    simpleProfileSel,
+    window.EKPlatform?.isWeb ? null : chk('autoOverlayOnGame', '🎮 Activar Overlay flotante automáticamente al entrar a un juego')
+  );
+
+  const isAdv = !!settings.advancedMode;
+  const advToggleBtn = h('button', {
+    type: 'button',
+    class: 'settings-adv-btn' + (isAdv ? ' active' : ''),
+    onclick: () => {
+      settings.advancedMode = !settings.advancedMode;
+      saveSettings();
+      closeModal();
+      modalSettings();
+    }
+  },
+    h('span', null, isAdv ? '⚙️ Ocultar Ajustes Avanzados (Pro)' : '⚙️ Ajustes Avanzados (Pro)'),
+    h('span', { style: 'font-size:11px;opacity:0.8' }, isAdv ? 'Activo ▲' : 'Mostrar ▼')
+  );
+
+  const isMobTouch = !!(window.EKPlatform?.isWeb && window.EKPlatform?.isTouch);
+  modal(`Ajustes · EpicKast v${S.appVer || '1.9.4'}`,
+    simpleAudioCard,
     micCard,
     spkCard,
     camCard,
-    modeCard,
-    accAudio,
-    accVideo,
-    accShortcuts,
     accVisual,
     accAccount,
-    accAbout
+    accAbout,
+    advToggleBtn,
+    isAdv ? diagBtn : null,
+    isAdv && !isMobTouch ? modeCard : null,
+    isAdv ? accAudio : null,
+    isAdv ? accVideo : null,
+    isAdv && !isMobTouch ? accShortcuts : null
   );
 }
 
@@ -5639,16 +6084,17 @@ function leaveCall(silent) {
   if (S.outgoing) { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
   if (!S.call) return;
   if (!silent) { sendRaw('voice.leave', {}); ringer.beep([520, 360]); }
-  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false; S.stageCollapsed = false;
+  S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false; S.stageCollapsed = false; S.floatPipDismissed = false; S.floatPipForce = false;
   $('micLive').style.width = '0%';
   $('voiceDock').classList.add('hidden'); $('stageWrap').classList.add('hidden');
   $('stageWrap').classList.remove('collapsed');
   $('stageResizer')?.classList.remove('hidden');
   $('voicePill')?.classList.add('hidden');
   $('meetMenu')?.classList.add('hidden');
-  tiles.forEach((t) => { t.boostCtx?.close().catch(() => {}); t.el.remove(); });
+  tiles.forEach((t) => { cleanupTileAudio(t); t.el.remove(); });
   tiles.clear(); renderCenter(); updateStatTimer(); updatePingTimer();
   syncOverlay();
+  syncFloatingCam();
 }
 function pushState() { const c = S.call; if (c) sendRaw('voice.state', { muted: c.muted, deaf: c.deaf, cam: !!c.camTrack, screen: c.screenStream?.id || null }); }
 const ICONS = {
@@ -5704,15 +6150,132 @@ function cycleStageSize() {
 function toggleStageCollapse(force, quiet = false) {
   if (!S.call) return;
   S.stageCollapsed = force !== undefined ? !!force : !S.stageCollapsed;
+  if (!S.stageCollapsed) S.floatPipDismissed = false;
   $('stageWrap')?.classList.toggle('collapsed', S.stageCollapsed);
   $('stageResizer')?.classList.toggle('hidden', S.stageCollapsed);
   $('voicePill')?.classList.toggle('hidden', !S.stageCollapsed);
   if (S.stageCollapsed) {
     updateVoicePill();
-    if (!quiet) toast('Escenario minimizado (hablando en segundo plano para ver el chat)');
+    if (!quiet) toast('Escenario minimizado (cámara flotante activa para ver el chat)');
   }
   updateDock();
+  syncFloatingCam();
 }
+
+function getFloatingCamSources() {
+  if (!S.call) return [];
+  const list = [];
+  for (const [k, t] of tiles) {
+    if (k === 'party') continue;
+    const stream = t.video?.srcObject || null;
+    if (t.hasVideo && stream) {
+      list.push({ key: k, name: t.nm?.textContent || 'Cámara', stream });
+    }
+  }
+  return list;
+}
+
+function syncFloatingCam() {
+  const dock = $('floatingCamDock');
+  const vid = $('floatCamVideo');
+  const av = $('floatCamAvatar');
+  const title = $('floatCamTitle');
+  const muteBtn = $('floatCamMute');
+  const prevBtn = $('floatCamPrev');
+  const nextBtn = $('floatCamNext');
+  if (!dock || !vid) return;
+
+  const sources = getFloatingCamSources();
+  const hasVideo = sources.length > 0;
+  window.epic?.setCallStatus?.({
+    inCall: !!S.call,
+    hasVideo,
+    autoFloat: settings.autoFloatOnMinimize !== false,
+  });
+
+  const isStageHidden = S.stageCollapsed || $('stageWrap')?.classList.contains('hidden') || $('stageWrap')?.classList.contains('collapsed');
+  const shouldShow = !!S.call && !S.mini && !S.floatPipDismissed && isStageHidden && (hasVideo || S.floatPipForce);
+  if (!shouldShow) {
+    dock.classList.add('hidden');
+    if (vid.srcObject) vid.srcObject = null;
+    return;
+  }
+
+  dock.classList.remove('hidden');
+  if (sources.length > 0) {
+    S.floatPipIndex = ((S.floatPipIndex || 0) % sources.length + sources.length) % sources.length;
+    const cur = sources[S.floatPipIndex];
+    if (vid.srcObject !== cur.stream) {
+      vid.srcObject = cur.stream;
+      vid.muted = true; // Siempre silenciado en PiP para evitar doble audio
+      vid.play?.().catch(() => {});
+    }
+    if (title) title.textContent = `📹 ${cur.name}${sources.length > 1 ? ` (${S.floatPipIndex + 1}/${sources.length})` : ''}`;
+    av?.classList.add('hidden');
+  } else {
+    if (vid.srcObject) vid.srcObject = null;
+    if (title) title.textContent = `🔊 ${S.callLabel || 'En llamada'}`;
+    if (av) {
+      av.textContent = (S.callLabel || 'EK').slice(0, 2).toUpperCase();
+      av.classList.remove('hidden');
+    }
+  }
+
+  if (prevBtn) prevBtn.style.display = sources.length > 1 ? '' : 'none';
+  if (nextBtn) nextBtn.style.display = sources.length > 1 ? '' : 'none';
+  if (muteBtn && S.call) {
+    muteBtn.classList.toggle('muted', !!S.call.muted);
+    muteBtn.textContent = S.call.muted ? '🔇' : '🎙️';
+  }
+}
+
+// Hacer arrastrable el dock de cámara flotante y conectar botones
+(() => {
+  const dock = $('floatingCamDock');
+  const head = $('floatCamHead');
+  if (dock && head) {
+    let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+    head.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return;
+      dragging = true;
+      const r = dock.getBoundingClientRect();
+      sx = e.clientX; sy = e.clientY;
+      startLeft = r.left; startTop = r.top;
+      dock.style.right = 'auto';
+      dock.style.bottom = 'auto';
+      dock.style.left = startLeft + 'px';
+      dock.style.top = startTop + 'px';
+      head.setPointerCapture?.(e.pointerId);
+    });
+    head.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const nx = Math.max(8, Math.min(window.innerWidth - dock.offsetWidth - 8, startLeft + (e.clientX - sx)));
+      const ny = Math.max(8, Math.min(window.innerHeight - dock.offsetHeight - 8, startTop + (e.clientY - sy)));
+      dock.style.left = nx + 'px';
+      dock.style.top = ny + 'px';
+    });
+    const endDrag = () => { dragging = false; };
+    head.addEventListener('pointerup', endDrag);
+    head.addEventListener('pointercancel', endDrag);
+  }
+  $('floatCamPrev')?.addEventListener('click', () => { S.floatPipIndex = (S.floatPipIndex || 0) - 1; syncFloatingCam(); });
+  $('floatCamNext')?.addEventListener('click', () => { S.floatPipIndex = (S.floatPipIndex || 0) + 1; syncFloatingCam(); });
+  $('floatCamMute')?.addEventListener('click', () => $('bMute')?.click());
+  $('floatCamPopOut')?.addEventListener('click', async () => {
+    const vid = $('floatCamVideo');
+    if (vid && vid.srcObject && vid.readyState >= 1 && typeof vid.requestPictureInPicture === 'function') {
+      try {
+        if (document.pictureInPictureElement === vid) await document.exitPictureInPicture();
+        else await vid.requestPictureInPicture();
+        return;
+      } catch {}
+    }
+    window.epic?.toggleMini?.(true);
+  });
+  $('floatCamExpand')?.addEventListener('click', () => { S.floatPipDismissed = false; S.floatPipForce = false; toggleStageCollapse(false); });
+  $('floatCamClose')?.addEventListener('click', () => { S.floatPipDismissed = true; S.floatPipForce = false; syncFloatingCam(); });
+  $('vpillFloat')?.addEventListener('click', () => { S.floatPipDismissed = false; S.floatPipForce = true; syncFloatingCam(); });
+})();
 
 function updateVoicePill() {
   if (!S.call) {
@@ -5992,6 +6555,7 @@ function toggleGameMode(enable) {
   if (S.call) S.call.setGameMode(S.gameMode);
   toast(S.gameMode ? '🎮 Modo Juego activado: 15 fps y bitrate reducido para dar 100% de CPU/Ping a tu partida' : 'Modo Juego desactivado');
   updateDock();
+  syncFloatingCam();
 }
 
 // ---------- Superposición Gamer Flotante (Overlay Transparente) ----------
@@ -6134,8 +6698,21 @@ function updateDock() {
     btn.classList.toggle('on', Number(btn.dataset.sz) === curItem.vh);
   });
 }
-$('bMute').onclick = () => { const c = S.call; if (!c) return; if (c.deaf) c.deaf = false; c.setMuted(!c.muted); updateDock(); renderStage(); syncPartyTile(); pushState(); };
-$('bDeaf').onclick = () => { const c = S.call; if (!c) return; c.deaf = !c.deaf; c.setMuted(c.deaf); updateDock(); renderStage(); syncPartyTile(); pushState(); };
+$('bMute').onclick = () => {
+  const c = S.call; if (!c) return;
+  if (c.serverMuted && c.muted) return toast('🔒 Estás silenciado por un administrador del servidor');
+  if (c.serverDeafened && c.deaf) return toast('🔒 Estás ensordecido por un administrador del servidor');
+  if (c.deaf) c.deaf = false;
+  c.setMuted(!c.muted);
+  updateDock(); renderStage(); syncPartyTile(); pushState();
+};
+$('bDeaf').onclick = () => {
+  const c = S.call; if (!c) return;
+  if (c.serverDeafened && c.deaf) return toast('🔒 Estás ensordecido por un administrador del servidor');
+  c.deaf = !c.deaf;
+  c.setMuted(c.deaf || !!c.serverMuted);
+  updateDock(); renderStage(); syncPartyTile(); pushState();
+};
 $('bDockMore').onclick = () => { S.dockOpen = !S.dockOpen; updateDock(); };
 $('bLoop').onclick = () => {
   const c = S.call; if (!c?.mic) return;
@@ -6143,6 +6720,7 @@ $('bLoop').onclick = () => {
   c.setSelfMonitor(next);
   if (next) toast('👂 Escuchando tu propio micrófono (desactívalo para no oírte doble)');
   updateDock();
+  syncFloatingCam();
 };
 $('bCam').onclick = async () => {
   try {
@@ -6242,6 +6820,7 @@ function setStagePreset(vh) {
   saveSettings();
   applyStageHeight();
   updateDock();
+  syncFloatingCam();
 }
 if ($('mSizeBtn')) $('mSizeBtn').onclick = (e) => {
   e.stopPropagation();
@@ -6305,8 +6884,11 @@ $('mMore').onclick = (e) => {
       renderStage();
       menu.classList.add('hidden');
     }, !settings.hideNoVideo),
-    tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini),
-    tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive)
+    // Ventana flotante y Overlay Gamer solo existen en escritorio (Electron)
+    window.EKPlatform?.isWeb ? null : tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini),
+    window.EKPlatform?.isWeb ? null : tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive),
+    // Móvil: alternar cámara frontal / trasera
+    window.EKPlatform?.isTouch ? tileBtn('🔄', 'Girar cámara (frontal / trasera)', () => { window.EKMobile?.flipCamera?.(); menu.classList.add('hidden'); }) : null
   );
 
   // 3. Audio, Música y Gaming
@@ -6381,24 +6963,129 @@ $('stageResizer').addEventListener('mousedown', (e) => {
 
 // ---------- Tiles de video, Enfoque estilo Google Meet y volumen individual (0% a 200%) ----------
 const tiles = new Map();
+function getUserRxClean(uid) {
+  return localStorage.getItem('epickast.rxClean.' + uid) === '1';
+}
+function setUserRxClean(uid, on) {
+  localStorage.setItem('epickast.rxClean.' + uid, on ? '1' : '0');
+}
+function cleanupTileAudio(t) {
+  if (t.rxTimer) { clearInterval(t.rxTimer); t.rxTimer = null; }
+  if (t.boostCtx) { t.boostCtx.close().catch(() => {}); t.boostCtx = null; t.boostGain = null; t.boostStream = null; }
+}
 function applyTileVolume(t) {
   if (!t.uid) return;
   const vol = S.call?.deaf ? 0 : getUserVol(t.uid);
+  const rxClean = getUserRxClean(t.uid);
+  const hasAudio = t.video.srcObject && t.video.srcObject.getAudioTracks().length > 0;
+
+  if (rxClean && hasAudio && !S.call?.deaf) {
+    // Modo Limpieza Local (RX): silencia <video> y procesa el audio entrante con filtro paso-alto + De-Hiss + puerta anti-ruido
+    t.video.muted = true;
+    t.video.volume = 0;
+    if (!t.boostCtx || t.boostStream !== t.video.srcObject || !t.rxMode) {
+      cleanupTileAudio(t);
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(t.video.srcObject);
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120; hp.Q.value = 0.7;
+      const deHiss = ctx.createBiquadFilter(); deHiss.type = 'highshelf'; deHiss.frequency.value = 4600; deHiss.gain.value = -6.5;
+      // Detector solo en banda vocal (180–1800 Hz) para ignorar clics agudos de teclado mecánico
+      const voiceDetect = ctx.createBiquadFilter(); voiceDetect.type = 'bandpass'; voiceDetect.frequency.value = 600; voiceDetect.Q.value = 0.65;
+      const an = ctx.createAnalyser(); an.fftSize = 256;
+      const gate = ctx.createGain(); gate.gain.value = 1;
+      const gain = ctx.createGain(); gain.gain.value = Math.max(0, Math.min(2, vol));
+      src.connect(hp); hp.connect(deHiss); hp.connect(voiceDetect); voiceDetect.connect(an); deHiss.connect(gate); gate.connect(gain); gain.connect(ctx.destination);
+      if (settings.spk && typeof ctx.setSinkId === 'function') ctx.setSinkId(settings.spk).catch(() => {});
+      const buf = new Uint8Array(an.fftSize);
+      let hold = 0, open = true, hits = 0;
+      t.rxTimer = setInterval(() => {
+        if (!t.boostCtx || t.boostCtx.state === 'closed') return;
+        an.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) { const d = (buf[i] - 128) / 128; sum += d * d; }
+        const rms = Math.sqrt(sum / buf.length);
+        const now = performance.now();
+        if (rms >= 0.020) {
+          hits++;
+          // Exigir 2 cuadros (~48ms) en banda vocal para no abrir la puerta con golpes breves de teclado
+          if (hits >= 2 || open) {
+            hold = now + 260;
+            if (!open) { open = true; gate.gain.setTargetAtTime(1, ctx.currentTime, 0.008); }
+          }
+        } else {
+          hits = 0;
+          if (open && now > hold) {
+            open = false;
+            gate.gain.setTargetAtTime(0.04, ctx.currentTime, 0.035);
+          }
+        }
+      }, 24);
+      t.boostCtx = ctx; t.boostGain = gain; t.boostStream = t.video.srcObject; t._boostSrc = src; t.rxMode = true;
+    }
+    t.boostGain.gain.setTargetAtTime(Math.max(0, Math.min(2, vol)), t.boostCtx.currentTime, 0.015);
+    if (t.boostCtx.state === 'suspended') t.boostCtx.resume().catch(() => {});
+    return;
+  }
+
+  if (t.rxMode) {
+    t.rxMode = false;
+    cleanupTileAudio(t);
+    t.video.muted = !!S.call?.deaf;
+  }
   t.video.volume = Math.max(0, Math.min(1, vol));
-  if (vol > 1.01 && t.video.srcObject && t.video.srcObject.getAudioTracks().length > 0) {
+  if (vol > 1.01 && hasAudio) {
     if (!t.boostCtx || t.boostStream !== t.video.srcObject) {
-      t.boostCtx?.close().catch(() => {});
+      cleanupTileAudio(t);
       const ctx = new AudioContext();
       const src = ctx.createMediaStreamSource(t.video.srcObject);
       const gain = ctx.createGain();
       src.connect(gain); gain.connect(ctx.destination);
-      t.boostCtx = ctx; t.boostGain = gain; t.boostStream = t.video.srcObject; t._boostSrc = src;
+      t.boostCtx = ctx; t.boostGain = gain; t.boostStream = t.video.srcObject; t._boostSrc = src; t.rxMode = false;
     }
     t.boostGain.gain.setTargetAtTime(vol - 1, t.boostCtx.currentTime, 0.015);
     if (t.boostCtx.state === 'suspended') t.boostCtx.resume().catch(() => {});
   } else if (t.boostGain) {
     t.boostGain.gain.setTargetAtTime(0, t.boostCtx.currentTime, 0.015);
   }
+}
+
+function modalRemoteAudioEditor(userId, userName, voiceKey) {
+  const key = voiceKey || S.callKey;
+  if (!key) return toast('No hay una llamada activa');
+  const st = { noise: 'high', micGain: 1, voiceGate: 0.012, antiEcho: true, echoCancellation: true, autoGainControl: true, voiceClarity: true, audioKbps: 96 };
+  const noiseSel = h('select', { onchange: () => { st.noise = noiseSel.value; } },
+    [['high', 'Alta (RNNoise IA — recomendado)'], ['std', 'Estándar (Chromium)'], ['off', 'Desactivada']].map(([v, l]) => h('option', { value: v, selected: st.noise === v }, l)));
+  const gainLbl = h('span', null, '100%');
+  const gainRng = h('input', { type: 'range', min: 0.4, max: 2.0, step: 0.05, value: st.micGain, oninput: () => { st.micGain = Number(gainRng.value); gainLbl.textContent = `${Math.round(st.micGain * 100)}%`; } });
+  const gateLbl = h('span', null, '20%');
+  const gateRng = h('input', { type: 'range', min: 0, max: 0.06, step: 0.002, value: st.voiceGate, oninput: () => { st.voiceGate = Number(gateRng.value); gateLbl.textContent = `${Math.round((st.voiceGate / 0.06) * 100)}%`; } });
+  const kbpsSel = h('select', { onchange: () => { st.audioKbps = Number(kbpsSel.value); } },
+    [[64, '64 kbps (Estable)'], [96, '96 kbps (HD recomendado)'], [128, '128 kbps (Estudio)']].map(([v, l]) => h('option', { value: v, selected: st.audioKbps === v }, l)));
+  const mkChk = (k, label) => h('label', { style: 'flex-direction:row;align-items:center;gap:8px;cursor:pointer;color:var(--tx)' },
+    h('input', { type: 'checkbox', style: 'width:16px;height:16px;accent-color:var(--ac)', checked: !!st[k], onchange: (e) => { st[k] = e.target.checked; } }), label);
+
+  modal(`🎛️ Ajustar Audio de ${userName}`,
+    h('div', { class: 'hint' }, 'Los cambios se aplican en tiempo real para todos en el canal y se guardan automáticamente en su EpicKast (también para llamadas privadas).'),
+    h('label', null, 'Supresión de ruido', noiseSel),
+    h('label', null, h('span', null, 'Volumen de su micrófono: ', gainLbl), gainRng),
+    h('label', null, h('span', null, 'Filtro anti-ruido de fondo (Puerta de Voz): ', gateLbl), gateRng),
+    h('label', null, 'Calidad de audio (Opus)', kbpsSel),
+    mkChk('antiEcho', '🛡️ Anti-Eco Inteligente (evita doble voz)'),
+    mkChk('echoCancellation', 'Cancelación de eco por hardware (AEC)'),
+    mkChk('autoGainControl', 'Control automático de ganancia (AGC)'),
+    mkChk('voiceClarity', '✨ Realce de claridad vocal'),
+    h('div', { class: 'row', style: 'margin-top:8px' },
+      h('button', {
+        class: 'primary',
+        onclick: async () => {
+          await safe(rpc('voice.assistAudio', { key, userId, preset: 'custom', config: st }));
+          toast(`🎛️ Ajustes de audio enviados y guardados para ${userName}`);
+          closeModal();
+        }
+      }, '✓ Aplicar y Guardar en su EpicKast'),
+      h('button', { onclick: closeModal }, 'Cancelar')
+    )
+  );
 }
 
 function toggleFocusTile(key) {
@@ -6456,7 +7143,30 @@ function tile(key, label, user, withVol = false) {
         vTxt.textContent = `${Math.round(val * 100)}%`;
         applyTileVolume(t);
       } });
-      volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt);
+      const rxBtn = h('button', {
+        type: 'button',
+        title: 'Limpiar ruido de fondo que escuchas de este usuario (filtro local en tu PC)',
+        style: `background:${getUserRxClean(user.id) ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)'};border:1px solid ${getUserRxClean(user.id) ? '#22c55e' : 'rgba(255,255,255,0.16)'};color:#fff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;cursor:pointer`,
+        onclick: (e) => {
+          e.stopPropagation();
+          const next = !getUserRxClean(user.id);
+          setUserRxClean(user.id, next);
+          rxBtn.style.background = next ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)';
+          rxBtn.style.borderColor = next ? '#22c55e' : 'rgba(255,255,255,0.16)';
+          applyTileVolume(t);
+          toast(next ? `✨ Limpieza local de ruido activada para ${user.name}` : `Limpieza local desactivada para ${user.name}`);
+        }
+      }, '✨');
+      const admBtn = h('button', {
+        type: 'button',
+        title: `Ajustar configuración de audio de ${user.name} (Admin / Prueba)`,
+        style: 'background:rgba(124,92,255,0.22);border:1px solid rgba(124,92,255,0.45);color:#e9d5ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:700;cursor:pointer',
+        onclick: (e) => {
+          e.stopPropagation();
+          modalRemoteAudioEditor(user.id, user.name, S.callKey);
+        }
+      }, '🎛️');
+      volWrap = h('div', { class: 'vol-wrap' }, '🔊', vRng, vTxt, rxBtn, admBtn);
     }
     const badgeOverlay = h('div', { class: 'tile-badges' });
     const el = h('div', { class: 'tile', 'data-tile': key }, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
@@ -6879,7 +7589,7 @@ function renderStage() {
       }
     }
   }
-  for (const [k, t] of tiles) if (!keep.has(k)) { t.boostCtx?.close().catch(() => {}); t.el.remove(); tiles.delete(k); }
+  for (const [k, t] of tiles) if (!keep.has(k)) { cleanupTileAudio(t); t.el.remove(); tiles.delete(k); }
   if (S.focusTile && !tiles.has(S.focusTile)) S.focusTile = null;
 
   // Enfoque inteligente estilo Google Meet:
@@ -6901,14 +7611,15 @@ function renderStage() {
   stg.classList.toggle('spotlight', isSpotlight);
   stg.classList.toggle('solo', isSpotlight && visibleCount <= 1);
 
-  // Recolectar tiles visibles secundarios para la barra lateral de spotlight
+  // Recolectar tiles secundarios para la barra lateral de spotlight (mantener ocultos en DOM para no cortar audio WebRTC)
   const visibleSideTiles = [];
+  const hiddenTiles = [];
   for (const [k, t] of tiles) {
     if (k === autoFocusKey) continue;
     if (!t.el.classList.contains('hide-tile')) {
       visibleSideTiles.push(t.el);
     } else {
-      t.el.remove();
+      hiddenTiles.push(t.el);
     }
   }
 
@@ -6918,21 +7629,27 @@ function renderStage() {
 
   if (hasSideStrip) {
     if (!sideStrip) sideStrip = h('div', { id: 'stageSideStrip' });
-    sideStrip.replaceChildren(...visibleSideTiles);
+    sideStrip.replaceChildren(...visibleSideTiles, ...hiddenTiles);
     const focusedTile = tiles.get(autoFocusKey);
     stg.replaceChildren(focusedTile.el, sideStrip);
   } else {
     if (sideStrip) sideStrip.remove();
     const visibleTiles = [];
     if (isSpotlight && autoFocusKey && tiles.has(autoFocusKey)) {
-      visibleTiles.push(tiles.get(autoFocusKey).el);
+      visibleTiles.push(tiles.get(autoFocusKey).el, ...hiddenTiles);
     } else {
       for (const [, t] of tiles) {
-        if (!t.el.classList.contains('hide-tile')) visibleTiles.push(t.el);
-        else t.el.remove();
+        visibleTiles.push(t.el);
       }
     }
     stg.replaceChildren(...visibleTiles);
+  }
+
+  // Reanudar reproducción de audio/video tras re-parentar en DOM (evita que Chromium pause el audio al entrar a un canal)
+  for (const [, t] of tiles) {
+    if (t.video?.srcObject && t.video.paused) {
+      t.video.play?.().catch(() => {});
+    }
   }
 
   for (const [k, t] of tiles) {
@@ -6945,6 +7662,7 @@ function renderStage() {
     }
   }
   updateDock();
+  syncFloatingCam();
 }
 function updateStatTimer() {
   clearInterval(S.statTimer); S.statTimer = null;

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('epic', {
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
   toggleMini: (enable) => ipcRenderer.invoke('window:mini', enable),
+  setCallStatus: (status) => ipcRenderer.invoke('call:status', status),
   onMiniChanged: (cb) => ipcRenderer.on('window:mini-changed', (_e, val) => cb(val)),
   version: () => ipcRenderer.invoke('app:version'),
   isStore: () => ipcRenderer.invoke('app:isStore'),

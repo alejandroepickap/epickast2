@@ -46,25 +46,33 @@ function preferredCodecs() {
  */
 async function createMic(settings) {
   const mode = ['off', 'std', 'high'].includes(settings.noise) ? settings.noise : 'high';
+  const useAec = settings.echoCancellation !== false;
+  const useAgc = settings.autoGainControl !== false;
+  const antiEcho = settings.antiEcho !== false;
+  const voiceClarity = settings.voiceClarity !== false;
   const preferredDevice = settings.mic && typeof settings.mic === 'string' && settings.mic.trim() !== '' ? settings.mic.trim() : null;
+
+  const audioConstraints = {
+    echoCancellation: useAec,
+    // Evitar doble supresión de ruido (Chromium + RNNoise) que produce voz robotizada
+    noiseSuppression: mode === 'std',
+    autoGainControl: useAgc,
+    channelCount: 1,
+    sampleRate: 48000,
+    googEchoCancellation: useAec,
+    googEchoCancellation2: useAec,
+    googDAEchoCancellation: useAec,
+    googAutoGainControl: useAgc,
+    googNoiseSuppression: mode === 'std',
+    googHighpassFilter: true,
+  };
 
   let raw = null;
   // 1) Intentar con el dispositivo configurado (con { ideal }, nunca { exact } para no fallar por id re-enumerado o desconectado)
   if (preferredDevice) {
     try {
       raw = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: { ideal: preferredDevice },
-          echoCancellation: true,
-          noiseSuppression: mode !== 'off',
-          autoGainControl: true,
-          channelCount: 1,
-          sampleRate: 48000,
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          googHighpassFilter: true,
-        },
+        audio: { ...audioConstraints, deviceId: { ideal: preferredDevice } },
       });
     } catch (e) {
       console.warn('getUserMedia con preferredDevice falló, intentando audio predeterminado:', e);
@@ -73,19 +81,7 @@ async function createMic(settings) {
 
   // 2) Fallback al dispositivo de audio predeterminado del sistema
   if (!raw) {
-    raw = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: mode !== 'off',
-        autoGainControl: true,
-        channelCount: 1,
-        sampleRate: 48000,
-        googEchoCancellation: true,
-        googAutoGainControl: true,
-        googNoiseSuppression: true,
-        googHighpassFilter: true,
-      },
-    });
+    raw = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
   }
 
   // Mantener vivo el pull de captura de Chromium en Windows
@@ -96,22 +92,34 @@ async function createMic(settings) {
 
   const ctx = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
   const src = ctx.createMediaStreamSource(raw);
-  // 1) Filtro paso-alto a 115 Hz + recorte suave en 180 Hz para eliminar golpes de aire, soplidos y respiración nasal
+  // 1) Filtro paso-alto a 105 Hz + recorte suave en 180 Hz + claridad vocal opcional en 3.2 kHz
   const hp = ctx.createBiquadFilter();
   hp.type = 'highpass';
-  hp.frequency.value = 115;
+  hp.frequency.value = 105;
   hp.Q.value = 0.707;
   const breathEq = ctx.createBiquadFilter();
   breathEq.type = 'peaking';
   breathEq.frequency.value = 180;
   breathEq.Q.value = 1.1;
-  breathEq.gain.value = -3.5;
+  breathEq.gain.value = -3.0;
+  const clarityEq = ctx.createBiquadFilter();
+  clarityEq.type = 'peaking';
+  clarityEq.frequency.value = 2800;
+  clarityEq.Q.value = 0.9;
+  clarityEq.gain.value = voiceClarity ? 1.5 : 0;
+  // Filtro De-Hiss (corte de estática y ruido blanco agudo > 6.2 kHz)
+  const deHissEq = ctx.createBiquadFilter();
+  deHissEq.type = 'highshelf';
+  deHissEq.frequency.value = 6200;
+  deHissEq.gain.value = -3.5;
 
   src.connect(hp);
   hp.connect(breathEq);
+  breathEq.connect(clarityEq);
+  clarityEq.connect(deHissEq);
 
   // 2) RNNoise corre ANTES del compresor para que las respiraciones bajas no sean amplificadas
-  let cleanNode = breathEq;
+  let cleanNode = deHissEq;
   let actualMode = mode === 'high' ? 'std' : mode;
   if (mode === 'high') {
     try {
@@ -124,13 +132,13 @@ async function createMic(settings) {
         channelCountMode: 'explicit',
       });
       rn.onprocessorerror = (err) => {
-        console.warn('RNNoise processor error, bypassing cleanly to breathEq:', err);
+        console.warn('RNNoise processor error, bypassing cleanly to deHissEq:', err);
         try {
-          breathEq.disconnect(rn);
-          breathEq.connect(gateGain);
+          deHissEq.disconnect(rn);
+          deHissEq.connect(gateGain);
         } catch {}
       };
-      breathEq.connect(rn);
+      deHissEq.connect(rn);
       cleanNode = rn;
       actualMode = 'high';
     } catch (e) {
@@ -138,15 +146,15 @@ async function createMic(settings) {
     }
   }
 
-  // 3) Puerta de Voz Anti-Respiración (Noise Gate)
+  // 3) Puerta de Voz Anti-Respiración, Anti-Ruido-Blanco y Anti-Doble-Audio (Adaptive Echo Guard)
   const gateAn = ctx.createAnalyser();
   gateAn.fftSize = 256;
   const gateGain = ctx.createGain();
-  // En modo 'high' (RNNoise), RNNoise elimina por IA el ruido ambiente y la respiración de forma continua.
-  // La compuerta de volumen por umbral solo se impone si el usuario la configura a un umbral alto (> 0.010).
   const userGate = Number(settings.voiceGate ?? 0.006);
-  let gateThresh = (actualMode === 'high' && userGate <= 0.010) ? 0 : Math.max(0, Math.min(0.12, userGate));
-  // Siempre iniciar en 1 (abierto) para que la voz fluya de inmediato
+  // Mantener un piso mínimo (0.0045) incluso con RNNoise para evitar que AGC/Compresor levanten ruido blanco en silencio
+  let gateThresh = userGate <= 0.001 ? 0 : (actualMode === 'high' && userGate <= 0.010 ? 0.0045 : Math.max(0.004, Math.min(0.12, userGate)));
+  let antiEchoOn = antiEcho;
+  let remoteSpeaking = false;
   gateGain.gain.value = 1;
   let gateOpen = true;
 
@@ -154,13 +162,20 @@ async function createMic(settings) {
   src.connect(gateAn);
   cleanNode.connect(gateGain);
 
-  // 4) Limitador/compresor suave de picos (umbral alto -18 dB para no levantar sonidos bajos) + ganancia de usuario
+  // 4) Compresor vocal equilibrado + limitador anti-clipping + ganancia de usuario
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -18;
+  comp.threshold.value = -20;
   comp.knee.value = 12;
-  comp.ratio.value = 2.5;
-  comp.attack.value = 0.004;
-  comp.release.value = 0.16;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.003;
+  comp.release.value = 0.14;
+
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -2;
+  limiter.knee.value = 0;
+  limiter.ratio.value = 20;
+  limiter.attack.value = 0.001;
+  limiter.release.value = 0.05;
 
   const inGain = ctx.createGain();
   inGain.gain.value = Math.max(0.2, Math.min(2.5, Number(settings.micGain ?? 1)));
@@ -174,8 +189,9 @@ async function createMic(settings) {
 
   gateGain.connect(comp);
   comp.connect(inGain);
-  inGain.connect(dest);
-  inGain.connect(an);
+  inGain.connect(limiter);
+  limiter.connect(dest);
+  limiter.connect(an);
   an.connect(zeroGain);
   zeroGain.connect(ctx.destination);
 
@@ -195,7 +211,8 @@ async function createMic(settings) {
   const buf = new Uint8Array(an.fftSize);
   let holdUntil = performance.now() + 400; // Mantener abierto inicialmente
   const gateTimer = setInterval(() => {
-    if (gateThresh <= 0.002) {
+    const echoGuardThresh = (antiEchoOn && remoteSpeaking) ? Math.max(gateThresh, 0.016) : gateThresh;
+    if (echoGuardThresh <= 0.002) {
       if (!gateOpen) { gateOpen = true; gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.01); }
       return;
     }
@@ -210,15 +227,17 @@ async function createMic(settings) {
     const rms = Math.sqrt(sum / gateBuf.length);
     const lv = Math.max(rms * 1.5, peak * 0.7);
     const now = performance.now();
-    if (lv >= gateThresh) {
+    if (lv >= echoGuardThresh) {
       holdUntil = now + 260; // 260ms sostén para no cortar finales de palabras
       if (!gateOpen) {
         gateOpen = true;
-        gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.008);
+        gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.006);
       }
     } else if (gateOpen && now > holdUntil) {
       gateOpen = false;
-      gateGain.gain.setTargetAtTime(0, ctx.currentTime, 0.040);
+      // Si es solo guarda anti-eco mientras otros hablan, atenuamos fuertemente (0.04) o cerramos (0) si hay gate manual
+      const targetGain = gateThresh > 0.002 ? 0 : 0.04;
+      gateGain.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.035);
     }
   }, 22);
 
@@ -230,17 +249,26 @@ async function createMic(settings) {
     ctx,
     analyser: an,
     monitoring: false,
-    _nodes: { src, hp, breathEq, cleanNode, gateAn, gateGain, comp, inGain, dest, an, zeroGain, monEl, pullEl },
+    _nodes: { src, hp, breathEq, clarityEq, cleanNode, gateAn, gateGain, comp, limiter, inGain, dest, an, zeroGain, monEl, pullEl },
     setGain(val) {
       inGain.gain.setTargetAtTime(Math.max(0.2, Math.min(2.5, Number(val) || 1)), ctx.currentTime, 0.015);
     },
     setGate(val) {
       const v = Number(val) || 0;
       gateThresh = (actualMode === 'high' && v <= 0.010) ? 0 : Math.max(0, Math.min(0.12, v));
-      if (gateThresh <= 0.002) {
+      if (gateThresh <= 0.002 && !(antiEchoOn && remoteSpeaking)) {
         gateOpen = true;
         gateGain.gain.setTargetAtTime(1, ctx.currentTime, 0.01);
       }
+    },
+    setAntiEcho(on) {
+      antiEchoOn = !!on;
+    },
+    setRemoteSpeaking(on) {
+      remoteSpeaking = !!on;
+    },
+    setClarity(on) {
+      clarityEq.gain.setTargetAtTime(on ? 2.2 : 0, ctx.currentTime, 0.02);
     },
     setSinkId(sinkId) {
       if (typeof monEl.setSinkId === 'function') monEl.setSinkId(sinkId).catch(() => {});
@@ -308,6 +336,56 @@ class Call {
     this.main = new MediaStream(this.mic.stream.getAudioTracks());
   }
 
+  async rebuildMic(newSettings) {
+    if (newSettings) this.settings = newSettings;
+    const oldMic = this.mic;
+    const wasMuted = this.muted;
+    const wasMonitoring = !!oldMic?.monitoring;
+    const nextMic = await createMic(this.settings);
+    const nextTrack = nextMic.stream.getAudioTracks()[0];
+    if (nextTrack) {
+      nextTrack.enabled = !wasMuted;
+      for (const p of this.peers.values()) {
+        if (p.senders.mic) {
+          try { await p.senders.mic.replaceTrack(nextTrack); this.tuneAudio(p.senders.mic); } catch {}
+        }
+      }
+      if (this.main) {
+        this.main.getAudioTracks().forEach((t) => { try { this.main.removeTrack(t); } catch {} });
+        this.main.addTrack(nextTrack);
+      } else {
+        this.main = new MediaStream([nextTrack]);
+      }
+    }
+    if (oldMic) oldMic.dispose();
+    this.mic = nextMic;
+    this.noiseMode = nextMic.mode;
+    this.setMuted(wasMuted);
+    if (wasMonitoring) nextMic.monitor(true);
+    this.onChange();
+  }
+
+  tuneOpusSdp(sdp) {
+    if (!sdp || typeof sdp !== 'string') return sdp;
+    const kbps = Math.max(32, Math.min(192, Number(this.settings.audioKbps) || 96));
+    const fec = this.settings.opusFec !== false ? 1 : 0;
+    const dtx = this.settings.opusDtx ? 1 : 0;
+    const m = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000/i);
+    if (!m) return sdp;
+    const pt = m[1];
+    const fmtpRe = new RegExp(`a=fmtp:${pt}\\s+([^\\r\\n]+)`, 'i');
+    const extra = `minptime=10;useinbandfec=${fec};usedtx=${dtx};maxaveragebitrate=${kbps * 1000}`;
+    if (fmtpRe.test(sdp)) {
+      return sdp.replace(fmtpRe, (line, params) => {
+        const cleaned = params
+          .replace(/;?\s*(minptime|useinbandfec|usedtx|maxaveragebitrate)=\d+/gi, '')
+          .replace(/^;|;$/g, '');
+        return `a=fmtp:${pt} ${cleaned ? cleaned + ';' : ''}${extra}`;
+      });
+    }
+    return sdp.replace(new RegExp(`(a=rtpmap:${pt}\\s+opus\\/48000[^\\r\\n]*\\r?\\n)`, 'i'), `$1a=fmtp:${pt} ${extra}\r\n`);
+  }
+
   setSelfMonitor(on) {
     this.mic?.monitor(on);
     this.onChange();
@@ -320,12 +398,18 @@ class Call {
   // ---- pares ----
   addPeer(user) {
     if (this.peers.has(user.id)) return;
-    const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: 'max-bundle', iceCandidatePoolSize: 0 });
-    const p = { id: user.id, name: user.name, user, pc, polite: this.myId > user.id, making: false, ignore: false, senders: {}, streams: new Map(), mainId: null, state: user.state || {}, speaking: false };
+    const iceTransportPolicy = this.settings.icePolicy === 'relay' ? 'relay' : 'all';
+    const pc = new RTCPeerConnection({ iceServers: this.ice, iceTransportPolicy, bundlePolicy: 'max-bundle', iceCandidatePoolSize: 2 });
+    const p = { id: user.id, name: user.name, user, pc, polite: this.myId > user.id, making: false, ignore: false, senders: {}, streams: new Map(), mainId: null, state: user.state || {}, speaking: false, _iceTimer: null };
     this.peers.set(user.id, p);
     pc.onicecandidate = (e) => { if (e.candidate) this.send('rtc.signal', { to: p.id, data: { candidate: e.candidate } }); };
     pc.onnegotiationneeded = async () => {
-      try { p.making = true; await pc.setLocalDescription(); this.send('rtc.signal', { to: p.id, data: { description: pc.localDescription } }); }
+      try {
+        p.making = true;
+        await pc.setLocalDescription();
+        const desc = pc.localDescription ? { type: pc.localDescription.type, sdp: this.tuneOpusSdp(pc.localDescription.sdp) } : pc.localDescription;
+        this.send('rtc.signal', { to: p.id, data: { description: desc } });
+      }
       catch (e) { console.warn('negotiation', e); } finally { p.making = false; }
     };
     const purgeDeadStreams = () => {
@@ -346,7 +430,16 @@ class Call {
       purgeDeadStreams();
     };
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed') pc.restartIce();
+      clearTimeout(p._iceTimer);
+      if (pc.connectionState === 'failed') {
+        pc.restartIce();
+      } else if (pc.connectionState === 'disconnected') {
+        p._iceTimer = setTimeout(() => {
+          if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+            try { pc.restartIce(); } catch {}
+          }
+        }, 3500);
+      }
       this.onChange();
     };
     // pistas locales actuales
@@ -361,6 +454,7 @@ class Call {
 
   removePeer(id) {
     const p = this.peers.get(id); if (!p) return;
+    clearTimeout(p._iceTimer);
     p.pc.close(); this.peers.delete(id); this.lastBytes.delete(id);
     this.retune(); this.onChange();
   }
@@ -374,10 +468,18 @@ class Call {
         const collision = d.type === 'offer' && (p.making || p.pc.signalingState !== 'stable');
         p.ignore = !p.polite && collision;
         if (p.ignore) return;
+        if (collision && p.polite) {
+          try { await p.pc.setLocalDescription({ type: 'rollback' }); } catch {}
+        }
         await p.pc.setRemoteDescription(d);
-        if (d.type === 'offer') { await p.pc.setLocalDescription(); this.send('rtc.signal', { to: from, data: { description: p.pc.localDescription } }); }
+        p.ignore = false;
+        if (d.type === 'offer') {
+          await p.pc.setLocalDescription();
+          const desc = p.pc.localDescription ? { type: p.pc.localDescription.type, sdp: this.tuneOpusSdp(p.pc.localDescription.sdp) } : p.pc.localDescription;
+          this.send('rtc.signal', { to: from, data: { description: desc } });
+        }
       } else if (data.candidate) {
-        try { await p.pc.addIceCandidate(data.candidate); } catch (e) { if (!p.ignore) throw e; }
+        try { await p.pc.addIceCandidate(data.candidate); } catch (e) { if (!p.ignore) console.warn('ice candidate', e); }
       }
     } catch (e) { console.warn('signal', e); }
   }
@@ -438,7 +540,8 @@ class Call {
   async setCamera(on) {
     if (on && !this.camTrack) {
       const pr = CAM_PRESETS[this.settings.camPreset] || CAM_PRESETS['720p30'];
-      const st = await navigator.mediaDevices.getUserMedia({ video: { deviceId: this.settings.cam ? { exact: this.settings.cam } : undefined, width: { ideal: pr.w }, height: { ideal: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } } });
+      const facing = this.settings.cam ? undefined : { ideal: this.facing || 'user' }; // móvil: frontal / trasera
+      const st = await navigator.mediaDevices.getUserMedia({ video: { deviceId: this.settings.cam ? { exact: this.settings.cam } : undefined, facingMode: facing, width: { ideal: pr.w }, height: { ideal: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } } });
       this.camTrack = st.getVideoTracks()[0]; this.camTrack.contentHint = 'motion';
       this.camTrack.onended = () => { this.setCamera(false); this.onCamEnded?.(); };
       this.main.addTrack(this.camTrack);
@@ -448,6 +551,35 @@ class Call {
       this.main.removeTrack(this.camTrack); this.camTrack.stop(); this.camTrack = null;
     }
     this.onChange();
+  }
+
+  // ---- cámara (móvil: frontal / trasera) ----
+  /**
+   * Móvil: alterna cámara frontal ('user') / trasera ('environment') sin renegociar (replaceTrack).
+   * Se detiene la pista anterior ANTES de abrir la nueva: muchos Android no permiten dos cámaras a la vez.
+   */
+  async switchCamera() {
+    const prev = this.facing || 'user';
+    this.facing = prev === 'environment' ? 'user' : 'environment';
+    if (!this.camTrack) return this.facing;
+    const pr = CAM_PRESETS[this.settings.camPreset] || CAM_PRESETS['720p30'];
+    const open = (mode) => navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: mode }, width: { ideal: pr.w }, height: { ideal: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } } });
+    const old = this.camTrack;
+    old.onended = null;
+    old.stop();
+    let st;
+    try { st = await open(this.facing); } catch { this.facing = prev; st = await open(prev); }
+    const nt = st.getVideoTracks()[0];
+    nt.contentHint = 'motion';
+    nt.onended = () => { this.setCamera(false); this.onCamEnded?.(); };
+    for (const p of this.peers.values()) {
+      if (p.senders.cam) { try { await p.senders.cam.replaceTrack(nt); } catch {} }
+    }
+    try { this.main.removeTrack(old); } catch {}
+    this.main.addTrack(nt);
+    this.camTrack = nt;
+    this.onChange();
+    return this.facing;
   }
 
   // ---- pantalla ----
@@ -466,7 +598,7 @@ class Call {
     if (this.mic?.monitoring) {
       this.setSelfMonitor(false);
     }
-    await window.epic.selectSource(sourceId, shareAudio);
+    await window.epic?.selectSource?.(sourceId, shareAudio);
     const st = await navigator.mediaDevices.getDisplayMedia({
       video: { width: { max: pr.w }, height: { max: pr.h }, frameRate: { ideal: pr.fps, max: pr.fps } },
       audio: shareAudio ? {
@@ -514,6 +646,7 @@ class Call {
       }
     }
     const now = performance.now();
+    let anyRemoteSpeaking = false;
     for (const p of this.peers.values()) {
       let sp = false;
       for (const r of p.pc.getReceivers()) {
@@ -521,8 +654,10 @@ class Call {
         const s = r.getSynchronizationSources?.()[0];
         if (s && s.audioLevel > 0.015 && now - s.timestamp < 600) sp = true;
       }
+      if (sp) anyRemoteSpeaking = true;
       if (sp !== p.speaking) { p.speaking = sp; this.onSpeaking(p.id, sp); }
     }
+    this.mic?.setRemoteSpeaking?.(anyRemoteSpeaking);
   }
 
   // ---- semáforo rápido de red (estilo Parsec/Steam: ping RTT + pérdida de paquetes) ----
@@ -577,7 +712,7 @@ class Call {
 
   close() {
     clearInterval(this.speakTimer);
-    for (const p of this.peers.values()) p.pc.close();
+    for (const p of this.peers.values()) { clearTimeout(p._iceTimer); p.pc.close(); }
     this.peers.clear();
     this.mic?.dispose(); this.mic = null;
     this.camTrack?.stop();

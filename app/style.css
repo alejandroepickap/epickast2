@@ -1799,3 +1799,197 @@ details.settings-acc .acc-body{padding:12px 14px 14px;display:flex;flex-directio
 .racer-countdown-pop {
   animation: racerPopCountdown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* v1.9.4: Cámaras flotantes PiP dentro de la app + insignia de versión inferior derecha + Ajustes Pro */
+#floatingCamDock {
+  position: fixed;
+  right: 18px;
+  bottom: 34px;
+  width: 280px;
+  background: rgba(14, 17, 26, 0.96);
+  border: 1px solid rgba(124, 92, 255, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.58);
+  z-index: 65;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(10px);
+  user-select: none;
+}
+#floatingCamDock.hidden { display: none !important; }
+body.mini-mode #floatingCamDock { display: none !important; }
+.float-cam-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: move;
+}
+.float-cam-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.float-cam-ctrls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.float-cam-ctrls button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 0;
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.float-cam-ctrls button:hover {
+  background: rgba(124, 92, 255, 0.4);
+  color: #fff;
+}
+.float-cam-ctrls button.muted {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+}
+.float-cam-body {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #07090e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#floatCamVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.float-cam-av {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  background: radial-gradient(circle at center, rgba(124, 92, 255, 0.25), rgba(8, 10, 16, 0.95));
+}
+.float-cam-av.hidden { display: none !important; }
+
+#ekVersionBadge {
+  position: fixed;
+  right: 10px;
+  bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--mu);
+  opacity: 0.58;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(11, 14, 20, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  z-index: 35;
+  user-select: none;
+  transition: opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+#ekVersionBadge:hover {
+  opacity: 1;
+  color: var(--tx);
+  border-color: var(--ac);
+}
+body.mini-mode #ekVersionBadge { display: none !important; }
+@media (max-width: 820px) {
+  #ekVersionBadge { display: none !important; }
+  #floatingCamDock { width: 200px; right: 10px; bottom: 68px; }
+}
+
+.settings-adv-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 92, 255, 0.35);
+  background: rgba(124, 92, 255, 0.1);
+  color: #e2e8f0;
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.settings-adv-btn:hover {
+  background: rgba(124, 92, 255, 0.2);
+  border-color: rgba(124, 92, 255, 0.65);
+}
+.settings-adv-btn.active {
+  background: rgba(124, 92, 255, 0.24);
+  border-color: var(--ac);
+}
+
+/* v1.9.4 Estética mejorada: Agrupación de mensajes, Anillos de Voz Neón y Glassmorphism */
+.msg.grouped {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+  margin-top: 0 !important;
+}
+.msg.grouped > .av {
+  visibility: hidden;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.msg.grouped .mhead {
+  display: none !important;
+}
+
+@keyframes ekSpeakGlow {
+  0%, 100% { box-shadow: 0 0 0 2px #22c55e, 0 0 16px rgba(34, 197, 94, 0.55); }
+  50% { box-shadow: 0 0 0 3px #4ade80, 0 0 24px rgba(74, 222, 128, 0.85); }
+}
+.tile {
+  border-radius: 14px !important;
+  background: radial-gradient(circle at 50% 42%, rgba(124, 92, 255, 0.14), rgba(10, 12, 18, 0.96)) !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.tile.speaking {
+  animation: ekSpeakGlow 1.2s ease-in-out infinite;
+  border-color: #22c55e !important;
+}
+.tile.speaking > .av {
+  box-shadow: 0 0 0 3px #22c55e, 0 0 18px rgba(34, 197, 94, 0.7);
+  transition: box-shadow 0.15s ease;
+}
+#meetBar {
+  backdrop-filter: blur(14px) !important;
+  background: rgba(13, 16, 24, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55) !important;
+}
+.voice-pill {
+  backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, rgba(19, 24, 38, 0.92), rgba(14, 18, 28, 0.92)) !important;
+  border-bottom: 1px solid rgba(124, 92, 255, 0.3) !important;
+}
+.macts {
+  backdrop-filter: blur(8px);
+  background: rgba(15, 19, 29, 0.92) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}

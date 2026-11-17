@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws: wss: http: https: data: blob:; img-src 'self' data: blob: http: https:; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream: http: https:; frame-src 'self' http: https: https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:">
 <title>EpicKast</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0e14">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+<script src="mobile-shim.js"></script>
 </head>
 <body>
 <div id="appSplash">
@@ -112,6 +121,7 @@
         <span id="vpillInfo" class="vpill-info">En llamada</span>
       </div>
       <div class="vpill-acts">
+        <button type="button" id="vpillFloat" class="vpill-btn" title="Mostrar cámaras flotantes">📌 Flotar</button>
         <button type="button" id="vpillExpand" class="vpill-btn" title="Mostrar cámaras / escenario de video">📹 Mostrar cámaras</button>
         <button type="button" id="vpillMute" class="vpill-btn" title="Silenciar / activar micro">Micro</button>
         <button type="button" id="vpillDeaf" class="vpill-btn" title="Silenciar audio">Audio</button>
@@ -135,6 +145,24 @@
 </div>
 
 <button id="bMiniExit" title="Volver a ventana normal">⤢</button>
+<div id="floatingCamDock" class="hidden" aria-label="Cámaras flotantes">
+  <div id="floatCamHead" class="float-cam-head">
+    <span id="floatCamTitle" class="float-cam-title">📹 Cámara en vivo</span>
+    <div class="float-cam-ctrls">
+      <button type="button" id="floatCamPrev" title="Cámara anterior">◀</button>
+      <button type="button" id="floatCamNext" title="Siguiente cámara">▶</button>
+      <button type="button" id="floatCamMute" title="Silenciar / Activar micrófono">🎙️</button>
+      <button type="button" id="floatCamPopOut" title="Sacar cámara fuera de la aplicación (PiP externo)">↗</button>
+      <button type="button" id="floatCamExpand" title="Volver al escenario completo">⤢</button>
+      <button type="button" id="floatCamClose" title="Ocultar cámara flotante">✕</button>
+    </div>
+  </div>
+  <div class="float-cam-body">
+    <video id="floatCamVideo" autoplay playsinline muted></video>
+    <div id="floatCamAvatar" class="float-cam-av hidden"></div>
+  </div>
+</div>
+<div id="ekVersionBadge" title="EpicKast · Ver notas de versión">v1.9.4</div>
 <div id="callOverlay" class="hidden"></div>
 <div id="modal" class="hidden"></div>
 <div id="toast"></div>
@@ -145,6 +173,7 @@
 <script src="game.js"></script>
 <script src="card-game.js"></script>
 <script src="racer-game.js"></script>
+<script src="mobile.js"></script>
 <script src="renderer.js"></script>
 </body>
 </html>

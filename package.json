@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": {
     "name": "EpicKap",
@@ -19,7 +19,11 @@
     "test": "node tools/smoke-test.js",
     "pack:friends": "electron-builder --win nsis zip --x64",
     "pack:store": "electron-builder --win appx --x64",
-    "pack:linux": "electron-builder --linux tar.gz deb --x64"
+    "pack:linux": "electron-builder --linux tar.gz deb --x64",
+    "mobile:init": "npm i -D @capacitor/cli @capacitor/core @capacitor/android @capacitor/ios @capacitor/app @capacitor/browser && npx cap add android && npx cap add ios",
+    "mobile:sync": "npx cap sync",
+    "mobile:android": "npx cap sync android && npx cap open android",
+    "mobile:ios": "npx cap sync ios && npx cap open ios"
   },
   "build": {
     "appId": "com.epickap.epickast",
