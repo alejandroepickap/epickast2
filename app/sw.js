@@ -5,7 +5,7 @@
  * reciente y usa la caché solo sin conexión. NUNCA cachea WebSockets, /upload ni /files
  * (los datos en tiempo real siempre vienen del servidor).
  */
-const CACHE = 'epickast-shell-v1.9.7';
+const CACHE = 'epickast-shell-v1.9.8';
 const SHELL = [
   './', './index.html', './theme-tokens.css', './vendor/cropper.min.css', './vendor/pickr-nano.min.css',
   './style.css', './mobile.css',

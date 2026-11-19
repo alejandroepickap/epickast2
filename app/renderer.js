@@ -1960,11 +1960,49 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.9.7 (ACTUAL · GALERÍA DE PÓSTERS ANIME & EVENTOS, DEGRADADOS PRO, TURBO CORE CURVAS ARCADE & DOJO REFINADO) ==================== -->
+        <!-- ==================== VERSIÓN 1.9.8 (ACTUAL · MENÚS UNIFICADOS CON DESPLEGABLES, BANNERS EN TODA LA APP, OVERLAY CLICK-THROUGH & BAJA LATENCIA WEBRTC) ==================== -->
+        <div style="border:2px solid #a855f7;border-radius:12px;padding:18px;margin-bottom:24px;background:#130e24;box-shadow:0 8px 24px rgba(168,85,247,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #312354;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#9333ea;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.8</h2>
+            </div>
+            <span style="font-size:12px;color:#d8b4fe;font-weight:700;">Menús Unificados con Desplegables, Banners Globales, Overlay Click-Through &amp; Audio/Video Baja Latencia</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#c084fc;">🧩 Menús y Submenús Unificados Ajustados a Pantalla:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Cabecera y Pie Fijos en Todos los Modales:</b> todos los menús (<i>Mi Perfil</i>, <i>Ajustes</i>, <i>Tarjeta de Miembro</i> y <i>Servidor</i>) ahora comparten la misma estructura con cabecera fija, cuerpo desplazable ajustado a pantalla (<code>88vh</code>) y botones de acción siempre accesibles.</li>
+                <li><b>Secciones Desplegables Unificadas:</b> <i>Mi Perfil</i> y <i>Tarjeta de Miembro</i> ahora agrupan sus opciones en acordeones plegables (<i>🖼️ Banner y Fondo</i>, <i>🎨 Color, Marco y Título</i>, <i>🟢 Presencia y Actividad</i>, <i>⚖️ Moderación</i>), eliminando controles duplicados y evitando saturar la pantalla.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">🖼️ Banners Visibles en Toda la Aplicación &amp; Arte Limpio 16:5:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Presencia Global de tus Banners:</b> tus pósters anime, degradados Pro e imágenes personalizadas ahora se muestran en las <b>tarjetas de Amigos</b>, la nueva <b>Mini-Tarjeta de Inicio</b>, tu barra inferior (<code>#meBar</code>), la <b>lista de Miembros</b>, la <b>cabecera de Mensajes Directos</b> y los <b>mosaicos de voz</b> con cámara apagada.</li>
+                <li><b>Arte Full-Bleed Sin Recortes:</b> los 8 pósters promocionales anime se regeneraron sin texto cortado, se corrigió el zoom 200 % en <i>Mi Armario</i>, se eliminó la franja oscura junto al avatar y el texto <code>null</code> en la barra superior.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#4ade80;">🎙️ Videollamadas de Baja Latencia, Contorno de Voz Limpio &amp; Overlay Click-Through:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Corrección del Brillo Verde al Hablar:</b> al hablar en videollamada, ahora solo se ilumina el contorno exterior del mosaico y nunca el recuadro interior del logo o foto de perfil.</li>
+                <li><b>Baja Latencia de Audio y Video WebRTC:</b> límite de <i>jitter buffer</i> (<code>20 ms</code> audio / <code>40 ms</code> video), eliminación de falsos positivos de congestión y reinicios ICE en llamadas sanas, prioridad de voz sobre video, <code>latencyHint: 'interactive'</code> y rutas <b>Cloudflare TURN UDP primero</b>.</li>
+                <li><b>Overlay Flotante 100 % Click-Through + <code>Alt+O</code>:</b> el fondo y bordes transparentes del overlay dejan pasar todos los clics a las ventanas o juegos debajo, se cierra/abre al instante con <code>Alt+O</code> (o <code>ESC</code>) y solo se auto-abre si estás en llamada activa.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.7 (GALERÍA DE PÓSTERS ANIME & EVENTOS, DEGRADADOS PRO, TURBO CORE CURVAS ARCADE & DOJO REFINADO) ==================== -->
         <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:#0b1726;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.7</span>
               <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.7</h2>
             </div>
             <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Pósters Promocionales Anime 16:5, Galería de Banners Pro, Turbo Core con Perspectiva Curva &amp; Dojo Refinado</span>
@@ -2709,7 +2747,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, isStore: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.7', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, isStore: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.8', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -2718,7 +2756,7 @@ const S = {
 };
 
 function updateVersionBadges() {
-  const verTxt = 'v' + (S.appVer || '1.9.7');
+  const verTxt = 'v' + (S.appVer || '1.9.8');
   const badge = $('ekVersionBadge');
   if (badge) {
     badge.textContent = verTxt;
@@ -4761,7 +4799,7 @@ function renderMe() {
 
   const myBanner = localStorage.getItem('epickast.equipped_banner') || S.me.banner || '';
   bar.classList.toggle('has-banner', !!myBanner);
-  bar.replaceChildren(
+  bar.replaceChildren(...[
     myBanner ? h('div', { class: 'mebar-banner-bg', style: bannerCss(myBanner) }) : null,
     h('div', { class: 'who', style: 'position:relative;z-index:1', title: 'Editar perfil, cosméticos y actividad', onclick: modalProfile },
       avatar(S.me, 34, true),
@@ -4777,7 +4815,7 @@ function renderMe() {
       h('button', { class: 'btn-ico', title: `Cambiar estado (${stLabel})`, style: 'font-size:13px;padding:4px 6px', onclick: toggleStatusPopover }, stIcon),
       h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16))
     )
-  );
+  ].filter(Boolean));
 }
 function renderRail() {
   const r = $('rail'); r.replaceChildren();
@@ -5207,10 +5245,14 @@ function modalMemberCard(sd, m) {
         h('button', { id: 'profBtnCardJitsu', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700;background:rgba(99,102,241,0.18);border-color:rgba(99,102,241,0.45);color:#c7d2fe' }, '🥋 Dojo'),
         h('button', { id: 'profBtnRacer', class: 'btn-act', style: 'justify-content:center;padding:7px 8px;font-size:11.5px;font-weight:700;background:rgba(16,185,129,0.18);border-color:rgba(16,185,129,0.45);color:#6ee7b7' }, '🏎️ Carrera')
       ) : null,
-      canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
-      (canKick || canBan || userVoiceKey) ? h('div', { class: 'mod-box' },
-        h('div', { class: 'mod-title' }, '⚖️ Herramientas de Moderación'),
-        userVoiceKey ? h('div', { class: 'mod-actions-grid' },
+      (canSetRole || canKick || canBan || userVoiceKey) ? makeAccordion(
+        '⚖️',
+        'Moderación y Rango del Servidor',
+        'Controles de voz, asistencia de audio, rango y expulsión',
+        false,
+        canSetRole ? h('label', null, '🛡️ Asignar rango en el servidor', roleSel) : null,
+        (canKick || canBan || userVoiceKey) ? h('div', { class: 'mod-box', style: 'margin-top:0' },
+          userVoiceKey ? h('div', { class: 'mod-actions-grid' },
           h('button', {
             type: 'button',
             class: 'mod-btn voice',
@@ -5319,7 +5361,8 @@ function modalMemberCard(sd, m) {
               closeModal();
             }
           }
-        }, '🧹 Limpiar mensajes recientes (Anti-Spam)') : null
+          }, '🧹 Limpiar mensajes recientes (Anti-Spam)') : null
+        ) : null
       ) : null
     )
   );
@@ -5403,7 +5446,7 @@ function renderCenter() {
   const dmBanner = dmFriend?.banner || '';
   const chTitleEl = $('chTitle');
   chTitleEl.classList.toggle('has-dm-banner', !!(dm && dmBanner));
-  chTitleEl.replaceChildren(
+  chTitleEl.replaceChildren(...[
     dm && dmBanner ? h('div', { class: 'ch-dm-banner-bg', style: bannerCss(dmBanner) }) : null,
     h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0;position:relative;z-index:1' },
       toggleSideBtn,
@@ -5417,7 +5460,7 @@ function renderCenter() {
       isGuide ? h('span', { style: 'background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #4338ca;' }, 'Canal Informativo Oficial') : null
     ),
     h('div', { style: 'position:relative;z-index:1;display:flex;align-items:center' }, rightBtns)
-  );
+  ].filter(Boolean));
 
   // Visibilidad de paneles en section#center
   $('msgs').classList.toggle('hidden', !showChat);
@@ -5580,9 +5623,42 @@ function renderHome() {
   H.append(h('div', { class: 'home-layout' }, mainCol, asideCol));
 }
 
-// ---------- modales ----------
+// ---------- modales unificados y acordeones ----------
+function makeAccordion(icon, title, desc, open, ...children) {
+  return h('details', { class: 'settings-acc', open: !!open },
+    h('summary', null,
+      h('div', null,
+        h('div', { class: 'acc-title' }, h('span', null, icon), title),
+        desc ? h('div', { class: 'acc-desc' }, desc) : null
+      ),
+      h('span', { class: 'acc-arrow' }, '▸')
+    ),
+    h('div', { class: 'acc-body' }, ...children)
+  );
+}
 function modal(title, ...body) {
-  const m = $('modal'); m.replaceChildren(h('div', { class: 'panel' }, h('h3', null, title), ...body, h('button', { onclick: closeModal }, 'Cerrar')));
+  const flat = body.filter(Boolean);
+  let primaryBtn = null;
+  if (flat.length > 0) {
+    const last = flat[flat.length - 1];
+    if (last && last.tagName === 'BUTTON' && (last.classList?.contains('primary') || last.classList?.contains('danger'))) {
+      primaryBtn = flat.pop();
+    }
+  }
+  const m = $('modal');
+  m.replaceChildren(
+    h('div', { class: 'panel' },
+      h('div', { class: 'panel-hdr' },
+        h('h3', null, title),
+        h('button', { type: 'button', class: 'panel-close-x', title: 'Cerrar (ESC)', onclick: closeModal }, '✕')
+      ),
+      h('div', { class: 'panel-body' }, ...flat),
+      h('div', { class: 'panel-ftr' },
+        h('button', { type: 'button', onclick: closeModal }, 'Cerrar'),
+        primaryBtn
+      )
+    )
+  );
   m.classList.remove('hidden'); m.onclick = (e) => { if (e.target === m) closeModal(); };
 }
 function closeModal() { S.partyModalUpdater = null; S.cleanup.splice(0).forEach((f) => { try { f(); } catch {} }); $('modal').classList.add('hidden'); $('modal').replaceChildren(); }
@@ -6195,28 +6271,45 @@ function modalProfile() {
       )
     )
   );
-  modal('Mi perfil, presencia y cosméticos',
-    liveCardPreview,
+  const accBanners = makeAccordion(
+    '🖼️',
+    'Banner y Fondo de Perfil',
+    'Pósters Anime & Eventos, Degradados Pro, Mundos o imagen propia 16:5',
+    true,
+    bannerGallerySlot,
+    bannerFileInp
+  );
+
+  const accColors = makeAccordion(
+    '🎨',
+    'Color de Nombre, Marco y Título',
+    'Paleta base, degradado libre, cosméticos de Bóveda y título equipado',
+    false,
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
-      h('label', null, '🚦 Estado de presencia', statusSelect),
-      h('label', null, '👑 Título de jugador', titleSelect)
+      h('label', null, '👑 Título de jugador', titleSelect),
+      unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar', frameSelect) : h('div')
     ),
-    unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar (Bóveda)', frameSelect) : null,
-    h('label', null, 'Color del avatar y nombre (Paleta Base + Selector Libre)', sws, colorStudioSlot),
-    vaultColorSwatches ? h('label', null, '✨ Colores y Gradientes Desbloqueados en la Bóveda', vaultColorSwatches) : null,
-    h('label', null, '🎨 Estudio de Banners (Pósters Anime, Eventos, Degradados Pro e Imagen 16:5)',
-      bannerGallerySlot,
-      bannerSelect,
-      h('div', { class: 'ek-banner-tools' },
-        h('button', { type: 'button', class: 'primary', onclick: () => bannerFileInp.click() }, '🖼️ Subir y recortar imagen propia (16:5)'),
-        h('span', { class: 'hint', style: 'font-size:11px' }, 'PNG, JPG, WEBP o GIF · Máx. 960×300'),
-        bannerFileInp
-      )
-    ),
+    h('label', null, 'Paleta base y selector libre (Sólido / Degradado)', sws, colorStudioSlot),
+    vaultColorSwatches ? h('label', null, '✨ Desbloqueados en la Bóveda', vaultColorSwatches) : null
+  );
+
+  const accPresence = makeAccordion(
+    '🟢',
+    'Presencia, Biografía y Actividad de Juego',
+    'Estado visible, frase personal y detección pasiva de juegos',
+    false,
+    h('label', null, '🚦 Estado de presencia', statusSelect),
     h('label', null, 'Estado / Biografía', bio),
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
     h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
-    h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-4px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).'),
+    h('div', { style: 'font-size:11px;color:var(--mu);margin-top:-2px;line-height:1.4' }, '🔒 Sondeo pasivo local sin inyección DLL. Seguro para anticheats (VAC / EasyAntiCheat).')
+  );
+
+  modal('Mi perfil, presencia y cosméticos',
+    liveCardPreview,
+    accBanners,
+    accColors,
+    accPresence,
     h('button', { class: 'primary', onclick: async () => {
       settings.customActivity = customAct.value.trim();
       settings.autoGameDetect = autoChk.checked;

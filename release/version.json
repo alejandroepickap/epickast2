@@ -1,7 +1,7 @@
 {
-    "version":  "1.9.7",
-    "notes":  "v1.9.7: banners visibles en toda la app, overlay click-through con Alt+O y audio/video de baja latencia (jitter buffer reducido, sin falsos reinicios ICE).",
-    "updatedAt":  "2026-11-19T20:18:21.996Z",
-    "asarSha256":  "d4b38271c1f7b5d754be448f827faa62bb169e8477e99820c116375eaa6d6b3b",
-    "asarSize":  27746512
+    "version":  "1.9.8",
+    "notes":  "EpicKast v1.9.8: Menús unificados con desplegables ajustados a pantalla, corrección del brillo verde interior al hablar y texto null en cabecera, banners visibles en toda la app, overlay 100% click-through (Alt+O) y audio/video WebRTC de baja latencia.",
+    "updatedAt":  "2026-11-19T21:52:07.013Z",
+    "asarSha256":  "e6d94a0a9bd03b6903b6a56fe8094c52b8bc0249f329005baa85b87754224bb9",
+    "asarSize":  27753153
 }

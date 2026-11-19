@@ -4,6 +4,21 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ---
 
+## [1.9.8] - 2026-11-19
+
+### 🧩 Menús Unificados con Desplegables, Corrección del Brillo Verde en Videollamadas, Banners Globales, Overlay Click-Through y Baja Latencia WebRTC
+- **Corrección del Indicador de Voz en Videollamadas (`app/style.css`):** Eliminado el recuadro verde sobre el avatar/logo interior (`.tile.speaking > .av`) para que únicamente se ilumine el contorno exterior del mosaico al hablar.
+- **Corrección de Texto `null` en Cabeceras (`app/renderer.js`):** Filtrado seguro en `replaceChildren()` de `#chTitle` y `#meBar` para eliminar la aparición de `"null"` cuando no hay banner de DM activo.
+- **Arquitectura de Modales Unificada y Ajustada a Pantalla (`app/renderer.js`, `app/style.css`):**
+  - Todos los modales ahora comparten cabecera fija con botón `✕`, cuerpo desplazable ajustado a `88vh` y pie fijo con los botones `Cerrar` y acción principal siempre visibles.
+  - Unificación de `Mi Perfil` y `Tarjeta de Miembro` con acordeones desplegables (`details.settings-acc`) idénticos a `Ajustes`, eliminando controles duplicados y evitando saturar los menús.
+- **Banners Globales y Arte Full-Bleed 16:5 (`app/renderer.js`, `app/style.css`, `app/profile-studio.js`, `app/assets/banners/promo_*.webp`):**
+  - Banners visibles en Tarjetas de Amigos, Mini-Tarjeta de Inicio, `#meBar`, Lista de Miembros, Cabecera DM, Mosaicos de Voz y `Mi Armario` (altura `72px` sin zoom deformado).
+- **Overlay Flotante 100 % Click-Through (`Alt+O`) y Baja Latencia WebRTC (`app/main.js`, `app/overlay.html`, `app/call.js`, `server/server.js`):**
+  - Transparencia *click-through* total en bordes/fondo del overlay, cierre global con `Alt+O`/`ESC`, *jitter buffer* reducido (`20 ms` audio / `40 ms` video), eliminación de falsos reinicios ICE y rutas ICE UDP primero.
+
+---
+
 ## [1.9.7] - 2026-11-19
 
 ### 🎨 Estudio de Banners Pro (Pósters Promocionales Anime & Eventos + Degradados de Estudio), Turbo Core con Perspectiva Curva y Dojo Elemental Refinado
