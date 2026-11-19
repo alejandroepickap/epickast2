@@ -26,7 +26,10 @@ html.ek-no-screen #mScreen { display: none !important; }
 .ek-touch #meetBar { opacity: 1 !important; }
 .ek-touch .mbtn { width: 44px; height: 44px; }
 .ek-touch .mbtn.hang { height: 44px; }
-.ek-touch button, .ek-touch .ico, .ek-touch .mem-row { -webkit-tap-highlight-color: transparent; }
+.ek-touch button, .ek-touch .ico, .ek-touch .mem-row, .ek-touch .ek-ctx-item { -webkit-tap-highlight-color: transparent; }
+.ek-touch .ek-ctx-item,
+.ek-touch button.ek-ctx-sub,
+.ek-touch .ek-ctx-sub > button { min-height: 40px; }
 .ek-touch #stageResizer { display: none; }
 
 /* ==========================================================================
@@ -167,6 +170,16 @@ html.ek-no-screen #mScreen { display: none !important; }
     padding: 12px 10px 80px !important;
     max-width: none !important;
     overflow-x: hidden !important;
+  }
+  .home-layout {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+  .home-aside {
+    position: static !important;
+  }
+  .home-aside-card {
+    padding: 12px !important;
   }
   .add-friend-bar {
     display: flex !important;
@@ -334,6 +347,59 @@ html.ek-no-screen #mScreen { display: none !important; }
     border-radius: 0 !important; border: 0 !important;
     padding: calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px) !important;
     box-sizing: border-box !important;
+  }
+
+  /* ----- Menú contextual flotante, Estudio de Perfil y Recortador (v1.9.6) ----- */
+  .ek-ctx-menu {
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+    overflow-y: auto !important;
+    padding: 8px !important;
+  }
+  .ek-ctx-item,
+  button.ek-ctx-sub,
+  .ek-ctx-sub > button {
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    font-size: 13.5px !important;
+  }
+  .ek-ctx-vol {
+    min-height: 40px !important;
+    padding: 8px 10px !important;
+  }
+
+  .ek-profile-studio {
+    gap: 10px !important;
+    max-width: 100% !important;
+  }
+  .ek-color-studio,
+  .ek-banner-tools {
+    padding: 10px !important;
+    gap: 8px !important;
+  }
+  .ek-cropper-overlay {
+    padding: calc(env(safe-area-inset-top) + 12px) calc(env(safe-area-inset-right) + 12px) calc(env(safe-area-inset-bottom) + 12px) calc(env(safe-area-inset-left) + 12px) !important;
+    justify-content: center !important;
+  }
+  .ek-cropper-box,
+  .ek-cropper-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px) !important;
+    overflow-y: auto !important;
+    padding: 14px !important;
+    box-sizing: border-box !important;
+  }
+  .ek-cropper-toolbar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .ek-cropper-actions {
+    width: 100% !important;
+  }
+  .ek-cropper-actions button {
+    flex: 1 !important;
+    min-height: 40px !important;
   }
 
   /* ----- Bóveda de Reliquias en Móvil (Foto 2) ----- */
@@ -517,7 +583,9 @@ html.ek-no-screen #mScreen { display: none !important; }
   }
 
   /* ----- Turbo Core: lienzo fluido + mando táctil grande ----- */
-  #racerCanvas { height: auto !important; aspect-ratio: 760 / 390; }
+  #racerCanvas,
+  #racerPhaserHost { height: auto !important; aspect-ratio: 760 / 390; width: 100% !important; }
+  #racerPhaserHost canvas { width: 100% !important; height: auto !important; }
   .racer-kbd-hint { display: none; }
   .racer-controls { padding: 8px !important; }
   .racer-touch-pad { width: 100%; display: grid !important; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px !important; }
@@ -526,6 +594,7 @@ html.ek-no-screen #mScreen { display: none !important; }
 
 /* Teléfono en horizontal: aprovechar la altura para el juego y la llamada */
 @media (max-height: 500px) and (orientation: landscape) {
-  .ek-touch #racerCanvas { height: 58vh !important; width: auto !important; max-width: 100%; margin: 0 auto; aspect-ratio: 760 / 390; }
+  .ek-touch #racerCanvas,
+  .ek-touch #racerPhaserHost { height: 58vh !important; width: auto !important; max-width: 100%; margin: 0 auto; aspect-ratio: 760 / 390; }
   .ek-touch #stageWrap { height: 78vh !important; max-height: 78vh !important; }
 }

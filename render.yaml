@@ -7,3 +7,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: CF_TURN_TOKEN_ID
+        sync: false
+      - key: CF_TURN_API_TOKEN
+        sync: false

@@ -5,43 +5,58 @@
   <title>EpicKast Overlay</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body {
-      background: transparent;
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       overflow: hidden;
       padding: 4px;
+      pointer-events: none;
     }
     .hud {
-      background: transparent;
+      background: transparent !important;
       border: 0;
-      display: flex;
+      display: inline-flex;
       flex-direction: column;
+      align-items: flex-start;
       gap: 3px;
+      pointer-events: none;
     }
     .hud-head {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: space-between;
       -webkit-app-region: drag;
       cursor: grab;
-      padding: 2px 7px;
-      border-radius: 6px;
-      background: rgba(15, 18, 25, 0.85);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(11, 14, 22, 0.88);
+      border: 1px solid rgba(255, 255, 255, 0.16);
       font-size: 10px;
       font-weight: 700;
-      color: #94a3b8;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      opacity: 0;
-      transition: opacity 0.18s ease;
+      color: #cbd5e1;
+      letter-spacing: 0.4px;
+      opacity: 0.38;
+      transition: opacity 0.16s ease, border-color 0.16s ease;
       width: fit-content;
       margin-bottom: 2px;
+      pointer-events: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
-    body:hover .hud-head, .hud-head:hover {
+    .hud-head:hover {
       opacity: 1;
+      border-color: rgba(56, 189, 248, 0.55);
+    }
+    .hud-key {
+      font-size: 9px;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.14);
+      border: 1px solid rgba(56, 189, 248, 0.32);
+      border-radius: 4px;
+      padding: 0 4px;
+      margin-left: 5px;
+      font-weight: 800;
     }
     .hud-close {
       -webkit-app-region: no-drag;
@@ -51,39 +66,41 @@
       color: #94a3b8;
       font-size: 11px;
       line-height: 1;
-      padding: 1px 3px;
+      padding: 2px 5px;
       margin-left: 6px;
-      border-radius: 3px;
+      border-radius: 999px;
+      pointer-events: auto;
     }
     .hud-close:hover {
-      color: #ff5468;
-      background: rgba(255, 84, 104, 0.2);
+      color: #fff;
+      background: rgba(239, 68, 68, 0.85);
     }
     .speaker-list {
       display: flex;
       flex-direction: column;
+      align-items: flex-start;
       gap: 3px;
-      max-height: 240px;
-      overflow-y: auto;
+      max-height: 215px;
+      overflow: hidden;
+      pointer-events: none;
     }
     .speaker {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 2px 8px 2px 3px;
+      padding: 2px 9px 2px 3px;
       border-radius: 999px;
-      background: rgba(14, 17, 24, 0.65);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(14, 17, 24, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.10);
       transition: all 0.15s ease;
       width: fit-content;
-      max-width: 180px;
+      max-width: 185px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
     }
     .speaker.speaking {
-      background: rgba(16, 185, 129, 0.26);
-      border-color: rgba(52, 211, 153, 0.6);
+      background: rgba(16, 185, 129, 0.32);
+      border-color: rgba(52, 211, 153, 0.75);
       box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
       transform: scale(1.02);
     }
@@ -125,18 +142,56 @@
 </head>
 <body>
   <div class="hud">
-    <div class="hud-head">
-      <span>🎮 EpicKast Overlay</span>
-      <button id="closeBtn" class="hud-close" title="Cerrar overlay">✕</button>
+    <div id="hudHead" class="hud-head">
+      <span>🎮 Overlay</span>
+      <span class="hud-key">Alt+O</span>
+      <button id="closeBtn" class="hud-close" title="Cerrar overlay (Alt+O)">✕</button>
     </div>
     <div id="speakers" class="speaker-list"></div>
   </div>
 
   <script>
     const speakersEl = document.getElementById('speakers');
-    document.getElementById('closeBtn').onclick = () => {
+    const hudHeadEl = document.getElementById('hudHead');
+    let ignoringMouse = true;
+
+    function setClickThrough(ignore) {
+      const next = !!ignore;
+      if (ignoringMouse === next) return;
+      ignoringMouse = next;
+      window.epic?.setOverlayIgnoreMouse?.(next);
+    }
+
+    // Por defecto toda el área transparente deja pasar los clics al 100%
+    window.epic?.setOverlayIgnoreMouse?.(true);
+
+    // Solo capturar el ratón cuando el cursor pasa exactamente sobre la píldora superior (.hud-head)
+    hudHeadEl.addEventListener('mouseenter', () => setClickThrough(false));
+    hudHeadEl.addEventListener('mouseleave', () => setClickThrough(true));
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = hudHeadEl.getBoundingClientRect();
+      const insideHead = (
+        e.clientX >= rect.left - 2 &&
+        e.clientX <= rect.right + 2 &&
+        e.clientY >= rect.top - 2 &&
+        e.clientY <= rect.bottom + 2
+      );
+      setClickThrough(!insideHead);
+    });
+
+    document.getElementById('closeBtn').onclick = (e) => {
+      e.stopPropagation();
+      setClickThrough(true);
       window.epic?.toggleOverlay(false);
     };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' || (e.altKey && (e.key === 'o' || e.key === 'O'))) {
+        setClickThrough(true);
+        window.epic?.toggleOverlay(false);
+      }
+    });
 
     if (window.epic?.onOverlayData) {
       window.epic.onOverlayData((data) => {
@@ -148,7 +203,7 @@
         data.peers.forEach((p) => {
           const row = document.createElement('div');
           row.className = 'speaker' + (p.speaking ? ' speaking' : '') + (p.muted ? ' muted' : '');
-          
+
           const av = document.createElement('div');
           av.className = 'av';
           if (p.color) av.style.background = p.color;

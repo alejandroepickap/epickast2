@@ -91,11 +91,11 @@ if (hasFounderInChest) {
 } else {
   console.log('  ✓ founder_frame correctamente excluido de los cofres.');
 }
-if (cfg.cosmetics.length !== 25) {
-  console.error(`  ✗ FALLO: Se esperaban exactamente 25 cosméticos en cofre, se encontraron ${cfg.cosmetics.length}`);
+if (cfg.cosmetics.length !== 32) {
+  console.error(`  ✗ FALLO: Se esperaban exactamente 32 cosméticos en cofre, se encontraron ${cfg.cosmetics.length}`);
   allPassed = false;
 } else {
-  console.log('  ✓ Reserva de cofres contiene exactamente 25 cosméticos (10 Común, 7 Raro, 5 Épico, 3 Legendario).');
+  console.log('  ✓ Reserva de cofres contiene exactamente 32 cosméticos (33 en total con Marco Fundador).');
 }
 
 // [2/4] Prueba DETERMINISTA de Piedad Dura (Casos 59, 60 y 61 con RNG que nunca saca legendario)

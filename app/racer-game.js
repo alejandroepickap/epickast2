@@ -37,7 +37,18 @@
     };
   }
 
-  // Audio sintetizado gestionado por EKLifecycle
+  const CARTOON_PALETTES = {
+    neon_highway: { sky: '#8ec085', marginAlt: '#82b479', road: '#5a667a', curbA: '#5eb8e5', curbB: '#faf3e0', border: '#5eb8e5' },
+    magma_canyon: { sky: '#d6a37a', marginAlt: '#c9936a', road: '#615956', curbA: '#ee7b68', curbB: '#fdf4e3', border: '#ee7b68' },
+    glacier_summit: { sky: '#e8f3fb', marginAlt: '#d7eaf7', road: '#6d8099', curbA: '#60b6e5', curbB: '#ffffff', border: '#60b6e5' },
+    obsidian_core: { sky: '#5a5673', marginAlt: '#504c67', road: '#626882', curbA: '#f3c669', curbB: '#d8b4fe', border: '#d8b4fe' }
+  };
+
+  function getCartoonPalette(trackId) {
+    return CARTOON_PALETTES[trackId] || CARTOON_PALETTES.neon_highway;
+  }
+
+  // Audio sintetizado gestionado por EKLifecycle + puente EKAudio
   const RacerAudio = {
     ctx: null,
     init(scope) {
@@ -75,21 +86,26 @@
         osc.stop(this.ctx.currentTime + dur);
       } catch {}
     },
-    beep(scope, high = false) { this.tone(scope, high ? 880 : 440, 'square', high ? 0.25 : 0.14, 0.08); },
-    coin(scope) { this.tone(scope, 987, 'sine', 0.09, 0.08, 1318); },
-    boost(scope) { this.tone(scope, 210, 'sawtooth', 0.38, 0.09, 860); },
-    crash(scope) { this.tone(scope, 140, 'sawtooth', 0.30, 0.12, 42); },
+    beep(scope, high = false) {
+      this.tone(scope, high ? 880 : 523, 'triangle', high ? 0.22 : 0.12, 0.07);
+      if (high) window.EKAudio?.play?.('msg-send', 0.35);
+    },
+    coin(scope) { this.tone(scope, 987, 'sine', 0.09, 0.07, 1318); },
+    boost(scope) { this.tone(scope, 240, 'triangle', 0.30, 0.08, 760); },
+    crash(scope) { this.tone(scope, 160, 'triangle', 0.26, 0.11, 48); },
     ramp(scope) {
+      window.EKAudio?.play?.('chest-open', 0.6);
       [349, 440, 523, 698].forEach((f, i) => {
-        const fn = () => this.tone(scope, f, 'sine', 0.12, 0.08);
+        const fn = () => this.tone(scope, f, 'sine', 0.12, 0.07);
         if (scope) scope.timeout(fn, i * 45);
         else setTimeout(fn, i * 45);
       });
     },
-    oil(scope) { this.tone(scope, 180, 'sawtooth', 0.22, 0.08, 90); },
+    oil(scope) { this.tone(scope, 210, 'triangle', 0.20, 0.08, 95); },
     win(scope) {
+      window.EKAudio?.play?.('legendary-win', 0.7);
       [523, 659, 784, 1046].forEach((f, i) => {
-        const fn = () => this.tone(scope, f, 'triangle', 0.22, 0.1);
+        const fn = () => this.tone(scope, f, 'triangle', 0.22, 0.09);
         if (scope) scope.timeout(fn, i * 110);
         else setTimeout(fn, i * 110);
       });
@@ -157,6 +173,9 @@
       this.paused = false;
       this.destroyed = false;
       this.rafId = null;
+      this.phaserRace = null;
+      this.phaserMountToken = 0;
+      this.fallbackLoopActive = false;
       this.keyState = {};
       const tracks = getTracks();
       this.selectedTrack = tracks[0];
@@ -241,11 +260,25 @@
       tick();
     }
 
+    _destroyPhaser() {
+      this.phaserMountToken++;
+      this.fallbackLoopActive = false;
+      if (this.rafId) {
+        try { cancelAnimationFrame(this.rafId); } catch {}
+        this.rafId = null;
+      }
+      if (this.phaserRace) {
+        try { this.phaserRace.destroy?.(); } catch {}
+        this.phaserRace = null;
+      }
+    }
+
     destroy() {
       if (this.destroyed) return;
       this.destroyed = true;
       this.inRace = false;
       this.paused = false;
+      this._destroyPhaser();
       if (this.scope) {
         this.scope.dispose();
       } else if (this.rafId) {
@@ -284,11 +317,13 @@
     confirmExitRace(onConfirm) {
       const cb = onConfirm || (() => this.renderLobby());
       if (!this.inRace || !this.raceState || this.raceState.finished) {
+        this._destroyPhaser();
         cb();
         return;
       }
       const wrap = this.container.querySelector('#racerStageWrap');
       if (!wrap) {
+        this._destroyPhaser();
         cb();
         return;
       }
@@ -318,6 +353,7 @@
         modal.remove();
         this.inRace = false;
         this.paused = false;
+        this._destroyPhaser();
         cb();
       };
     }
@@ -349,6 +385,7 @@
 
     renderLobby() {
       if (this.destroyed) return;
+      this._destroyPhaser();
       this.inRace = false;
       this.paused = false;
       this.pilot = getNinjaPilot();
@@ -405,7 +442,7 @@
           </div>
 
           <!-- Cabecera Turbo Core -->
-          <div style="background:linear-gradient(135deg, #0b101d 0%, #17132b 100%);border:1px solid #28324e;border-radius:12px;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 6px 20px rgba(0,0,0,0.4);">
+          <div style="position:relative;overflow:hidden;background:linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.76) 58%, rgba(15,23,42,0.42) 100%), url('${window.EKCartoonArtManifest?.racerHero || 'assets/cartoon/racer_hero.webp'}') center 45%/cover no-repeat;border:1.5px solid #334155;border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;box-shadow:0 8px 22px rgba(0,0,0,0.42);">
             <div style="display:flex;align-items:center;gap:14px;">
               <div style="width:54px;height:54px;border-radius:12px;background:radial-gradient(circle,#1e293b,#090d16);border:2px solid ${ch.glow};display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px ${ch.glow}44;">
                 ${renderSpr('tab_racer', 2.2)}
@@ -614,6 +651,7 @@
 
     startRace(rawTrack) {
       if (this.destroyed) return;
+      this._destroyPhaser();
       const baseTrack = rawTrack || getTracks()[0] || {};
       const theme = baseTrack.theme || {
         sky: baseTrack.skyTop || '#070b19',
@@ -637,6 +675,7 @@
       this.keyState = {};
       const chassisList = getChassisColors();
       const ch = chassisList.find(c => c.id === this.save.chassis) || chassisList[0];
+      const pal = getCartoonPalette(track.id);
 
       this.container.innerHTML = `
         <div style="display:flex;flex-direction:column;gap:10px;user-select:none;">
@@ -665,8 +704,9 @@
           </div>
 
           <!-- Lienzo de Carrera -->
-          <div id="racerStageWrap" style="position:relative;border-radius:12px;overflow:hidden;border:2px solid ${track.theme.border};background:${track.theme.sky};box-shadow:0 10px 30px rgba(0,0,0,0.6);">
+          <div id="racerStageWrap" style="position:relative;border-radius:12px;overflow:hidden;border:2px solid ${pal.border};background:${pal.sky};box-shadow:0 10px 30px rgba(0,0,0,0.45);">
             <canvas id="racerCanvas" width="760" height="390" style="width:100%;height:390px;display:block;"></canvas>
+            <div id="racerPhaserHost" class="ek-phaser-stage-host" style="position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;"></div>
             <div id="racerOverlay" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:20;"></div>
           </div>
 
@@ -745,9 +785,9 @@
           phase: i * 0.1
         })),
         rivals: [
-          { name: 'Kenshin-X', x: -0.45, targetX: -0.45, dist: 35, baseSpeed: 5.15, speed: 5.15, color: '#ef4444', jumpTimer: 0, jumpHeight: 0 },
-          { name: 'Valkyria-9', x: 0.0, targetX: 0.0, dist: 70, baseSpeed: 5.35, speed: 5.35, color: '#eab308', jumpTimer: 0, jumpHeight: 0 },
-          { name: 'Sensei-GT', x: 0.45, targetX: 0.45, dist: 105, baseSpeed: 5.55, speed: 5.55, color: '#a855f7', jumpTimer: 0, jumpHeight: 0 }
+          { name: 'Kenshin-X', x: -0.62, vx: 0, preferredLane: -0.58, targetX: -0.58, dist: 35, baseSpeed: 5.15, speed: 5.15, color: '#ef4444', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Valkyria-9', x: 0.0, vx: 0, preferredLane: 0.0, targetX: 0.0, dist: 70, baseSpeed: 5.35, speed: 5.35, color: '#eab308', jumpTimer: 0, jumpHeight: 0 },
+          { name: 'Sensei-GT', x: 0.62, vx: 0, preferredLane: 0.58, targetX: 0.58, dist: 105, baseSpeed: 5.55, speed: 5.55, color: '#a855f7', jumpTimer: 0, jumpHeight: 0 }
         ]
       };
 
@@ -794,19 +834,84 @@
       };
       tickCountdown();
 
-      const stepFrame = () => {
-        if (!this.inRace || this.destroyed) return;
+      this.fallbackLoopActive = true;
+      let lastFallbackTs = performance.now();
+      const stepFrame = (now) => {
+        if (!this.inRace || this.destroyed || !this.fallbackLoopActive) return;
+        const ts = typeof now === 'number' ? now : performance.now();
+        const dtScale = Math.min(Math.max((ts - lastFallbackTs) / 16.667, 0.25), 2.5);
+        lastFallbackTs = ts;
         if (!this.paused) {
-          this.updateRace(track);
+          this.updateRace(track, dtScale);
           this.drawRace(ctx, canvas.width, canvas.height, track, ch);
         }
-        if (!this.raceState.finished) {
+        if (!this.raceState.finished && this.fallbackLoopActive) {
           if (this.scope) this.rafId = this.scope.raf(stepFrame);
           else this.rafId = requestAnimationFrame(stepFrame);
         }
       };
+      this.drawRace(ctx, canvas.width, canvas.height, track, ch);
       if (this.scope) this.rafId = this.scope.raf(stepFrame);
       else this.rafId = requestAnimationFrame(stepFrame);
+
+      const hostEl = this.container.querySelector('#racerPhaserHost');
+      if (hostEl && window.EKRacerPhaser && typeof window.EKRacerPhaser.mount === 'function') {
+        const token = ++this.phaserMountToken;
+        let phaserReady = false;
+        let phaserActivated = false;
+        const activatePhaser = () => {
+          if (phaserActivated || this.destroyed || !this.inRace || token !== this.phaserMountToken) return;
+          phaserActivated = true;
+          this.fallbackLoopActive = false;
+          if (this.rafId) {
+            try { cancelAnimationFrame(this.rafId); } catch {}
+            this.rafId = null;
+          }
+          canvas.style.display = 'none';
+          hostEl.style.position = 'relative';
+          hostEl.style.inset = 'auto';
+          hostEl.style.width = '100%';
+          hostEl.style.aspectRatio = '760 / 390';
+          hostEl.style.maxHeight = '390px';
+          hostEl.style.height = window.innerWidth <= 820 ? 'auto' : '390px';
+          try { window.dispatchEvent(new Event('resize')); } catch {}
+        };
+        window.EKRacerPhaser.mount(hostEl, {
+          gameRef: this,
+          track,
+          chassis: ch,
+          pilot: this.pilot,
+          playerName: this.options.playerName || 'Tú',
+          isCancelled: () => this.destroyed || !this.inRace || token !== this.phaserMountToken,
+          onReady: () => {
+            phaserReady = true;
+            if (this.phaserRace) activatePhaser();
+          }
+        }).then((phaserHandle) => {
+          if (!phaserHandle) return;
+          if (this.destroyed || !this.inRace || token !== this.phaserMountToken) {
+            try { phaserHandle.destroy?.(); } catch {}
+            return;
+          }
+          this.phaserRace = phaserHandle;
+          if (phaserReady || phaserHandle.isReady?.()) {
+            activatePhaser();
+          } else {
+            let checks = 0;
+            const waitReady = () => {
+              if (phaserActivated || this.destroyed || !this.inRace || token !== this.phaserMountToken) return;
+              if (phaserReady || phaserHandle.isReady?.()) {
+                activatePhaser();
+                return;
+              }
+              if (++checks < 120) requestAnimationFrame(waitReady);
+            };
+            requestAnimationFrame(waitReady);
+          }
+        }).catch(() => {
+          // Mantener Canvas2D fallback corriendo limpiamente
+        });
+      }
 
       if (window.__EK && typeof window.__EK.assertNoBadText === 'function') {
         window.__EK.assertNoBadText(this.container);
@@ -823,52 +928,67 @@
       }
     }
 
-    updateRace(track) {
+    updateRace(track, rawDtScale = 1) {
       const st = this.raceState;
       if (st.countdown > 0 || st.finished) return;
 
+      const dtScale = Math.min(Math.max(Number(rawDtScale) || 1, 0.25), 2.5);
       const left = this.keyState['a'] || this.keyState['arrowleft'];
       const right = this.keyState['d'] || this.keyState['arrowright'];
       const brake = this.keyState['s'] || this.keyState['arrowdown'];
 
       if (st.skidTimer > 0) {
-        st.skidTimer--;
-        st.vx += Math.sin(st.skidTimer * 0.9) * 0.006;
+        st.skidTimer = Math.max(0, st.skidTimer - dtScale);
+        st.vx += Math.sin(st.skidTimer * 0.9) * 0.006 * dtScale;
       }
 
-      if (left) st.vx = Math.max(st.vx - 0.0075, -0.026);
-      else if (right) st.vx = Math.min(st.vx + 0.0075, 0.026);
-      else st.vx *= 0.82;
+      if (left) st.vx = Math.max(st.vx - 0.0075 * dtScale, -0.026);
+      else if (right) st.vx = Math.min(st.vx + 0.0075 * dtScale, 0.026);
+      else st.vx *= Math.pow(0.82, dtScale);
 
-      st.x = Math.max(-0.84, Math.min(0.84, st.x + st.vx));
+      st.x = Math.max(-0.84, Math.min(0.84, st.x + st.vx * dtScale));
 
       if (st.jumpTimer > 0) {
-        st.jumpTimer--;
-        st.jumpHeight = Math.sin(((36 - st.jumpTimer) / 36) * Math.PI) * 26;
+        st.jumpTimer = Math.max(0, st.jumpTimer - dtScale);
+        st.jumpHeight = st.jumpTimer > 0 ? Math.sin(((36 - st.jumpTimer) / 36) * Math.PI) * 26 : 0;
       } else {
         st.jumpHeight = 0;
       }
 
       const boostBonus = st.nitroActive > 0 ? (2.4 + (this.save.turbo - 1) * 0.35) : 0;
-      if (st.nitroActive > 0) st.nitroActive--;
-      else st.nitro = Math.min(100, st.nitro + 0.14 + (this.save.turbo - 1) * 0.03);
+      if (st.nitroActive > 0) st.nitroActive = Math.max(0, st.nitroActive - dtScale);
+      else st.nitro = Math.min(100, st.nitro + (0.14 + (this.save.turbo - 1) * 0.03) * dtScale);
 
-      if (st.shakeFrames > 0) st.shakeFrames--;
-      if (st.crashFlash > 0) st.crashFlash--;
+      if (st.shakeFrames > 0) st.shakeFrames = Math.max(0, st.shakeFrames - dtScale);
+      if (st.crashFlash > 0) st.crashFlash = Math.max(0, st.crashFlash - dtScale);
 
       const targetSpd = brake ? st.maxSpeed * 0.52 : (st.maxSpeed + boostBonus);
-      st.speed += (targetSpd - st.speed) * 0.09;
-      st.dist += st.speed;
+      const spdLerp = 1 - Math.pow(1 - 0.09, dtScale);
+      st.speed += (targetSpd - st.speed) * spdLerp;
+      st.dist += st.speed * dtScale;
 
       // IA equilibrada y visible: los competidores compiten de verdad sin desaparecer
       if (this.pvp) {
         this.pvp.frameTick = (this.pvp.frameTick || 0) + 1;
-        if (this.pvp.frameTick % 6 === 0) {
+        this.pvp.syncAccum = (this.pvp.syncAccum || 0) + dtScale;
+        if (this.pvp.syncAccum >= 6) {
+          this.pvp.syncAccum -= 6;
           this.pvp.sendSync?.({ dist: Math.round(st.dist), x: Number(st.x.toFixed(3)), speed: Number(st.speed.toFixed(2)), jumpHeight: Math.round(st.jumpHeight || 0) });
         }
       }
 
       const lanes = [-0.62, -0.21, 0.21, 0.62];
+      const preferredLanes = [-0.58, 0.0, 0.58];
+      const evadeSteerLerp = 1 - Math.pow(1 - 0.075, dtScale);
+      const normalSteerLerp = 1 - Math.pow(1 - 0.045, dtScale);
+      const isLaneDangerous = (laneX, rDist) => st.items.some(it =>
+        (it.type === 'hazard' || it.type === 'oil') &&
+        !it.hit &&
+        (it.dist - rDist) >= 15 &&
+        (it.dist - rDist) <= 140 &&
+        Math.abs(it.x - laneX) < 0.24
+      );
+
       st.rivals.forEach((r, idx) => {
         if (r.isPvp && this.pvp && performance.now() - this.pvp.lastSyncAt < 3500) {
           const od = this.pvp.oppData;
@@ -881,14 +1001,71 @@
           r.jumpHeight = od.jumpHeight || 0;
           return;
         }
-        if (Math.floor(st.dist / 70 + idx * 3) % 6 === 0) {
-          r.targetX = lanes[(idx + Math.floor(st.dist / 220)) % lanes.length];
+        const prefLane = typeof r.preferredLane === 'number' ? r.preferredLane : (preferredLanes[idx] ?? 0);
+        r.preferredLane = prefLane;
+        r.vx = (r.vx || 0) * Math.pow(0.84, dtScale);
+
+        // Evasión inteligente de obstáculos próximos (hazard / oil) en [15..140]
+        const dangerAhead = st.items.some(it =>
+          (it.type === 'hazard' || it.type === 'oil') &&
+          !it.hit &&
+          (it.dist - r.dist) >= 15 &&
+          (it.dist - r.dist) <= 140 &&
+          (Math.abs(it.x - r.x) < 0.24 || Math.abs(it.x - r.targetX) < 0.24)
+        );
+        let evading = false;
+        if (dangerAhead) {
+          let closestIdx = 0;
+          let closestDist = Infinity;
+          for (let li = 0; li < lanes.length; li++) {
+            const d = Math.abs(lanes[li] - prefLane);
+            if (d < closestDist) {
+              closestDist = d;
+              closestIdx = li;
+            }
+          }
+          const candidates = [
+            closestIdx,
+            closestIdx - 1,
+            closestIdx + 1,
+            closestIdx - 2,
+            closestIdx + 2,
+            closestIdx - 3,
+            closestIdx + 3
+          ].filter(li => li >= 0 && li < lanes.length);
+          const safeLane = candidates.map(li => lanes[li]).find(lx => !isLaneDangerous(lx, r.dist));
+          if (safeLane !== undefined) {
+            r.targetX = safeLane;
+            evading = true;
+          }
+        } else {
+          // Cruising suave alrededor de su carril preferido sin amontonarse
+          const weave = Math.sin(st.dist * 0.007 + idx * 2.1) * 0.11;
+          r.targetX = Math.max(-0.76, Math.min(0.76, prefLane + weave));
         }
-        r.x += (r.targetX - r.x) * 0.04;
+
+        // Separación lateral y longitudinal kart-a-kart contra otros rivales
+        for (let otherIdx = 0; otherIdx < st.rivals.length; otherIdx++) {
+          if (otherIdx === idx) continue;
+          const other = st.rivals[otherIdx];
+          const dz = r.dist - other.dist;
+          const dx = r.x - other.x;
+          if (Math.abs(dz) < 55 && Math.abs(dx) < 0.34) {
+            const pushSign = Math.abs(dx) > 0.02
+              ? (dx > 0 ? 1 : -1)
+              : (prefLane !== (other.preferredLane ?? 0) ? (prefLane > (other.preferredLane ?? 0) ? 1 : -1) : (idx > otherIdx ? 1 : -1));
+            const proximity = (1 - Math.abs(dx) / 0.34) * (1 - Math.abs(dz) / 55);
+            r.vx += pushSign * (0.0045 + proximity * 0.0065) * dtScale;
+            r.targetX = Math.max(-0.78, Math.min(0.78, r.targetX + pushSign * 0.08 * dtScale));
+          }
+        }
+
+        r.x += (r.targetX - r.x) * (evading ? evadeSteerLerp : normalSteerLerp) + r.vx * dtScale;
+        r.x = Math.max(-0.80, Math.min(0.80, r.x));
 
         if (r.jumpTimer > 0) {
-          r.jumpTimer--;
-          r.jumpHeight = Math.sin(((36 - r.jumpTimer) / 36) * Math.PI) * 26;
+          r.jumpTimer = Math.max(0, r.jumpTimer - dtScale);
+          r.jumpHeight = r.jumpTimer > 0 ? Math.sin(((36 - r.jumpTimer) / 36) * Math.PI) * 26 : 0;
         } else {
           r.jumpHeight = 0;
         }
@@ -902,7 +1079,7 @@
         else if (diff < -70) rubberband = 0.20;
 
         r.speed = r.baseSpeed + rubberband + Math.sin(st.dist * 0.012 + idx * 1.5) * 0.15;
-        r.dist += r.speed;
+        r.dist += r.speed * dtScale;
 
         // Rivales saltan si tocan una rampa
         if (r.jumpTimer <= 0) {
@@ -913,21 +1090,30 @@
         }
       });
 
-      // Resolver repulsión entre rivales y contra el jugador
+      // Resolver separación final lateral y longitudinal entre rivales y contra el jugador
       for (let i = 0; i < st.rivals.length; i++) {
         const a = st.rivals[i];
-        if (Math.abs(a.dist - st.dist) < 26 && Math.abs(a.x - st.x) < 0.26) {
+        if (Math.abs(a.dist - st.dist) < 34 && Math.abs(a.x - st.x) < 0.28) {
           const pushDir = a.x >= st.x ? 1 : -1;
-          a.x = Math.max(-0.80, Math.min(0.80, a.x + pushDir * 0.035));
+          a.vx = (a.vx || 0) + pushDir * 0.005 * dtScale;
+          a.x = Math.max(-0.80, Math.min(0.80, a.x + pushDir * 0.032 * dtScale));
         }
         for (let j = i + 1; j < st.rivals.length; j++) {
           const b = st.rivals[j];
           const dz = b.dist - a.dist;
           const dx = b.x - a.x;
-          if (Math.abs(dz) < 24 && Math.abs(dx) < 0.24) {
-            const latDir = dx >= 0 ? 1 : -1;
-            a.x = Math.max(-0.80, Math.min(0.80, a.x - latDir * 0.025));
-            b.x = Math.max(-0.80, Math.min(0.80, b.x + latDir * 0.025));
+          if (Math.abs(dz) < 55 && Math.abs(dx) < 0.34) {
+            const latDir = Math.abs(dx) > 0.01 ? (dx >= 0 ? 1 : -1) : 1;
+            const push = (0.34 - Math.abs(dx)) * 0.08 * dtScale;
+            a.vx = (a.vx || 0) - latDir * 0.004 * dtScale;
+            b.vx = (b.vx || 0) + latDir * 0.004 * dtScale;
+            a.x = Math.max(-0.80, Math.min(0.80, a.x - latDir * push));
+            b.x = Math.max(-0.80, Math.min(0.80, b.x + latDir * push));
+            if (Math.abs(dz) < 28 && Math.abs(dx) < 0.24) {
+              const longDir = dz >= 0 ? 1 : -1;
+              a.dist -= longDir * 0.35 * dtScale;
+              b.dist += longDir * 0.35 * dtScale;
+            }
           }
         }
       }
@@ -1020,8 +1206,9 @@
         ctx.translate((Math.random() - 0.5) * mag * 2, (Math.random() - 0.5) * mag * 2);
       }
 
-      // Fondo general
-      ctx.fillStyle = track.theme.sky || '#080c18';
+      // Fondo general cartoon suave (sin flash neón oscuro)
+      const pal = getCartoonPalette(track.id);
+      ctx.fillStyle = pal.sky;
       ctx.fillRect(0, 0, W, H);
 
       const roadW = 440;
@@ -1029,74 +1216,17 @@
       const roadRight = roadLeft + roadW; // 600
       const roadCenterX = W / 2; // 380
 
-      // Paisaje lateral 2D animado según el circuito (Left: 0..160, Right: 600..760)
+      // Paisaje lateral 2D amigable según el circuito (Left: 0..160, Right: 600..760)
       const drawSideScenery = () => {
         ctx.save();
-        const scY = (st.dist * 0.4) % 60;
-        if (track.id === 'magma_canyon') {
-          // Río de lava candente en los márgenes
-          ctx.fillStyle = '#1c0a05';
-          ctx.fillRect(0, 0, roadLeft, H);
-          ctx.fillRect(roadRight, 0, W - roadRight, H);
-          ctx.fillStyle = '#ea580c';
-          for (let y = -60 + scY; y < H + 60; y += 40) {
-            ctx.beginPath();
-            ctx.arc(60 + Math.sin(y * 0.05) * 16, y, 22, 0, Math.PI * 2);
-            ctx.arc(roadRight + 70 + Math.cos(y * 0.05) * 16, y, 22, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.fillStyle = '#fbbf24';
-          for (let y = -60 + scY; y < H + 60; y += 40) {
-            ctx.beginPath();
-            ctx.arc(60 + Math.sin(y * 0.05) * 16, y, 10, 0, Math.PI * 2);
-            ctx.arc(roadRight + 70 + Math.cos(y * 0.05) * 16, y, 10, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        } else if (track.id === 'glacier_summit') {
-          // Nieve y cristales de hielo
-          ctx.fillStyle = '#061a29';
-          ctx.fillRect(0, 0, roadLeft, H);
-          ctx.fillRect(roadRight, 0, W - roadRight, H);
-          ctx.fillStyle = '#38bdf8';
-          for (let y = -60 + scY; y < H + 60; y += 48) {
-            ctx.fillRect(30, y, 8, 18);
-            ctx.fillRect(90, y + 20, 10, 24);
-            ctx.fillRect(roadRight + 30, y + 10, 10, 22);
-            ctx.fillRect(roadRight + 80, y + 30, 8, 16);
-          }
-        } else if (track.id === 'obsidian_core') {
-          // Runas y monolitos arcanos
-          ctx.fillStyle = '#0f081d';
-          ctx.fillRect(0, 0, roadLeft, H);
-          ctx.fillRect(roadRight, 0, W - roadRight, H);
-          ctx.fillStyle = '#a855f7';
-          for (let y = -60 + scY; y < H + 60; y += 50) {
-            ctx.fillRect(40, y, 14, 28);
-            ctx.fillRect(roadRight + 50, y + 15, 14, 28);
-          }
-          ctx.fillStyle = '#fbbf24';
-          for (let y = -60 + scY; y < H + 60; y += 50) {
-            ctx.fillRect(44, y + 8, 6, 12);
-            ctx.fillRect(roadRight + 54, y + 23, 6, 12);
-          }
-        } else {
-          // Ciber-Neón: Rascacielos y ventanas luminosas
-          ctx.fillStyle = '#0b0f1a';
-          ctx.fillRect(0, 0, roadLeft, H);
-          ctx.fillRect(roadRight, 0, W - roadRight, H);
-          for (let y = -60 + scY; y < H + 60; y += 32) {
-            ctx.fillStyle = '#1e293b';
-            ctx.fillRect(15, y, 45, 26);
-            ctx.fillRect(75, y + 8, 55, 22);
-            ctx.fillRect(roadRight + 15, y, 50, 24);
-            ctx.fillRect(roadRight + 75, y + 10, 40, 20);
-            ctx.fillStyle = '#38bdf8';
-            ctx.fillRect(25, y + 6, 6, 6);
-            ctx.fillRect(45, y + 6, 6, 6);
-            ctx.fillRect(85, y + 12, 6, 6);
-            ctx.fillRect(roadRight + 25, y + 6, 6, 6);
-            ctx.fillRect(roadRight + 45, y + 6, 6, 6);
-          }
+        const scY = (st.dist * 0.85) % 128;
+        ctx.fillStyle = pal.sky;
+        ctx.fillRect(0, 0, roadLeft, H);
+        ctx.fillRect(roadRight, 0, W - roadRight, H);
+        ctx.fillStyle = pal.marginAlt;
+        for (let y = -128 + scY; y < H + 128; y += 128) {
+          ctx.fillRect(0, y, roadLeft, 64);
+          ctx.fillRect(roadRight, y, W - roadRight, 64);
         }
         ctx.restore();
       };
@@ -1104,35 +1234,31 @@
 
       // Pianos / Bordillos bicolores laterales
       const curbW = 16;
-      const curbStep = 24;
-      const curbOffset = (st.dist * 1.6) % curbStep;
-      for (let y = -curbStep + curbOffset; y < H + curbStep; y += curbStep) {
+      const curbStep = 28;
+      const curbOffset = (st.dist * 0.85) % (curbStep * 2);
+      for (let y = -curbStep * 2 + curbOffset; y < H + curbStep; y += curbStep) {
         const isAlt = Math.floor((y - curbOffset) / curbStep) % 2 === 0;
-        ctx.fillStyle = isAlt ? (track.theme.accent || '#38bdf8') : '#f8fafc';
+        ctx.fillStyle = isAlt ? pal.curbA : pal.curbB;
         ctx.fillRect(roadLeft - curbW, y, curbW, curbStep);
         ctx.fillRect(roadRight, y, curbW, curbStep);
       }
 
       // Asfalto Central 2D
-      ctx.fillStyle = track.theme.road || '#101726';
+      ctx.fillStyle = pal.road;
       ctx.fillRect(roadLeft, 0, roadW, H);
 
-      // Líneas de cuadrícula cibernética sutiles
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-      ctx.lineWidth = 1;
-      const gridOffset = (st.dist * 1.2) % 36;
-      for (let y = -36 + gridOffset; y < H + 36; y += 36) {
-        ctx.beginPath();
-        ctx.moveTo(roadLeft, y);
-        ctx.lineTo(roadRight, y);
-        ctx.stroke();
-      }
+      // Contorno cartoon de bordillos
+      ctx.fillStyle = '#1e2433';
+      ctx.fillRect(roadLeft - curbW, 0, 2, H);
+      ctx.fillRect(roadLeft - 1, 0, 2, H);
+      ctx.fillRect(roadRight - 1, 0, 2, H);
+      ctx.fillRect(roadRight + curbW - 2, 0, 2, H);
 
       // Líneas divisoras discontinuas de 4 carriles (3 divisores)
-      const dashStep = 44;
+      const dashStep = 48;
       const dashH = 24;
-      const dashOffset = (st.dist * 1.8) % dashStep;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      const dashOffset = (st.dist * 0.85) % dashStep;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
       const laneDividers = [roadLeft + roadW * 0.25, roadLeft + roadW * 0.50, roadLeft + roadW * 0.75];
       for (const lx of laneDividers) {
         for (let y = -dashStep + dashOffset; y < H + dashStep; y += dashStep) {
@@ -1351,9 +1477,11 @@
       ctx.save();
 
       // Sombra inferior (permanece en la superficie de la pista)
-      ctx.fillStyle = 'rgba(0,0,0,0.55)';
-      const shadowScale = scale * Math.max(0.65, 1 - (jumpHeight || 0) / 60);
-      ctx.fillRect(x - 26 * shadowScale, y + (jumpHeight || 0) + 14 * scale, 52 * shadowScale, 9 * shadowScale);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
+      const shadowScale = scale * Math.max(0.55, 1 - (jumpHeight || 0) / 55);
+      ctx.beginPath();
+      ctx.ellipse(x, y + (jumpHeight || 0) + 18 * scale, 26 * shadowScale, 8 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.fill();
 
       // Elevar kart según el salto
       ctx.translate(x, y);
@@ -1378,16 +1506,20 @@
         ctx.fillRect(9, 17, 6, 11);
       }
 
-      // Ruedas / Propulsores Pixel
-      ctx.fillStyle = '#0f172a';
+      // Ruedas cartoon
+      ctx.fillStyle = '#2c3447';
+      ctx.strokeStyle = '#1e2433';
+      ctx.lineWidth = 2;
       ctx.fillRect(-32, -4, 10, 20);
+      ctx.strokeRect(-32, -4, 10, 20);
       ctx.fillRect(22, -4, 10, 20);
+      ctx.strokeRect(22, -4, 10, 20);
 
-      // Chasis principal
+      // Chasis principal con contorno cartoon #1e2433
       ctx.fillStyle = bodyColor;
       ctx.fillRect(-24, -10, 48, 26);
-      ctx.strokeStyle = glowColor;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#1e2433';
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(-24, -10, 48, 26);
 
       // Alerón trasero
@@ -1530,6 +1662,7 @@
     // --- MODO ARCADE 2: OPERACIÓN METAL CORE 2D (Acción Run & Gun estilo Contra / Metal Slug) ---
     startMetalCore2D() {
       if (this.destroyed) return;
+      this._destroyPhaser();
       this.inRace = true;
       this.paused = false;
 
@@ -1812,6 +1945,7 @@
     // --- MODO ARCADE 3: BATALLA NAVAL TÁCTICA 2D (Flota del Núcleo) ---
     startNavalBattle2D() {
       if (this.destroyed) return;
+      this._destroyPhaser();
       this.inRace = true;
       const SIZE = 7;
       const myGrid = Array.from({ length: SIZE * SIZE }, () => 0); // 0 agua, 1 barco, 2 impacto, 3 agua tocada

@@ -1,7 +1,7 @@
 {
   "name": "epickast",
   "productName": "EpicKast",
-  "version": "1.9.5",
+  "version": "1.9.7",
   "description": "EpicKast - comunicación personal optimizada: chat, llamadas, pantalla compartida, servidores y amigos",
   "author": {
     "name": "EpicKap",
@@ -17,6 +17,7 @@
     "start": "electron .",
     "server": "node server/server.js",
     "test": "node tools/smoke-test.js",
+    "bundle:vendors": "node tools/bundle-vendors.js",
     "pack:friends": "electron-builder --win nsis zip --x64",
     "pack:store": "electron-builder --win appx --x64",
     "pack:linux": "electron-builder --linux tar.gz deb --x64",
@@ -99,9 +100,17 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@floating-ui/dom": "^1.8.0",
+    "@simonwep/pickr": "^1.10.3",
+    "canvas-confetti": "^1.9.4",
+    "cropperjs": "^1.6.2",
     "electron": "^38.0.0",
     "electron-builder": "^26.18.0",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "gsap": "^3.15.1",
+    "howler": "^2.2.4",
+    "phaser": "^4.2.1",
+    "sortablejs": "^1.15.7"
   },
   "allowScripts": {
     "electron@38.8.6": true

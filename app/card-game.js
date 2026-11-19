@@ -13,6 +13,7 @@
     constructor(scope) {
       this.scope = scope;
       this.ctx = null;
+      this._disposed = false;
       this.muted = localStorage.getItem('epickast.dojo.mute') === '1';
       this.masterVol = 0.25;
     }
@@ -24,7 +25,7 @@
     }
 
     ensureCtx() {
-      if (this.muted || (this.scope && this.scope.isDisposed())) return null;
+      if (this._isMutedOrDisposed()) return null;
       if (!this.ctx || this.ctx.state === 'closed') {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) return null;
@@ -77,56 +78,84 @@
       } catch {}
     }
 
+    _isMutedOrDisposed() {
+      return this._disposed || this.muted || (this.scope && this.scope.isDisposed());
+    }
+
     selectCard() {
-      this.tone(880, 0.06, 'square', 0.35);
+      if (this._isMutedOrDisposed()) return;
+      if (typeof window.EKAudio?.play === 'function') {
+        window.EKAudio.play('msg-send', 0.45);
+        return;
+      }
+      this.tone(660, 0.06, 'triangle', 0.28, 880);
     }
 
     clash() {
-      this.noise(0.12, 0.45);
-      this.tone(180, 0.1, 'sawtooth', 0.3, 75);
+      if (this._isMutedOrDisposed()) return;
+      this.noise(0.1, 0.3);
+      this.tone(180, 0.1, 'triangle', 0.28, 80);
     }
 
     cinematicPower() {
-      this.tone(220, 0.25, 'sawtooth', 0.35, 660);
+      if (this._isMutedOrDisposed()) return;
+      if (typeof window.EKAudio?.play === 'function') {
+        window.EKAudio.play('legendary-win', 0.65);
+        return;
+      }
+      this.tone(260, 0.22, 'triangle', 0.32, 660);
       if (this.scope) {
-        this.scope.timeout(() => this.tone(880, 0.22, 'square', 0.35, 1320), 140);
+        this.scope.timeout(() => this.tone(784, 0.22, 'sine', 0.32, 1046.5), 140);
       }
     }
 
     winRound() {
-      this.tone(523.25, 0.09, 'square', 0.3);
+      if (this._isMutedOrDisposed()) return;
+      if (typeof window.EKAudio?.play === 'function') {
+        window.EKAudio.play('chest-open', 0.55);
+        return;
+      }
+      this.tone(523.25, 0.09, 'triangle', 0.28);
       if (this.scope) {
-        this.scope.timeout(() => this.tone(659.25, 0.09, 'square', 0.3), 80);
-        this.scope.timeout(() => this.tone(783.99, 0.14, 'square', 0.35), 160);
+        this.scope.timeout(() => this.tone(659.25, 0.09, 'triangle', 0.28), 80);
+        this.scope.timeout(() => this.tone(783.99, 0.14, 'sine', 0.32), 160);
       }
     }
 
     loseRound() {
-      this.tone(330, 0.12, 'sawtooth', 0.28, 220);
+      if (this._isMutedOrDisposed()) return;
+      this.tone(330, 0.12, 'triangle', 0.24, 220);
       if (this.scope) {
-        this.scope.timeout(() => this.tone(220, 0.18, 'sawtooth', 0.28, 140), 110);
+        this.scope.timeout(() => this.tone(220, 0.16, 'sine', 0.24, 150), 110);
       }
     }
 
     winMatch() {
+      if (this._isMutedOrDisposed()) return;
+      if (typeof window.EKAudio?.play === 'function') {
+        window.EKAudio.play('legendary-win', 0.65);
+        return;
+      }
       const notes = [523.25, 659.25, 783.99, 1046.5];
       notes.forEach((f, idx) => {
         if (this.scope) {
-          this.scope.timeout(() => this.tone(f, 0.14, 'square', 0.38), idx * 95);
+          this.scope.timeout(() => this.tone(f, 0.16, idx === 3 ? 'sine' : 'triangle', 0.32), idx * 95);
         }
       });
     }
 
     loseMatch() {
+      if (this._isMutedOrDisposed()) return;
       const notes = [392, 349.23, 311.13, 261.63];
       notes.forEach((f, idx) => {
         if (this.scope) {
-          this.scope.timeout(() => this.tone(f, 0.16, 'sawtooth', 0.3), idx * 110);
+          this.scope.timeout(() => this.tone(f, 0.16, 'triangle', 0.24), idx * 110);
         }
       });
     }
 
     destroy() {
+      this._disposed = true;
       if (this.ctx && this.ctx.state !== 'closed') {
         try { this.ctx.close().catch(() => {}); } catch {}
       }
@@ -201,23 +230,23 @@
     [4, 'fire', 7, 'Lámpara del Templo', '#ec4899', 'lantern'],
     [5, 'fire', 8, 'Tigre Volcánico', '#eab308', 'tiger', 'assets/cards/fire.jpg'],
     [6, 'fire', 10, 'Oni de Obsidiana', '#dc2626', 'oni', 'assets/cards/fire.jpg'],
-    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', 'assets/cards/card_fire_phoenix.jpg', '¡LLAMARADA DEL FÉNIX SOLAR!'],
-    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', 'assets/cards/card_fire_dragon.jpg', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
+    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', 'assets/cartoon/card_fire_phoenix.webp', '¡LLAMARADA DEL FÉNIX SOLAR!'],
+    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', 'assets/cartoon/card_fire_dragon.webp', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
     [9, 'water', 2, 'Gota Serena', '#38bdf8', 'droplet'],
     [10, 'water', 4, 'Koi Imperial', '#06b6d4', 'koi'],
     [11, 'water', 5, 'Tortuga Acorazada', '#10b981', 'turtle'],
     [12, 'water', 7, 'Abanico de Marea', '#3b82f6', 'fan_water'],
     [13, 'water', 8, 'Tiburón Abisal', '#6366f1', 'shark', 'assets/cards/water.jpg'],
     [14, 'water', 10, 'Serpiente Midgard', '#0ea5e9', 'serpent', 'assets/cards/water.jpg'],
-    [15, 'water', 11, 'Kraken del Abismo', '#8b5cf6', 'kraken', 'assets/cards/card_water_kraken.jpg', '¡TENTÁCULOS DEL KRAKEN ABISAL!'],
+    [15, 'water', 11, 'Nutria Marejada', '#38bdf8', 'kraken', 'assets/cartoon/card_water_splash.webp', '¡OLA GIGANTE DE LA MAREA!'],
     [16, 'water', 12, 'Leviatán Tsunami', '#2563eb', 'leviathan', 'assets/cards/card_water_leviathan.jpg', '¡MAREMOTO DEL LEVIATÁN SUPREMO!'],
     [17, 'snow', 3, 'Cristal Boreal', '#7dd3fc', 'crystal'],
     [18, 'snow', 4, 'Puffle Glacial', '#38bdf8', 'penguin'],
     [19, 'snow', 6, 'Búho Nival', '#a855f7', 'owl', 'assets/cards/snow.jpg'],
     [20, 'snow', 7, 'Shuriken Cero', '#06b6d4', 'shuriken_ice'],
     [21, 'snow', 9, 'Lobo Ventisca', '#60a5fa', 'wolf', 'assets/cards/card_snow_titan.jpg'],
-    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti', 'assets/cards/card_snow_yeti.jpg'],
-    [23, 'snow', 11, 'Dragón de Escarcha', '#c084fc', 'dragon_ice', 'assets/cards/card_snow_yeti.jpg', '¡ALIENTO DEL DRAGÓN DE ESCARCHA!'],
+    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti', 'assets/cartoon/card_snow_yeti.webp'],
+    [23, 'snow', 11, 'Pingüino Yeti Glaciar', '#7dd3fc', 'dragon_ice', 'assets/cartoon/card_snow_yeti.webp', '¡VENTISCA DEL YETI GLACIAR!'],
     [24, 'snow', 12, 'Titán Cero Absoluto', '#e0f2fe', 'titan_ice', 'assets/cards/card_snow_titan.jpg', '¡ERA GLACIAL: CERO ABSOLUTO!']
   ];
   const UNLOCK_CARDS = UNLOCK_RAW.map(([n, element, power, name, accent, motif, imgUrl, cineTitle]) => ({
@@ -299,179 +328,192 @@
     const belts = CFG().BELTS || [];
     const beltObj = belts.find((b) => b.id === cfg.belt || ('belt_' + b.id) === cfg.belt) || belts[0] || { color: '#f8fafc', shadow: '#cbd5e1' };
 
-    const suitBase = cfg.suitColor || '#1e293b';
-    const suitLight = shadeHex(suitBase, 38);
-    const suitDark = shadeHex(suitBase, -36);
+    const suitMap = {
+      suit_shadow: '#1e293b',
+      suit_crimson: '#dc2626',
+      suit_sapphire: '#2563eb',
+      suit_cyan: '#0891b2',
+      suit_jade: '#16a34a',
+      suit_amethyst: '#7c3aed',
+      suit_magma: '#ea580c',
+      suit_white: '#e2e8f0'
+    };
+    const suitBase = cfg.suitColor || suitMap[cfg.suit] || '#1e293b';
+    const suitLight = shadeHex(suitBase, 34);
+    const suitDark = shadeHex(suitBase, -30);
     const maskBase = cfg.maskColor || '#0f172a';
-    const maskLight = shadeHex(maskBase, 26);
+    const maskLight = shadeHex(maskBase, 24);
     const beltColor = beltObj.color || '#f8fafc';
     const beltShadow = beltObj.shadow || shadeHex(beltColor, -35);
+    const OL = '#1e2433';
 
-    const breathY = pose === 'idle' ? (frame % 2 === 1 ? 1.2 : 0) : (pose === 'victory' ? -2 : 0);
+    const breathY = pose === 'idle' ? (frame % 2 === 1 ? 1.4 : 0) : (pose === 'victory' ? -2.5 : 0);
     const scarfWave = frame % 3;
-    const tailY1 = scarfWave === 0 ? 0 : scarfWave === 1 ? -3 : 2.5;
-    const tailY2 = scarfWave === 0 ? 2 : scarfWave === 1 ? -1.5 : 4;
+    const tailY1 = scarfWave === 0 ? 0 : scarfWave === 1 ? -3.2 : 2.8;
+    const tailY2 = scarfWave === 0 ? 2 : scarfWave === 1 ? -1.4 : 4.2;
 
-    // Armas detalladas detrás o en mano
+    // Armas detrás o en mano con trazo cartoon redondeado
     let backWeaponSvg = '';
     let frontWeaponSvg = '';
     const wpn = String(cfg.weapon || 'katana').replace(/^wpn_/, '');
     if (wpn === 'katana') {
       backWeaponSvg = `
-        <g transform="translate(0,${breathY}) rotate(24 58 46)">
-          <rect x="55" y="6" width="5" height="54" rx="2" fill="#0f172a" stroke="#475569" stroke-width="1"/>
-          <rect x="56.5" y="7" width="2" height="44" fill="#e2e8f0"/>
-          <rect x="52" y="16" width="11" height="3.5" rx="1.5" fill="#fbbf24" stroke="#92400e" stroke-width="0.8"/>
-          <rect x="55.5" y="6" width="4" height="9" rx="1" fill="#dc2626"/>
+        <g transform="translate(0,${breathY}) rotate(-26 24 46)">
+          <rect x="20" y="6" width="5.5" height="52" rx="2.5" fill="#334155" stroke="${OL}" stroke-width="2.4"/>
+          <rect x="21.5" y="8" width="2" height="40" fill="#e2e8f0"/>
+          <rect x="17" y="18" width="11.5" height="4" rx="2" fill="#fbbf24" stroke="${OL}" stroke-width="1.8"/>
+          <rect x="20.5" y="7" width="4.5" height="10" rx="1.5" fill="#ef4444"/>
         </g>`;
     } else if (wpn === 'staff') {
       backWeaponSvg = `
-        <g transform="translate(0,${breathY * 0.5}) rotate(12 64 52)">
-          <rect x="61" y="4" width="5.5" height="86" rx="2.5" fill="#78350f" stroke="#451a03" stroke-width="1.2"/>
-          <rect x="61" y="4" width="5.5" height="9" rx="1.5" fill="#fbbf24"/>
-          <rect x="61" y="81" width="5.5" height="9" rx="1.5" fill="#fbbf24"/>
-          <rect x="61" y="40" width="5.5" height="12" fill="#dc2626"/>
+        <g transform="translate(0,${breathY * 0.5}) rotate(-14 20 52)">
+          <rect x="17" y="5" width="6" height="84" rx="3" fill="#8b5a2b" stroke="${OL}" stroke-width="2.4"/>
+          <rect x="17" y="5" width="6" height="9" rx="2" fill="#fbbf24"/>
+          <rect x="17" y="80" width="6" height="9" rx="2" fill="#fbbf24"/>
+          <rect x="17" y="40" width="6" height="12" fill="#e87454"/>
         </g>`;
     } else if (wpn === 'scroll') {
       backWeaponSvg = `
-        <g transform="translate(0,${breathY})">
-          <rect x="18" y="40" width="44" height="13" rx="4" fill="#fde68a" stroke="#78350f" stroke-width="1.5"/>
-          <rect x="15" y="39" width="6" height="15" rx="2" fill="#dc2626" stroke="#7f1d1d" stroke-width="1"/>
-          <rect x="59" y="39" width="6" height="15" rx="2" fill="#dc2626" stroke="#7f1d1d" stroke-width="1"/>
-          <line x1="40" y1="39" x2="40" y2="54" stroke="#b91c1c" stroke-width="2.5"/>
+        <g transform="translate(0,${breathY}) rotate(-15 36 48)">
+          <rect x="16" y="42" width="42" height="13" rx="5" fill="#fde68a" stroke="${OL}" stroke-width="2.4"/>
+          <rect x="13" y="41" width="6" height="15" rx="2.5" fill="#ef4444" stroke="${OL}" stroke-width="2"/>
+          <rect x="55" y="41" width="6" height="15" rx="2.5" fill="#ef4444" stroke="${OL}" stroke-width="2"/>
+          <line x1="37" y1="42" x2="37" y2="55" stroke="#dc2626" stroke-width="3"/>
         </g>`;
     } else if (wpn === 'shuriken') {
-      const sx = pose === 'attack' ? 10 : 62;
-      const sy = pose === 'victory' ? 20 : 54 + breathY;
+      const sx = pose === 'attack' ? 68 : 63;
+      const sy = pose === 'victory' ? 22 : 55 + breathY;
       frontWeaponSvg = `
         <g transform="translate(${sx},${sy}) rotate(${frame * 45})">
-          <polygon points="0,-10 3,-3 10,0 3,3 0,10 -3,3 -10,0 -3,-3" fill="#e2e8f0" stroke="#0f172a" stroke-width="1.4"/>
-          <circle cx="0" cy="0" r="2.6" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+          <polygon points="0,-10 3,-3 10,0 3,3 0,10 -3,3 -10,0 -3,-3" fill="#e2e8f0" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <circle cx="0" cy="0" r="2.6" fill="#38bdf8" stroke="${OL}" stroke-width="1.4"/>
         </g>`;
     } else if (wpn === 'kunai') {
-      const kx = pose === 'attack' ? 8 : 62;
-      const ky = pose === 'victory' ? 20 : 53 + breathY;
-      const kRot = pose === 'attack' ? -75 : 25;
+      const kx = pose === 'attack' ? 70 : 63;
+      const ky = pose === 'victory' ? 22 : 54 + breathY;
+      const kRot = pose === 'attack' ? 75 : 35;
       frontWeaponSvg = `
         <g transform="translate(${kx},${ky}) rotate(${kRot})">
-          <polygon points="0,-13 4.5,-2 0,1 -4.5,-2" fill="#f8fafc" stroke="#0f172a" stroke-width="1.2"/>
-          <rect x="-1.4" y="1" width="2.8" height="6" fill="#dc2626"/>
-          <circle cx="0" cy="9.5" r="2.6" fill="none" stroke="#fbbf24" stroke-width="1.6"/>
+          <polygon points="0,-12 4.5,-2 0,1.5 -4.5,-2" fill="#f8fafc" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <rect x="-1.5" y="1.5" width="3" height="6" fill="#ef4444"/>
+          <circle cx="0" cy="9.5" r="2.6" fill="none" stroke="#fbbf24" stroke-width="2"/>
         </g>`;
     }
 
-    // Brazos según pose
+    // Brazos redondeados estilo Club Penguin
     let armsSvg = '';
     if (pose === 'attack') {
       armsSvg = `
-        <path d="M24,${46 + breathY} L8,${42 + breathY} L10,${51 + breathY} L26,${55 + breathY} Z" fill="${suitLight}" stroke="#070a12" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="8" cy="${46.5 + breathY}" r="4.5" fill="${maskBase}" stroke="#070a12" stroke-width="1.8"/>
-        <path d="M56,${46 + breathY} L68,${49 + breathY} L65,${57 + breathY} L54,${54 + breathY} Z" fill="${suitDark}" stroke="#070a12" stroke-width="2" stroke-linejoin="round"/>
+        <ellipse cx="22" cy="${54 + breathY}" rx="7" ry="11" transform="rotate(14 22 ${54 + breathY})" fill="${suitDark}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="20" cy="${63 + breathY}" r="5" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
+        <ellipse cx="62" cy="${50 + breathY}" rx="11" ry="6.5" transform="rotate(-8 62 ${50 + breathY})" fill="${suitLight}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="71" cy="${49 + breathY}" r="5.2" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
       `;
     } else if (pose === 'victory') {
       armsSvg = `
-        <path d="M25,${46 + breathY} L13,${24 + breathY} L21,${21 + breathY} L30,${43 + breathY} Z" fill="${suitLight}" stroke="#070a12" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="16.5" cy="${22 + breathY}" r="4.5" fill="${maskBase}" stroke="#070a12" stroke-width="1.8"/>
-        <path d="M55,${46 + breathY} L67,${24 + breathY} L59,${21 + breathY} L50,${43 + breathY} Z" fill="${suitLight}" stroke="#070a12" stroke-width="2" stroke-linejoin="round"/>
-        <circle cx="63.5" cy="${22 + breathY}" r="4.5" fill="${maskBase}" stroke="#070a12" stroke-width="1.8"/>
+        <ellipse cx="21" cy="${42 + breathY}" rx="6.5" ry="12" transform="rotate(-34 21 ${42 + breathY})" fill="${suitLight}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="15" cy="${32 + breathY}" r="5.2" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
+        <ellipse cx="59" cy="${42 + breathY}" rx="6.5" ry="12" transform="rotate(34 59 ${42 + breathY})" fill="${suitLight}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="65" cy="${32 + breathY}" r="5.2" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
       `;
     } else {
       armsSvg = `
-        <rect x="16" y="${43 + breathY}" width="10" height="22" rx="5" fill="${suitLight}" stroke="#070a12" stroke-width="2"/>
-        <rect x="54" y="${43 + breathY}" width="10" height="22" rx="5" fill="${suitDark}" stroke="#070a12" stroke-width="2"/>
-        <circle cx="21" cy="${63 + breathY}" r="4" fill="${maskBase}" stroke="#070a12" stroke-width="1.6"/>
-        <circle cx="59" cy="${63 + breathY}" r="4" fill="${maskBase}" stroke="#070a12" stroke-width="1.6"/>
+        <ellipse cx="20" cy="${55 + breathY}" rx="6.5" ry="11" transform="rotate(12 20 ${55 + breathY})" fill="${suitDark}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="19" cy="${64 + breathY}" r="4.8" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
+        <ellipse cx="60" cy="${55 + breathY}" rx="6.5" ry="11" transform="rotate(-12 60 ${55 + breathY})" fill="${suitLight}" stroke="${OL}" stroke-width="2.4"/>
+        <circle cx="61" cy="${64 + breathY}" r="4.8" fill="${maskBase}" stroke="${OL}" stroke-width="2.2"/>
       `;
     }
 
     const flipStyle = flip ? 'transform:scaleX(-1);' : '';
     return `
-      <svg class="ek-ninja-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100" width="${size}" height="${Math.round(size * 1.25)}" style="overflow:visible;filter:drop-shadow(0 6px 10px rgba(0,0,0,0.55));${flipStyle}">
-        <!-- Sombra elíptica sobre el tatami -->
-        <ellipse cx="40" cy="93" rx="24" ry="5.5" fill="rgba(0,0,0,0.52)"/>
+      <svg class="ek-ninja-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 100" width="${size}" height="${Math.round(size * 1.25)}" style="overflow:visible;filter:drop-shadow(0 4px 6px rgba(30,36,51,0.28));${flipStyle}">
+        <!-- Sombra suave sobre el tatami -->
+        <ellipse cx="40" cy="92" rx="26" ry="6" fill="rgba(62,45,29,0.26)"/>
         ${backWeaponSvg}
 
-        <!-- Piernas y botas shinobi -->
-        <rect x="26" y="68" width="11" height="22" rx="4" fill="${suitDark}" stroke="#070a12" stroke-width="2"/>
-        <rect x="43" y="68" width="11" height="22" rx="4" fill="${suitBase}" stroke="#070a12" stroke-width="2"/>
-        <!-- Vendas de espinilla -->
-        <line x1="27" y1="78" x2="36" y2="78" stroke="${beltShadow}" stroke-width="2"/>
-        <line x1="44" y1="78" x2="53" y2="78" stroke="${beltShadow}" stroke-width="2"/>
-        <rect x="24" y="86" width="14" height="6.5" rx="3" fill="#090d16"/>
-        <rect x="42" y="86" width="14" height="6.5" rx="3" fill="#090d16"/>
+        <!-- Piernas y botas redondeadas -->
+        <rect x="25" y="70" width="11" height="17" rx="5" fill="${suitDark}" stroke="${OL}" stroke-width="2.4"/>
+        <rect x="44" y="70" width="11" height="17" rx="5" fill="${suitBase}" stroke="${OL}" stroke-width="2.4"/>
+        <ellipse cx="30" cy="88" rx="8.5" ry="5" fill="#2b3347" stroke="${OL}" stroke-width="2.4"/>
+        <ellipse cx="50" cy="88" rx="8.5" ry="5" fill="#2b3347" stroke="${OL}" stroke-width="2.4"/>
 
-        <!-- Torso Gi Ninja con sombreado 3 tonos y solapa en V -->
+        <!-- Torso rechoncho estilo 2D cartoon con cel-shading suave -->
         <g transform="translate(0,${breathY})">
-          <rect x="23" y="40" width="34" height="31" rx="7" fill="${suitBase}" stroke="#070a12" stroke-width="2.2"/>
-          <path d="M25,42 L35,42 L32,69 L25,69 Z" fill="${suitLight}" opacity="0.75"/>
-          <path d="M46,42 L55,42 L55,69 L48,69 Z" fill="${suitDark}" opacity="0.8"/>
-          <!-- Solapa cruzada estilo Card-Jitsu -->
-          <path d="M29,41 L44,58 M51,41 L37,56" stroke="${suitDark}" stroke-width="3" stroke-linecap="round"/>
-          <path d="M30,41 L44,57" stroke="${suitLight}" stroke-width="1.2" opacity="0.6"/>
+          <rect x="21" y="42" width="38" height="31" rx="14" fill="${suitBase}" stroke="${OL}" stroke-width="2.4"/>
+          <ellipse cx="33" cy="54" rx="7" ry="9" fill="${suitLight}" opacity="0.72"/>
+          <path d="M31,44 L45,59 M49,44 L36,58" stroke="${suitDark}" stroke-width="2.8" stroke-linecap="round"/>
         </g>
 
         ${armsSvg}
 
-        <!-- Cinturón Obi del Rango Actual + Nudo y puntas colgantes -->
+        <!-- Cinturón Obi redondeado + Nudo y puntas -->
         <g transform="translate(0,${breathY})">
-          <rect x="21.5" y="60" width="37" height="7.5" rx="3" fill="${beltColor}" stroke="#070a12" stroke-width="2"/>
-          <rect x="23" y="64.5" width="34" height="2.2" fill="${beltShadow}"/>
-          <rect x="35.5" y="59" width="9" height="9.5" rx="2.5" fill="${beltColor}" stroke="#070a12" stroke-width="1.8"/>
-          <path d="M37,67 L33,80 L38,81 L40,68 Z" fill="${beltShadow}" stroke="#070a12" stroke-width="1.5"/>
-          <path d="M42,67 L47,81 L42,82 L39,68 Z" fill="${beltColor}" stroke="#070a12" stroke-width="1.5"/>
+          <rect x="20" y="60" width="40" height="8" rx="4" fill="${beltColor}" stroke="${OL}" stroke-width="2.4"/>
+          <rect x="22" y="65" width="36" height="2.4" rx="1" fill="${beltShadow}" opacity="0.85"/>
+          <path d="M38,67 L33,80 L38,81 L41,68 Z" fill="${beltShadow}" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M42,67 L48,81 L43,82 L39,68 Z" fill="${beltColor}" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
+          <rect x="35.5" y="59" width="9" height="9.5" rx="3.5" fill="${beltColor}" stroke="${OL}" stroke-width="2.2"/>
         </g>
 
-        <!-- Cola de la cinta de cabeza ondeando al viento -->
+        <!-- Cola de la cinta ondeando suavemente -->
         <g transform="translate(0,${breathY})">
-          <path d="M22,22 Q10,${19 + tailY1} 4,${24 + tailY2} L7,${30 + tailY2} Q14,${25 + tailY1} 23,26 Z" fill="${beltColor}" stroke="#070a12" stroke-width="1.6"/>
-          <path d="M22,24 Q13,${25 + tailY2} 7,${32 + tailY1} L11,${36 + tailY1} Q17,${29 + tailY2} 23,27 Z" fill="${beltShadow}" stroke="#070a12" stroke-width="1.4"/>
+          <path d="M21,21 Q10,${18 + tailY1} 3,${23 + tailY2} L6,${29 + tailY2} Q13,${24 + tailY1} 22,25 Z" fill="${beltColor}" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M21,24 Q12,${25 + tailY2} 6,${32 + tailY1} L10,${36 + tailY1} Q16,${29 + tailY2} 22,27 Z" fill="${beltShadow}" stroke="${OL}" stroke-width="2" stroke-linejoin="round"/>
 
-          <!-- Cabeza y Capucha Ninja -->
-          <rect x="21" y="10" width="38" height="31" rx="12" fill="${suitBase}" stroke="#070a12" stroke-width="2.2"/>
-          <path d="M24,13 Q40,9 56,13 Q40,16 24,13 Z" fill="${suitLight}" opacity="0.85"/>
+          <!-- Cabeza amplia y redondeada -->
+          <ellipse cx="40" cy="25" rx="22" ry="19" fill="${suitBase}" stroke="${OL}" stroke-width="2.4"/>
+          <ellipse cx="34" cy="14" rx="10" ry="4.5" fill="${suitLight}" opacity="0.78"/>
 
-          <!-- Cinta frontal con placa metálica del Dojo -->
-          <rect x="20.5" y="18.5" width="39" height="6.5" rx="2.5" fill="${beltColor}" stroke="#070a12" stroke-width="1.8"/>
-          <rect x="34" y="19.5" width="12" height="4.5" rx="1.2" fill="#e2e8f0" stroke="#0f172a" stroke-width="1"/>
-          <circle cx="40" cy="21.7" r="1.1" fill="#38bdf8"/>
+          <!-- Cinta frontal + placa del Dojo -->
+          <rect x="18" y="16.5" width="44" height="7" rx="3.5" fill="${beltColor}" stroke="${OL}" stroke-width="2.2"/>
+          <rect x="35" y="17.5" width="13" height="5" rx="2" fill="#f1f5f9" stroke="${OL}" stroke-width="1.6"/>
+          <circle cx="41.5" cy="20" r="1.4" fill="#38bdf8"/>
 
-          <!-- Abertura del visor y ojos expresivos personalizables -->
-          <rect x="25" y="25" width="30" height="8" rx="3.5" fill="#fde68a" stroke="#070a12" stroke-width="1.6"/>
+          <!-- Visor amable y ojos expresivos con brillo -->
+          <rect x="27" y="23" width="30" height="11.5" rx="5.5" fill="#fde7be" stroke="${OL}" stroke-width="2.2"/>
           ${(() => {
             const eyeType = cfg.eyes || 'amber';
             if (eyeType === 'cyber') {
-              return `<rect x="26.5" y="26.5" width="27" height="5" rx="2" fill="#06b6d4" stroke="#cffafe" stroke-width="1"/><line x1="29" y1="29" x2="51" y2="29" stroke="#ffffff" stroke-width="1.4"/>`;
+              return `
+                <rect x="29" y="25" width="26" height="7" rx="3.5" fill="#06b6d4" stroke="#cffafe" stroke-width="1.2"/>
+                <circle cx="36" cy="28.5" r="1.7" fill="#ffffff"/>
+                <circle cx="48" cy="28.5" r="1.7" fill="#ffffff"/>
+              `;
             }
-            const eyeFill = eyeType === 'sharingan' ? '#ef4444' : eyeType === 'ice' ? '#38bdf8' : eyeType === 'dragon' ? '#fbbf24' : '#090d16';
+            const irisCol = eyeType === 'sharingan' ? '#ef4444' : eyeType === 'ice' ? '#38bdf8' : eyeType === 'dragon' ? '#f59e0b' : '#1e2433';
             return `
-              <polygon points="28,27 36,28.2 35,31.5 28,31" fill="${eyeFill}"/>
-              <polygon points="52,27 44,28.2 45,31.5 52,31" fill="${eyeFill}"/>
-              <circle cx="31" cy="29" r="1.3" fill="#ffffff"/>
-              <circle cx="47" cy="29" r="1.3" fill="#ffffff"/>
+              <ellipse cx="35.5" cy="28.5" rx="4.2" ry="4.8" fill="#ffffff" stroke="${OL}" stroke-width="1.6"/>
+              <ellipse cx="48.5" cy="28.5" rx="4.2" ry="4.8" fill="#ffffff" stroke="${OL}" stroke-width="1.6"/>
+              <circle cx="36.2" cy="28.6" r="2.6" fill="${irisCol}"/>
+              <circle cx="49.2" cy="28.6" r="2.6" fill="${irisCol}"/>
+              ${eyeType === 'dragon' ? `<ellipse cx="36.2" cy="28.6" rx="0.9" ry="2.4" fill="${OL}"/><ellipse cx="49.2" cy="28.6" rx="0.9" ry="2.4" fill="${OL}"/>` : ''}
+              <circle cx="35.2" cy="27.3" r="1.2" fill="#ffffff"/>
+              <circle cx="48.2" cy="27.3" r="1.2" fill="#ffffff"/>
             `;
           })()}
 
-          <!-- Máscara facial inferior -->
-          <path d="M22,31.5 Q40,34 58,31.5 L56,39 Q40,43 24,39 Z" fill="${maskBase}" stroke="#070a12" stroke-width="1.8"/>
-          <path d="M26,33 Q40,35.5 54,33" stroke="${maskLight}" stroke-width="1.5" fill="none" opacity="0.75"/>
+          <!-- Máscara inferior redondeada -->
+          <path d="M21,32 Q42,35 60,32 L58,41 Q40,45.5 22,41 Z" fill="${maskBase}" stroke="${OL}" stroke-width="2.4" stroke-linejoin="round"/>
+          <path d="M26,35.5 Q42,38 54,35.5" stroke="${maskLight}" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.8"/>
 
-          <!-- Sombrero / Casco / Peinado (Capa Superior de Personalización) -->
+          <!-- Casco / Sombrero / Peinado -->
           ${(() => {
             const hg = cfg.headgear || 'none';
             if (hg === 'kasa') {
-              return `<path d="M8,16 Q40,-2 72,16 Z" fill="#d97706" stroke="#451a03" stroke-width="2"/><path d="M16,15 Q40,3 64,15" stroke="#fde68a" stroke-width="1.5" fill="none"/>`;
+              return `<path d="M8,16 Q40,-3 72,16 Q40,19 8,16 Z" fill="#eab308" stroke="${OL}" stroke-width="2.4" stroke-linejoin="round"/><path d="M18,14 L62,14" stroke="#fef3c7" stroke-width="2" fill="none" stroke-linecap="round"/>`;
             }
             if (hg === 'oni') {
-              return `<path d="M25,13 Q18,0 28,3 L31,12 Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="1.5"/><path d="M55,13 Q62,0 52,3 L49,12 Z" fill="#ef4444" stroke="#7f1d1d" stroke-width="1.5"/>`;
+              return `<path d="M25,13 Q19,-1 30,4 L32,12 Z" fill="#ef4444" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/><path d="M55,13 Q61,-1 50,4 L48,12 Z" fill="#ef4444" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>`;
             }
             if (hg === 'neko') {
-              return `<polygon points="22,14 25,2 33,11" fill="${suitBase}" stroke="#070a12" stroke-width="1.8"/><polygon points="24,12 26,5 31,11" fill="#ec4899"/><polygon points="58,14 55,2 47,11" fill="${suitBase}" stroke="#070a12" stroke-width="1.8"/><polygon points="56,12 54,5 49,11" fill="#ec4899"/>`;
+              return `<polygon points="22,14 25,1 35,10" fill="${suitBase}" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/><polygon points="24.5,12 26.2,4.5 32.5,10.5" fill="#f472b6"/><polygon points="58,14 55,1 45,10" fill="${suitBase}" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/><polygon points="55.5,12 53.8,4.5 47.5,10.5" fill="#f472b6"/>`;
             }
             if (hg === 'crown') {
-              return `<polygon points="26,12 28,2 35,8 40,0 45,8 52,2 54,12" fill="#fbbf24" stroke="#92400e" stroke-width="1.6"/><circle cx="40" cy="7" r="2" fill="#ef4444"/>`;
+              return `<polygon points="26,11 28,0 35,7 40,-2 45,7 52,0 54,11" fill="#fbbf24" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/><circle cx="40" cy="6.5" r="2.2" fill="#ef4444"/>`;
             }
             if (hg === 'spiky') {
-              return `<polygon points="22,14 16,3 29,9 34,-2 41,8 48,-2 52,9 64,3 58,14" fill="#fde047" stroke="#ca8a04" stroke-width="1.6"/>`;
+              return `<polygon points="22,13 17,1 30,8 35,-3 41,7 49,-2 52,8 63,1 58,13" fill="#fde047" stroke="${OL}" stroke-width="2.2" stroke-linejoin="round"/>`;
             }
             return '';
           })()}
@@ -479,105 +521,110 @@
 
         ${frontWeaponSvg}
 
-        <!-- Mascota Compañera Animada junto al Ninja -->
+        <!-- Mascota Compañera Redondeada junto al Ninja -->
         ${(() => {
           const pet = cfg.pet || 'none';
-          const py = 68 - (frame % 2) * 2.5;
+          const py = 67 - (frame % 2) * 2.5;
           if (pet === 'kitsune') {
-            return `<g transform="translate(2,${py})"><ellipse cx="10" cy="22" rx="8" ry="3" fill="rgba(0,0,0,0.4)"/><path d="M3,14 Q-4,6 4,8 Q8,12 6,18 Z" fill="#f97316" stroke="#7c2d12" stroke-width="1.2"/><circle cx="11" cy="14" r="6.5" fill="#fb923c" stroke="#7c2d12" stroke-width="1.4"/><polygon points="6,10 8,3 11,9" fill="#ea580c"/><polygon points="16,10 14,3 11,9" fill="#ea580c"/><circle cx="9.5" cy="14" r="1.1" fill="#090d16"/><circle cx="13.5" cy="14" r="1.1" fill="#090d16"/></g>`;
+            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><ellipse cx="5" cy="14" rx="5.5" ry="4" fill="#fb923c" stroke="${OL}" stroke-width="2"/><circle cx="12" cy="14" r="7.5" fill="#f97316" stroke="${OL}" stroke-width="2.2"/><polygon points="6,9 8,2 11,8" fill="#f97316" stroke="${OL}" stroke-width="1.8"/><polygon points="18,9 16,2 13,8" fill="#f97316" stroke="${OL}" stroke-width="1.8"/><ellipse cx="13" cy="16.5" rx="5" ry="3" fill="#fef3c7"/><circle cx="10.5" cy="13.5" r="1.4" fill="${OL}"/><circle cx="15" cy="13.5" r="1.4" fill="${OL}"/><circle cx="10.1" cy="13" r="0.5" fill="#fff"/><circle cx="14.6" cy="13" r="0.5" fill="#fff"/></g>`;
           }
           if (pet === 'axolotl') {
-            return `<g transform="translate(2,${py - 6})"><ellipse cx="10" cy="14" rx="7.5" ry="6" fill="#f472b6" stroke="#831843" stroke-width="1.4"/><path d="M2,11 L-2,8 M2,14 L-3,14 M18,11 L22,8 M18,14 L23,14" stroke="#db2777" stroke-width="2" stroke-linecap="round"/><circle cx="8" cy="13" r="1.2" fill="#090d16"/><circle cx="13" cy="13" r="1.2" fill="#090d16"/><path d="M9,16 Q10.5,17.5 12,16" stroke="#831843" stroke-width="1.2" fill="none"/></g>`;
+            return `<g transform="translate(-4,${py - 4})"><ellipse cx="11" cy="20" rx="8.5" ry="3" fill="rgba(62,45,29,0.2)"/><path d="M3,11 L-2,8 M3,14 L-3,14 M19,11 L24,8 M19,14 L25,14" stroke="#db2777" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="11" cy="14" rx="8" ry="6.8" fill="#f472b6" stroke="${OL}" stroke-width="2.2"/><ellipse cx="12" cy="16" rx="4.5" ry="2.8" fill="#fbcfe8"/><circle cx="9" cy="13" r="1.4" fill="${OL}"/><circle cx="14" cy="13" r="1.4" fill="${OL}"/><circle cx="8.6" cy="12.5" r="0.5" fill="#fff"/><circle cx="13.6" cy="12.5" r="0.5" fill="#fff"/></g>`;
           }
           if (pet === 'shiba') {
-            return `<g transform="translate(2,${py})"><ellipse cx="10" cy="22" rx="8" ry="3" fill="rgba(0,0,0,0.4)"/><circle cx="11" cy="14" r="6.8" fill="#eab308" stroke="#713f12" stroke-width="1.4"/><ellipse cx="11" cy="16.5" rx="4.2" ry="3" fill="#fef9c3"/><polygon points="6,10 7,3 10,9" fill="#ca8a04"/><polygon points="16,10 15,3 12,9" fill="#ca8a04"/><circle cx="9" cy="13.5" r="1.1" fill="#090d16"/><circle cx="13" cy="13.5" r="1.1" fill="#090d16"/></g>`;
+            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><circle cx="11" cy="14" r="7.5" fill="#eab308" stroke="${OL}" stroke-width="2.2"/><polygon points="5,9 6.5,2 10,8" fill="#ca8a04" stroke="${OL}" stroke-width="1.8"/><polygon points="17,9 15.5,2 12,8" fill="#ca8a04" stroke="${OL}" stroke-width="1.8"/><ellipse cx="12" cy="16.5" rx="5.2" ry="3.4" fill="#fef9c3"/><circle cx="9.5" cy="13" r="1.4" fill="${OL}"/><circle cx="14" cy="13" r="1.4" fill="${OL}"/><circle cx="12" cy="15.5" r="1.3" fill="${OL}"/></g>`;
           }
           if (pet === 'penguin') {
-            return `<g transform="translate(2,${py})"><ellipse cx="10" cy="22" rx="8" ry="3" fill="rgba(0,0,0,0.4)"/><ellipse cx="11" cy="14" rx="6.8" ry="7.5" fill="#0284c7" stroke="#082f49" stroke-width="1.4"/><ellipse cx="11" cy="15.5" rx="4.5" ry="5" fill="#f8fafc"/><rect x="5" y="8" width="12" height="2.2" rx="1" fill="#ef4444"/><polygon points="9.5,14 12.5,14 11,16.5" fill="#fbbf24"/><circle cx="9" cy="12.5" r="1.1" fill="#090d16"/><circle cx="13" cy="12.5" r="1.1" fill="#090d16"/></g>`;
+            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><ellipse cx="11" cy="14" rx="7.6" ry="8.4" fill="#0284c7" stroke="${OL}" stroke-width="2.2"/><ellipse cx="12" cy="15.5" rx="4.8" ry="5.5" fill="#f8fafc"/><rect x="4" y="8" width="14" height="3.2" rx="1.5" fill="#ef4444" stroke="${OL}" stroke-width="1.4"/><polygon points="10.5,14 14.5,15 10.5,17" fill="#fbbf24" stroke="${OL}" stroke-width="1.4"/><circle cx="9.5" cy="12.5" r="1.3" fill="${OL}"/><circle cx="13.8" cy="12.5" r="1.3" fill="${OL}"/></g>`;
           }
           if (pet === 'dragon') {
-            return `<g transform="translate(1,${py - 8})"><path d="M3,12 L-3,5 L4,8 Z M19,12 L25,5 L18,8 Z" fill="#a855f7" stroke="#3b0764" stroke-width="1.2"/><circle cx="11" cy="13" r="6.5" fill="#7e22ce" stroke="#3b0764" stroke-width="1.4"/><polygon points="8,8 6,2 10,7" fill="#fbbf24"/><polygon points="14,8 16,2 12,7" fill="#fbbf24"/><circle cx="9" cy="13" r="1.3" fill="#fde047"/><circle cx="13" cy="13" r="1.3" fill="#fde047"/></g>`;
+            return `<g transform="translate(-4,${py - 6})"><path d="M4,12 L-3,5 L5,8 Z" fill="#a855f7" stroke="${OL}" stroke-width="1.8"/><circle cx="11" cy="13" r="7.2" fill="#7e22ce" stroke="${OL}" stroke-width="2.2"/><polygon points="7,7 5,1 10,6" fill="#fbbf24" stroke="${OL}" stroke-width="1.5"/><polygon points="15,7 17,1 12,6" fill="#fbbf24" stroke="${OL}" stroke-width="1.5"/><circle cx="9.5" cy="12.5" r="1.6" fill="#fde047"/><circle cx="14" cy="12.5" r="1.6" fill="#fde047"/></g>`;
           }
           return '';
         })()}
       </svg>`;
   }
 
-  // --- ESCENARIO ILUSTRADO DEL DOJO TRADICIONAL (Tatami, Shoji, Linternas y Amuleto Elemental) ---
+  // --- ESCENARIO CALMO DEL DOJO ESTILO CLUB PENGUIN (Shoji crema, cielo pastel, linternas, tatami dorado) ---
   function renderDojoBackdropSvg(accentColor = '#38bdf8') {
     return `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 280" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;">
-        <defs>
-          <linearGradient id="cjWallGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#070a14"/>
-            <stop offset="65%" stop-color="#131b2e"/>
-            <stop offset="100%" stop-color="#1e1510"/>
-          </linearGradient>
-          <linearGradient id="cjTatamiGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#3b2313"/>
-            <stop offset="35%" stop-color="#29180d"/>
-            <stop offset="100%" stop-color="#140b06"/>
-          </linearGradient>
-          <radialGradient id="cjLanternGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.48"/>
-            <stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
+        <!-- Paredes Shoji color crema cálido -->
+        <rect x="0" y="0" width="800" height="186" fill="#f3ebd9"/>
+        <rect x="0" y="146" width="800" height="40" fill="#e8dcc4"/>
 
-        <!-- Pared del Dojo -->
-        <rect x="0" y="0" width="800" height="186" fill="url(#cjWallGrad)"/>
+        <!-- Paneles Shoji izquierdo y derecho -->
+        <g>
+          <rect x="28" y="22" width="174" height="148" rx="4" fill="#f8f2e4" stroke="#7d5837" stroke-width="3"/>
+          <line x1="86" y1="24" x2="86" y2="168" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="144" y1="24" x2="144" y2="168" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="30" y1="71" x2="200" y2="71" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="30" y1="120" x2="200" y2="120" stroke="#d8c9ad" stroke-width="1.5"/>
 
-        <!-- Paneles Shoji Izquierdo y Derecho con celosía japonesa -->
-        <g opacity="0.24">
-          <rect x="34" y="18" width="160" height="150" rx="3" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
-          <line x1="87" y1="18" x2="87" y2="168" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="140" y1="18" x2="140" y2="168" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="34" y1="68" x2="194" y2="68" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="34" y1="118" x2="194" y2="118" stroke="#64748b" stroke-width="1.5"/>
-
-          <rect x="606" y="18" width="160" height="150" rx="3" fill="#1e293b" stroke="#64748b" stroke-width="2"/>
-          <line x1="659" y1="18" x2="659" y2="168" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="712" y1="18" x2="712" y2="168" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="606" y1="68" x2="766" y2="68" stroke="#64748b" stroke-width="1.5"/>
-          <line x1="606" y1="118" x2="766" y2="118" stroke="#64748b" stroke-width="1.5"/>
+          <rect x="598" y="22" width="174" height="148" rx="4" fill="#f8f2e4" stroke="#7d5837" stroke-width="3"/>
+          <line x1="656" y1="24" x2="656" y2="168" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="714" y1="24" x2="714" y2="168" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="600" y1="71" x2="770" y2="71" stroke="#d8c9ad" stroke-width="1.5"/>
+          <line x1="600" y1="120" x2="770" y2="120" stroke="#d8c9ad" stroke-width="1.5"/>
         </g>
 
-        <!-- Vigas de madera tradicionales -->
-        <rect x="0" y="0" width="800" height="12" fill="#1c110a"/>
-        <rect x="210" y="12" width="12" height="174" fill="#1c110a"/>
-        <rect x="578" y="12" width="12" height="174" fill="#1c110a"/>
-
-        <!-- Amuleto Elemental Central (Fuego / Agua / Nieve estilo Card-Jitsu) -->
-        <g transform="translate(400, 88)" opacity="0.32">
-          <circle cx="0" cy="0" r="56" fill="#090d16" stroke="${accentColor}" stroke-width="2.5"/>
-          <circle cx="0" cy="0" r="46" fill="none" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="6 4"/>
-          <circle cx="0" cy="-22" r="14" fill="#450a0a" stroke="#ef4444" stroke-width="2"/>
-          <circle cx="-20" cy="14" r="14" fill="#172554" stroke="#3b82f6" stroke-width="2"/>
-          <circle cx="20" cy="14" r="14" fill="#083344" stroke="#38bdf8" stroke-width="2"/>
+        <!-- Ventana central con cielo azul pastel, nubes blancas y montañas nevadas -->
+        <g>
+          <rect x="248" y="20" width="304" height="144" fill="#cbe2f0"/>
+          <rect x="248" y="98" width="304" height="66" fill="#dfeef7" opacity="0.85"/>
+          <polygon points="248,164 306,92 370,164" fill="#b1cde0" stroke="#8aaec7" stroke-width="1.5"/>
+          <polygon points="291,110 306,92 323,110 307,106" fill="#f8fafc"/>
+          <polygon points="336,164 410,74 490,164" fill="#9ab8cf" stroke="#7a9bb5" stroke-width="1.5"/>
+          <polygon points="389,99 410,74 432,99 410,94" fill="#ffffff"/>
+          <polygon points="438,164 500,96 552,164" fill="#b8d2e3" stroke="#8aaec7" stroke-width="1.5"/>
+          <polygon points="484,112 500,96 517,112 500,108" fill="#f8fafc"/>
+          <!-- Nubes esponjosas -->
+          <g fill="#ffffff" opacity="0.94">
+            <circle cx="298" cy="54" r="13"/><circle cx="312" cy="50" r="16"/><circle cx="326" cy="54" r="12"/>
+            <circle cx="456" cy="44" r="11"/><circle cx="468" cy="41" r="13"/><circle cx="480" cy="44" r="10"/>
+          </g>
+          <rect x="248" y="20" width="304" height="144" fill="none" stroke="#5e3f25" stroke-width="4"/>
+          <rect x="246" y="18" width="308" height="148" fill="none" stroke="#241b16" stroke-width="2"/>
+          <line x1="349" y1="20" x2="349" y2="164" stroke="#7d5837" stroke-width="2"/>
+          <line x1="450" y1="20" x2="450" y2="164" stroke="#7d5837" stroke-width="2"/>
         </g>
 
-        <!-- Linternas colgantes del Dojo -->
-        <g transform="translate(256, 12)">
-          <circle cx="0" cy="28" r="42" fill="url(#cjLanternGlow)"/>
-          <line x1="0" y1="0" x2="0" y2="12" stroke="#fbbf24" stroke-width="2"/>
-          <rect x="-11" y="12" width="22" height="28" rx="8" fill="#dc2626" stroke="#fbbf24" stroke-width="1.5"/>
-          <rect x="-8" y="16" width="16" height="20" rx="5" fill="#fef08a" opacity="0.65"/>
+        <!-- Vigas de madera cálida -->
+        <rect x="0" y="0" width="800" height="14" fill="#7d5837" stroke="#241b16" stroke-width="2"/>
+        <rect x="216" y="14" width="16" height="170" fill="#7d5837" stroke="#241b16" stroke-width="2"/>
+        <rect x="570" y="14" width="16" height="170" fill="#7d5837" stroke="#241b16" stroke-width="2"/>
+        <circle cx="224" cy="44" r="5" fill="${accentColor}" stroke="#241b16" stroke-width="1.6" opacity="0.85"/>
+        <circle cx="578" cy="44" r="5" fill="${accentColor}" stroke="#241b16" stroke-width="1.6" opacity="0.85"/>
+
+        <!-- Linternas redondas colgantes -->
+        <g transform="translate(268, 14)">
+          <circle cx="0" cy="30" r="28" fill="#fae1a8" opacity="0.25"/>
+          <line x1="0" y1="0" x2="0" y2="12" stroke="#241b16" stroke-width="2.5"/>
+          <ellipse cx="0" cy="30" rx="16" ry="17" fill="#e87454" stroke="#241b16" stroke-width="2.4"/>
+          <ellipse cx="-2" cy="28" rx="8" ry="11" fill="#fae1a8" opacity="0.65"/>
+          <rect x="-9" y="10" width="18" height="5" rx="2" fill="#5e3f25" stroke="#241b16" stroke-width="1.8"/>
+          <rect x="-9" y="45" width="18" height="5" rx="2" fill="#5e3f25" stroke="#241b16" stroke-width="1.8"/>
+          <line x1="0" y1="50" x2="0" y2="59" stroke="#d95338" stroke-width="2.4"/>
         </g>
-        <g transform="translate(544, 12)">
-          <circle cx="0" cy="28" r="42" fill="url(#cjLanternGlow)"/>
-          <line x1="0" y1="0" x2="0" y2="12" stroke="#fbbf24" stroke-width="2"/>
-          <rect x="-11" y="12" width="22" height="28" rx="8" fill="#dc2626" stroke="#fbbf24" stroke-width="1.5"/>
-          <rect x="-8" y="16" width="16" height="20" rx="5" fill="#fef08a" opacity="0.65"/>
+        <g transform="translate(532, 14)">
+          <circle cx="0" cy="30" r="28" fill="#fae1a8" opacity="0.25"/>
+          <line x1="0" y1="0" x2="0" y2="12" stroke="#241b16" stroke-width="2.5"/>
+          <ellipse cx="0" cy="30" rx="16" ry="17" fill="#e87454" stroke="#241b16" stroke-width="2.4"/>
+          <ellipse cx="-2" cy="28" rx="8" ry="11" fill="#fae1a8" opacity="0.65"/>
+          <rect x="-9" y="10" width="18" height="5" rx="2" fill="#5e3f25" stroke="#241b16" stroke-width="1.8"/>
+          <rect x="-9" y="45" width="18" height="5" rx="2" fill="#5e3f25" stroke="#241b16" stroke-width="1.8"/>
+          <line x1="0" y1="50" x2="0" y2="59" stroke="#d95338" stroke-width="2.4"/>
         </g>
 
-        <!-- Piso Tatami con líneas de perspectiva -->
-        <rect x="0" y="184" width="800" height="96" fill="url(#cjTatamiGrad)"/>
-        <rect x="0" y="182" width="800" height="5" fill="#b45309"/>
-        <rect x="0" y="183" width="800" height="1.5" fill="#fde047" opacity="0.75"/>
-        <line x1="160" y1="187" x2="40" y2="280" stroke="#78350f" stroke-width="2" opacity="0.55"/>
-        <line x1="400" y1="187" x2="400" y2="280" stroke="#78350f" stroke-width="2" opacity="0.55"/>
-        <line x1="640" y1="187" x2="760" y2="280" stroke="#78350f" stroke-width="2" opacity="0.55"/>
-        <rect x="65" y="198" width="670" height="72" rx="8" fill="none" stroke="rgba(251,191,36,0.22)" stroke-width="2"/>
+        <!-- Piso Tatami dorado cálido con medallón sutil -->
+        <rect x="0" y="184" width="800" height="96" fill="#d8b878"/>
+        <rect x="0" y="181" width="800" height="6" fill="#7d5837"/>
+        <line x1="0" y1="187" x2="800" y2="187" stroke="#6e4e2e" stroke-width="2.5"/>
+        <line x1="155" y1="187" x2="50" y2="280" stroke="#b58c4b" stroke-width="2" opacity="0.75"/>
+        <line x1="400" y1="187" x2="400" y2="280" stroke="#b58c4b" stroke-width="2" opacity="0.75"/>
+        <line x1="645" y1="187" x2="750" y2="280" stroke="#b58c4b" stroke-width="2" opacity="0.75"/>
+        <rect x="76" y="198" width="648" height="70" rx="12" fill="rgba(207,169,98,0.42)" stroke="#b58c4b" stroke-width="3"/>
+        <ellipse cx="400" cy="233" rx="58" ry="22" fill="rgba(181,140,75,0.22)" stroke="rgba(110,78,46,0.26)" stroke-width="2"/>
       </svg>
     `;
   }
@@ -611,6 +658,7 @@
     let lastStep = 0;
     const step = (ts) => {
       if (scope.isDisposed() || !canvas.isConnected) return;
+      if (canvas.closest && canvas.closest('.cj-phaser-active')) return;
       if (ts - lastStep >= 34) {
         lastStep = ts;
         ctx.clearRect(0, 0, w, h);
@@ -831,8 +879,8 @@
 
   function renderRivalHandHtml(count = 5) {
     return Array.from({ length: count }, (_, i) => `
-      <div class="cj-rival-card-back" style="transform:rotate(${(i - 2) * 3.5}deg);">
-        <div style="width:22px;height:22px;border-radius:50%;border:1px solid rgba(251,191,36,0.65);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fbbf24;background:rgba(0,0,0,0.4);">☯</div>
+      <div class="cj-rival-card-back" style="width:28px;height:38px;border-radius:5px;border:1.5px solid #fbbf24;background:linear-gradient(145deg,#1e3a8a,#0f172a);box-shadow:0 3px 8px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;transform:rotate(${(i - 2) * 3}deg);">
+        <div style="width:16px;height:16px;border-radius:50%;border:1px solid rgba(251,191,36,0.65);display:flex;align-items:center;justify-content:center;font-size:8px;color:#fbbf24;background:rgba(0,0,0,0.4);">☯</div>
       </div>
     `).join('');
   }
@@ -907,9 +955,19 @@
       this.playerPose = 'idle';
       this.aiPose = 'idle';
       this.activeParticles = 0;
+      this.phaserArena = null;
+      this.phaserMountToken = 0;
 
       this.bindLifecycleEvents();
       this.start();
+    }
+
+    _destroyPhaser() {
+      this.phaserMountToken++;
+      if (this.phaserArena) {
+        try { this.phaserArena.destroy(); } catch {}
+        this.phaserArena = null;
+      }
     }
 
     bindLifecycleEvents() {
@@ -999,6 +1057,7 @@
       this.destroyed = true;
       this.paused = false;
       this.phase = 'ended';
+      this._destroyPhaser();
       if (this.sfx) this.sfx.destroy();
       if (this.scope) this.scope.dispose();
     }
@@ -1017,6 +1076,7 @@
 
     renderLobby() {
       if (this.destroyed || !this.container) return;
+      this._destroyPhaser();
       this.phase = 'lobby';
       const floors = CFG().DOJO_FLOORS || [];
       const claimed = this.getClaimedFloors();
@@ -1028,8 +1088,8 @@
 
       this.container.innerHTML = `
         <div style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:14px;padding:16px;color:#e2e8f0;position:relative;display:flex;flex-direction:column;gap:14px;">
-          <!-- Hero Banner del Templo del Dojo Elemental con Arte HD -->
-          <div style="position:relative;border-radius:12px;overflow:hidden;border:1.5px solid rgba(251,191,36,0.4);background:linear-gradient(90deg,rgba(9,13,22,0.94) 0%,rgba(9,13,22,0.78) 55%,rgba(9,13,22,0.5) 100%), url('assets/cards/dojo_sensei_hero.jpg') center 28%/cover no-repeat;padding:18px 20px;box-shadow:0 10px 28px rgba(0,0,0,0.65);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+          <!-- Hero Banner del Templo del Dojo Elemental con Arte Caricatura -->
+          <div style="position:relative;border-radius:12px;overflow:hidden;border:1.5px solid rgba(251,191,36,0.45);background:linear-gradient(90deg,rgba(15,23,42,0.88) 0%,rgba(15,23,42,0.68) 55%,rgba(15,23,42,0.34) 100%), url('${window.EKCartoonArtManifest?.dojoHero || 'assets/cartoon/dojo_hero.webp'}') center 40%/cover no-repeat;padding:18px 20px;box-shadow:0 8px 24px rgba(0,0,0,0.45);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
             <div style="max-width:520px;">
               <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(251,191,36,0.16);border:1px solid rgba(251,191,36,0.5);color:#fde047;font-size:9.5px;font-weight:900;padding:2px 9px;border-radius:999px;margin-bottom:6px;">
                 <span>🏯 TEMPLO IMPERIAL CARD-JITSU</span>
@@ -1100,7 +1160,7 @@
             ${floors.map((f) => {
               const isDone = !!claimed[f.level];
               const guardianPortrait = f.level === 5
-                ? `<div style="width:100%;height:100%;background:url('assets/cards/dojo_sensei_hero.jpg') center/cover no-repeat;border-radius:8px;"></div>`
+                ? `<div style="width:100%;height:100%;background:#f5f2ea url('${window.EKCartoonArtManifest?.ninjaEmblem || 'assets/cartoon/ninja_emblem.webp'}') center/cover no-repeat;border-radius:8px;"></div>`
                 : renderPixelNinjaSvg(f.ninjaConfig, { size: 46, pose: 'idle', frame: 0 });
               const keySprite = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('key_' + f.reward.key, 0.95) : '';
               const trainCoins = Math.round(f.reward.coins * (CFG().TRAINING_REWARD_RULES?.coinMultiplier || 0.5));
@@ -1526,6 +1586,7 @@
 
     refreshArenaSprites() {
       if (this.destroyed || !this.container) return;
+      if (this.phaserArena && this.phaserArena.isReady()) return;
       const pBox = this.container.querySelector('#cjPlayerSpriteWrap');
       const aBox = this.container.querySelector('#cjAiSpriteWrap');
       if (pBox) {
@@ -1547,10 +1608,11 @@
 
     renderMatchArena(opts = {}) {
       if (this.destroyed || !this.container) return;
+      this._destroyPhaser();
       const f = this.selectedFloor;
       const myNinja = getSavedNinjaConfig();
       const belts = CFG().BELTS || [];
-      const myBeltObj = belts.find((b) => b.id === myNinja.belt) || belts[0] || { name: 'Cinturón Blanco', color: '#f8fafc' };
+      const myBeltObj = belts.find((b) => b.id === myNinja.belt || ('belt_' + b.id) === myNinja.belt) || belts[0] || { name: 'Cinturón Blanco', color: '#f8fafc' };
 
       this.container.innerHTML = `
         <div id="cjMatchRoot" style="background:var(--bg-panel,#0f131d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:14px;color:#e2e8f0;display:flex;flex-direction:column;gap:10px;position:relative;overflow:hidden;">
@@ -1558,7 +1620,7 @@
           <div style="background:linear-gradient(180deg,#161d2e 0%,#0f1420 100%);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;box-shadow:0 6px 16px rgba(0,0,0,0.4);">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <div style="display:flex;flex-direction:column;">
-                <span class="ek-pixel-font" style="font-size:9.5px;color:#38bdf8;">TÚ (${this.playerPoints.length})</span>
+                <span id="cjPlayerScoreLabel" class="ek-pixel-font" style="font-size:9.5px;color:#38bdf8;">TÚ (${this.playerPoints.length})</span>
                 <span style="font-size:9px;color:#64748b;">Pilas Elementales</span>
               </div>
               <div id="cjPlayerScoreRow" style="display:flex;gap:5px;flex-wrap:wrap;">${this.formatPointsRow(this.playerPoints)}</div>
@@ -1578,15 +1640,18 @@
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <div id="cjAiScoreRow" style="display:flex;gap:5px;flex-wrap:wrap;">${this.formatPointsRow(this.aiPoints)}</div>
               <div style="display:flex;flex-direction:column;text-align:right;">
-                <span class="ek-pixel-font" style="font-size:9.5px;color:${f.color};">RIVAL (${this.aiPoints.length})</span>
+                <span id="cjAiScoreLabel" class="ek-pixel-font" style="font-size:9.5px;color:${f.color};">RIVAL (${this.aiPoints.length})</span>
                 <span style="font-size:9px;color:#64748b;">Pilas del Rival</span>
               </div>
             </div>
           </div>
 
-          <!-- Escenario Tatami Tradicional del Dojo HD -->
-          <div id="cjBattleStage" style="position:relative;min-height:268px;border-radius:12px;border:2px solid #2e3b56;background:#0b0e14;display:grid;grid-template-columns:168px 1fr 168px;align-items:center;padding:12px 16px;overflow:hidden;box-shadow:inset 0 0 34px rgba(0,0,0,0.75);">
-            ${renderDojoBackdropSvg(f.color)}
+          <!-- Escenario Tatami Tradicional del Dojo (Phaser 3 + Fallback Vectorial Calmo) -->
+          <div id="cjBattleStage" style="position:relative;min-height:268px;border-radius:12px;border:2px solid #8b6843;background:#efe6d2;display:grid;grid-template-columns:168px 1fr 168px;align-items:center;padding:12px 16px;overflow:hidden;box-shadow:inset 0 0 18px rgba(110,78,46,0.22);">
+            <div id="cjPhaserHost" class="ek-phaser-stage-host" style="position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:hidden;"></div>
+            <div id="cjBackdropSvgWrap" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;">
+              ${renderDojoBackdropSvg(f.color)}
+            </div>
 
             <!-- Combatiente Jugador -->
             <div id="cjPlayerCharBox" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;transition:transform 0.18s ease;">
@@ -1594,33 +1659,32 @@
                 <canvas id="cjPlayerAuraCanvas" width="136" height="156" style="position:absolute;inset:0;pointer-events:none;"></canvas>
                 <div id="cjPlayerSpriteWrap">${renderPixelNinjaSvg(myNinja, { size: 124, pose: this.playerPose, frame: this.idleFrame })}</div>
               </div>
-              <div style="background:rgba(11,14,20,0.92);border:1.5px solid #38bdf8;border-radius:8px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.6);">
+              <div style="background:rgba(20,26,40,0.92);border:1.5px solid #38bdf8;border-radius:8px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.35);">
                 <div style="font-size:11.5px;font-weight:900;color:#fff;">Tú</div>
                 <div style="font-size:9.5px;color:${myBeltObj.color};font-weight:700;">${myBeltObj.name}</div>
               </div>
             </div>
 
             <!-- Zona Central de Choque + Mano Boca Abajo del Rival -->
-            <div id="cjCenterClashZone" style="position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:space-between;min-height:224px;">
-              <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-                <div id="cjRivalHandRow" class="cj-rival-hand" title="Mano oculta del rival (5 cartas)">${renderRivalHandHtml(5)}</div>
-                <div id="cjSenseiSpeech" style="background:rgba(11,14,20,0.94);border:1px solid ${f.color};color:#f8fafc;padding:4px 14px;border-radius:999px;font-size:11.5px;font-style:italic;text-align:center;max-width:380px;box-shadow:0 4px 12px rgba(0,0,0,0.5);"></div>
+            <div id="cjCenterClashZone" style="position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:space-between;min-height:236px;padding-top:2px;">
+              <div style="position:relative;top:2px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+                <div id="cjRivalHandRow" class="cj-rival-hand" style="display:flex;align-items:center;justify-content:center;gap:3px;" title="Mano oculta del rival (5 cartas)">${renderRivalHandHtml(5)}</div>
               </div>
-              <div id="cjArenaTable" style="display:flex;align-items:center;justify-content:center;gap:22px;min-height:156px;">
-                <div style="text-align:center;color:#cbd5e1;font-size:12px;background:rgba(9,13,22,0.75);border:1px solid rgba(255,255,255,0.1);padding:10px 18px;border-radius:10px;backdrop-filter:blur(4px);">
-                  <div class="ek-pixel-font" style="font-size:10.5px;color:#fbbf24;margin-bottom:6px;">ELIGE UNA CARTA DE TU MANO</div>
-                  <div style="font-size:11px;">🔥 Fuego &gt; ❄️ Nieve &gt; 💧 Agua &gt; 🔥 Fuego</div>
+              <div id="cjArenaTable" style="display:flex;align-items:center;justify-content:center;gap:22px;flex:1;width:100%;">
+                <div style="margin-top:auto;margin-bottom:4px;padding:3px 12px;font-size:10px;border-radius:999px;background:rgba(15, 23, 42, 0.76);border:1px solid rgba(255,255,255,0.18);color:#f8fafc;font-weight:800;backdrop-filter:blur(4px);box-shadow:0 4px 12px rgba(0,0,0,0.25);white-space:nowrap;">
+                  ⚡ Elige tu carta · 🔥 &gt; ❄️ &gt; 💧 &gt; 🔥
                 </div>
               </div>
             </div>
 
             <!-- Combatiente Guardián -->
             <div id="cjAiCharBox" style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;transition:transform 0.18s ease;">
+              <div id="cjSenseiSpeech" style="position:absolute;top:-6px;right:4px;background:rgba(15,23,42,0.92);border:1.5px solid ${f.color};color:#f8fafc;padding:3px 10px;border-radius:10px;font-size:10px;font-style:italic;text-align:center;width:190px;box-shadow:0 4px 12px rgba(0,0,0,0.45);z-index:8;pointer-events:none;"></div>
               <div style="position:relative;width:136px;height:156px;display:flex;align-items:center;justify-content:center;">
                 <canvas id="cjAiAuraCanvas" width="136" height="156" style="position:absolute;inset:0;pointer-events:none;"></canvas>
                 <div id="cjAiSpriteWrap">${renderPixelNinjaSvg(f.ninjaConfig, { size: 124, flip: true, pose: this.aiPose, frame: this.idleFrame })}</div>
               </div>
-              <div style="background:rgba(11,14,20,0.92);border:1.5px solid ${f.color};border-radius:8px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.6);">
+              <div style="background:rgba(20,26,40,0.92);border:1.5px solid ${f.color};border-radius:8px;padding:3px 12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.35);">
                 <div style="font-size:11.5px;font-weight:900;color:${f.color};">${f.name}</div>
                 <div style="font-size:9.5px;color:#cbd5e1;font-weight:700;">${f.belt} · Piso ${f.level}</div>
               </div>
@@ -1629,20 +1693,53 @@
 
           <!-- Mano de 5 Cartas (112×158 px) -->
           <div style="background:linear-gradient(180deg,#141a29 0%,#0d111b 100%);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <style>
+              #cjHandRow { display:flex; justify-content:center; align-items:flex-end; gap:12px; flex-wrap:nowrap; min-height:168px; padding-top:10px; box-sizing:border-box; }
+              #cjHandRow .cj-card-v191 { margin:0 !important; align-self:flex-end; transition:transform 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.18s ease !important; will-change:transform; }
+              #cjHandRow .cj-card-v191:hover { transform:translateY(-10px) scale(1.03) !important; z-index:12; }
+            </style>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <span class="ek-pixel-font" style="font-size:10px;color:#94a3b8;">TU MANO ELEMENTAL (HAZ CLIC PARA LANZAR)</span>
               <span style="font-size:10.5px;color:#fbbf24;font-weight:700;">★ Cartas 10–12 activan cinemática elemental</span>
             </div>
-            <div id="cjHandRow" style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;min-height:162px;align-items:center;">
+            <div id="cjHandRow">
               ${this.playerHand.map((c, i) => renderCardHtml(c, i, { stagger: !!opts.staggerHand })).join('')}
             </div>
           </div>
         </div>
       `;
 
-      // Iniciar partículas de aura elemental
+      // Iniciar partículas de aura elemental (fallback mientras carga Phaser)
       attachAuraLoop(this.scope, this.container.querySelector('#cjPlayerAuraCanvas'), myNinja.aura);
       attachAuraLoop(this.scope, this.container.querySelector('#cjAiAuraCanvas'), f.ninjaConfig?.aura);
+
+      // Montar escena Phaser 3 UNA sola vez por partida (sin recrear entre rondas)
+      const phaserHost = this.container.querySelector('#cjPhaserHost');
+      const battleStage = this.container.querySelector('#cjBattleStage');
+      if (phaserHost && battleStage && window.EKDojoPhaser && typeof window.EKDojoPhaser.mount === 'function') {
+        const mountToken = this.phaserMountToken;
+        const opponentName = this.pvp ? (this.pvp.opponent?.name || f.name) : f.name;
+        window.EKDojoPhaser.mount(phaserHost, {
+          playerConfig: myNinja,
+          aiConfig: f.ninjaConfig,
+          floorColor: f.color,
+          playerName: 'Tú',
+          aiName: opponentName,
+          accentColor: f.color,
+          isDisposed: () => this.destroyed || mountToken !== this.phaserMountToken
+        }).then((handle) => {
+          if (this.destroyed || mountToken !== this.phaserMountToken || !handle || !handle.isReady()) {
+            if (handle && typeof handle.destroy === 'function') handle.destroy();
+            return;
+          }
+          this.phaserArena = handle;
+          battleStage.classList.add('cj-phaser-active');
+          ['#cjBackdropSvgWrap', '#cjPlayerSpriteWrap', '#cjAiSpriteWrap', '#cjPlayerAuraCanvas', '#cjAiAuraCanvas'].forEach((sel) => {
+            const el = battleStage.querySelector(sel);
+            if (el) el.style.visibility = 'hidden';
+          });
+        }).catch(() => {});
+      }
 
       const exitBtn = this.container.querySelector('#cjBtnExitMatch');
       if (exitBtn) {
@@ -1662,6 +1759,56 @@
       }
 
       this.bindHandClicks();
+      window.__EK?.assertNoBadText(this.container);
+    }
+
+    resetRoundUI() {
+      if (this.destroyed || !this.container) return;
+
+      const pScore = this.container.querySelector('#cjPlayerScoreRow');
+      const aScore = this.container.querySelector('#cjAiScoreRow');
+      if (pScore) pScore.innerHTML = this.formatPointsRow(this.playerPoints);
+      if (aScore) aScore.innerHTML = this.formatPointsRow(this.aiPoints);
+
+      const pScoreLabel = this.container.querySelector('#cjPlayerScoreLabel');
+      const aScoreLabel = this.container.querySelector('#cjAiScoreLabel');
+      if (pScoreLabel) pScoreLabel.textContent = `TÚ (${this.playerPoints.length})`;
+      if (aScoreLabel) aScoreLabel.textContent = `RIVAL (${this.aiPoints.length})`;
+
+      const rivalHandRow = this.container.querySelector('#cjRivalHandRow');
+      if (rivalHandRow) rivalHandRow.innerHTML = renderRivalHandHtml(5);
+
+      const table = this.container.querySelector('#cjArenaTable');
+      if (table) {
+        table.innerHTML = `
+          <div style="margin-top:auto;margin-bottom:6px;padding:4px 12px;font-size:10.5px;border-radius:999px;background:rgba(15, 23, 42, 0.72);border:1px solid rgba(255,255,255,0.18);color:#f8fafc;font-weight:800;backdrop-filter:blur(4px);box-shadow:0 4px 12px rgba(0,0,0,0.25);white-space:nowrap;">
+            ⚡ Elige tu carta · 🔥 &gt; ❄️ &gt; 💧 &gt; 🔥
+          </div>
+        `;
+      }
+
+      const handRow = this.container.querySelector('#cjHandRow');
+      if (handRow) {
+        handRow.innerHTML = this.playerHand.map((c, i) => renderCardHtml(c, i, { stagger: false })).join('');
+        this.bindHandClicks();
+      }
+
+      const pCharBox = this.container.querySelector('#cjPlayerCharBox');
+      const aCharBox = this.container.querySelector('#cjAiCharBox');
+      [pCharBox, aCharBox].forEach((box) => {
+        if (!box) return;
+        box.style.transform = '';
+        box.classList.remove('cj-ninja-hit-shake');
+        const oldGag = box.querySelector('.cj-loser-gag');
+        if (oldGag) oldGag.remove();
+      });
+
+      if (this.phaserArena && this.phaserArena.isReady()) {
+        this.phaserArena.resetToIdle();
+      } else {
+        this.refreshArenaSprites();
+      }
+
       window.__EK?.assertNoBadText(this.container);
     }
 
@@ -2077,10 +2224,22 @@
         if (this.destroyed) return;
         const executeImpact = () => {
           if (this.destroyed) return;
-          // 2) Hit-stop de 80ms + flash blanco de 60ms
+          // 2) Hit-stop de 80ms + flash blanco de 60ms + animación en escena Phaser 3
           this.sfx.clash();
+          const phaserActive = !!(this.phaserArena && this.phaserArena.isReady());
+          if (phaserActive) {
+            const winElem = outcome === 'player' ? pCard.element : aCard.element;
+            const winPower = outcome === 'player' ? pCard.power : aCard.power;
+            this.phaserArena.playClash({
+              winner: outcome,
+              element: winElem,
+              power: winPower,
+              isSpecial: winPower > SPECIAL_THRESHOLD
+            });
+          }
+
           const flash = document.createElement('div');
-          flash.style.cssText = 'position:absolute;inset:0;background:#ffffff;opacity:0.75;z-index:55;pointer-events:none;';
+          flash.style.cssText = `position:absolute;inset:0;background:#ffffff;opacity:${phaserActive ? 0.35 : 0.75};z-index:55;pointer-events:none;`;
           stage.appendChild(flash);
           this.scope.timeout(() => flash.remove(), 60);
 
@@ -2090,15 +2249,18 @@
             const aSlot = this.container?.querySelector('#cjDuelAiSlot');
             const pCharBox = this.container?.querySelector('#cjPlayerCharBox');
             const aCharBox = this.container?.querySelector('#cjAiCharBox');
+            const hasPhaser = !!(this.phaserArena && this.phaserArena.isReady());
 
             // 3) Ganadora escala ×1.15 con halo; perdedora se rompe en 24 partículas pixel (600ms)
-            // 4) Ninja ganador embiste 28px en 180ms; perdedor tiembla ±4px en 6 cuadros
+            // 4) Cuando no hay Phaser activo, fallback DOM embiste/tiembla y muestra gag SVG
             if (outcome === 'player') {
               this.sfx.winRound();
               this.playerPoints.push(pCard);
-              this.playerPose = 'attack';
-              this.aiPose = 'idle';
-              this.refreshArenaSprites();
+              if (!hasPhaser) {
+                this.playerPose = 'attack';
+                this.aiPose = 'idle';
+                this.refreshArenaSprites();
+              }
 
               if (pSlot) pSlot.classList.add('cj-card-winner-scale');
               if (aSlot) {
@@ -2106,10 +2268,12 @@
                 if (cardNode) cardNode.style.opacity = '0';
                 this.shatterLoserCard(aSlot, aCard.element);
               }
-              if (pCharBox) pCharBox.style.transform = 'translateX(28px)';
-              if (aCharBox) {
-                aCharBox.classList.add('cj-ninja-hit-shake');
-                this.playLoserGagAnimation(aCharBox, pCard.element);
+              if (!hasPhaser) {
+                if (pCharBox) pCharBox.style.transform = 'translateX(28px)';
+                if (aCharBox) {
+                  aCharBox.classList.add('cj-ninja-hit-shake');
+                  this.playLoserGagAnimation(aCharBox, pCard.element);
+                }
               }
 
               this.flyPointToken(pSlot, this.container?.querySelector('#cjPlayerScoreRow'), pCard.element);
@@ -2117,9 +2281,11 @@
             } else if (outcome === 'ai') {
               this.sfx.loseRound();
               this.aiPoints.push(aCard);
-              this.playerPose = 'idle';
-              this.aiPose = 'attack';
-              this.refreshArenaSprites();
+              if (!hasPhaser) {
+                this.playerPose = 'idle';
+                this.aiPose = 'attack';
+                this.refreshArenaSprites();
+              }
 
               if (aSlot) aSlot.classList.add('cj-card-winner-scale');
               if (pSlot) {
@@ -2127,10 +2293,12 @@
                 if (cardNode) cardNode.style.opacity = '0';
                 this.shatterLoserCard(pSlot, pCard.element);
               }
-              if (aCharBox) aCharBox.style.transform = 'translateX(-28px)';
-              if (pCharBox) {
-                pCharBox.classList.add('cj-ninja-hit-shake');
-                this.playLoserGagAnimation(pCharBox, aCard.element);
+              if (!hasPhaser) {
+                if (aCharBox) aCharBox.style.transform = 'translateX(-28px)';
+                if (pCharBox) {
+                  pCharBox.classList.add('cj-ninja-hit-shake');
+                  this.playLoserGagAnimation(pCharBox, aCard.element);
+                }
               }
 
               this.flyPointToken(aSlot, this.container?.querySelector('#cjAiScoreRow'), aCard.element);
@@ -2163,7 +2331,7 @@
               } else {
                 this.roundLocked = false;
                 this.phase = 'playing';
-                this.renderMatchArena({ staggerHand: false });
+                this.resetRoundUI();
                 this.setSpeech('Elige tu siguiente carta elemental…');
                 this.startTurnTimer();
               }
@@ -2207,6 +2375,9 @@
       this.playerPose = playerWon ? 'victory' : 'idle';
       this.aiPose = playerWon ? 'idle' : 'victory';
       this.refreshArenaSprites();
+      if (this.phaserArena && this.phaserArena.isReady()) {
+        this.phaserArena.playVictory(playerWon ? 'player' : 'ai');
+      }
 
       const f = this.selectedFloor;
       let coinsAwarded = 0;

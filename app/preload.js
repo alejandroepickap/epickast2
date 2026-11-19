@@ -32,4 +32,6 @@ contextBridge.exposeInMainWorld('epic', {
   updateOverlay: (data) => ipcRenderer.invoke('overlay:update', data),
   onOverlayData: (cb) => ipcRenderer.on('overlay:data', (_e, data) => cb(data)),
   onOverlayStatus: (cb) => ipcRenderer.on('overlay:status-changed', (_e, val) => cb(val)),
+  setOverlayIgnoreMouse: (ignore) => ipcRenderer.invoke('overlay:ignore-mouse', !!ignore),
+  onBeforeQuit: (cb) => ipcRenderer.on('app:before-quit', () => cb()),
 });

@@ -1,4 +1,4 @@
-// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (v1.8.0 Pro)
+// EpicKast: Dungeons of the Core • Minas de Magma & Obsidiana (v1.9.6 Cartoon Edition)
 // Action-RPG de Mazmorras Cooperativo con 5 Niveles y Navegación entre Plantas:
 // - Nivel 1: Entrada de las Minas de Magma (Mineros Zombi, llaves de cobre)
 // - Nivel 2: Galerías de Amatista (Zombis + Arqueros Esqueléticos, llaves de plata)
@@ -7,15 +7,15 @@
 // - Nivel 5: Sagrario del Núcleo (Jefe Gólem Coloso de Obsidiana, llave de obsidiana)
 //
 // Al despejar cada nivel, se abre un Portal Místico (🌀) para descender a la siguiente planta.
-// Gráficos HD 2.5D Isométricos: sprites detallados, sombras suaves, antorchas y efectos visuales fluidos.
+// Estética Cartoon 2D suave con trazos #1e2433, sombras blandas, partículas circulares y efectos fluidos.
 // Inventario integrado del personaje para equipar armas y armaduras ganadas en el juego.
 // Llaves de perfil con ratio de aparición equilibrado mensual para la Bóveda de Reliquias.
-// 100% compatible con las políticas de Microsoft Store.
+// 100% compatible con las políticas de Microsoft Store (IARC Everyone).
 
 (function(global) {
   'use strict';
 
-  // --- Motor de Audio Web Audio Sintetizado (Sin bucles de sonido) ---
+  // --- Motor de Audio Web Audio Sintetizado + Puente Opcional EKAudio ---
   const AC = window.AudioContext || window.webkitAudioContext;
   let audioCtx = null;
 
@@ -36,8 +36,8 @@
         const o = c.createOscillator(); const g = c.createGain();
         o.type = 'triangle';
         o.frequency.setValueAtTime(360, t);
-        o.frequency.exponentialRampToValueAtTime(70, t + 0.1);
-        g.gain.setValueAtTime(0.15, t);
+        o.frequency.exponentialRampToValueAtTime(75, t + 0.1);
+        g.gain.setValueAtTime(0.13, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
         o.connect(g); g.connect(c.destination);
         o.start(t); o.stop(t + 0.11);
@@ -49,9 +49,9 @@
         const t = c.currentTime;
         const o = c.createOscillator(); const g = c.createGain();
         o.type = 'sine';
-        o.frequency.setValueAtTime(700, t);
-        o.frequency.exponentialRampToValueAtTime(180, t + 0.12);
-        g.gain.setValueAtTime(0.09, t);
+        o.frequency.setValueAtTime(680, t);
+        o.frequency.exponentialRampToValueAtTime(190, t + 0.12);
+        g.gain.setValueAtTime(0.08, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
         o.connect(g); g.connect(c.destination);
         o.start(t); o.stop(t + 0.13);
@@ -62,9 +62,9 @@
       try {
         const t = c.currentTime;
         const o = c.createOscillator(); const g = c.createGain();
-        o.type = 'square';
-        o.frequency.setValueAtTime(150, t);
-        o.frequency.exponentialRampToValueAtTime(40, t + 0.08);
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(190, t);
+        o.frequency.exponentialRampToValueAtTime(62, t + 0.08);
         g.gain.setValueAtTime(0.09, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
         o.connect(g); g.connect(c.destination);
@@ -76,16 +76,31 @@
       try {
         const t = c.currentTime;
         const o = c.createOscillator(); const g = c.createGain();
-        o.type = 'sawtooth';
-        o.frequency.setValueAtTime(120, t);
-        o.frequency.exponentialRampToValueAtTime(45, t + 0.16);
-        g.gain.setValueAtTime(0.12, t);
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(155, t);
+        o.frequency.exponentialRampToValueAtTime(58, t + 0.16);
+        g.gain.setValueAtTime(0.10, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+        o.connect(g); g.connect(c.destination);
+        o.start(t); o.stop(t + 0.17);
+      } catch {}
+    },
+    coinPickup() {
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        const o = c.createOscillator(); const g = c.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(880, t);
+        o.frequency.setValueAtTime(1174.66, t + 0.05);
+        g.gain.setValueAtTime(0.08, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
         o.connect(g); g.connect(c.destination);
         o.start(t); o.stop(t + 0.17);
       } catch {}
     },
     itemPickup() {
+      try { window.EKAudio?.play?.('chest-open', 0.45); } catch {}
       const c = this.getCtx(); if (!c) return;
       try {
         const t = c.currentTime;
@@ -94,13 +109,29 @@
         o.frequency.setValueAtTime(523.25, t);
         o.frequency.setValueAtTime(659.25, t + 0.06);
         o.frequency.setValueAtTime(783.99, t + 0.12);
-        g.gain.setValueAtTime(0.09, t);
+        g.gain.setValueAtTime(0.08, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
         o.connect(g); g.connect(c.destination);
         o.start(t); o.stop(t + 0.23);
       } catch {}
     },
+    allyJoin() {
+      try { window.EKAudio?.play?.('voice-join', 0.45); } catch {}
+      const c = this.getCtx(); if (!c) return;
+      try {
+        const t = c.currentTime;
+        const o = c.createOscillator(); const g = c.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(440, t);
+        o.frequency.setValueAtTime(587.33, t + 0.07);
+        g.gain.setValueAtTime(0.07, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.20);
+        o.connect(g); g.connect(c.destination);
+        o.start(t); o.stop(t + 0.21);
+      } catch {}
+    },
     portalOpen() {
+      try { window.EKAudio?.play?.('msg-send', 0.5); } catch {}
       const c = this.getCtx(); if (!c) return;
       try {
         const t = c.currentTime;
@@ -108,7 +139,7 @@
           const o = c.createOscillator(); const g = c.createGain();
           o.type = 'sine';
           o.frequency.setValueAtTime(f, t + i * 0.07);
-          g.gain.setValueAtTime(0.08, t + i * 0.07);
+          g.gain.setValueAtTime(0.07, t + i * 0.07);
           g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.3);
           o.connect(g); g.connect(c.destination);
           o.start(t + i * 0.07); o.stop(t + i * 0.07 + 0.32);
@@ -116,6 +147,7 @@
       } catch {}
     },
     victory() {
+      try { window.EKAudio?.play?.('legendary-win', 0.65); } catch {}
       const c = this.getCtx(); if (!c) return;
       try {
         const t = c.currentTime;
@@ -125,7 +157,7 @@
           o.type = 'triangle';
           o.frequency.setValueAtTime(f, t + i * 0.09);
           g.gain.setValueAtTime(0.001, t + i * 0.09);
-          g.gain.linearRampToValueAtTime(0.11, t + i * 0.09 + 0.02);
+          g.gain.linearRampToValueAtTime(0.09, t + i * 0.09 + 0.02);
           g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.09 + 0.45);
           o.connect(g); g.connect(c.destination);
           o.start(t + i * 0.09); o.stop(t + i * 0.09 + 0.48);
@@ -133,6 +165,83 @@
       } catch {}
     }
   };
+
+  function roundedRectPath(ctx, x, y, w, h, r) {
+    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rad, y);
+    ctx.lineTo(x + w - rad, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+    ctx.lineTo(x + w, y + h - rad);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+    ctx.lineTo(x + rad, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+    ctx.lineTo(x, y + rad);
+    ctx.quadraticCurveTo(x, y, x + rad, y);
+    ctx.closePath();
+  }
+
+  function drawCartoonKey(ctx, x, y, size, mainColor, highlightColor, glowColor) {
+    ctx.save();
+    const outlineW = Math.max(1.6, Math.min(2.2, size * 0.11));
+    if (glowColor) {
+      ctx.fillStyle = glowColor;
+      ctx.beginPath();
+      ctx.arc(x, y, size * 0.68, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const bowY = y - size * 0.25;
+    const outerR = size * 0.33;
+    const innerR = size * 0.13;
+    const shaftW = Math.max(3, size * 0.20);
+    const shaftTop = bowY + outerR * 0.65;
+    const shaftH = size * 0.66;
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1e2433';
+    ctx.lineWidth = outlineW;
+
+    // Dientes de llave redondeados
+    roundedRectPath(ctx, x, shaftTop + shaftH * 0.50, size * 0.25, Math.max(2.3, size * 0.14), 1.4);
+    ctx.fillStyle = mainColor;
+    ctx.fill();
+    ctx.stroke();
+
+    roundedRectPath(ctx, x, shaftTop + shaftH * 0.78, size * 0.19, Math.max(2.1, size * 0.12), 1.3);
+    ctx.fillStyle = mainColor;
+    ctx.fill();
+    ctx.stroke();
+
+    // Vástago redondeado
+    roundedRectPath(ctx, x - shaftW / 2, shaftTop, shaftW, shaftH, shaftW / 2);
+    ctx.fillStyle = mainColor;
+    ctx.fill();
+    ctx.stroke();
+
+    // Brillo en el vástago
+    ctx.fillStyle = highlightColor;
+    ctx.fillRect(x - shaftW * 0.18, shaftTop + 2, shaftW * 0.32, shaftH * 0.62);
+
+    // Cabeza anillada hueca con contorno #1e2433
+    ctx.beginPath();
+    ctx.arc(x, bowY, outerR, 0, Math.PI * 2, false);
+    ctx.moveTo(x + innerR, bowY);
+    ctx.arc(x, bowY, innerR, 0, Math.PI * 2, true);
+    ctx.fillStyle = mainColor;
+    ctx.fill('evenodd');
+    ctx.stroke();
+
+    // Brillo cartoon en anillo
+    ctx.strokeStyle = highlightColor;
+    ctx.lineWidth = Math.max(1.2, size * 0.08);
+    ctx.beginPath();
+    ctx.arc(x, bowY, (outerR + innerR) * 0.52, -Math.PI * 0.85, -Math.PI * 0.25);
+    ctx.stroke();
+
+    ctx.restore();
+  }
 
   // --- Almacenamiento Persistente del Minijuego ---
   const SAVE_KEY = 'epickast.dungeon.v1';
@@ -189,68 +298,30 @@
     try { localStorage.setItem(INV_KEY, JSON.stringify(inv)); } catch {}
   }
 
-  // --- Catálogo de Llaves (Sprites Limpios de perfil) ---
+  // --- Catálogo de Llaves (Sprites Cartoon Limpios de perfil) ---
   const KEY_TIERS = {
     copper: {
-      name: 'Llave de Cobre', color: '#d97706',
+      name: 'Llave de Cobre', color: '#f59e0b',
       draw(ctx, x, y, size = 18) {
-        ctx.save();
-        ctx.fillStyle = '#b45309';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.35, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b0e17';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#d97706';
-        ctx.fillRect(x - size * 0.08, y, size * 0.16, size * 0.7);
-        ctx.fillRect(x, y + size * 0.45, size * 0.25, size * 0.12);
-        ctx.fillRect(x, y + size * 0.62, size * 0.2, size * 0.1);
-        ctx.restore();
+        drawCartoonKey(ctx, x, y, size, '#e07a24', '#fcd34d', null);
       }
     },
     silver: {
       name: 'Llave de Plata', color: '#cbd5e1',
       draw(ctx, x, y, size = 18) {
-        ctx.save();
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.35, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b0e17';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.15, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(x - size * 0.08, y, size * 0.16, size * 0.7);
-        ctx.fillRect(x, y + size * 0.45, size * 0.25, size * 0.12);
-        ctx.fillRect(x, y + size * 0.62, size * 0.2, size * 0.1);
-        ctx.restore();
+        drawCartoonKey(ctx, x, y, size, '#cbd5e1', '#ffffff', null);
       }
     },
     gold: {
       name: 'Llave de Oro', color: '#fbbf24',
       draw(ctx, x, y, size = 18) {
-        ctx.save();
-        ctx.fillStyle = '#fbbf24';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.38, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b0e17';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.16, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fde047';
-        ctx.fillRect(x - size * 0.09, y, size * 0.18, size * 0.75);
-        ctx.fillRect(x, y + size * 0.45, size * 0.28, size * 0.14);
-        ctx.fillRect(x, y + size * 0.65, size * 0.22, size * 0.12);
-        ctx.restore();
+        drawCartoonKey(ctx, x, y, size, '#fbbf24', '#fef9c3', 'rgba(251, 191, 36, 0.25)');
       }
     },
     obsidian: {
       name: 'Llave de Obsidiana', color: '#c084fc',
       draw(ctx, x, y, size = 20) {
-        ctx.save();
-        ctx.fillStyle = 'rgba(192, 132, 252, 0.45)';
-        ctx.beginPath(); ctx.arc(x, y, size * 0.75, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#a855f7';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#0b0e17';
-        ctx.beginPath(); ctx.arc(x, y - size * 0.25, size * 0.16, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#e879f9';
-        ctx.fillRect(x - size * 0.09, y, size * 0.18, size * 0.8);
-        ctx.fillRect(x, y + size * 0.5, size * 0.3, size * 0.14);
-        ctx.fillRect(x, y + size * 0.7, size * 0.24, size * 0.12);
-        ctx.restore();
+        drawCartoonKey(ctx, x, y, size, '#a855f7', '#f5d0fe', 'rgba(192, 132, 252, 0.35)');
       }
     }
   };
@@ -445,69 +516,69 @@
 
     initDom() {
       this.container.innerHTML = `
-        <div class="cd-wrap" style="position:relative; width: 1040px; max-width: 98vw; background:#0b0813; border:1px solid #36224d; border-radius:12px; overflow:hidden; box-shadow:0 16px 50px rgba(0,0,0,0.9); font-family:system-ui, -apple-system, sans-serif;">
+        <div class="cd-wrap" style="position:relative; width: 1040px; max-width: 98vw; background:#131722; border:2px solid #2b3348; border-radius:14px; overflow:hidden; box-shadow:0 16px 44px rgba(8, 11, 20, 0.72); font-family:system-ui, -apple-system, sans-serif;">
           
           <!-- Encabezado -->
-          <div class="cd-header" style="background:#150f24; border-bottom:1px solid #2d1d44; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
+          <div class="cd-header" style="background:#1b2131; border-bottom:1px solid #2b3348; padding:10px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="font-size:24px;">🌋</span>
               <div>
-                <strong id="dFloorTitle" style="color:#f8fafc; font-size:15px; letter-spacing:0.5px;">Dungeons of the Core • Nivel 1</strong>
-                <span style="background:#7c3aed; color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; margin-left:6px;">v1.8.0 PRO</span>
+                <strong id="dFloorTitle" style="color:#f8fafc; font-size:15px; letter-spacing:0.4px;">Dungeons of the Core • Nivel 1</strong>
+                <span style="background:#4f46e5; color:#fff; font-size:10px; font-weight:800; padding:2px 8px; border-radius:999px; margin-left:6px; border:1px solid #818cf8;">v1.9.6</span>
               </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:18px;">
-              <div style="color:#fca5a5; font-size:12px; font-weight:700;">❤️ Salud: <b id="dHp" style="color:#fff;">${Math.round(this.player.hp)}/${this.player.maxHp}</b></div>
+              <div style="color:#fda4af; font-size:12px; font-weight:700;">❤️ Salud: <b id="dHp" style="color:#fff;">${Math.round(this.player.hp)}/${this.player.maxHp}</b></div>
               <div style="color:#fde047; font-size:12px; font-weight:700;">💰 Monedas: <b id="dCoins" style="color:#fff;">${this.data.coins}</b></div>
-              <div style="color:#c084fc; font-size:12px; font-weight:700;">🏰 Planta: <b id="dFloorNum" style="color:#fff;">1/5</b></div>
+              <div style="color:#c4b5fd; font-size:12px; font-weight:700;">🏰 Planta: <b id="dFloorNum" style="color:#fff;">1/5</b></div>
             </div>
 
             <div style="display:flex; gap:8px;">
-              <button id="dBtnRestart" class="cd-btn" style="background:#ca8a04; border-color:#eab308; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;" title="Reiniciar desde el Nivel 1">🔄 Reiniciar</button>
-              <button id="dBtnInvite" class="cd-btn" style="background:#059669; border-color:#10b981; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;">📢 Invitar</button>
-              <button id="dBtnBot" class="cd-btn" style="background:#2563eb; border-color:#3b82f6; color:#fff; font-weight:700; padding:6px 12px; border-radius:6px; cursor:pointer;">🤖 +Aliado</button>
-              <button id="dBtnClose" class="cd-btn" style="background:#334155; border-color:#475569; color:#fff; padding:6px 12px; border-radius:6px; cursor:pointer;">✕ Salir</button>
+              <button id="dBtnRestart" class="cd-btn" style="background:#d97706; border:1px solid #f59e0b; color:#fff; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer; box-shadow:inset 0 -2px 0 rgba(0,0,0,0.2);" title="Reiniciar desde el Nivel 1">🔄 Reiniciar</button>
+              <button id="dBtnInvite" class="cd-btn" style="background:#059669; border:1px solid #34d399; color:#fff; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer; box-shadow:inset 0 -2px 0 rgba(0,0,0,0.2);">📢 Invitar</button>
+              <button id="dBtnBot" class="cd-btn" style="background:#2563eb; border:1px solid #60a5fa; color:#fff; font-weight:700; padding:6px 12px; border-radius:8px; cursor:pointer; box-shadow:inset 0 -2px 0 rgba(0,0,0,0.2);">🤖 +Aliado</button>
+              <button id="dBtnClose" class="cd-btn" style="background:#334155; border:1px solid #475569; color:#fff; padding:6px 12px; border-radius:8px; cursor:pointer;">✕ Salir</button>
             </div>
           </div>
 
           <!-- Canvas + Panel Lateral -->
-          <div style="display:flex; background:#08050e;">
+          <div style="display:flex; background:#131722;">
             <div style="position:relative; width:768px; height:480px; flex:none;">
-              <canvas id="dCanvas" width="768" height="480" style="display:block; image-rendering:pixelated; cursor:crosshair;"></canvas>
+              <canvas id="dCanvas" width="768" height="480" style="display:block; cursor:crosshair; background:#262c3d;"></canvas>
               
-              <div id="dPortalPrompt" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(18, 12, 28, 0.94); border:2px solid #a855f7; padding:10px 20px; border-radius:8px; color:#f8fafc; font-size:13px; font-weight:800; box-shadow:0 0 20px rgba(168,85,247,0.5); pointer-events:none; z-index:15;">
+              <div id="dPortalPrompt" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); background:rgba(19, 23, 34, 0.94); border:2px solid #818cf8; padding:10px 20px; border-radius:999px; color:#f8fafc; font-size:13px; font-weight:800; box-shadow:0 8px 24px rgba(15, 23, 42, 0.55); pointer-events:none; z-index:15;">
                 🌀 ¡PORTAL ACTIVO! Camina hacia él para descender
               </div>
 
               <!-- Modal de Game Over Interactivo -->
-              <div id="dGameOverModal" style="display:none; position:absolute; inset:0; background:rgba(12, 5, 20, 0.92); backdrop-filter:blur(6px); z-index:30; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
-                <div style="font-size:42px; margin-bottom:8px;">💀</div>
-                <h2 style="color:#ef4444; font-size:22px; font-weight:900; margin:0 0 8px 0; letter-spacing:0.8px;">HAS CAÍDO EN LAS MINAS</h2>
-                <p style="color:#cbd5e1; font-size:13px; max-width:420px; margin:0 0 18px 0; line-height:1.4;">
-                  Los monstruos del Núcleo te han superado. Conservas tus llaves y monedas para reintentar la expedición.
+              <div id="dGameOverModal" style="display:none; position:absolute; inset:0; background:rgba(19, 23, 34, 0.90); backdrop-filter:blur(6px); z-index:30; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+                <div style="font-size:42px; margin-bottom:8px;">💫</div>
+                <h2 style="color:#fb7185; font-size:22px; font-weight:900; margin:0 0 8px 0; letter-spacing:0.6px;">HAS CAÍDO EN LAS MINAS</h2>
+                <p style="color:#cbd5e1; font-size:13px; max-width:420px; margin:0 0 18px 0; line-height:1.45;">
+                  Los guardianes de la mina te han superado. Conservas tus llaves y monedas para reintentar la expedición.
                 </p>
-                <button id="dGoBtnRetry" style="background:linear-gradient(135deg, #eab308, #ca8a04); color:#0b0813; border:none; padding:12px 30px; border-radius:8px; font-weight:900; cursor:pointer; font-size:14px; box-shadow:0 0 20px rgba(234,179,8,0.5); text-transform:uppercase; letter-spacing:0.8px;">
+                <button id="dGoBtnRetry" style="background:linear-gradient(135deg, #facc15, #eab308); color:#131722; border:2px solid #1e2433; padding:12px 30px; border-radius:10px; font-weight:900; cursor:pointer; font-size:14px; box-shadow:0 6px 20px rgba(234,179,8,0.35); text-transform:uppercase; letter-spacing:0.6px;">
                   🔄 REINTENTAR DESDE EL NIVEL 1
                 </button>
               </div>
 
               <!-- Modal de Victoria (Único y sin bugs) -->
-              <div id="dVictoryModal" style="display:none; position:absolute; inset:0; background:rgba(8, 4, 18, 0.92); backdrop-filter:blur(6px); z-index:30; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+              <div id="dVictoryModal" style="display:none; position:absolute; inset:0; background:rgba(19, 23, 34, 0.90); backdrop-filter:blur(6px); z-index:30; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
                 <div style="font-size:42px; margin-bottom:8px;">🏆</div>
-                <h2 style="color:#fbbf24; font-size:22px; font-weight:900; margin:0 0 6px 0; letter-spacing:0.8px;">¡MAZMORRA PURIFICADA!</h2>
-                <p style="color:#cbd5e1; font-size:13px; max-width:440px; margin:0 0 16px 0; line-height:1.4;">
+                <h2 style="color:#fbbf24; font-size:22px; font-weight:900; margin:0 0 6px 0; letter-spacing:0.6px;">¡MAZMORRA PURIFICADA!</h2>
+                <p style="color:#cbd5e1; font-size:13px; max-width:440px; margin:0 0 16px 0; line-height:1.45;">
                   Has conquistado las 5 plantas del Sagrario del Núcleo y vencido al Gólem Coloso de Obsidiana.
                 </p>
-                <div style="background:#1c132d; border:1px solid #7c3aed; border-radius:8px; padding:12px 20px; margin-bottom:18px; color:#e2e8f0; font-size:12px;">
+                <div style="background:#1b2131; border:1.5px solid #6366f1; border-radius:12px; padding:12px 20px; margin-bottom:18px; color:#e2e8f0; font-size:12px;">
                   💎 <b>Recompensa Principal:</b> 1 Llave de Obsidiana para la Bóveda.<br>
                   ★ Abre tu cofre en la barra de la app para desbloquear el <b>Marco Azul de Fundador</b>.
                 </div>
                 <div style="display:flex; gap:12px;">
-                  <button id="dVicOpenVault" style="background:linear-gradient(135deg, #78350f, #d97706); color:#fde047; border:1px solid #fbbf24; padding:10px 20px; border-radius:8px; font-weight:800; cursor:pointer; font-size:13px; box-shadow:0 0 15px rgba(217,119,6,0.4);">
+                  <button id="dVicOpenVault" style="background:linear-gradient(135deg, #92400e, #d97706); color:#fef3c7; border:1.5px solid #fbbf24; padding:10px 20px; border-radius:10px; font-weight:800; cursor:pointer; font-size:13px; box-shadow:0 6px 18px rgba(217,119,6,0.35);">
                     🎁 ABRIR BÓVEDA DE RELIQUIAS
                   </button>
-                  <button id="dVicRestart" style="background:#334155; color:#fff; border:none; padding:10px 18px; border-radius:8px; font-weight:700; cursor:pointer; font-size:13px;">
+                  <button id="dVicRestart" style="background:#334155; color:#fff; border:1px solid #475569; padding:10px 18px; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px;">
                     🔄 Jugar de Nuevo
                   </button>
                 </div>
@@ -515,14 +586,14 @@
             </div>
 
             <!-- Panel Lateral con Pestañas: [Mazmorra] y [Inventario] -->
-            <div style="flex:1; background:#110c1c; border-left:1px solid #291b3b; display:flex; flex-direction:column; overflow:hidden; max-height:480px;">
+            <div style="flex:1; background:#131722; border-left:1px solid #2b3348; display:flex; flex-direction:column; overflow:hidden; max-height:480px;">
               
               <!-- Selector de Pestañas -->
-              <div style="display:flex; border-bottom:1px solid #291b3b; background:#160f24;">
-                <button id="dTabBtnDungeon" style="flex:1; padding:10px 4px; font-size:11px; font-weight:800; background:#110c1c; color:#fbbf24; border:none; border-bottom:2px solid #fbbf24; cursor:pointer;">
+              <div style="display:flex; border-bottom:1px solid #2b3348; background:#1b2131;">
+                <button id="dTabBtnDungeon" style="flex:1; padding:10px 4px; font-size:11px; font-weight:800; background:#131722; color:#fbbf24; border:none; border-bottom:2px solid #fbbf24; cursor:pointer;">
                   ⚔️ Mazmorra
                 </button>
-                <button id="dTabBtnInv" style="flex:1; padding:10px 4px; font-size:11px; font-weight:800; background:#160f24; color:#94a3b8; border:none; border-bottom:2px solid transparent; cursor:pointer;">
+                <button id="dTabBtnInv" style="flex:1; padding:10px 4px; font-size:11px; font-weight:800; background:#1b2131; color:#94a3b8; border:none; border-bottom:2px solid transparent; cursor:pointer;">
                   🎒 Inventario
                 </button>
               </div>
@@ -531,26 +602,26 @@
               <div id="dTabPanelDungeon" style="padding:14px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex:1;">
                 
                 <!-- Acceso a la Bóveda -->
-                <div style="background:#1e140a; border:1px solid #ca8a04; border-radius:8px; padding:10px; font-size:11px; color:#fde047; line-height:1.4;">
+                <div style="background:#1b2131; border:1px solid #d97706; border-radius:10px; padding:10px; font-size:11px; color:#fde68a; line-height:1.4;">
                   <strong style="display:block; color:#fff; font-size:12px; margin-bottom:4px;">🏛️ Bóveda de Cosméticos</strong>
                   Las llaves abren marcos, colores y banners para tu perfil.
-                  <button id="dBtnOpenVault" style="background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;font-size:11px;font-weight:800;padding:6px 10px;border-radius:6px;cursor:pointer;width:100%;text-align:center;margin-top:8px;">🎁 Ir a la Bóveda de Reliquias</button>
+                  <button id="dBtnOpenVault" style="background:linear-gradient(135deg, #92400e, #d97706);color:#fef3c7;border:1px solid #fbbf24;font-size:11px;font-weight:800;padding:6px 10px;border-radius:8px;cursor:pointer;width:100%;text-align:center;margin-top:8px;">🎁 Ir a la Bóveda de Reliquias</button>
                 </div>
 
                 <!-- Llaves Recolectadas -->
-                <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px;">
+                <div style="background:#1b2131; border:1px solid #2b3348; border-radius:10px; padding:10px;">
                   <h4 style="margin:0 0 8px 0; color:#e2e8f0; font-size:11px; text-transform:uppercase; letter-spacing:0.8px;">🔑 Llaves de Perfil (Temporada 1)</h4>
                   
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; border:1px solid #78350f;">
+                    <div style="display:flex; align-items:center; gap:8px; background:#131722; padding:6px; border-radius:8px; border:1px solid #92400e;">
                       <canvas id="keyCopperIco" width="22" height="24"></canvas>
                       <div>
-                        <div style="color:#d97706; font-size:11px; font-weight:700;">Cobre</div>
+                        <div style="color:#f59e0b; font-size:11px; font-weight:700;">Cobre</div>
                         <div style="color:#94a3b8; font-size:10px;">x<b id="kCountCopper" style="color:#fff;">${this.data.keys.copper}</b></div>
                       </div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; border:1px solid #475569;">
+                    <div style="display:flex; align-items:center; gap:8px; background:#131722; padding:6px; border-radius:8px; border:1px solid #475569;">
                       <canvas id="keySilverIco" width="22" height="24"></canvas>
                       <div>
                         <div style="color:#cbd5e1; font-size:11px; font-weight:700;">Plata</div>
@@ -558,7 +629,7 @@
                       </div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; border:1px solid #ca8a04;">
+                    <div style="display:flex; align-items:center; gap:8px; background:#131722; padding:6px; border-radius:8px; border:1px solid #ca8a04;">
                       <canvas id="keyGoldIco" width="22" height="24"></canvas>
                       <div>
                         <div style="color:#fbbf24; font-size:11px; font-weight:700;">Oro</div>
@@ -566,7 +637,7 @@
                       </div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap:8px; background:#0e0817; padding:6px; border-radius:6px; border:1px solid #7e22ce;">
+                    <div style="display:flex; align-items:center; gap:8px; background:#131722; padding:6px; border-radius:8px; border:1px solid #7c3aed;">
                       <canvas id="keyObsidianIco" width="22" height="24"></canvas>
                       <div>
                         <div style="color:#c084fc; font-size:11px; font-weight:700;">Obsidiana</div>
@@ -577,7 +648,7 @@
                 </div>
 
                 <!-- Controles -->
-                <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px; font-size:11px; color:#cbd5e1; line-height:1.5;">
+                <div style="background:#1b2131; border:1px solid #2b3348; border-radius:10px; padding:10px; font-size:11px; color:#cbd5e1; line-height:1.5;">
                   <strong style="color:#fff; display:block; margin-bottom:4px;">⚔️ COMBATE Y CONTROLES</strong>
                   <div>🗡️ <b>Clic Izq / Espacio:</b> Espadazo melee (o clic en botín/portal).</div>
                   <div>🏹 <b>Clic Der:</b> Flecha de ballesta rúnica a distancia.</div>
@@ -589,15 +660,15 @@
 
               <!-- Pestaña 2: Inventario del Personaje (Objetos del Juego) -->
               <div id="dTabPanelInv" style="display:none; padding:14px; flex-direction:column; gap:12px; overflow-y:auto; flex:1;">
-                <div style="font-size:11px; color:#94a3b8; line-height:1.3;">
+                <div style="font-size:11px; color:#94a3b8; line-height:1.35;">
                   Equipa los objetos conseguidos en la mazmorra para aumentar tus estadísticas de combate.
                 </div>
 
                 <!-- Ranuras Equipadas -->
-                <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px; display:flex; flex-direction:column; gap:8px;">
+                <div style="background:#1b2131; border:1px solid #2b3348; border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px;">
                   <h4 style="margin:0; color:#e2e8f0; font-size:11px; text-transform:uppercase;">🛡️ Equipo Activo</h4>
                   
-                  <div style="display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:8px; border-radius:6px; border:1px solid #38bdf8;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; background:#131722; padding:8px; border-radius:8px; border:1px solid #38bdf8;">
                     <div>
                       <div style="font-size:10px; color:#38bdf8; font-weight:800;">ARMA MELEE</div>
                       <div style="font-size:12px; font-weight:700; color:#fff;" id="dEqWeaponName">${this.inventory.equippedWeapon?.name || 'Espada de Hierro'}</div>
@@ -605,7 +676,7 @@
                     <span style="font-size:11px; color:#4ade80; font-weight:800;" id="dEqWeaponStat">+${this.inventory.equippedWeapon?.bonusDmg || 0} Daño</span>
                   </div>
 
-                  <div style="display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:8px; border-radius:6px; border:1px solid #c084fc;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; background:#131722; padding:8px; border-radius:8px; border:1px solid #c084fc;">
                     <div>
                       <div style="font-size:10px; color:#c084fc; font-weight:800;">BALLESTA</div>
                       <div style="font-size:12px; font-weight:700; color:#fff;" id="dEqBowName">${this.inventory.equippedBow?.name || 'Ballesta de Caza'}</div>
@@ -613,7 +684,7 @@
                     <span style="font-size:11px; color:#4ade80; font-weight:800;" id="dEqBowStat">+${this.inventory.equippedBow?.bonusDmg || 0} Daño</span>
                   </div>
 
-                  <div style="display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:8px; border-radius:6px; border:1px solid #fbbf24;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; background:#131722; padding:8px; border-radius:8px; border:1px solid #fbbf24;">
                     <div>
                       <div style="font-size:10px; color:#fbbf24; font-weight:800;">ARMADURA</div>
                       <div style="font-size:12px; font-weight:700; color:#fff;" id="dEqArmorName">${this.inventory.equippedArmor?.name || 'Túnica de Explorador'}</div>
@@ -623,7 +694,7 @@
                 </div>
 
                 <!-- Mochila de Objetos -->
-                <div style="background:#181126; border:1px solid #33204d; border-radius:8px; padding:10px; flex:1;">
+                <div style="background:#1b2131; border:1px solid #2b3348; border-radius:10px; padding:10px; flex:1;">
                   <h4 style="margin:0 0 8px 0; color:#e2e8f0; font-size:11px; text-transform:uppercase;">🎒 Mochila de Objetos Ganados</h4>
                   <div id="dInvList" style="display:flex; flex-direction:column; gap:6px;"></div>
                 </div>
@@ -681,13 +752,13 @@
                            (item.type === 'armor' && this.inventory.equippedArmor?.id === item.id);
 
         const card = document.createElement('div');
-        card.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:#0e0817; padding:6px 10px; border-radius:6px; border:1px solid ${isEquipped ? '#10b981' : '#33204d'}; margin-bottom:4px;`;
+        card.style.cssText = `display:flex; justify-content:space-between; align-items:center; background:#131722; padding:6px 10px; border-radius:8px; border:1px solid ${isEquipped ? '#10b981' : '#2b3348'}; margin-bottom:4px;`;
         card.innerHTML = `
           <div style="min-width:0; flex:1; padding-right:8px;">
             <div style="font-size:11px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.name}</div>
             <div style="font-size:9.5px; color:#94a3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item.desc || ''}</div>
           </div>
-          <button style="flex-shrink:0; background:${isEquipped ? '#059669' : '#2563eb'}; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-size:10px; font-weight:700; cursor:${isEquipped ? 'default' : 'pointer'};">
+          <button style="flex-shrink:0; background:${isEquipped ? '#059669' : '#2563eb'}; color:#fff; border:none; padding:4px 10px; border-radius:6px; font-size:10px; font-weight:700; cursor:${isEquipped ? 'default' : 'pointer'};">
             ${isEquipped ? '✓ Equipado' : 'Equipar'}
           </button>
         `;
@@ -832,10 +903,10 @@
 
       tabDungeon.onclick = () => {
         this.activeTab = 'dungeon';
-        tabDungeon.style.background = '#110c1c';
+        tabDungeon.style.background = '#131722';
         tabDungeon.style.color = '#fbbf24';
         tabDungeon.style.borderBottom = '2px solid #fbbf24';
-        tabInv.style.background = '#160f24';
+        tabInv.style.background = '#1b2131';
         tabInv.style.color = '#94a3b8';
         tabInv.style.borderBottom = '2px solid transparent';
         panelDungeon.style.display = 'flex';
@@ -844,10 +915,10 @@
 
       tabInv.onclick = () => {
         this.activeTab = 'inventory';
-        tabInv.style.background = '#110c1c';
+        tabInv.style.background = '#131722';
         tabInv.style.color = '#38bdf8';
         tabInv.style.borderBottom = '2px solid #38bdf8';
-        tabDungeon.style.background = '#160f24';
+        tabDungeon.style.background = '#1b2131';
         tabDungeon.style.color = '#94a3b8';
         tabDungeon.style.borderBottom = '2px solid transparent';
         panelDungeon.style.display = 'none';
@@ -891,11 +962,11 @@
       const panelInv = this.container.querySelector('#dTabPanelInv');
       if (tabDungeon && panelDungeon) {
         this.activeTab = 'dungeon';
-        tabDungeon.style.background = '#110c1c';
+        tabDungeon.style.background = '#131722';
         tabDungeon.style.color = '#fbbf24';
         tabDungeon.style.borderBottom = '2px solid #fbbf24';
         if (tabInv) {
-          tabInv.style.background = '#160f24';
+          tabInv.style.background = '#1b2131';
           tabInv.style.color = '#94a3b8';
           tabInv.style.borderBottom = '2px solid transparent';
         }
@@ -1093,15 +1164,16 @@
       if (this.victoryModalEl) {
         this.victoryModalEl.style.display = 'flex';
       }
-      // Fuegos artificiales de celebración
-      for (let i = 0; i < 30; i++) {
+      // Fuegos artificiales de celebración (burbujas y chispas cartoon)
+      const colors = ['#fbbf24', '#38bdf8', '#c084fc', '#34d399', '#f472b6'];
+      for (let i = 0; i < 32; i++) {
         this.particles.push({
           x: 384 + (Math.random() - 0.5) * 100,
           y: 240 + (Math.random() - 0.5) * 100,
           vx: (Math.random() - 0.5) * 180,
           vy: (Math.random() - 0.5) * 180,
-          color: ['#fbbf24', '#38bdf8', '#c084fc', '#ea580c'][Math.floor(Math.random() * 4)],
-          life: 50, maxLife: 50, size: 5
+          color: colors[Math.floor(Math.random() * colors.length)],
+          life: 52, maxLife: 52, size: 4.5 + Math.random() * 2.5
         });
       }
     }
@@ -1158,7 +1230,7 @@
         isBot: true,
         shootTimer: 0
       });
-      AudioFX.itemPickup();
+      AudioFX.allyJoin();
       this.spawnFloatingText(this.player.x, this.player.y - 20, '🤖 ¡Aliado se unió al equipo!', '#38bdf8', 14);
     }
 
@@ -1196,12 +1268,13 @@
 
             this.spawnFloatingText(en.x, en.y - 12, `-${this.player.meleeDmg}`, '#fbbf24', 14);
 
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < 5; i++) {
               this.particles.push({
                 x: en.x, y: en.y,
-                vx: Math.cos(ang + (Math.random() - 0.5)) * 90,
-                vy: Math.sin(ang + (Math.random() - 0.5)) * 90,
-                color: '#38bdf8', life: 14, maxLife: 14, size: 3
+                vx: Math.cos(ang + (Math.random() - 0.5)) * 95,
+                vy: Math.sin(ang + (Math.random() - 0.5)) * 95,
+                color: i % 2 === 0 ? '#7dd3fc' : '#fef08a',
+                life: 16, maxLife: 16, size: 3.5 + Math.random() * 1.5
               });
             }
           }
@@ -1655,7 +1728,7 @@
         this.player.hp = 0;
         this.gameState = 'gameover';
         if (this.gameOverModalEl) this.gameOverModalEl.style.display = 'flex';
-        this.spawnFloatingText(this.player.x, this.player.y, '💀 CAÍDO EN LA MINA', '#ef4444', 16);
+        this.spawnFloatingText(this.player.x, this.player.y, '💫 CAÍDO EN LA MINA', '#fb7185', 16);
       }
 
       this.updateUi();
@@ -1667,11 +1740,16 @@
       this.spawnFloatingText(en.x, en.y - 16, `+${coinDrop} 🪙`, '#fde047', 12);
       AudioFX.hitEnemy();
 
-      for (let i = 0; i < 10; i++) {
+      const puffColors = en.type === 'golem_boss'
+        ? ['#c084fc', '#fbbf24', '#e9d5ff', '#f97316']
+        : ['#fde68a', '#f59e0b', '#cbd5e1', '#a78bfa'];
+      const puffCount = en.type === 'golem_boss' ? 20 : 10;
+      for (let i = 0; i < puffCount; i++) {
         this.particles.push({
           x: en.x, y: en.y,
-          vx: (Math.random() - 0.5) * 90, vy: (Math.random() - 0.5) * 90,
-          color: '#ea580c', life: 22, maxLife: 22, size: 4
+          vx: (Math.random() - 0.5) * 95, vy: (Math.random() - 0.5) * 95,
+          color: puffColors[i % puffColors.length],
+          life: 24, maxLife: 24, size: 4 + Math.random() * 3
         });
       }
 
@@ -1747,7 +1825,7 @@
       });
     }
 
-    // --- RENDERIZADO HD 2.5D ISOMÉTRICO CON SPRITES Y SOMBRAS ---
+    // --- RENDERIZADO CARTOON 2D SUAVE ESTILO CLUB PENGUIN ---
     render(now) {
       const ctx = this.ctx;
       ctx.save();
@@ -1759,12 +1837,12 @@
         ctx.translate(sx, sy);
       }
 
-      ctx.fillStyle = '#06040a';
+      ctx.fillStyle = '#262c3d';
       ctx.fillRect(0, 0, this.width, this.height);
 
       const curMap = this.currentMap || FLOOR_MAPS[1];
 
-      // 1. SUELO DE ADOQUINES VOXEL
+      // 1. SUELO DE ADOQUINES CARTOON + PILARES + CRISTALES
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const tile = curMap[r][c];
@@ -1772,36 +1850,100 @@
           const ty = r * TILE_SZ;
 
           if (tile === 0 || tile === 4 || tile === 5) {
-            ctx.fillStyle = (r + c) % 2 === 0 ? '#150f24' : '#1a132c';
+            ctx.fillStyle = (r + c) % 2 === 0 ? '#464e68' : '#4e5773';
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
 
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
-            ctx.fillRect(tx + 2, ty + 2, TILE_SZ - 4, TILE_SZ - 4);
+            // Bisel interior suave redondeado
+            roundedRectPath(ctx, tx + 2.5, ty + 2.5, TILE_SZ - 5, TILE_SZ - 5, 5);
+            ctx.strokeStyle = '#596382';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
 
             if (tile === 4) {
-              // Pilar de soporte tallado
-              ctx.fillStyle = '#2d1b44';
-              ctx.fillRect(tx + 4, ty + 4, TILE_SZ - 8, TILE_SZ - 8);
-              ctx.fillStyle = '#3f285d';
-              ctx.fillRect(tx + 6, ty + 6, TILE_SZ - 12, TILE_SZ - 12);
-            } else if (tile === 5) {
-              // Cristal de amatista brillante
-              ctx.fillStyle = 'rgba(192, 132, 252, 0.25)';
+              // Pilar de piedra redondeado con contorno #1e2433
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.28)';
               ctx.beginPath();
-              ctx.arc(tx + 16, ty + 16, 12, 0, Math.PI * 2);
+              ctx.ellipse(tx + 16, ty + 25, 12, 5, 0, 0, Math.PI * 2);
               ctx.fill();
-              ctx.fillStyle = '#c084fc';
-              ctx.fillRect(tx + 12, ty + 8, 8, 14);
-              ctx.fillStyle = '#e879f9';
-              ctx.fillRect(tx + 14, ty + 10, 4, 8);
+
+              roundedRectPath(ctx, tx + 4, ty + 7, TILE_SZ - 8, TILE_SZ - 9, 7);
+              ctx.fillStyle = '#525c7a';
+              ctx.fill();
+              ctx.strokeStyle = '#1e2433';
+              ctx.lineWidth = 2;
+              ctx.stroke();
+
+              roundedRectPath(ctx, tx + 6, ty + 3, TILE_SZ - 12, TILE_SZ - 14, 6);
+              ctx.fillStyle = '#727ea1';
+              ctx.fill();
+              ctx.stroke();
+
+              // Brillo superior cartoon
+              ctx.fillStyle = '#9aa7c7';
+              ctx.beginPath();
+              ctx.ellipse(tx + 13, ty + 8, 4.5, 2.2, -0.25, 0, Math.PI * 2);
+              ctx.fill();
+            } else if (tile === 5) {
+              // Cristales pastel cielo/lila con contorno #1e2433
+              ctx.fillStyle = 'rgba(167, 139, 250, 0.22)';
+              ctx.beginPath();
+              ctx.arc(tx + 16, ty + 16, 15, 0, Math.PI * 2);
+              ctx.fill();
+
+              // Base de piedra
+              ctx.fillStyle = '#475569';
+              ctx.strokeStyle = '#1e2433';
+              ctx.lineWidth = 1.8;
+              ctx.beginPath();
+              ctx.ellipse(tx + 16, ty + 23, 10, 4.5, 0, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
+
+              // Cristal izquierdo cielo pastel
+              ctx.beginPath();
+              ctx.moveTo(tx + 8, ty + 21);
+              ctx.lineTo(tx + 7, ty + 12);
+              ctx.lineTo(tx + 11, ty + 9);
+              ctx.lineTo(tx + 14, ty + 21);
+              ctx.closePath();
+              ctx.fillStyle = '#7dd3fc';
+              ctx.fill();
+              ctx.stroke();
+
+              // Cristal derecho lavanda pastel
+              ctx.beginPath();
+              ctx.moveTo(tx + 18, ty + 21);
+              ctx.lineTo(tx + 21, ty + 10);
+              ctx.lineTo(tx + 25, ty + 13);
+              ctx.lineTo(tx + 24, ty + 21);
+              ctx.closePath();
+              ctx.fillStyle = '#d8b4fe';
+              ctx.fill();
+              ctx.stroke();
+
+              // Cristal central lila brillante
+              ctx.beginPath();
+              ctx.moveTo(tx + 12, ty + 22);
+              ctx.lineTo(tx + 13, ty + 8);
+              ctx.lineTo(tx + 16, ty + 4);
+              ctx.lineTo(tx + 20, ty + 9);
+              ctx.lineTo(tx + 20, ty + 22);
+              ctx.closePath();
+              ctx.fillStyle = '#c4b5fd';
+              ctx.fill();
+              ctx.stroke();
+
+              // Destello blanco cartoon
               ctx.fillStyle = '#ffffff';
-              ctx.fillRect(tx + 15, ty + 11, 2, 3);
+              ctx.beginPath();
+              ctx.arc(tx + 15.5, ty + 10, 1.8, 0, Math.PI * 2);
+              ctx.fill();
             }
           }
         }
       }
 
-      // 2. RÍO DE LAVA
+      // 2. RÍO DE LAVA SUAVE & PUENTES CONTRASTADOS
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const tile = curMap[r][c];
@@ -1809,501 +1951,989 @@
           const ty = r * TILE_SZ;
 
           if (tile === 2) {
-            ctx.fillStyle = '#3a1608';
+            ctx.fillStyle = '#e8743b';
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
 
-            const wave = Math.sin(now * 0.003 + c * 0.4 + r * 0.4);
-            const wave2 = Math.cos(now * 0.004 + r * 0.6);
-            ctx.fillStyle = wave > 0.2 ? '#c2410c' : '#ea580c';
-            ctx.fillRect(tx + 2, ty + 2, TILE_SZ - 4, TILE_SZ - 4);
+            // Ondas suaves de lava sin estrobo
+            const wave = Math.sin(now * 0.0018 + c * 0.6 + r * 0.5);
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.ellipse(tx + 16 + wave * 3, ty + 15, 11, 7, 0.15, 0, Math.PI * 2);
+            ctx.fill();
 
-            ctx.fillStyle = '#f97316';
-            ctx.fillRect(tx + 6 + wave * 3, ty + 6, 12, 10);
-            ctx.fillStyle = '#fef08a';
-            ctx.fillRect(tx + 8 + wave2 * 2, ty + 8, 6, 6);
+            // Burbujas cómics cremosas que suben suavemente
+            const bPhase = (now * 0.0011 + c * 0.37 + r * 0.53) % 1;
+            const bRad = 1.6 + Math.sin(bPhase * Math.PI) * 2.4;
+            const bx = tx + 10 + ((c * 13 + r * 7) % 13);
+            const by = ty + 23 - bPhase * 12;
+            ctx.fillStyle = '#fef3c7';
+            ctx.beginPath();
+            ctx.arc(bx, by, bRad, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#b45309';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Orilla oscura alrededor del río de lava
+            ctx.fillStyle = '#1e2433';
+            if ((curMap[r - 1]?.[c] ?? 1) !== 2) ctx.fillRect(tx, ty, TILE_SZ, 2.5);
+            if ((curMap[r + 1]?.[c] ?? 1) !== 2) ctx.fillRect(tx, ty + TILE_SZ - 2.5, TILE_SZ, 2.5);
+            if ((curMap[r]?.[c - 1] ?? 1) !== 2) ctx.fillRect(tx, ty, 2.5, TILE_SZ);
+            if ((curMap[r]?.[c + 1] ?? 1) !== 2) ctx.fillRect(tx + TILE_SZ - 2.5, ty, 2.5, TILE_SZ);
           } else if (tile === 3) {
-            // Puentes de piedra sobre lava
-            ctx.fillStyle = '#261b36';
+            // Puentes cálidos de madera/piedra claramente visibles sobre la lava
+            ctx.fillStyle = '#a67c46';
             ctx.fillRect(tx, ty, TILE_SZ, TILE_SZ);
-            ctx.fillStyle = '#3a2a52';
-            ctx.fillRect(tx + 2, ty + 2, TILE_SZ - 4, 6);
-            ctx.fillRect(tx + 2, ty + 11, TILE_SZ - 4, 8);
-            ctx.fillRect(tx + 2, ty + 22, TILE_SZ - 4, 7);
-            ctx.fillStyle = '#cbd5e1';
-            ctx.fillRect(tx + 4, ty + 4, 2, 2);
-            ctx.fillRect(tx + TILE_SZ - 6, ty + 4, 2, 2);
+
+            for (let p = 0; p < 3; p++) {
+              const py = ty + 2 + p * 9.5;
+              roundedRectPath(ctx, tx + 1.5, py, TILE_SZ - 3, 8, 2.5);
+              ctx.fillStyle = p % 2 === 0 ? '#c8a26d' : '#d6b380';
+              ctx.fill();
+              ctx.strokeStyle = '#1e2433';
+              ctx.lineWidth = 1.5;
+              ctx.stroke();
+
+              // Clavos de tablón
+              ctx.fillStyle = '#78532a';
+              ctx.beginPath();
+              ctx.arc(tx + 5, py + 4, 1.2, 0, Math.PI * 2);
+              ctx.arc(tx + TILE_SZ - 5, py + 4, 1.2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            const topOpen = (curMap[r - 1]?.[c] ?? 0) !== 3;
+            const botOpen = (curMap[r + 1]?.[c] ?? 0) !== 3;
+            const leftOpen = (curMap[r]?.[c - 1] ?? 0) !== 3;
+            const rightOpen = (curMap[r]?.[c + 1] ?? 0) !== 3;
+
+            // Barandas superiores/inferiores
+            ctx.strokeStyle = '#1e2433';
+            ctx.lineWidth = 1.8;
+            if (topOpen) {
+              roundedRectPath(ctx, tx, ty, TILE_SZ, 4.5, 2);
+              ctx.fillStyle = '#a67c46';
+              ctx.fill();
+              ctx.stroke();
+            }
+            if (botOpen) {
+              roundedRectPath(ctx, tx, ty + TILE_SZ - 4.5, TILE_SZ, 4.5, 2);
+              ctx.fillStyle = '#a67c46';
+              ctx.fill();
+              ctx.stroke();
+            }
+
+            // Postes en las esquinas exteriores del puente
+            const corners = [];
+            if (topOpen && leftOpen) corners.push([tx + 3.5, ty + 3.5]);
+            if (topOpen && rightOpen) corners.push([tx + TILE_SZ - 3.5, ty + 3.5]);
+            if (botOpen && leftOpen) corners.push([tx + 3.5, ty + TILE_SZ - 3.5]);
+            if (botOpen && rightOpen) corners.push([tx + TILE_SZ - 3.5, ty + TILE_SZ - 3.5]);
+            corners.forEach(([px, py]) => {
+              ctx.beginPath();
+              ctx.arc(px, py, 4, 0, Math.PI * 2);
+              ctx.fillStyle = '#deb982';
+              ctx.fill();
+              ctx.strokeStyle = '#1e2433';
+              ctx.lineWidth = 1.8;
+              ctx.stroke();
+            });
           }
         }
       }
 
-      // 3. MUROS 3D VOXEL
+      // 3. MUROS 3D CARTOON CON TAPAS REDONDEADAS Y LADRILLOS LIMPIOS
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           if (curMap[r][c] === 1) {
             const tx = c * TILE_SZ;
             const ty = r * TILE_SZ;
 
-            ctx.fillStyle = '#1e142e';
-            ctx.fillRect(tx, ty, TILE_SZ, 14);
+            // Sombra suave proyectada hacia abajo si el bloque inferior es transitable
+            if ((curMap[r + 1]?.[c] ?? 1) !== 1) {
+              ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
+              ctx.fillRect(tx, ty + TILE_SZ, TILE_SZ, 5);
+            }
 
-            ctx.fillStyle = '#4c3175';
-            ctx.fillRect(tx, ty, TILE_SZ, 2);
-            ctx.fillRect(tx, ty, 2, 14);
+            // Fachada frontal del muro
+            ctx.fillStyle = '#343b52';
+            ctx.fillRect(tx, ty + 12, TILE_SZ, 20);
 
-            ctx.fillStyle = '#7c3aed';
-            ctx.fillRect(tx + 6, ty + 5, 3, 3);
-            ctx.fillRect(tx + TILE_SZ - 9, ty + 5, 3, 3);
+            // Ladrillos limpios con juntas suaves
+            ctx.fillStyle = '#3e4661';
+            roundedRectPath(ctx, tx + 2, ty + 15, 13, 6.5, 2);
+            ctx.fill();
+            roundedRectPath(ctx, tx + 17, ty + 15, 13, 6.5, 2);
+            ctx.fill();
+            roundedRectPath(ctx, tx + 2, ty + 23.5, 14, 6.5, 2);
+            ctx.fill();
+            roundedRectPath(ctx, tx + 18, ty + 23.5, 12, 6.5, 2);
+            ctx.fill();
 
-            ctx.fillStyle = '#100b1a';
-            ctx.fillRect(tx, ty + 14, TILE_SZ, 18);
+            ctx.strokeStyle = '#1e2433';
+            ctx.lineWidth = 1.4;
+            ctx.strokeRect(tx + 0.5, ty + 13, TILE_SZ - 1, 18.5);
 
-            ctx.fillStyle = '#191128';
-            ctx.fillRect(tx + 2, ty + 15, 12, 7);
-            ctx.fillRect(tx + 16, ty + 15, 14, 7);
-            ctx.fillRect(tx + 2, ty + 23, 14, 7);
-            ctx.fillRect(tx + 18, ty + 23, 12, 7);
+            // Tapa superior redondeada cartoon
+            roundedRectPath(ctx, tx + 0.5, ty + 0.5, TILE_SZ - 1, 14, 4);
+            ctx.fillStyle = '#667091';
+            ctx.fill();
+            ctx.strokeStyle = '#1e2433';
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
 
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-            ctx.fillRect(tx, ty + 30, TILE_SZ, 2);
+            // Brillo sutil superior
+            ctx.fillStyle = '#7c87ab';
+            ctx.fillRect(tx + 4, ty + 2.5, TILE_SZ - 8, 2.5);
           }
         }
       }
 
-      // 4. ANTORCHAS
+      // 4. ANTORCHAS ACOGEDORAS DE PARED
       this.torches.forEach(tc => {
-        ctx.fillStyle = '#332347';
-        ctx.fillRect(tc.x - 3, tc.y - 4, 6, 12);
-        const flk = (Math.sin(now * 0.012 + tc.x) + 1) * 0.5;
-        ctx.fillStyle = '#ea580c';
-        ctx.fillRect(tc.x - 3, tc.y - 10 - flk * 2, 6, 6 + flk * 2);
+        const flk = Math.sin(now * 0.008 + tc.x) * 1.3;
+        const glow = ctx.createRadialGradient(tc.x, tc.y - 6, 4, tc.x, tc.y - 6, 44);
+        glow.addColorStop(0, 'rgba(251, 191, 36, 0.26)');
+        glow.addColorStop(0.55, 'rgba(249, 115, 22, 0.10)');
+        glow.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(tc.x, tc.y - 6, 44, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Soporte redondeado de hierro
+        roundedRectPath(ctx, tc.x - 3.5, tc.y - 3, 7, 11, 3);
+        ctx.fillStyle = '#475569';
+        ctx.fill();
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        // Flama en gota cartoon
+        ctx.beginPath();
+        ctx.moveTo(tc.x - 4.5, tc.y - 4);
+        ctx.quadraticCurveTo(tc.x - 5, tc.y - 11, tc.x + flk * 0.4, tc.y - 15 - Math.abs(flk));
+        ctx.quadraticCurveTo(tc.x + 5, tc.y - 11, tc.x + 4.5, tc.y - 4);
+        ctx.closePath();
+        ctx.fillStyle = '#f97316';
+        ctx.fill();
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(tc.x + flk * 0.2, tc.y - 7, 2.3, 0, Math.PI * 2);
         ctx.fillStyle = '#fef08a';
-        ctx.fillRect(tc.x - 1, tc.y - 8 - flk * 2, 2, 3);
+        ctx.fill();
       });
 
-      // 5. PORTAL DE DESCENSO A LA SIGUIENTE PLANTA (🌀)
+      // 5. PORTAL DE DESCENSO A LA SIGUIENTE PLANTA (🌀 Cartoon Pastel)
       if (this.portal && this.portal.active) {
+        const pulse = Math.sin(now * 0.004) * 2;
         ctx.save();
         ctx.translate(this.portal.x, this.portal.y);
-        const pRot = (now * 0.003) % (Math.PI * 2);
-        ctx.rotate(pRot);
 
-        // Anillo exterior púrpura
-        ctx.fillStyle = 'rgba(168, 85, 247, 0.4)';
+        // Sombra suave
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
         ctx.beginPath();
-        ctx.arc(0, 0, 26, 0, Math.PI * 2);
+        ctx.ellipse(0, 14, 24, 9, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Remolino místico
-        ctx.fillStyle = '#c084fc';
-        for (let i = 0; i < 4; i++) {
-          ctx.rotate(Math.PI / 2);
-          ctx.fillRect(4, -3, 16, 6);
-        }
+        // Aura exterior pastel
+        ctx.fillStyle = 'rgba(167, 139, 250, 0.28)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 29 + pulse, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Núcleo del portal
+        // Anillos concéntricos pastel con contorno #1e2433
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#1e2433';
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 23, 0, Math.PI * 2);
+        ctx.fillStyle = '#818cf8';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 16.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#c4b5fd';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 10.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#bae6fd';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 5.5 + pulse * 0.4, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, 8, 0, Math.PI * 2);
         ctx.fill();
+
+        // Destellos giratorios en órbita
+        const pRot = (now * 0.0025) % (Math.PI * 2);
+        for (let i = 0; i < 5; i++) {
+          const ang = pRot + (i * Math.PI * 2) / 5;
+          const sx = Math.cos(ang) * 19;
+          const sy = Math.sin(ang) * 19;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 2.8, 0, Math.PI * 2);
+          ctx.fillStyle = i % 2 === 0 ? '#fef08a' : '#e0f2fe';
+          ctx.fill();
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        }
         ctx.restore();
 
-        // Texto flotante sobre el portal
-        ctx.fillStyle = '#e879f9';
-        ctx.font = 'bold 10px monospace';
+        // Etiqueta flotante limpia sobre el portal
+        const portalTxt = this.floor < this.maxFloors ? `🌀 Portal Nivel ${this.floor + 1}` : '🏆 Salida Triunfal';
+        ctx.save();
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        const pTxtW = ctx.measureText(portalTxt).width;
+        roundedRectPath(ctx, this.portal.x - pTxtW / 2 - 8, this.portal.y - 44, pTxtW + 16, 17, 8);
+        ctx.fillStyle = 'rgba(19, 23, 34, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#f8fafc';
         ctx.textAlign = 'center';
-        ctx.fillText(this.floor < this.maxFloors ? `🌀 Portal Nivel ${this.floor + 1}` : '🏆 Salida Triunfal', this.portal.x, this.portal.y - 32);
+        ctx.fillText(portalTxt, this.portal.x, this.portal.y - 32);
+        ctx.restore();
       }
 
-      // 6. BOTÍN EN EL SUELO (Armas, armaduras y pociones de combate)
+      // 6. BOTÍN EN EL SUELO (Armas y armaduras cartoon con contorno #1e2433)
       this.droppedLoot.forEach(item => {
-        const bobY = Math.sin(item.bob || 0) * 4;
-        const pulse = 1 + Math.sin((item.bob || 0) * 2) * 0.15;
+        const bobY = Math.sin(item.bob || 0) * 3.5;
+        const pulse = 1 + Math.sin((item.bob || 0) * 2) * 0.12;
         ctx.save();
         ctx.translate(item.x, item.y + bobY);
 
-        // Sombra en suelo
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-        ctx.beginPath(); ctx.ellipse(0, 10, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+        // Sombra suave en el suelo
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, 12 - bobY, 10, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
 
-        // Resplandor pulsante
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
-        ctx.beginPath(); ctx.arc(0, 0, 16 * pulse, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.arc(0, 0, 12 * pulse, 0, Math.PI * 2); ctx.stroke();
+        // Resplandor pastel suave
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 15 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(125, 211, 252, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 12 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
 
         if (item.data.type === 'weapon') {
-          // Espada brillante
+          // Espada cartoon redondeada
+          roundedRectPath(ctx, -2.5, -11, 5, 15, 2.5);
           ctx.fillStyle = '#e2e8f0';
-          ctx.fillRect(-2, -10, 4, 16);
+          ctx.fill();
+          ctx.stroke();
+
           ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(-1, -8, 2, 12);
-          ctx.fillStyle = '#ca8a04';
-          ctx.fillRect(-6, 2, 12, 3);
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(-2, 5, 4, 4);
+          ctx.fillRect(-1, -8, 2, 10);
+
+          roundedRectPath(ctx, -6, 2, 12, 3.5, 1.5);
+          ctx.fillStyle = '#fbbf24';
+          ctx.fill();
+          ctx.stroke();
+
+          roundedRectPath(ctx, -2, 5.5, 4, 4.5, 1.5);
+          ctx.fillStyle = '#92400e';
+          ctx.fill();
+          ctx.stroke();
         } else if (item.data.type === 'bow') {
-          // Ballesta
-          ctx.strokeStyle = '#c084fc';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.arc(0, 0, 8, -Math.PI / 2, Math.PI / 2); ctx.stroke();
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(-6, -2, 12, 4);
+          // Arco/Ballesta cartoon
+          ctx.beginPath();
+          ctx.arc(-1, 0, 8.5, -Math.PI * 0.55, Math.PI * 0.55);
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 4.8;
+          ctx.stroke();
+          ctx.strokeStyle = '#c8a26d';
+          ctx.lineWidth = 2.4;
+          ctx.stroke();
+
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(0, -8);
+          ctx.lineTo(0, 8);
+          ctx.stroke();
+
+          roundedRectPath(ctx, -7, -2, 13, 4, 2);
+          ctx.fillStyle = '#a78bfa';
+          ctx.fill();
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
         } else {
-          // Armadura
+          // Armadura / Escudo cartoon
+          roundedRectPath(ctx, -7.5, -7.5, 15, 15, 5);
           ctx.fillStyle = '#38bdf8';
-          ctx.fillRect(-7, -7, 14, 14);
-          ctx.fillStyle = '#0284c7';
-          ctx.fillRect(-5, -5, 10, 10);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#bae6fd';
+          ctx.beginPath();
+          ctx.arc(-2, -2, 3, 0, Math.PI * 2);
+          ctx.fill();
         }
 
-        // Etiqueta flotante oscura con borde neón
-        ctx.font = 'bold 9px monospace';
+        // Badge legible redondeado
+        ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
         const txtW = ctx.measureText(item.data.name).width;
-        ctx.fillStyle = 'rgba(10, 6, 20, 0.85)';
-        ctx.fillRect(-txtW / 2 - 4, -22, txtW + 8, 12);
-        ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-txtW / 2 - 4, -22, txtW + 8, 12);
+        roundedRectPath(ctx, -txtW / 2 - 6, -26, txtW + 12, 15, 7);
+        ctx.fillStyle = 'rgba(19, 23, 34, 0.92)';
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
 
-        ctx.fillStyle = '#38bdf8';
+        ctx.fillStyle = '#e0f2fe';
         ctx.textAlign = 'center';
-        ctx.fillText(item.data.name, 0, -13);
+        ctx.fillText(item.data.name, 0, -15);
         ctx.restore();
       });
 
       // 7. LLAVES EN EL SUELO (Para la Bóveda de perfil)
       this.droppedKeys.forEach(k => {
         const bobY = Math.sin(k.bob) * 3;
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
+        ctx.beginPath();
+        ctx.ellipse(k.x, k.y + 12, 8, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
         KEY_TIERS[k.tier].draw(ctx, k.x, k.y + bobY, 18);
+
+        const tierInfo = KEY_TIERS[k.tier];
+        if (tierInfo) {
+          ctx.save();
+          ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
+          const kW = ctx.measureText(tierInfo.name).width;
+          roundedRectPath(ctx, k.x - kW / 2 - 5, k.y + bobY - 25, kW + 10, 14, 7);
+          ctx.fillStyle = 'rgba(19, 23, 34, 0.9)';
+          ctx.fill();
+          ctx.strokeStyle = tierInfo.color;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+          ctx.fillStyle = '#f8fafc';
+          ctx.textAlign = 'center';
+          ctx.fillText(tierInfo.name, k.x, k.y + bobY - 14.5);
+          ctx.restore();
+        }
       });
 
-      // 8. ENEMIGOS (Sprites Detallados con Sombras y Físicas)
+      // 8. ENEMIGOS (Sprites Cartoon 2D Amigables, IARC Everyone)
       this.enemies.forEach(en => {
         ctx.save();
         ctx.translate(en.x, en.y);
 
         // Sombra suave en el suelo
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.36)';
         ctx.beginPath();
-        ctx.ellipse(0, en.radius * 0.7, en.radius, en.radius * 0.45, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, en.radius * 0.78, en.radius * 0.95, en.radius * 0.42, 0, 0, Math.PI * 2);
         ctx.fill();
 
         const anim = Math.sin(en.animTimer * 6);
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
 
         if (en.type === 'zombie_miner') {
-          // Minero Zombi HD
-          // Cono de luz de la linterna frontal
+          // Minero Cavernícola Cartoon (Casco amarillo + Pico limpio plata/cobre)
           const pAngle = Math.atan2(this.player.y - en.y, this.player.x - en.x);
           ctx.save();
           ctx.rotate(pAngle);
-          const grad = ctx.createRadialGradient(8, 0, 4, 38, 0, 42);
-          grad.addColorStop(0, 'rgba(254, 240, 138, 0.35)');
-          grad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+          const grad = ctx.createRadialGradient(8, 0, 4, 38, 0, 40);
+          grad.addColorStop(0, 'rgba(254, 243, 199, 0.28)');
+          grad.addColorStop(1, 'rgba(254, 243, 199, 0)');
           ctx.fillStyle = grad;
           ctx.beginPath();
           ctx.moveTo(8, 0);
-          ctx.arc(8, 0, 42, -0.4, 0.4);
+          ctx.arc(8, 0, 40, -0.38, 0.38);
           ctx.closePath();
           ctx.fill();
           ctx.restore();
 
-          // Cuerpo de zombi
-          ctx.fillStyle = '#1e3a8a'; // Pantalón minero
-          ctx.fillRect(-6, 2, 12, 10);
-          ctx.fillStyle = '#365314'; // Piel verdosa descompuesta
-          ctx.fillRect(-7, -6, 14, 9);
-          // Brazos extendidos
-          ctx.fillRect(-9, -4 + anim * 2, 4, 10);
-          ctx.fillRect(5, -4 - anim * 2, 4, 10);
-          // Cabeza y Casco
-          ctx.fillStyle = '#4d7c0f';
-          ctx.fillRect(-6, -14, 12, 9);
-          ctx.fillStyle = '#b45309'; // Casco industrial oxidado
-          ctx.fillRect(-8, -17, 16, 5);
-          ctx.fillStyle = '#fef08a'; // Foco del casco
-          ctx.fillRect(-3, -16, 6, 4);
-          // Ojos siniestros
-          ctx.fillStyle = '#fde047';
-          ctx.fillRect(-4, -11, 2, 2);
-          ctx.fillRect(2, -11, 2, 2);
-          // Pico ensangrentado en la mano
-          ctx.fillStyle = '#94a3b8';
-          ctx.fillRect(8, -6, 3, 14);
-          ctx.fillStyle = '#7f1d1d';
-          ctx.fillRect(6, -10, 10, 4);
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 2;
+
+          // Brazos redondeados
+          roundedRectPath(ctx, -11, -3 + anim * 1.8, 5, 10, 2.5);
+          ctx.fillStyle = '#84cc16';
+          ctx.fill();
+          ctx.stroke();
+
+          roundedRectPath(ctx, 6, -3 - anim * 1.8, 5, 10, 2.5);
+          ctx.fillStyle = '#84cc16';
+          ctx.fill();
+          ctx.stroke();
+
+          // Pico limpio de plata y cobre en la mano derecha (100% IARC)
+          ctx.save();
+          ctx.translate(9, -2 - anim * 1.8);
+          roundedRectPath(ctx, -1.5, -6, 3, 14, 1.5);
+          ctx.fillStyle = '#b45309';
+          ctx.fill();
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(0, -6, 7, Math.PI * 1.15, Math.PI * 1.85);
+          ctx.lineWidth = 4.5;
+          ctx.strokeStyle = '#1e2433';
+          ctx.stroke();
+          ctx.lineWidth = 2.6;
+          ctx.strokeStyle = '#cbd5e1';
+          ctx.stroke();
+          ctx.fillStyle = '#d97706';
+          ctx.beginPath();
+          ctx.arc(0, -7, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
+          ctx.restore();
+
+          // Overol azul de minero
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 2;
+          roundedRectPath(ctx, -7, -2, 14, 13, 5);
+          ctx.fillStyle = '#3b82f6';
+          ctx.fill();
+          ctx.stroke();
+
+          // Cabeza redondeada alegre
+          ctx.beginPath();
+          ctx.arc(0, -9, 8.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#a3e635';
+          ctx.fill();
+          ctx.stroke();
+
+          // Ojos cartoon expresivos
+          ctx.lineWidth = 1.2;
+          ctx.strokeStyle = '#1e2433';
+          [-3.2, 3.2].forEach((ex) => {
+            ctx.beginPath();
+            ctx.arc(ex, -8, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(ex + 0.4, -8, 1.2, 0, Math.PI * 2);
+            ctx.fillStyle = '#1e2433';
+            ctx.fill();
+          });
+
+          // Casco amarillo de minero + lámpara
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, -12, 8.8, Math.PI, 0);
+          ctx.closePath();
+          ctx.fillStyle = '#facc15';
+          ctx.fill();
+          ctx.stroke();
+
+          roundedRectPath(ctx, -10, -13, 20, 3.2, 1.6);
+          ctx.fillStyle = '#eab308';
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(0, -15, 3, 0, Math.PI * 2);
+          ctx.fillStyle = '#fef08a';
+          ctx.fill();
+          ctx.lineWidth = 1.4;
+          ctx.stroke();
 
         } else if (en.type === 'skeleton_archer') {
-          // Arquero Esqueleto HD
-          // Capa desgarrada
-          ctx.fillStyle = '#1c1917';
-          ctx.fillRect(-6, -4, 12, 14);
-          // Costillas de hueso
-          ctx.fillStyle = '#f1f5f9';
-          ctx.fillRect(-4, -2, 8, 2);
-          ctx.fillRect(-4, 2, 8, 2);
-          ctx.fillRect(-4, 6, 8, 2);
-          // Cráneo
-          ctx.fillRect(-5, -14, 10, 9);
-          // Cuencas con fuego espectral violeta
-          const fEye = (Math.sin(now * 0.02) + 1) * 0.5;
-          ctx.fillStyle = fEye > 0.3 ? '#e11d48' : '#c084fc';
-          ctx.fillRect(-3, -11, 2, 2);
-          ctx.fillRect(1, -11, 2, 2);
-          // Arco largo curvado
-          ctx.strokeStyle = '#ca8a04';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.arc(8, 0, 10, -Math.PI / 2, Math.PI / 2);
+          // Arquero Esqueleto Explorador Cartoon
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 2;
+
+          // Capa de explorador índigo
+          roundedRectPath(ctx, -7, -3, 14, 14, 5);
+          ctx.fillStyle = '#4f46e5';
+          ctx.fill();
           ctx.stroke();
-          // Cuerda del arco
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-          ctx.lineWidth = 1;
+
+          // Pecho de huesitos redondeado
+          roundedRectPath(ctx, -4.5, -1, 9, 9, 3);
+          ctx.fillStyle = '#f1f5f9';
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#cbd5e1';
+          ctx.fillRect(-3, 2, 6, 1.5);
+          ctx.fillRect(-3, 5, 6, 1.5);
+
+          // Cráneo redondeado simpático
           ctx.beginPath();
-          ctx.moveTo(8, -10);
+          ctx.arc(0, -9, 8.2, 0, Math.PI * 2);
+          ctx.fillStyle = '#f8fafc';
+          ctx.fill();
+          ctx.stroke();
+
+          // Capucha / pluma lila de arquero
+          ctx.beginPath();
+          ctx.arc(0, -11, 8.4, Math.PI * 1.1, -Math.PI * 0.1);
+          ctx.fillStyle = '#6366f1';
+          ctx.fill();
+          ctx.stroke();
+
+          // Ojos grandes expresivos
+          ctx.fillStyle = '#1e2433';
+          ctx.beginPath();
+          ctx.arc(-3, -8, 2.4, 0, Math.PI * 2);
+          ctx.arc(3, -8, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+
+          const fEye = (Math.sin(now * 0.01) + 1) * 0.5;
+          ctx.fillStyle = fEye > 0.4 ? '#c4b5fd' : '#7dd3fc';
+          ctx.beginPath();
+          ctx.arc(-2.6, -8.3, 1.1, 0, Math.PI * 2);
+          ctx.arc(3.4, -8.3, 1.1, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Arco curvo de madera limpio
+          ctx.beginPath();
+          ctx.arc(7, 0, 10, -Math.PI * 0.48, Math.PI * 0.48);
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 4.6;
+          ctx.stroke();
+          ctx.strokeStyle = '#c8a26d';
+          ctx.lineWidth = 2.4;
+          ctx.stroke();
+
+          // Cuerda del arco
+          ctx.strokeStyle = '#f8fafc';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(7.5, -9.5);
           ctx.lineTo(4, 0);
-          ctx.lineTo(8, 10);
+          ctx.lineTo(7.5, 9.5);
           ctx.stroke();
 
         } else if (en.type === 'golem_boss') {
-          // Jefe Gólem Coloso de Obsidiana HD (Imponente)
-          const heart = (Math.sin(now * 0.007) + 1) * 0.5;
-          
-          // Bloques de obsidiana facetados 3D
-          ctx.fillStyle = '#0f0a1c';
-          ctx.fillRect(-28, -28, 56, 56);
-          ctx.fillStyle = '#1e1338';
-          ctx.fillRect(-24, -24, 48, 48);
+          // Jefe Coloso Cartoon de Obsidiana & Cristales
+          const heart = (Math.sin(now * 0.005) + 1) * 0.5;
 
-          // Grietas de lava ardiente palpitantes
-          ctx.fillStyle = heart > 0.4 ? '#f97316' : '#ea580c';
-          ctx.fillRect(-16, -14, 32, 6);
-          ctx.fillRect(-6, -8, 12, 24);
-          ctx.fillRect(-18, 10, 36, 6);
-          ctx.fillStyle = '#fef08a';
-          ctx.fillRect(-8, -13, 16, 4);
-          ctx.fillRect(-3, -4, 6, 14);
+          // Aura suave del jefe
+          ctx.fillStyle = 'rgba(192, 132, 252, 0.16)';
+          ctx.beginPath();
+          ctx.arc(0, 0, 34, 0, Math.PI * 2);
+          ctx.fill();
 
-          // Puños gigantes flotantes de basalto
-          const fistBob = Math.sin(now * 0.008) * 4;
-          ctx.fillStyle = '#2d1b54';
-          ctx.fillRect(-36, -6 + fistBob, 10, 16);
-          ctx.fillRect(26, -6 - fistBob, 10, 16);
-          ctx.fillStyle = '#f97316';
-          ctx.fillRect(-34, -2 + fistBob, 6, 8);
-          ctx.fillRect(28, -2 - fistBob, 6, 8);
+          ctx.strokeStyle = '#1e2433';
+          ctx.lineWidth = 3;
 
-          // Ojos ardientes de hendidura
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(-14, -20, 8, 4);
-          ctx.fillRect(6, -20, 8, 4);
+          // Corona de cristales en hombros
           ctx.fillStyle = '#c084fc';
-          ctx.fillRect(-12, -19, 4, 2);
-          ctx.fillRect(8, -19, 4, 2);
+          ctx.beginPath();
+          ctx.moveTo(-18, -18);
+          ctx.lineTo(-14, -30);
+          ctx.lineTo(-7, -21);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(18, -18);
+          ctx.lineTo(14, -30);
+          ctx.lineTo(7, -21);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Cuerpo robusto redondeado de obsidiana
+          roundedRectPath(ctx, -24, -24, 48, 48, 16);
+          ctx.fillStyle = '#312b4b';
+          ctx.fill();
+          ctx.stroke();
+
+          // Bisel superior suave
+          roundedRectPath(ctx, -19, -20, 38, 16, 10);
+          ctx.fillStyle = '#453e68';
+          ctx.fill();
+
+          // Runa cristalina brillante en el pecho
+          ctx.fillStyle = heart > 0.45 ? '#fbbf24' : '#c084fc';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 5, 9.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fef3c7';
+          ctx.beginPath();
+          ctx.arc(-2, 3, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Puños flotantes redondeados de roca
+          const fistBob = Math.sin(now * 0.007) * 4;
+          [-1, 1].forEach(side => {
+            const fx = side < 0 ? -38 : 24;
+            const fy = -7 + (side < 0 ? fistBob : -fistBob);
+            roundedRectPath(ctx, fx, fy, 14, 18, 6);
+            ctx.fillStyle = '#3b3559';
+            ctx.lineWidth = 2.5;
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(fx + 7, fy + 9, 3.6, 0, Math.PI * 2);
+            ctx.fillStyle = side < 0 ? '#fbbf24' : '#c084fc';
+            ctx.fill();
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          });
+
+          // Ojos expresivos de coloso
+          ctx.fillStyle = '#fef08a';
+          ctx.lineWidth = 2;
+          roundedRectPath(ctx, -14, -14, 10, 6.5, 3);
+          ctx.fill();
+          ctx.stroke();
+          roundedRectPath(ctx, 4, -14, 10, 6.5, 3);
+          ctx.fill();
+          ctx.stroke();
+
+          // Pupilas cartoon
+          ctx.fillStyle = '#1e2433';
+          ctx.beginPath();
+          ctx.arc(-8.5, -10.8, 1.8, 0, Math.PI * 2);
+          ctx.arc(9.5, -10.8, 1.8, 0, Math.PI * 2);
+          ctx.fill();
         }
 
         ctx.restore();
 
-        // Barra de Salud Ornamental
-        const hpPct = Math.max(0, en.hp / en.maxHp);
-        const barW = en.type === 'golem_boss' ? 56 : 28;
-        ctx.fillStyle = '#090511';
-        ctx.fillRect(en.x - barW / 2, en.y - en.radius - 12, barW, 4);
-        ctx.fillStyle = en.type === 'golem_boss' ? '#c084fc' : '#ef4444';
-        ctx.fillRect(en.x - barW / 2, en.y - en.radius - 12, Math.round(barW * hpPct), 4);
+        // Barra de Salud Cartoon Redondeada con Contorno #1e2433
+        const hpPct = Math.max(0, Math.min(1, en.hp / en.maxHp));
+        const barW = en.type === 'golem_boss' ? 60 : 30;
+        const barH = en.type === 'golem_boss' ? 7 : 5;
+        const barX = en.x - barW / 2;
+        const barY = en.y - en.radius - 14;
+
+        roundedRectPath(ctx, barX - 1.5, barY - 1.5, barW + 3, barH + 3, (barH + 3) / 2);
+        ctx.fillStyle = '#1e2433';
+        ctx.fill();
+
+        roundedRectPath(ctx, barX, barY, barW, barH, barH / 2);
+        ctx.fillStyle = '#334155';
+        ctx.fill();
+
+        if (hpPct > 0) {
+          const fillW = Math.max(barH, Math.round(barW * hpPct));
+          roundedRectPath(ctx, barX, barY, fillW, barH, barH / 2);
+          ctx.fillStyle = en.type === 'golem_boss' ? '#c084fc' : '#f43f5e';
+          ctx.fill();
+        }
       });
 
-      // 9. BOTS ALIADOS
+      // 9. BOTS ALIADOS (Guardianes Cartoon Redondeados)
       this.teammates.forEach(tm => {
         ctx.save();
         ctx.translate(tm.x, tm.y);
-        ctx.rotate(tm.angle || 0);
 
-        // Sombra
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        // Sombra suave
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
         ctx.beginPath();
-        ctx.ellipse(0, 3, 12, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 7, 11, 5, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#065f46';
-        ctx.fillRect(-8, -8, 16, 16);
-        ctx.fillStyle = '#10b981';
-        ctx.fillRect(-6, -6, 12, 12);
-        ctx.fillStyle = '#a7f3d0';
-        ctx.fillRect(2, -2, 4, 4);
+        ctx.rotate(tm.angle || 0);
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 2;
+
+        // Mochila/capa esmeralda
+        roundedRectPath(ctx, -11, -7, 7, 14, 3.5);
+        ctx.fillStyle = '#059669';
+        ctx.fill();
+        ctx.stroke();
+
+        // Cuerpo redondeado
+        ctx.beginPath();
+        ctx.arc(0, 0, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#34d399';
+        ctx.fill();
+        ctx.stroke();
+
+        // Visor amigable
+        roundedRectPath(ctx, 1, -5, 6.5, 10, 3);
+        ctx.fillStyle = '#ecfdf5';
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#1e2433';
+        ctx.beginPath();
+        ctx.arc(4.5, -2.2, 1.3, 0, Math.PI * 2);
+        ctx.arc(4.5, 2.2, 1.3, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
 
-        ctx.fillStyle = '#10b981';
-        ctx.font = 'bold 9px monospace';
+        // Nombre legible en cápsula
+        ctx.save();
+        ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+        const nmW = ctx.measureText(tm.name).width;
+        roundedRectPath(ctx, tm.x - nmW / 2 - 5, tm.y - 26, nmW + 10, 13, 6);
+        ctx.fillStyle = 'rgba(19, 23, 34, 0.85)';
+        ctx.fill();
+        ctx.fillStyle = '#6ee7b7';
         ctx.textAlign = 'center';
-        ctx.fillText(tm.name, tm.x, tm.y - 18);
+        ctx.fillText(tm.name, tm.x, tm.y - 16);
+        ctx.restore();
       });
 
-      // 10. EL JUGADOR (Explorador del Núcleo HD con Armadura y Armas Dinámicas)
-      // Si está en tiempo de invulnerabilidad, parpadea visualmente
+      // 10. EL JUGADOR (Héroe Cartoon Redondeado con Capa, Ojos y Armadura Dinámica)
       if (this.player.invulnTimer > 0 && Math.floor(now / 80) % 2 === 0) {
-        ctx.globalAlpha = 0.45;
+        ctx.globalAlpha = 0.5;
       }
       ctx.save();
       ctx.translate(this.player.x, this.player.y);
 
+      const eqArmorId = this.inventory.equippedArmor?.id || 'leather_armor';
+      const eqWeaponId = this.inventory.equippedWeapon?.id || 'iron_sword';
+      const armorBonusHp = this.inventory.equippedArmor?.bonusHp || 0;
+
+      let capeColor = '#334155';
+      let armorPrimary = '#38bdf8';
+      let pauldronColor = '#f59e0b';
+      let auraColor = 'rgba(56, 189, 248, 0.25)';
+
+      if (eqArmorId === 'armor_magma_mesh') {
+        capeColor = '#b91c1c';
+        armorPrimary = '#f97316';
+        pauldronColor = '#fbbf24';
+        auraColor = 'rgba(251, 146, 60, 0.28)';
+      } else if (eqArmorId === 'armor_colossus' || eqArmorId === 'armor_obsidian') {
+        capeColor = '#5b21b6';
+        armorPrimary = '#a855f7';
+        pauldronColor = '#e9d5ff';
+        auraColor = 'rgba(192, 132, 252, 0.30)';
+      } else if (eqArmorId === 'tunic_adventurer') {
+        capeColor = '#047857';
+        armorPrimary = '#10b981';
+        pauldronColor = '#fbbf24';
+        auraColor = 'rgba(52, 211, 153, 0.28)';
+      }
+
+      // Aura/anillo de escudo si lleva armadura de salud mejorada
+      if (armorBonusHp >= 20) {
+        const ringPulse = 17.5 + Math.sin(now * 0.005) * 1.2;
+        ctx.fillStyle = auraColor;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringPulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = armorPrimary;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
       // Sombra suave en el suelo
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
       ctx.beginPath();
-      ctx.ellipse(0, 5, 14, 7, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 6, 13, 6.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.rotate(this.player.angle);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#1e2433';
+      ctx.lineWidth = 2;
 
-      // Determinar colores y texturas según equipo
-      const eqArmorId = this.inventory.equippedArmor?.id || 'leather_armor';
-      const eqWeaponId = this.inventory.equippedWeapon?.id || 'iron_sword';
-
-      let capeColor = '#1e293b';
-      let armorPrimary = '#0284c7';
-      let armorSecondary = '#0f172a';
-      let pauldronColor = '#b45309';
-
-      if (eqArmorId === 'armor_magma_mesh') {
-        capeColor = '#7f1d1d';
-        armorPrimary = '#dc2626';
-        armorSecondary = '#450a0a';
-        pauldronColor = '#f97316';
-      } else if (eqArmorId === 'armor_colossus' || eqArmorId === 'armor_obsidian') {
-        capeColor = '#2e1065';
-        armorPrimary = '#7e22ce';
-        armorSecondary = '#1e1b4b';
-        pauldronColor = '#c084fc';
-      } else if (eqArmorId === 'tunic_adventurer') {
-        capeColor = '#064e3b';
-        armorPrimary = '#10b981';
-        armorSecondary = '#022c22';
-        pauldronColor = '#d97706';
-      }
-
-      // Capa ondeando
-      ctx.fillStyle = '#090d16';
-      ctx.fillRect(-12, -7, 6, 14);
+      // Capa ondeante matching armadura
+      const capeWave = Math.sin(this.player.walkCycle || 0) * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(-4, -8);
+      ctx.quadraticCurveTo(-15, -7 + capeWave, -14, capeWave * 0.5);
+      ctx.quadraticCurveTo(-15, 7 + capeWave, -4, 8);
+      ctx.closePath();
       ctx.fillStyle = capeColor;
-      ctx.fillRect(-10, -6, 5, 12);
+      ctx.fill();
+      ctx.stroke();
 
-      // Torso y armadura dinámica
-      ctx.fillStyle = armorSecondary;
-      ctx.fillRect(-7, -7, 14, 14);
-      ctx.fillStyle = armorPrimary;
-      ctx.fillRect(-5, -5, 10, 10);
-
-      // Hombreras
-      ctx.fillStyle = pauldronColor;
-      ctx.fillRect(-7, -8, 4, 16);
-      ctx.fillStyle = '#fde047';
-      ctx.fillRect(0, -2, 3, 4);
-
-      // Cabeza y Capucha con Visera
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(-5, -6, 10, 12);
-      // Ojos cian resplandecientes del aventurero
-      ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(2, -4, 4, 3);
-      ctx.fillRect(2, 1, 4, 3);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(3, -3, 2, 2);
-      ctx.fillRect(3, 2, 2, 2);
-
-      // Arma Dinámica en mano
-      if (eqWeaponId === 'sword_fire_core' || eqWeaponId === 'sword_fire') {
-        // Espada Flamígera con brasa incandescente
-        ctx.fillStyle = '#78350f';
-        ctx.fillRect(5, 2, 3, 7);
-        ctx.fillStyle = '#ea580c';
-        ctx.fillRect(6, 4, 16, 4);
-        ctx.fillStyle = '#fde047';
-        ctx.fillRect(8, 5, 12, 2);
-      } else if (eqWeaponId === 'dagger_copper') {
-        // Daga rápida de cobre
-        ctx.fillStyle = '#92400e';
-        ctx.fillRect(5, 2, 2, 5);
-        ctx.fillStyle = '#d97706';
-        ctx.fillRect(7, 3, 10, 3);
-      } else {
-        // Espada de hierro forjada estándar
-        ctx.fillStyle = '#64748b';
-        ctx.fillRect(6, 4, 14, 3);
-        ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(8, 5, 11, 1);
-        ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(5, 2, 3, 7);
+      // Arma dinámica en mano derecha
+      ctx.save();
+      if (this.player.isAttacking) {
+        ctx.rotate(0.55);
       }
+      if (eqWeaponId === 'sword_fire_core' || eqWeaponId === 'sword_fire') {
+        // Espada Flamígera redondeada
+        roundedRectPath(ctx, 5, 3, 17, 4.5, 2.2);
+        ctx.fillStyle = '#fb923c';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(8, 4.3, 11, 2);
+        roundedRectPath(ctx, 4, 1.5, 3.2, 7.5, 1.5);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fill();
+        ctx.stroke();
+      } else if (eqWeaponId === 'dagger_copper') {
+        // Daga de cobre brillante
+        roundedRectPath(ctx, 6, 3.5, 11, 3.5, 1.8);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fde68a';
+        ctx.fillRect(8, 4.5, 7, 1.4);
+      } else {
+        // Espada de hierro brillante
+        roundedRectPath(ctx, 5, 3.5, 15, 4, 2);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#7dd3fc';
+        ctx.fillRect(8, 4.8, 10, 1.5);
+        roundedRectPath(ctx, 4, 1.5, 3, 8, 1.5);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Torso & Hombreras redondeadas
+      ctx.strokeStyle = '#1e2433';
+      ctx.lineWidth = 2;
+      roundedRectPath(ctx, -8, -10, 16, 20, 8);
+      ctx.fillStyle = armorPrimary;
+      ctx.fill();
+      ctx.stroke();
+
+      // Hombreras cartoon
+      [-9, 9].forEach((py) => {
+        ctx.beginPath();
+        ctx.arc(-1, py, 4.2, 0, Math.PI * 2);
+        ctx.fillStyle = pauldronColor;
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // Capucha/Casco redondeado alegre
+      ctx.beginPath();
+      ctx.arc(1, 0, 8.2, 0, Math.PI * 2);
+      ctx.fillStyle = '#475569';
+      ctx.fill();
+      ctx.stroke();
+
+      // Visera cálida y ojos expresivos
+      ctx.beginPath();
+      ctx.ellipse(4.2, 0, 4.2, 5.4, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#fde68a';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Ojos cartoon blancos con pupilas
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(4.8, -2.3, 2, 0, Math.PI * 2);
+      ctx.arc(4.8, 2.3, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#1e2433';
+      ctx.beginPath();
+      ctx.arc(5.4, -2.3, 1.1, 0, Math.PI * 2);
+      ctx.arc(5.4, 2.3, 1.1, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.restore();
       ctx.globalAlpha = 1.0;
 
-      // Animación de Tajo Melee (Arco de Energía Luminosa)
+      // Animación suave de tajo melee (blanco + cian/ámbar)
       if (this.player.isAttacking) {
         ctx.save();
         ctx.translate(this.player.x, this.player.y);
         ctx.rotate(this.player.attackAngle);
-        
-        const isFire = (this.inventory.equippedWeapon?.id || '').includes('fire');
-        ctx.strokeStyle = isFire ? 'rgba(249, 115, 22, 0.95)' : 'rgba(56, 189, 248, 0.9)';
-        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+
+        const isWarmBlade = eqWeaponId.includes('fire') || eqWeaponId.includes('copper');
+        ctx.strokeStyle = isWarmBlade ? 'rgba(245, 158, 11, 0.35)' : 'rgba(56, 189, 248, 0.35)';
+        ctx.lineWidth = 10;
         ctx.beginPath();
         ctx.arc(0, 0, 48, -Math.PI * 0.42, Math.PI * 0.42);
+        ctx.stroke();
+
+        ctx.strokeStyle = isWarmBlade ? '#f59e0b' : '#38bdf8';
+        ctx.lineWidth = 5.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 48, -Math.PI * 0.40, Math.PI * 0.40);
         ctx.stroke();
 
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
-        ctx.arc(0, 0, 48, -Math.PI * 0.35, Math.PI * 0.35);
+        ctx.arc(0, 0, 48, -Math.PI * 0.33, Math.PI * 0.33);
         ctx.stroke();
 
         ctx.restore();
       }
 
-      // 11. PROYECTILES
+      // 11. PROYECTILES CARTOON CON CONTORNO
       this.projectiles.forEach(p => {
+        ctx.save();
         ctx.fillStyle = p.color;
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, (p.radius || 3) + 0.8, 0, Math.PI * 2);
         ctx.fill();
+        ctx.stroke();
 
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(p.x - p.vx * 0.012, p.y - p.vy * 0.012, p.radius * 0.6, 0, Math.PI * 2);
+        ctx.arc(p.x - p.vx * 0.01, p.y - p.vy * 0.01, (p.radius || 3) * 0.55, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       });
 
-      // 12. PARTÍCULAS
+      // 12. PARTÍCULAS CIRCULARES SUAVES (Puffs y chispas cartoon)
       this.particles.forEach(pt => {
-        const pct = pt.life / pt.maxLife;
-        ctx.fillStyle = pt.color;
+        const pct = Math.max(0, pt.life / pt.maxLife);
+        const rad = Math.max(1.4, (pt.size || 4) * (0.45 + 0.55 * pct));
+        ctx.save();
         ctx.globalAlpha = pct;
-        ctx.fillRect(pt.x - pt.size / 2, pt.y - pt.size / 2, pt.size, pt.size);
-        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, rad, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+        ctx.restore();
       });
 
-      // 13. TEXTOS FLOTANTES
+      // 13. TEXTOS FLOTANTES CON BORDE SUAVE
       this.floatingTexts.forEach(ft => {
         ctx.save();
-        ctx.fillStyle = ft.color;
-        ctx.font = `bold ${ft.size || 13}px monospace`;
+        ctx.font = `800 ${ft.size || 13}px system-ui, -apple-system, sans-serif`;
         ctx.textAlign = 'center';
-        ctx.shadowColor = '#000';
-        ctx.shadowBlur = 4;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#1e2433';
+        ctx.lineWidth = 3.2;
+        ctx.strokeText(ft.text, ft.x, ft.y);
+        ctx.fillStyle = ft.color;
         ctx.fillText(ft.text, ft.x, ft.y);
         ctx.restore();
       });
 
       // 14. PANTALLA DE GAMEOVER
       if (this.gameState === 'gameover') {
-        ctx.fillStyle = 'rgba(15, 6, 24, 0.85)';
+        ctx.fillStyle = 'rgba(19, 23, 34, 0.86)';
         ctx.fillRect(0, 0, this.width, this.height);
-        ctx.fillStyle = '#ef4444';
-        ctx.font = '900 24px system-ui, sans-serif';
+        ctx.fillStyle = '#fb7185';
+        ctx.font = '900 24px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('💀 HAS CAÍDO EN LAS MINAS', this.width / 2, this.height / 2 - 20);
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '13px system-ui, sans-serif';
+        ctx.fillText('💫 HAS CAÍDO EN LAS MINAS', this.width / 2, this.height / 2 - 20);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '13px system-ui, -apple-system, sans-serif';
         ctx.fillText('👉 Haz clic en la pantalla o pulsa "🔄 Reiniciar" para volver a intentarlo', this.width / 2, this.height / 2 + 15);
       }
 

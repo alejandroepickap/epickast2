@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+server/.env
+server/data/
+server/serviceAccount*.json
+server/firebase.config.json
+server/*firebase-adminsdk*.json
+server/render-env-variable.txt
+node_modules/
+dist/
+instalador/
+graphify-out/
+*.log

@@ -11,6 +11,30 @@ const { DatabaseSync } = require('node:sqlite');
 const { WebSocketServer } = require('ws');
 const firebaseAdapter = require('./firebase-adapter');
 
+(function loadLocalEnv() {
+  const envPath = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(envPath)) return;
+  try {
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eq = line.indexOf('=');
+      if (eq <= 0) continue;
+      const key = line.slice(0, eq).trim();
+      let val = line.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && process.env[key] === undefined) {
+        process.env[key] = val;
+      }
+    }
+  } catch (err) {
+    console.warn('[env] No se pudo leer .env local:', err?.message || err);
+  }
+})();
+
 const PORT = Number(process.env.PORT) || 7777;
 const DATA = process.env.EPICKAST_DATA || path.join(__dirname, 'data');
 const UPLOADS = path.join(DATA, 'uploads');
@@ -107,7 +131,8 @@ function _performSaveBackup(forceCloud = false) {
     const reports = all('SELECT id,reporter_id,reported_user_id,message_id,channel,reason,ts,status FROM reports');
     const files = all('SELECT id,channel,user_id,name,mime,size,disk,ts FROM files ORDER BY id DESC LIMIT 1000').reverse();
     const messages = all('SELECT id,channel,user_id,text,ts,file_id,reply_to,pinned,thread_id FROM messages ORDER BY id DESC LIMIT 2000').reverse();
-    const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports, files, messages };
+    const sessions = all('SELECT token,user_id,created FROM sessions ORDER BY created DESC LIMIT 2000');
+    const state = { ts: Date.now(), users, friends, servers, members, channels, bans, blocks, reports, files, messages, sessions };
     fs.writeFileSync(BACKUP_FILE, JSON.stringify(state, null, 2));
     if (!process.env.EPICKAST_TEST) { firebaseAdapter.syncDatabaseToFirebase(DATA, state, forceCloud).catch(() => {}); }
   } catch (e) {
@@ -192,6 +217,13 @@ function applyBackupDataset(data, isAuthoritative = false) {
   if (Array.isArray(data.messages)) {
     for (const m of data.messages) {
       run('INSERT OR IGNORE INTO messages(id,channel,user_id,text,ts,file_id,reply_to,pinned,thread_id) VALUES(?,?,?,?,?,?,?,?,?)', m.id ?? null, m.channel ?? '', m.user_id ?? null, m.text ?? '', m.ts ?? Date.now(), m.file_id ?? null, m.reply_to ?? null, m.pinned ?? 0, m.thread_id ?? null);
+    }
+  }
+  if (Array.isArray(data.sessions)) {
+    for (const s of data.sessions) {
+      if (s.token && s.user_id) {
+        run('INSERT OR IGNORE INTO sessions(token,user_id,created) VALUES(?,?,?)', s.token, s.user_id, s.created ?? Date.now());
+      }
     }
   }
 }
@@ -412,11 +444,76 @@ function leaveRoom(ws) {
 }
 
 // ---------- API ----------
+const _cfIceCache = { servers: null, expiresAt: 0 };
+function dedupeIce(list) {
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    if (!item || !item.urls) continue;
+    const k = JSON.stringify([item.urls, item.username || '', item.credential || '']);
+    if (!seen.has(k)) { seen.add(k); out.push(item); }
+  }
+  // Prioridad: STUN y TURN UDP primero; TURN sobre TCP/TLS al final (evita head-of-line blocking y retraso de audio)
+  const isTcp = (item) => [].concat(item.urls).some((u) => /transport=tcp/i.test(u) || /^turns:/i.test(u));
+  return [...out.filter((i) => !isTcp(i)), ...out.filter(isTcp)];
+}
+function baseIceServers() {
+  const base = [
+    { urls: process.env.EPICKAST_STUN || 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.l.google.com:19302' },
+  ];
+  if (process.env.EPICKAST_TURN_URL) {
+    base.push({ urls: process.env.EPICKAST_TURN_URL, username: process.env.EPICKAST_TURN_USER, credential: process.env.EPICKAST_TURN_PASS });
+  }
+  return base;
+}
+async function getIceServers(userId = 0) {
+  const base = [
+    { urls: process.env.EPICKAST_STUN || 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:stun.l.google.com:19302' },
+  ];
+  const manual = process.env.EPICKAST_TURN_URL
+    ? [{ urls: process.env.EPICKAST_TURN_URL, username: process.env.EPICKAST_TURN_USER, credential: process.env.EPICKAST_TURN_PASS }]
+    : [];
+  const tokenId = process.env.CF_TURN_TOKEN_ID;
+  const apiToken = process.env.CF_TURN_API_TOKEN;
+  if (tokenId && apiToken) {
+    if (_cfIceCache.servers && Date.now() < _cfIceCache.expiresAt) {
+      return dedupeIce([..._cfIceCache.servers, ...manual]);
+    }
+    try {
+      const resp = await fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(tokenId)}/credentials/generate-ice-servers`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ttl: 43200 }),
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const json = await resp.json();
+      const cfList = Array.isArray(json?.iceServers) ? json.iceServers : (json?.iceServers ? [json.iceServers] : []);
+      const combined = dedupeIce([...base, ...cfList]);
+      _cfIceCache.servers = combined;
+      _cfIceCache.expiresAt = Date.now() + 6 * 3600 * 1000;
+      return dedupeIce([...combined, ...manual]);
+    } catch (err) {
+      console.warn('[ice] Cloudflare TURN fallback:', err?.message || err);
+    }
+  }
+  return dedupeIce([...base, ...manual]);
+}
 const iceServers = () => {
-  const l = [{ urls: process.env.EPICKAST_STUN || 'stun:stun.l.google.com:19302' }];
-  if (process.env.EPICKAST_TURN_URL) l.push({ urls: process.env.EPICKAST_TURN_URL, username: process.env.EPICKAST_TURN_USER, credential: process.env.EPICKAST_TURN_PASS });
-  return l;
+  const base = baseIceServers();
+  if (_cfIceCache.servers && Date.now() < _cfIceCache.expiresAt) {
+    return dedupeIce([...base, ..._cfIceCache.servers]);
+  }
+  return base;
 };
+if (process.env.CF_TURN_TOKEN_ID && process.env.CF_TURN_API_TOKEN && !process.env.EPICKAST_TEST) {
+  getIceServers(0).catch(() => {});
+}
 const serverView = (sid, uid) => {
   const s = get('SELECT id,name,owner,invite,icon FROM servers WHERE id=?', sid);
   if (!s) fail('Servidor inexistente');
@@ -911,9 +1008,11 @@ const H = {
     const a = authorize(d.channel, ws.user.id);
     toUsers(a.audience.filter((id) => id !== ws.user.id), { t: 'typing', channel: d.channel, userId: ws.user.id, name: ws.user.name });
   },
-  'voice.join': (ws, d) => {
+  'voice.join': async (ws, d) => {
     const a = authorize(d.key, ws.user.id);
     if (a.type === 'text') fail('No es canal de voz');
+    const ice = await getIceServers(ws.user.id);
+    if (ws.readyState !== 1) return { peers: [], ice, ringing: false, offline: false, party: partyView(d.key) };
     leaveRoom(ws);
     let r = rooms.get(d.key); if (!r) rooms.set(d.key, (r = new Map()));
     const limit = a.userLimit > 0 ? Math.min(MAX_ROOM, a.userLimit) : MAX_ROOM;
@@ -933,12 +1032,12 @@ const H = {
         if (isOnline(other)) {
           stopRing(d.key, 'replaced');
           rings.set(d.key, { from: ws.user.id, to: other, timer: setTimeout(() => stopRing(d.key, 'missed'), 45000) });
-          toUser(other, { t: 'call.incoming', key: d.key, from: { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) } });
+          toUser(other, { t: 'call.incoming', key: d.key, video: !!d.video, from: { id: ws.user.id, name: ws.user.name, ...profileOf(ws.user.id) } });
           ringing = true;
         } else offline = true;
       }
     }
-    return { peers, ice: iceServers(), ringing, offline, party: partyView(d.key) };
+    return { peers, ice, ringing, offline, party: partyView(d.key) };
   },
   'call.decline': (ws, d) => { const r = rings.get(d.key); if (r && r.to === ws.user.id) stopRing(d.key, 'declined'); },
   'profile.set': (ws, d) => {
@@ -949,8 +1048,23 @@ const H = {
       else if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(d.avatar)) && d.avatar.length <= 60000) { avatar = d.avatar; av = Date.now(); }
       else fail('Imagen inválida o demasiado grande');
     }
+    const validateBanner = (raw) => {
+      if (raw === null || raw === '') return null;
+      const s = String(raw).trim();
+      if (!s) return null;
+      if (s.length > 600 || /javascript:|<|>|;|\.\./i.test(s)) fail('Banner inválido');
+      if (/^\/files\/\d+$/.test(s) || /^url\(\/files\/\d+\)$/i.test(s)) return s;
+      if (/^assets\/[a-z0-9_\/-]+\.(?:webp|jpg|jpeg|png)$/i.test(s)) return s;
+      if (/^url\(\s*['"]?(assets\/[a-z0-9_\/-]+\.(?:webp|jpg|jpeg|png))['"]?\s*\)(?:\s+[a-z0-9/% -]{1,40})?$/i.test(s)) return s;
+      if (/^[a-z0-9_:-]{1,80}$/i.test(s) && !/^(https?|data|vbscript|file):/i.test(s)) return s;
+      if (/^(?:linear|radial)-gradient\([^;{}<>\\"']+\)$/i.test(s)
+        && !/url\s*\(|expression\s*\(|(?:https?|data|javascript|vbscript|file):|\/\//i.test(s)) {
+        return s;
+      }
+      fail('Banner inválido');
+    };
     const color = d.color !== undefined ? ((/^#[0-9a-f]{6}$/i.test(d.color) || /^linear-gradient\([^;]+\)$/i.test(d.color)) ? clean(d.color, 140) : fail('Color inválido')) : cur.color;
-    const banner = d.banner !== undefined ? (d.banner ? clean(d.banner, 420) : null) : (cur.banner || null);
+    const banner = d.banner !== undefined ? validateBanner(d.banner) : (cur.banner || null);
     const bio = d.bio !== undefined ? clean(d.bio, 120) : cur.bio;
     const frame = d.frame !== undefined ? (d.frame ? clean(d.frame, 40) : null) : (cur.frame || null);
     const title = d.title !== undefined ? (d.title ? clean(d.title, 60) : null) : (cur.title || null);
@@ -1052,6 +1166,27 @@ const H = {
     send(targetEntry.ws, { t: 'voice.audioAssist', key, fromName: ws.user.name, preset, config: cfg });
     return { ok: true, userId: targetId, preset };
   },
+  'voice.disconnect': (ws, d) => {
+    const key = clean(d.key, 40);
+    const targetId = Number(d.userId);
+    const auth = authorize(key, ws.user.id);
+    if (!auth.serverId) fail('Solo disponible en canales de servidor');
+    const myR = roleOf(auth.serverId, ws.user.id), tarR = roleOf(auth.serverId, targetId);
+    if (!myR || roleRank(myR) < 2) fail('Necesitas rango Moderador, Admin o Dueño para desconectar de voz');
+    if (targetId !== ws.user.id && tarR && roleRank(myR) <= roleRank(tarR)) fail('No puedes desconectar a alguien de igual o mayor rango');
+    const r = rooms.get(key);
+    const targetEntry = r?.get(targetId);
+    if (targetEntry) {
+      r.delete(targetId);
+      if (targetEntry.ws.room === key) targetEntry.ws.room = null;
+      send(targetEntry.ws, { t: 'voice.kicked', key, reason: 'Desconectado del canal de voz por ' + ws.user.name });
+      for (const [, v] of r) send(v.ws, { t: 'voice.left', key, userId: targetId });
+      if (!r.size) { rooms.delete(key); parties.delete(key); }
+      const partyTrack = parties.get(key)?.current?.title || null;
+      toUsers(auth.audience, { t: 'voice.room', key, users: roomUsers(key), partyTrack });
+    }
+    return { ok: true, userId: targetId };
+  },
   'voice.moveUser': (ws, d) => {
     const curKey = clean(d.currentKey, 40);
     const toKey = clean(d.targetKey, 40);
@@ -1065,8 +1200,15 @@ const H = {
     const r = rooms.get(curKey);
     const targetEntry = r?.get(targetId);
     if (!targetEntry) fail('El usuario no está en la sala de voz');
-    const toCh = get('SELECT name FROM channels WHERE id=?', Number(toKey.slice(1)));
-    send(targetEntry.ws, { t: 'voice.forceMove', toKey, channelName: toCh?.name || 'Canal de voz' });
+    const toCh = toKey[0] === 'c' ? get('SELECT id, name, type, user_limit FROM channels WHERE id=?', Number(toKey.slice(1))) : null;
+    if (!toCh || toCh.type !== 'voice') fail('Canal de voz destino inválido');
+    if (toCh.user_limit > 0 && roleRank(myR) < 3) {
+      const destRoom = rooms.get(toKey);
+      if (destRoom && !destRoom.has(targetId) && destRoom.size >= toCh.user_limit) {
+        fail(`Canal destino lleno (máx. ${toCh.user_limit} usuarios)`);
+      }
+    }
+    send(targetEntry.ws, { t: 'voice.forceMove', toKey, channelName: toCh.name || 'Canal de voz' });
     return { ok: true, userId: targetId, toKey };
   },
   'voice.sound': (ws, d) => {
@@ -1777,22 +1919,34 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
     const tok = String(req.headers['x-token'] || '');
     const usr = get('SELECT u.id,u.name FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=?', tok);
     if (!usr) { res.writeHead(401, { 'content-type': 'application/json' }); return res.end('{"error":"No autenticado"}'); }
-    const channel = clean(u.searchParams.get('channel'), 32);
+    const kind = clean(u.searchParams.get('kind') || '', 24);
+    const rawChannel = clean(u.searchParams.get('channel'), 32);
+    const isBanner = kind === 'banner' || rawChannel === '__profile__';
+    const channel = isBanner ? '__profile__' : rawChannel;
     const name = clean(u.searchParams.get('name') || 'archivo', 140).replace(/[/\\?%*:|"<>]/g, '_');
     const mime = clean(u.searchParams.get('mime') || 'application/octet-stream', 80);
     const text = clean(u.searchParams.get('text') || '', 2000);
-    let auth;
-    try { auth = authorize(channel, usr.id); if (auth.type === 'voice') fail('Canal de voz'); }
-    catch (e) { res.writeHead(403, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    let auth = null;
+    if (isBanner) {
+      if (!SAFE_MIMES.test(mime) || !/^image\/(png|jpeg|webp|gif)$/i.test(mime)) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        return res.end('{"error":"Formato de banner no permitido (PNG, JPEG, WebP o GIF)"}');
+      }
+    } else {
+      try { auth = authorize(channel, usr.id); if (auth.type === 'voice') fail('Canal de voz'); }
+      catch (e) { res.writeHead(403, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
+    }
+    const maxBytes = isBanner ? Math.floor(1.5 * 1024 * 1024) : MAX_UPLOAD;
     const disk = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
     const destPath = path.join(UPLOADS, disk);
     const wsOut = fs.createWriteStream(destPath);
     let size = 0, aborted = false;
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > MAX_UPLOAD && !aborted) {
+      if (size > maxBytes && !aborted) {
         aborted = true; wsOut.destroy(); try { fs.unlinkSync(destPath); } catch {}
-        res.writeHead(413, { 'content-type': 'application/json' }); res.end('{"error":"Archivo demasiado grande (máx. 25 MB)"}');
+        res.writeHead(413, { 'content-type': 'application/json' });
+        res.end(isBanner ? '{"error":"Banner demasiado grande (máx. 1.5 MB)"}' : '{"error":"Archivo demasiado grande (máx. 25 MB)"}');
       } else if (!aborted) wsOut.write(chunk);
     });
     req.on('end', () => {
@@ -1800,6 +1954,15 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
       wsOut.end(() => {
         if (!size) { try { fs.unlinkSync(destPath); } catch {} res.writeHead(400, { 'content-type': 'application/json' }); return res.end('{"error":"Archivo vacío"}'); }
         const ts = Date.now();
+        const fileId = Number(run('INSERT INTO files(channel,user_id,name,mime,size,disk,ts) VALUES(?,?,?,?,?,?,?)', channel, usr.id, name, mime, size, disk, ts).lastInsertRowid);
+        if (isBanner) {
+          if (!process.env.EPICKAST_TEST) {
+            firebaseAdapter.syncAttachmentToFirebase(DATA, disk, destPath, mime).catch(() => {});
+          }
+          setTimeout(saveBackup, 400);
+          res.writeHead(200, { 'content-type': 'application/json' });
+          return res.end(JSON.stringify({ ok: true, fileId, url: '/files/' + fileId }));
+        }
         const replyTo = u.searchParams.get('replyTo') ? Number(u.searchParams.get('replyTo')) : null;
         let replyInfo = null;
         if (replyTo) {
@@ -1811,7 +1974,6 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
           const rootM = get('SELECT id, thread_id FROM messages WHERE id=? AND channel=?', threadId, channel);
           threadId = rootM ? (rootM.thread_id || rootM.id) : null;
         }
-        const fileId = Number(run('INSERT INTO files(channel,user_id,name,mime,size,disk,ts) VALUES(?,?,?,?,?,?,?)', channel, usr.id, name, mime, size, disk, ts).lastInsertRowid);
         const msgId = Number(run('INSERT INTO messages(channel,user_id,text,ts,file_id,reply_to,thread_id) VALUES(?,?,?,?,?,?,?)', channel, usr.id, text, ts, fileId, replyInfo ? replyTo : null, threadId).lastInsertRowid);
         const msg = { id: msgId, userId: usr.id, name: usr.name, text, ts, fileId, fileName: name, fileMime: mime, fileSize: size, threadId, threadCount: 0, ...(replyInfo || {}), ...profileOf(usr.id) };
         if (threadId) {
@@ -1930,6 +2092,7 @@ wss.on('connection', (ws, req) => {
           }
           recordLoginSuccess(ip, name);
           const token = newToken(); run('INSERT INTO sessions VALUES(?,?,?)', token, u.id, Date.now());
+          setTimeout(saveBackup, 300);
           login(ws, u.id, u.name); return reply(true, { token, user: selfView(u.id), ice: iceServers() });
         }
         if (m.t === 'resume') {

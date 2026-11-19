@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws: wss: http: https: data: blob:; img-src 'self' data: blob: http: https:; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream: http: https:; frame-src 'self' http: https: https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' file: ws: wss: http: https: data: blob:; img-src 'self' file: data: blob: http: https:; style-src 'self' 'unsafe-inline'; media-src 'self' file: data: blob: mediastream: http: https:; frame-src 'self' http: https: https://www.youtube.com https://www.youtube-nocookie.com; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:">
 <title>EpicKast</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0b0e14">
@@ -11,6 +11,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="theme-tokens.css">
+<link rel="stylesheet" href="vendor/cropper.min.css">
+<link rel="stylesheet" href="vendor/pickr-nano.min.css">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="mobile.css">
 <script src="mobile-shim.js"></script>
@@ -169,13 +172,22 @@
     <div id="floatCamAvatar" class="float-cam-av hidden"></div>
   </div>
 </div>
-<div id="ekVersionBadge" title="EpicKast · Ver notas de versión">v1.9.5</div>
+<div id="ekVersionBadge" title="EpicKast · Ver notas de versión">v1.9.6</div>
 <div id="callOverlay" class="hidden"></div>
 <div id="modal" class="hidden"></div>
 <div id="toast"></div>
 <script src="lifecycle.js"></script>
 <script src="game-config.js"></script>
 <script src="sprites.js"></script>
+<script src="vendor/ui-kit.bundle.js"></script>
+<script src="vendor/audio.bundle.js"></script>
+<script src="audio-engine.js"></script>
+<script src="context-menu.js"></script>
+<script src="profile-studio.js"></script>
+<script src="cartoon-art.js"></script>
+<script src="phaser-loader.js"></script>
+<script src="dojo-phaser.js"></script>
+<script src="racer-phaser.js"></script>
 <script src="call.js"></script>
 <script src="game.js"></script>
 <script src="card-game.js"></script>

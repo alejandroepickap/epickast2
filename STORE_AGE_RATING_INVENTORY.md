@@ -2,7 +2,7 @@
 
 **Producto:** EpicKast (`9NWDBN0SHXQR`)  
 **Publisher:** `epickap`  
-**Versión auditada:** `1.9.1` (`Version="1.9.1.0"`)  
+**Versión auditada:** `1.9.6` (`Version="1.9.6.0"`)  
 **Propósito de este documento:** Proveer evidencia exacta del código fuente (`Sí / No / Incierto`) para que el desarrollador responda con precisión el cuestionario **Age Ratings (IARC)** en Microsoft Partner Center tras la observación **11.11.1 Age Ratings - Required Rating Certificate**.
 
 > **Nota importante:** Este documento **no** selecciona ni envía la clasificación final por edades. Expone únicamente los hechos técnicos verificables en el código de EpicKast para responder cada pregunta del cuestionario oficial de Partner Center.
@@ -123,3 +123,13 @@
   * Todos los textos de la interfaz (`app/index.html`, `app/renderer.js`) y las frases de los personajes del Dojo (`app/game-config.js`) son de temática ninja/arcade familiar.
 * **¿Existe un filtro automático de lenguaje inapropiado para los mensajes que escriben los usuarios? -> `NO`**
   * En `server/server.js` los mensajes de chat se sanitizan contra inyección HTML/XSS en el cliente (`escapeHtml` / `textContent`), pero no pasan por un diccionario de censura de groserías. En los cuestionarios IARC esto forma parte de la declaración de **interacción en línea sin filtro entre usuarios** (*Unrestricted / Unfiltered User-to-User Communication*).
+
+---
+
+### 9. Cumplimiento Técnico Microsoft Store (Políticas 10.2.5 / 10.2.7) y Bloqueo de Usuarios (`v1.9.6`)
+
+* **Política 10.2.5 / 10.2.7 (Sin auto-actualizador externo ni ejecución remota de código en Store):**
+  * **Bloqueo centralizado en el proceso principal (`app/main.js`):** La función `isStoreBuild()` detecta compilaciones de Microsoft Store (`process.windowsStore`, `process.env.STORE_BUILD === '1'` o ruta de ejecución en `\WindowsApps\`) y desactiva por completo los canales IPC de auto-actualización y desinstalación propios (`app:download-asar-update`, `app:apply-asar-update`, `app:download-and-install` y `app:uninstall`), devolviendo `{ ok: false, storeManaged: true, ... }`. En la versión Store, todas las actualizaciones y desinstalaciones son gestionadas exclusivamente por Microsoft Store y Configuración de Windows.
+  * **Cero CDNs ni carga remota de scripts (`CSP 'self'`):** Todas las bibliotecas y dependencias de interfaz se empaquetan localmente en tiempo de compilación mediante `bundle:vendors` (`node tools/bundle-vendors.js`), operando bajo una política de seguridad de contenido (`CSP`) estricta con `'self'` sin descarga de scripts desde redes externas.
+* **Bloqueo individual de usuarios (`block.add`):**
+  * A partir de la versión `1.9.6`, además de las herramientas de moderación de servidor (`kick_member`, `delete_message`) y eliminación de amigos (`friend_remove`), los usuarios disponen de bloqueo individual de cuentas (`block.add`) para impedir mensajes e interacciones no deseadas.

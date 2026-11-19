@@ -4,6 +4,43 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ---
 
+## [1.9.7] - 2026-11-19
+
+### 🎨 Estudio de Banners Pro (Pósters Promocionales Anime & Eventos + Degradados de Estudio), Turbo Core con Perspectiva Curva y Dojo Elemental Refinado
+- **8 Pósters Promocionales Originales Anime & Eventos (`1280×400` 16:5 WebP en `app/assets/banners/promo_*.webp`, `tools/build-anime-promo-banners.py`):**
+  - Nuevas ilustraciones promocionales estilo key-visual oficial de torneos, convenciones y eventos: *Elemental Clash (Ignis · Maestro Ryūjin · Torrente)*, *Rival Showdown (Ignis vs. Zero-Frost)*, *Cyber Matsuri (Akira Hoshino)*, *Crimson Moon (Kurogane)*, *Shibuya Drift GP (Renji Takahashi)*, *Dual-Soul Shinobi (Kaelen)*, *Colossus Raid* y *Boreal Aurora*.
+  - Composición profesional con zona segura lateral izquierda con viñeta coseno sin costuras para que el avatar circular y el nombre nunca tapen los rostros de los personajes.
+- **Galería Visual Interactiva de Banners y 12 Degradados Multi-Parada Pro (`app/profile-studio.js`, `app/renderer.js`, `app/style.css`, `app/game-config.js`):**
+  - Nuevo selector visual por pestañas (*🔥 Pósters Anime*, *🌈 Degradados Pro*, *🏞️ Mundos Cartoon*, *🎁 Todos*) con miniaturas 16:5 interactivas, insignias de evento y previsualización instantánea en vivo.
+  - 12 degradados multi-parada diseñados con armonía de color (*Aurora Hyperion*, *Atardecer en Shibuya*, *Nebulosa de Amatista*, *Obsidiana & Oro Real*, *Océano Bioluminiscente*, *Sakura de Medianoche*, *Cyberpunk Akihabara*, *Esmeralda Cuántica*, *Forja Carmesí*, *Prisma Holográfico*, *Cielo Lo-Fi Pastel*, *Tormenta Eléctrica*).
+- **Turbo Core Arcade Circuit con Perspectiva Curva, Horizonte Parallax y Anti-Amontonamiento (`app/racer-phaser.js`, `app/racer-game.js`):**
+  - Carretera con perspectiva trapezoidal y curvas sinusoidales dinámicas, horizonte temático con scroll parallax, tribunas de competición *TURBO GP*, velocímetro digital (`KM/H`, marcha y barra RPM) e IA con separación lateral activa para evitar que los rivales se encimen.
+- **Dojo Elemental con Escenario Despejado y Ninjas Expresivos (`app/dojo-phaser.js`, `app/card-game.js`):**
+  - Reubicación compacta del HUD central para dejar 100% visible la ventana al Monte Fuji con disco solar, pétalos de sakura en movimiento y pergaminos *kakemono*; ninjas rediseñados con túnica *gi*, mirada expresiva y cintas ondeantes.
+
+---
+
+## [1.9.6] - 2026-11-19
+
+### 🎨 Motor Phaser 3 Cartoon 2D (Estilo Club Penguin), Cloudflare Realtime TURN, Moderación Clic Derecho, Estudio de Perfil Pro y Audio Orgánico
+- **Minijuegos con Motor Phaser 3 y Arte Cartoon 2D (`app/dojo-phaser.js`, `app/racer-phaser.js`, `app/card-game.js`, `app/racer-game.js`, `app/game.js`, `app/cartoon-art.js`, `app/assets/cartoon/*.webp`):**
+  - **Dojo Elemental Phaser 3 (`EKDojoScene`):** Escenario animado a 60 FPS con tatami cálido, puertas *shoji*, ventana con cielo pastel, linternas oscilantes, ninjas cartoon redondeados con contorno limpio (`#1e2433`) y soporte completo de cosméticos/mascotas de *Mi Ninja*, proyectiles elementales y gags cómicos al estilo Card-Jitsu clásico sin recrear el contexto WebGL entre rondas.
+  - **Turbo Core Phaser 3 (`TurboCoreScene`):** Motor de carreras pseudo-3D de curvas suaves, paletas diurnas descansadas en las 4 pistas, karts redondeados con inclinación al girar, normalización `dtScale` para monitores de 60/120/144 Hz, rivales con evasión anticipada de obstáculos y sincronización PvP intacta.
+  - **Mazmorras Cartoon 2D y Paquete WebP (`318 KB`):** Suelo de adoquines pizarra descansado para la vista, héroes/jefes con contornos limpios 100% aptos para clasificación familiar IARC y 10 ilustraciones cartoon originales optimizadas en `.webp`.
+- **Cloudflare Realtime TURN, Videollamada Directa y Estabilidad WebRTC (`server/server.js`, `app/call.js`):**
+  - Integración oficial con **Cloudflare Realtime TURN** (`CF_TURN_TOKEN_ID` / `CF_TURN_API_TOKEN`) con credenciales efímeras `stun:` / `turn:` / `turns:` y respaldo automático.
+  - Presupuesto de subida adaptativo (`4800 kbps`), degradación inteligente de resolución/FPS ante pérdida de paquetes (`monitorNetwork`), *watchdog* contra audio unidireccional y botón de **Videollamada Directa** (`video: true`) en amigos y mensajes directos.
+- **Moderación por Clic Derecho y Drag & Drop en Canales de Voz (`app/context-menu.js`, `server/server.js`):**
+  - Menú contextual (clic derecho en PC / pulsación larga en móvil) sobre mosaicos de cámara y miembros en canales de voz con control de volumen individual (`0–200%`), enfoque de cámara, silenciar, ensordecer, asistencia de audio, mover a otro canal o desconectar (`voice.disconnect`).
+  - Arrastrar y soltar (*SortableJS*) usuarios entre canales de voz de la barra lateral para administradores con permisos `moveMembers`.
+- **Estudio de Perfil Pro, Bóveda Animada y 16 Sonidos Orgánicos (`app/profile-studio.js`, `app/audio-engine.js`, `app/theme-tokens.css`):**
+  - Selector libre de color sólido y degradado de 2 paradas (*Pickr*), recortador interactivo `16:5` para subir banners personalizados (*CropperJS* + `POST /upload?kind=banner`), 3 fondos cartoon gratuitos estilo Club Penguin y animaciones *GSAP* + confeti en la Bóveda.
+  - Motor de audio **Howler.js** (`window.EKAudio`) con 16 efectos WAV orgánicos sin pitidos estridentes, jerarquía visual de 4 superficies oscuras descansadas y vista de Amigos en 2 columnas.
+- **Cumplimiento Microsoft Store (`app/main.js`, `app/preload.js`, `STORE_AGE_RATING_INVENTORY.md`):**
+  - `isStoreBuild()` desactiva y oculta cualquier auto-actualizador/desinstalador propio cuando la app se ejecuta como paquete de Microsoft Store (`9NWDBN0SHXQR`), manteniendo `0` CDNs externos (`script-src 'self'`).
+
+---
+
 ## [1.9.5] - 2026-11-17
 
 ### 🏯 Dojo Elemental HD (Estilo Card-Jitsu Original), Colección de 60 Cartas, Inventario Estilo Clash Royale, Santuario Arcano y Ventana Flotante Limpia

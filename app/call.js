@@ -13,10 +13,10 @@ const CAM_PRESETS = {
   '1080p30': { w: 1920, h: 1080, fps: 30, kbps: 3500 },
 };
 const SCREEN_PRESETS = {
-  '720p30': { w: 1280, h: 720, fps: 30, kbps: 2500 },
-  '1080p30': { w: 1920, h: 1080, fps: 30, kbps: 5000 },
-  '1080p60': { w: 1920, h: 1080, fps: 60, kbps: 8000 },
-  '1440p60': { w: 2560, h: 1440, fps: 60, kbps: 12000 },
+  '720p30': { w: 1280, h: 720, fps: 30, kbps: 1800 },
+  '1080p30': { w: 1920, h: 1080, fps: 30, kbps: 3000 },
+  '1080p60': { w: 1920, h: 1080, fps: 60, kbps: 4500 },
+  '1440p60': { w: 2560, h: 1440, fps: 60, kbps: 6500 },
 };
 
 function preferredCodecs() {
@@ -318,15 +318,21 @@ async function createMic(settings) {
 }
 
 class Call {
-  constructor({ send, myId, settings, ice, onChange, onSpeaking }) {
+  constructor({ send, myId, settings, ice, onChange, onSpeaking, onPeerStatus }) {
     this.send = send; this.myId = myId; this.settings = settings; this.ice = ice;
-    this.onChange = onChange; this.onSpeaking = onSpeaking;
+    this.onChange = onChange; this.onSpeaking = onSpeaking; this.onPeerStatus = onPeerStatus || null;
     this.peers = new Map(); this.pending = new Map();
     this.main = null; this.camTrack = null; this.screenStream = null; this.mic = null;
     this.muted = false; this.deaf = false; this.selfSpeaking = false;
     this.codecs = settings.hwPrefer ? preferredCodecs() : null;
     this.lastBytes = new Map();
+    this.bwScale = 1;
+    this.uplinkCapKbps = 4800;
+    this._netBusy = false;
     this.speakTimer = setInterval(() => this.pollSpeaking(), 180);
+    this.netTimer = setInterval(() => this.monitorNetwork(), 2500);
+    this._onlineHandler = () => this.recoverAllPeers();
+    if (typeof window !== 'undefined') window.addEventListener('online', this._onlineHandler);
   }
 
   async start() {
@@ -399,7 +405,13 @@ class Call {
     if (this.peers.has(user.id)) return;
     const iceTransportPolicy = this.settings.icePolicy === 'relay' ? 'relay' : 'all';
     const pc = new RTCPeerConnection({ iceServers: this.ice, iceTransportPolicy, bundlePolicy: 'max-bundle', iceCandidatePoolSize: 2 });
-    const p = { id: user.id, name: user.name, user, pc, polite: this.myId > user.id, making: false, ignore: false, senders: {}, streams: new Map(), mainId: null, state: user.state || {}, speaking: false, _iceTimer: null };
+    const p = {
+      id: user.id, name: user.name, user, pc, polite: this.myId > user.id,
+      making: false, ignore: false, senders: {}, streams: new Map(), mainId: null,
+      state: user.state || {}, speaking: false,
+      _iceTimer: null, _retryTimer: null, _iceRetries: 0, _retrying: false,
+      _lastAudioBytes: 0, _stalledChecks: 0, _connectedAt: 0, _audioWatchdogFired: false,
+    };
     this.peers.set(user.id, p);
     pc.onicecandidate = (e) => { if (e.candidate) this.send('rtc.signal', { to: p.id, data: { candidate: e.candidate } }); };
     pc.onnegotiationneeded = async () => {
@@ -420,6 +432,15 @@ class Call {
       this.onChange();
     };
     pc.ontrack = (e) => {
+      // Baja latencia: limitar el jitter buffer / playout delay de recepción (audio y video)
+      try {
+        if (e.receiver && 'playoutDelayHint' in e.receiver) {
+          e.receiver.playoutDelayHint = e.track.kind === 'audio' ? 0.02 : 0.04;
+        }
+        if (e.receiver && 'jitterBufferTarget' in e.receiver) {
+          e.receiver.jitterBufferTarget = e.track.kind === 'audio' ? 20 : 40;
+        }
+      } catch {}
       const st = e.streams[0] || new MediaStream([e.track]);
       if (!p.streams.has(st.id)) {
         p.streams.set(st.id, st); if (!p.mainId) p.mainId = st.id;
@@ -429,16 +450,23 @@ class Call {
       purgeDeadStreams();
     };
     pc.onconnectionstatechange = () => {
+      const state = pc.connectionState;
       clearTimeout(p._iceTimer);
-      if (pc.connectionState === 'failed') {
-        pc.restartIce();
-      } else if (pc.connectionState === 'disconnected') {
+      if (state === 'connected') {
+        clearTimeout(p._retryTimer);
+        p._retrying = false;
+        p._iceRetries = 0;
+        p._connectedAt = p._connectedAt || Date.now();
+      } else if (state === 'failed') {
+        this.triggerIceRestart(p);
+      } else if (state === 'disconnected') {
         p._iceTimer = setTimeout(() => {
-          if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-            try { pc.restartIce(); } catch {}
+          if (this.peers.get(p.id) === p && (pc.connectionState === 'disconnected' || pc.connectionState === 'failed')) {
+            this.triggerIceRestart(p);
           }
-        }, 3500);
+        }, 3200);
       }
+      this.onPeerStatus?.(p.id, state);
       this.onChange();
     };
     // pistas locales actuales
@@ -451,9 +479,66 @@ class Call {
     this.onChange();
   }
 
+  triggerIceRestart(p, { immediate = false, force = false } = {}) {
+    if (!p || this.peers.get(p.id) !== p || p.pc.connectionState === 'closed') return;
+    if (p._retrying && !immediate && !force) return;
+    if (!force && p._iceRetries >= 4) return;
+    clearTimeout(p._retryTimer);
+    clearTimeout(p._iceTimer);
+    const delays = [2000, 4000, 8000, 14000];
+    const attempt = p._iceRetries;
+    const delay = (immediate || force) ? 150 : delays[Math.min(attempt, delays.length - 1)];
+    if (!force) p._iceRetries += 1;
+    const retryNum = p._iceRetries;
+    p._retrying = true;
+    p._retryTimer = setTimeout(async () => {
+      p._retrying = false;
+      if (this.peers.get(p.id) !== p) return;
+      const pc = p.pc;
+      if (pc.connectionState === 'closed') return;
+      if (!force && pc.connectionState === 'connected') return;
+      try {
+        pc.restartIce?.();
+        if (pc.signalingState === 'stable' && (p.polite || retryNum >= 2 || force)) {
+          p.making = true;
+          try {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            const desc = pc.localDescription
+              ? { type: pc.localDescription.type, sdp: this.tuneOpusSdp(pc.localDescription.sdp) }
+              : pc.localDescription;
+            this.send('rtc.signal', { to: p.id, data: { description: desc } });
+          } finally {
+            p.making = false;
+          }
+        }
+      } catch (e) {
+        console.warn('ice restart', e);
+      }
+      if (!force && this.peers.get(p.id) === p && p._iceRetries < 4 && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) {
+        p._iceTimer = setTimeout(() => {
+          if (this.peers.get(p.id) === p && !p._retrying && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) {
+            this.triggerIceRestart(p);
+          }
+        }, 3500);
+      }
+    }, delay);
+  }
+
+  recoverAllPeers() {
+    for (const p of this.peers.values()) {
+      if (p.pc.connectionState !== 'connected' && p.pc.connectionState !== 'closed') {
+        p._iceRetries = 0;
+        p._retrying = false;
+        this.triggerIceRestart(p, { immediate: true });
+      }
+    }
+  }
+
   removePeer(id) {
     const p = this.peers.get(id); if (!p) return;
     clearTimeout(p._iceTimer);
+    clearTimeout(p._retryTimer);
     p.pc.close(); this.peers.delete(id); this.lastBytes.delete(id);
     this.retune(); this.onChange();
   }
@@ -502,17 +587,26 @@ class Call {
   }
   share() { return Math.min(1, 2 / Math.max(1, this.peers.size)); }
   tuneVideo(sender, preset, kind) {
+    const peers = Math.max(1, this.peers.size);
+    const both = !!(this.camTrack && this.screenStream);
+    const peerCapBps = Math.round((this.uplinkCapKbps * 1000) / peers);
+    const kindBudget = both
+      ? (kind === 'cam' ? Math.round(peerCapBps * 0.35) : Math.round(peerCapBps * 0.65))
+      : peerCapBps;
     this.setParams(sender, (prm) => {
       const e = prm.encodings[0];
       if (this.gameMode) {
-        e.maxBitrate = Math.min(320000, Math.round(preset.kbps * 1000 * 0.35));
+        e.maxBitrate = Math.min(kindBudget, 320000, Math.round(preset.kbps * 1000 * 0.35 * this.bwScale));
         e.maxFramerate = 15;
       } else {
-        e.maxBitrate = Math.round(preset.kbps * 1000 * this.share());
-        e.maxFramerate = preset.fps;
+        const scaled = Math.max(80000, Math.round(preset.kbps * 1000 * this.share() * this.bwScale));
+        e.maxBitrate = Math.min(kindBudget, scaled);
+        e.maxFramerate = this.bwScale < 0.45 ? Math.min(preset.fps, 24) : preset.fps;
       }
-      e.networkPriority = kind === 'screen' ? 'medium' : 'high';
-      prm.degradationPreference = kind === 'screen' && preset.fps <= 30 ? 'maintain-resolution' : 'balanced';
+      // El video nunca debe competir con el audio: prioridad más baja que la voz
+      e.networkPriority = kind === 'screen' ? 'very-low' : 'low';
+      e.priority = kind === 'screen' ? 'very-low' : 'low';
+      prm.degradationPreference = kind === 'screen' ? 'maintain-resolution' : 'maintain-framerate';
     });
   }
   setGameMode(enabled) {
@@ -548,6 +642,7 @@ class Call {
     } else if (!on && this.camTrack) {
       for (const p of this.peers.values()) { if (p.senders.cam) { try { p.pc.removeTrack(p.senders.cam); } catch {} delete p.senders.cam; } }
       this.main.removeTrack(this.camTrack); this.camTrack.stop(); this.camTrack = null;
+      this.retune();
     }
     this.onChange();
   }
@@ -623,7 +718,7 @@ class Call {
       p.senders.screenTracks = [];
     }
     this.screenStream.getTracks().forEach((t) => t.stop());
-    this.screenStream = null; this.onChange();
+    this.screenStream = null; this.retune(); this.onChange();
   }
 
   setMuted(m) {
@@ -657,6 +752,101 @@ class Call {
       if (sp !== p.speaking) { p.speaking = sp; this.onSpeaking(p.id, sp); }
     }
     this.mic?.setRemoteSpeaking?.(anyRemoteSpeaking);
+  }
+
+  // ---- monitoreo adaptativo de congestión + watchdog de audio unidireccional ----
+  async monitorNetwork() {
+    if (this._netBusy || this.peers.size === 0) return;
+    this._netBusy = true;
+    try {
+      const hasVideoOut = !!(this.camTrack || this.screenStream);
+      const cp = CAM_PRESETS[this.settings.camPreset] || CAM_PRESETS['720p30'];
+      const sp = SCREEN_PRESETS[this.settings.screenPreset] || SCREEN_PRESETS['720p30'];
+      const demandBps = ((this.camTrack ? cp.kbps : 0) + (this.screenStream ? sp.kbps : 0)) * 1000 * this.share();
+      const peerCapBps = (this.uplinkCapKbps * 1000) / Math.max(1, this.peers.size);
+      const activeTargetBps = Math.min(demandBps * this.bwScale, peerCapBps);
+
+      let congested = false;
+      let tightHeadroom = false;
+      const peerStats = [];
+
+      for (const p of this.peers.values()) {
+        if (p.pc.connectionState === 'closed') continue;
+        try {
+          const rep = await p.pc.getStats();
+          let rtt = null;
+          let availOut = null;
+          let fracLost = 0;
+          let audioBytes = 0;
+
+          rep.forEach((r) => {
+            if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.nominated) {
+              if (r.currentRoundTripTime != null) rtt = r.currentRoundTripTime;
+              if (r.availableOutgoingBitrate != null) availOut = r.availableOutgoingBitrate;
+            }
+            if (r.type === 'remote-inbound-rtp' && r.fractionLost != null && r.fractionLost > fracLost) {
+              fracLost = r.fractionLost;
+            }
+            if (r.type === 'inbound-rtp' && r.kind === 'audio') {
+              audioBytes += (r.bytesReceived || 0);
+            }
+          });
+
+          if (rtt != null && rtt > 0.35) congested = true;
+          if (fracLost > 0.07) congested = true;
+          if (hasVideoOut && availOut != null && availOut > 0 && availOut < activeTargetBps * 0.5) {
+            tightHeadroom = true;
+          }
+
+          if (audioBytes > 0) p._everReceivedAudio = true;
+          let audioGrew = false;
+          if (p.pc.connectionState === 'connected' && p._connectedAt > 0 && Date.now() - p._connectedAt > 8000 && !p.state?.muted) {
+            audioGrew = audioBytes > p._lastAudioBytes;
+            p._lastAudioBytes = audioBytes;
+            if (audioGrew) {
+              p._stalledChecks = 0;
+              p._audioWatchdogFired = false;
+            } else {
+              p._stalledChecks += 1;
+            }
+          } else {
+            p._stalledChecks = 0;
+            p._lastAudioBytes = audioBytes;
+          }
+          peerStats.push({ p, audioGrew });
+        } catch {}
+      }
+
+      const prevScale = this.bwScale;
+      if (congested) {
+        this.bwScale = Math.max(0.25, this.bwScale * 0.78);
+      } else if (!tightHeadroom && this.bwScale < 1) {
+        this.bwScale = Math.min(1, this.bwScale + 0.08);
+      }
+      if (Math.abs(this.bwScale - prevScale) >= 0.08) {
+        this.retune();
+      }
+
+      for (const item of peerStats) {
+        const p = item.p;
+        if (
+          p.pc.connectionState === 'connected' &&
+          p._connectedAt > 0 &&
+          Date.now() - p._connectedAt > 8000 &&
+          !p.state?.muted &&
+          !p._audioWatchdogFired
+        ) {
+          const otherAudioFlowing = peerStats.some((s) => s.p !== p && s.audioGrew);
+          // Solo reiniciar ICE si jamás llegó audio de este par (evita congelar una llamada ya sana)
+          if (!p._everReceivedAudio && ((p._stalledChecks >= 3 && otherAudioFlowing) || p._stalledChecks >= 4)) {
+            p._audioWatchdogFired = true;
+            this.triggerIceRestart(p, { immediate: true, force: true });
+          }
+        }
+      }
+    } finally {
+      this._netBusy = false;
+    }
   }
 
   // ---- semáforo rápido de red (estilo Parsec/Steam: ping RTT + pérdida de paquetes) ----
@@ -711,7 +901,11 @@ class Call {
 
   close() {
     clearInterval(this.speakTimer);
-    for (const p of this.peers.values()) { clearTimeout(p._iceTimer); p.pc.close(); }
+    clearInterval(this.netTimer);
+    if (typeof window !== 'undefined' && this._onlineHandler) {
+      window.removeEventListener('online', this._onlineHandler);
+    }
+    for (const p of this.peers.values()) { clearTimeout(p._iceTimer); clearTimeout(p._retryTimer); p.pc.close(); }
     this.peers.clear();
     this.mic?.dispose(); this.mic = null;
     this.camTrack?.stop();

@@ -13,7 +13,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  const APP_VERSION = '1.9.5';
+  const APP_VERSION = '1.9.7';
 
   const RARITY_TOKENS = {
     common: {
@@ -164,7 +164,7 @@
     // --- LEGENDARIOS (6) ---
     { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia «FUNDADOR» para llamadas, chat y perfil (Prestigio Edición 1).' },
     { id: 'frame_colossus_legend', name: 'Marco: Núcleo del Coloso', type: 'frame', val: 'frame-colossus-legend', rarity: 'legendary', desc: 'Doble halo dorado y cian con rotación continua forjado en el corazón del Coloso.' },
-    { id: 'banner_golem_animated', name: 'Banner: Despertar del Coloso', type: 'banner', val: "url('assets/banners/banner_colossus_lava.jpg') center/cover no-repeat", animated: true, rarity: 'legendary', desc: 'Arte legendario de fantasía oscura del Coloso emergiendo del magma volcánico.' },
+    { id: 'banner_golem_animated', name: 'Banner: Colossus Raid (Póster Oficial)', type: 'banner', val: "url('assets/banners/promo_colossus_raid_event.webp') center/cover no-repeat", animated: true, rarity: 'legendary', desc: 'Póster promocional legendario del evento Raid: Titán de Obsidiana.' },
     { id: 'title_colossus_slayer', name: 'Título: Coloso Caído', type: 'title', val: 'Coloso Caído', badgeIcon: '👑', rarity: 'legendary', desc: 'Título resplandeciente reservado para quienes derriban al Coloso.' },
     { id: 'plate_colossus', name: 'Placa: Fragua del Coloso', type: 'plate', val: 'plate_colossus', cssClass: 'plate-colossus', animated: true, previewBg: 'linear-gradient(90deg, rgba(251,191,36,0.42), rgba(239,68,68,0.32), rgba(120,53,15,0.25))', rarity: 'legendary', desc: 'Placa de nombre legendaria del Set del Coloso con brasas incandescentes.' },
     { id: 'fx_void', name: 'Efecto: Vórtice Abisal', type: 'fx', val: 'fx_void', fxKind: 'void', particleColor: '#fbbf24', rarity: 'legendary', desc: 'Partículas gravitatorias doradas y violetas del vacío sobre tu tarjeta de perfil.' },
@@ -173,8 +173,8 @@
     { id: 'frame_runic', name: 'Marco: Partículas Rúnicas', type: 'frame', val: 'frame-runic', rarity: 'epic', desc: 'Marco pulsante con chispas mágicas alrededor de tu avatar.' },
     { id: 'color_aurora', name: 'Color: Aurora Boreal', type: 'color', val: 'linear-gradient(90deg, #38bdf8, #a855f7)', rarity: 'epic', desc: 'Gradiente animado estilo aurora boreal para tu nombre.' },
     { id: 'color_volcanic_flame', name: 'Color: Fuego Volcánico', type: 'color', val: 'linear-gradient(90deg, #fb7185, #fbbf24)', rarity: 'epic', desc: 'Gradiente ardiente en movimiento continuo.' },
-    { id: 'banner_fluid_lava', name: 'Banner: Shinobi Luna Carmesí (Anime)', type: 'banner', val: "url('assets/banners/banner_anime_samurai.jpg') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Ilustración estilo anime de un shinobi bajo la luna carmesí y pétalos de sakura.' },
-    { id: 'banner_rune_storm', name: 'Banner: Neo-Tokyo Streetwear (Urbano)', type: 'banner', val: "url('assets/banners/banner_urban_streetwear.jpg') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Estética urbana nocturna con luces de neón cian y púrpura en callejón de Tokio.' },
+    { id: 'banner_fluid_lava', name: 'Banner: Crimson Moon · Kurogane (Anime)', type: 'banner', val: "url('assets/banners/promo_crimson_shinobi.webp') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Póster clave de anime: Kurogane bajo la luna carmesí en Neo-Tokyo.' },
+    { id: 'banner_rune_storm', name: 'Banner: Cyber Matsuri · Akira (Anime)', type: 'banner', val: "url('assets/banners/promo_cyber_idol_matsuri.webp') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Póster promocional de convención anime en Akihabara con Akira Hoshino.' },
     { id: 'plate_runic_storm', name: 'Placa: Tormenta Rúnica', type: 'plate', val: 'plate_runic_storm', cssClass: 'plate-runic-storm', animated: true, previewBg: 'linear-gradient(90deg, rgba(168,85,247,0.42), rgba(59,130,246,0.28), rgba(236,72,153,0.22))', rarity: 'epic', desc: 'Placa arcana con brillo animado recorriendo tu fila de miembro.' },
     { id: 'fx_embers', name: 'Efecto: Brasas del Núcleo', type: 'fx', val: 'fx_embers', fxKind: 'embers', particleColor: '#fb923c', rarity: 'epic', desc: 'Chispas ascendentes de fuego elemental sobre tu tarjeta de perfil.' },
 
@@ -195,11 +195,11 @@
     { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#34d399', rarity: 'common', desc: 'Tinte resplandeciente esmeralda del Núcleo.' },
     { id: 'color_cyan', name: 'Color: Cian Neón', type: 'color', val: '#38bdf8', rarity: 'common', desc: 'Destello ciberpunk cian brillante para tu nombre.' },
     { id: 'color_crimson', name: 'Color: Rojo Magma', type: 'color', val: '#fb7185', rarity: 'common', desc: 'Tono carmesí ardiente de roca fundida.' },
-    { id: 'banner_mines', name: 'Banner: Minas de Magma (Minimalista)', type: 'banner', val: 'linear-gradient(135deg, #451a03, #b45309, #78350f)', rarity: 'common', desc: 'Estandarte limpio de magma y basalto sin personajes para un perfil sobrio.' },
-    { id: 'banner_amethyst', name: 'Banner: Santuario Boreal (Paisaje HD)', type: 'banner', val: "url('assets/banners/banner_glacial_aurora.jpg') center/cover no-repeat", rarity: 'rare', desc: 'Templo de hielo cristalino bajo una aurora boreal esmeralda y violeta.' },
-    { id: 'banner_crypt', name: 'Banner: Cripta Ancestral (Minimalista)', type: 'banner', val: 'linear-gradient(135deg, #09090b, #1e293b, #334155)', rarity: 'common', desc: 'Gradiente oscuro minimalista de piedra antigua y niebla.' },
-    { id: 'banner_bridges', name: 'Banner: Drift Nocturno JDM (Urbano)', type: 'banner', val: "url('assets/banners/banner_cyber_drift.jpg') center/cover no-repeat", rarity: 'epic', desc: 'Estilo urbano nocturno con deportivo JDM y reflejos neón magenta.' },
-    { id: 'banner_sanctum', name: 'Banner: Sagrario del Núcleo (Minimalista)', type: 'banner', val: 'linear-gradient(135deg, #09090b, #581c87, #dc2626)', rarity: 'common', desc: 'Gradiente limpio de obsidiana y carmesí sin elementos distractores.' },
+    { id: 'banner_mines', name: 'Banner: Elemental Clash · Torneo Dojo (Anime)', type: 'banner', val: "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat", rarity: 'common', desc: 'Póster triple del Gran Torneo del Dojo: Ignis, Maestro Ryūjin y Torrente.' },
+    { id: 'banner_amethyst', name: 'Banner: Boreal Aurora · Winter Fest', type: 'banner', val: "url('assets/banners/promo_aurora_sanctuary_fest.webp') center/cover no-repeat", rarity: 'rare', desc: 'Póster de convención invernal en el Santuario Cristalino bajo la aurora.' },
+    { id: 'banner_crypt', name: 'Banner: Dual-Soul · Kaelen (Anime)', type: 'banner', val: "url('assets/banners/promo_shadow_flame_chronicles.webp') center/cover no-repeat", rarity: 'common', desc: 'Arte promocional de Kaelen dominando la llama solar y el vórtice arcano.' },
+    { id: 'banner_bridges', name: 'Banner: Shibuya Drift GP · Renji (Anime)', type: 'banner', val: "url('assets/banners/promo_neotokyo_drift_gp.webp') center/cover no-repeat", rarity: 'epic', desc: 'Póster oficial del torneo nocturno Turbo Core GP con Renji Takahashi.' },
+    { id: 'banner_sanctum', name: 'Banner: Rival Showdown · Ignis vs. Zero-Frost', type: 'banner', val: "url('assets/banners/promo_frost_vs_ignis_rivals.webp') center/cover no-repeat", rarity: 'common', desc: 'Póster promocional Versus de choque elemental: Fuego Inmortal contra Hielo Cero.' },
     { id: 'plate_copper_forge', name: 'Placa: Forja de Cobre', type: 'plate', val: 'plate_copper_forge', cssClass: 'plate-copper-forge', previewBg: 'linear-gradient(90deg, rgba(194,65,12,0.32), rgba(124,45,18,0.08))', rarity: 'common', desc: 'Franja metálica de cobre templado detrás de tu nombre en miembros y mensajes directos.' }
   ];
 

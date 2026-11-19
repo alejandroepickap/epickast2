@@ -131,6 +131,66 @@ function client(port) {
   b.ws.close(); assert.equal((await a.wait('voice.left')).userId, rb.user.id);
   // sesión
   const c2 = await client(port); await c2.rpc('resume', { token: ra.token });
+  await a.rpc('voice.leave'); a.ws.close();
+  const b2 = await client(port); await b2.rpc('resume', { token: rb.token });
+  // llamada directa con video: call.incoming incluye video: true
+  c2.events.length = 0; b2.events.length = 0;
+  const vRing = await c2.rpc('voice.join', { key, video: true });
+  assert.equal(vRing.ringing, true);
+  const vInc = await b2.wait('call.incoming');
+  assert.equal(vInc.key, key);
+  assert.equal(vInc.video, true);
+  await b2.rpc('call.decline', { key });
+  await c2.wait('call.stop');
+  await c2.rpc('voice.leave');
+  // voice.moveUser entre canales de voz del mismo servidor + validación de destino
+  const voice2 = sv.channels.find((c) => c.type === 'voice' && c.key !== voice.key);
+  assert.ok(voice2);
+  await c2.rpc('voice.join', { key: voice.key });
+  await b2.rpc('voice.join', { key: voice.key });
+  await assert.rejects(c2.rpc('voice.moveUser', { currentKey: voice.key, targetKey: txt.key, userId: rb.user.id }), /voz/);
+  b2.events.length = 0;
+  const mvRes = await c2.rpc('voice.moveUser', { currentKey: voice.key, targetKey: voice2.key, userId: rb.user.id });
+  assert.equal(mvRes.ok, true);
+  assert.equal(mvRes.toKey, voice2.key);
+  assert.equal((await b2.wait('voice.forceMove')).toKey, voice2.key);
+  await b2.rpc('voice.join', { key: voice2.key });
+  // voice.disconnect: miembro regular rechazado, dueño desconecta y envía voice.kicked
+  await c2.rpc('server.setRole', { id, userId: rb.user.id, role: 'member' });
+  await assert.rejects(b2.rpc('voice.disconnect', { key: voice.key, userId: ra.user.id }), /Moderador/);
+  await assert.rejects(b2.rpc('voice.disconnect', { key: voice2.key, userId: rb.user.id }), /Moderador/);
+  b2.events.length = 0;
+  const dcRes = await c2.rpc('voice.disconnect', { key: voice2.key, userId: rb.user.id });
+  assert.equal(dcRes.ok, true);
+  const kicked = await b2.wait('voice.kicked');
+  assert.equal(kicked.key, voice2.key);
+  await c2.rpc('voice.leave');
+  // subida de banner personalizado (POST /upload?kind=banner) y validación segura en profile.set
+  c2.events.length = 0; b2.events.length = 0;
+  const banRes = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=banner.png&mime=image/png`, {
+    method: 'POST', headers: { 'x-token': ra.token }, body: Buffer.from('PNG-BANNER-DATA'),
+  });
+  assert.equal(banRes.status, 200);
+  const banJson = await banRes.json();
+  assert.equal(banJson.ok, true);
+  assert.ok(banJson.fileId > 0);
+  assert.equal(banJson.url, '/files/' + banJson.fileId);
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(b2.events.some((e) => e.t === 'msg'), false);
+  const banDl = await fetch(`http://127.0.0.1:${port}${banJson.url}`);
+  assert.equal(banDl.status, 200);
+  assert.equal(await banDl.text(), 'PNG-BANNER-DATA');
+  const badMimeBan = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=doc.pdf&mime=application/pdf`, {
+    method: 'POST', headers: { 'x-token': ra.token }, body: Buffer.from('PDF'),
+  });
+  assert.equal(badMimeBan.status, 400);
+  const profBan = await c2.rpc('profile.set', { banner: banJson.url });
+  assert.equal(profBan.banner, banJson.url);
+  await assert.rejects(c2.rpc('profile.set', { banner: 'javascript:alert(1)' }), /Banner inválido/);
+  await assert.rejects(c2.rpc('profile.set', { banner: ';evil' }), /Banner inválido/);
+  await assert.rejects(c2.rpc('profile.set', { banner: 'https://evil.com/banner.png' }), /Banner inválido/);
+  const profGrad = await c2.rpc('profile.set', { banner: 'linear-gradient(135deg, #112233, #445566)' });
+  assert.equal(profGrad.banner, 'linear-gradient(135deg, #112233, #445566)');
   console.log('✔ Todas las pruebas del servidor pasaron');
-  for (const c of [a, c2]) c.ws.close(); wss.close(); httpServer.close(); setTimeout(() => process.exit(0), 200);
+  for (const c of [c2, b2]) c.ws.close(); wss.close(); httpServer.close(); setTimeout(() => process.exit(0), 200);
 })().catch((e) => { console.error('✘', e); process.exit(1); });

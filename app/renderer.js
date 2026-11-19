@@ -15,6 +15,7 @@ function h(tag, props, ...kids) {
 const SVG_PATHS = {
   chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
   phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  video: '<path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/>',
   pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"/>',
   gallery: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
@@ -75,8 +76,42 @@ function applyTheme(theme) {
 applyTheme(settings.theme);
 
 const userVols = JSON.parse(localStorage.getItem('epickast.volumes') || '{}'); // userId -> 0..2 (1 = 100%)
+const userPrevVols = {};
 const getUserVol = (uid) => (userVols[uid] !== undefined ? Number(userVols[uid]) : 1);
-const setUserVol = (uid, v) => { userVols[uid] = Math.round(v * 100) / 100; localStorage.setItem('epickast.volumes', JSON.stringify(userVols)); };
+const setUserVol = (uid, v) => {
+  userVols[uid] = Math.round(v * 100) / 100;
+  localStorage.setItem('epickast.volumes', JSON.stringify(userVols));
+};
+const isUserLocalMuted = (uid) => getUserVol(uid) <= 0.001;
+const toggleUserLocalMute = (uid) => {
+  const cur = getUserVol(uid);
+  if (cur <= 0.001) {
+    const prev = userPrevVols[uid] && userPrevVols[uid] > 0.05 ? userPrevVols[uid] : 1;
+    setUserVol(uid, prev);
+  } else {
+    userPrevVols[uid] = cur;
+    setUserVol(uid, 0);
+  }
+  const nextVol = getUserVol(uid);
+  for (const [, t] of tiles) {
+    if (String(t.uid) === String(uid)) {
+      if (t.vRng) t.vRng.value = nextVol;
+      if (t.vTxt) t.vTxt.textContent = `${Math.round(nextVol * 100)}%`;
+      applyTileVolume(t);
+    }
+  }
+  return nextVol <= 0.001;
+};
+function bannerCss(bannerVal) {
+  if (window.EKProfileStudio?.bannerStyle) {
+    const s = window.EKProfileStudio.bannerStyle(bannerVal, httpBase);
+    if (s) return s;
+  }
+  if (typeof bannerVal === 'string' && /^\/files\/\d+$/.test(bannerVal.trim())) {
+    return `background-image:url('${httpBase()}${bannerVal.trim()}');background-size:cover;background-position:center`;
+  }
+  return `background:${bannerVal || 'linear-gradient(135deg, #7c5cff, #4f46e5)'}`;
+}
 function applyAccent() { document.documentElement.style.setProperty('--ac', settings.accent); }
 function applyStageHeight() { document.documentElement.style.setProperty('--stage-h', `${Math.max(24, Math.min(94, Number(settings.stageHeight) || 60))}vh`); }
 function applyShortcuts() {
@@ -401,37 +436,42 @@ function modalVault(initialTab = 'roulette') {
     prevWrap.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);';
 
     const box = document.createElement('div');
-    box.style.cssText = 'background:#0f131d;border:1.5px solid #283247;border-radius:14px;padding:24px;width:92%;max-width:440px;box-shadow:0 16px 40px rgba(0,0,0,0.8);color:#fff;font-family:system-ui,-apple-system,sans-serif;position:relative;overflow:hidden;';
+    box.style.cssText = 'background:#0f131d;border:1.5px solid #283247;border-radius:16px;padding:22px;width:92%;max-width:480px;box-shadow:0 20px 48px rgba(0,0,0,0.85);color:#fff;font-family:system-ui,-apple-system,sans-serif;position:relative;overflow:hidden;';
 
     const eqFrame = (item.type === 'frame' ? item.val : localStorage.getItem('epickast.equipped_frame')) || S.me?.frame;
     const eqBanner = (item.type === 'banner' ? item.val : localStorage.getItem('epickast.equipped_banner')) || S.me?.banner || 'linear-gradient(135deg, #1e1b4b, #4338ca)';
     const eqColor = (item.type === 'color' ? item.val : localStorage.getItem('epickast.equipped_color')) || S.me?.color || '#38bdf8';
     const eqTitle = (item.type === 'title' ? item.val : localStorage.getItem('epickast.equipped_title')) || S.me?.title || 'Aspirante del Núcleo';
-    const eqPlate = (item.type === 'nameplate' ? item.val : localStorage.getItem('epickast.equipped_nameplate')) || S.me?.nameplate || '';
-    const activeFx = (item.type === 'profile_fx' ? item.val : localStorage.getItem('epickast.equipped_profile_fx')) || S.me?.profile_fx || '';
+    const eqPlate = (item.type === 'nameplate' || item.type === 'plate' ? item.val : localStorage.getItem('epickast.equipped_nameplate')) || S.me?.nameplate || '';
+    const activeFx = (item.type === 'profile_fx' || item.type === 'fx' ? item.val : localStorage.getItem('epickast.equipped_profile_fx')) || S.me?.profile_fx || '';
 
     const frameCls = eqFrame === 'founder_blue' ? 'frame-founder' : (eqFrame ? ' ' + eqFrame : '');
     const isAnimatedBanner = String(eqBanner).includes('linear-gradient') && item.type === 'banner' && item.rarity === 'legendary';
+    const hasAvatarImg = S.me?.av && S.me?.id;
+    const avBgStyle = hasAvatarImg
+      ? `background-image:url('${avUrl(S.me.id, S.me.av)}');background-size:cover;background-position:center;color:transparent;`
+      : `background:${String(eqColor).startsWith('linear') ? '#1e293b' : (eqColor || '#1e293b')};color:#fff;`;
 
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid #1e2638;padding-bottom:10px;">
         <div style="display:flex;align-items:center;gap:8px;color:#38bdf8;">
           ${MINIMAL_EYE_SVG}
-          <b style="font-size:14px;letter-spacing:0.3px;color:#f8fafc;">Vista Previa de Perfil Nitro</b>
+          <b style="font-size:14px;letter-spacing:0.3px;color:#f8fafc;">Estudio de Vista Previa · Perfil Pro</b>
         </div>
         <button id="closePreviewBtn" style="background:transparent;border:none;color:#94a3b8;font-size:16px;cursor:pointer;font-weight:900;">✕</button>
       </div>
 
-      <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:#0b0e14;box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-        <!-- Banner con personaje/mascota exclusiva y partículas -->
-        <div class="preview-banner-box ${isAnimatedBanner ? 'banner-animated' : ''}" style="height:90px;background:${eqBanner};background-size:cover;position:relative;overflow:hidden;">
+      <div style="position:relative;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.14);background:#0b0e14;box-shadow:0 12px 28px rgba(0,0,0,0.6);">
+        <!-- Banner 16:5 con scrim inferior profesional y partículas -->
+        <div class="preview-banner-box ${isAnimatedBanner ? 'banner-animated' : ''}" style="height:132px;${bannerCss(eqBanner)};position:relative;overflow:hidden;">
           ${renderBannerExclusiveArtSvg(item.type === 'banner' ? (item.id + ' ' + item.name) : eqBanner)}
-          <canvas id="prevFxCanvas" width="390" height="90" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(180deg,transparent 0%,rgba(11,14,20,0.84) 100%);pointer-events:none;"></div>
+          <canvas id="prevFxCanvas" width="436" height="132" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></canvas>
         </div>
 
-        <div style="padding:16px;position:relative;margin-top:-38px;">
+        <div style="padding:16px;position:relative;margin-top:-42px;z-index:2;">
           <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:10px;">
-            <div class="avatar ${frameCls}" style="width:64px;height:64px;font-size:24px;background:#1e293b;border:3px solid #0f131d;border-radius:50%;display:grid;place-items:center;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,0.6);flex-shrink:0;">
+            <div class="avatar ${frameCls} ${hasAvatarImg ? 'img' : ''}" style="width:68px;height:68px;font-size:24px;${avBgStyle}border:4px solid #0b0e14;border-radius:50%;display:grid;place-items:center;font-weight:900;box-shadow:0 6px 16px rgba(0,0,0,0.7);flex-shrink:0;">
               ${(S.me?.name || 'Tú').slice(0, 2).toUpperCase()}
             </div>
             <div style="min-width:0;">
@@ -643,8 +683,8 @@ function modalVault(initialTab = 'roulette') {
         <div style="display:flex;align-items:center;gap:10px;min-width:0;">
           <span style="font-size:24px;">🏛️</span>
           <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v1.9.5</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Santuario Arcano · Cosméticos, Dojo Elemental HD 1v1 y Turbo Core 1v1</p>
+            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v${S.appVer || window.EKGameConfig?.APP_VERSION || '1.9.7'}</h2>
+            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Santuario Arcano · Cosméticos Pro, Dojo Elemental 1v1 y Turbo Core 1v1</p>
           </div>
         </div>
 
@@ -1054,6 +1094,12 @@ function modalVault(initialTab = 'roulette') {
     if (window.__EK && typeof window.__EK.assertNoBadText === 'function') {
       window.__EK.assertNoBadText(wrap);
     }
+
+    const winCard = wrap.querySelector('#vWinnerArea');
+    if (winCard && lastSpinResult && !lastSpinResult._animated) {
+      lastSpinResult._animated = true;
+      window.EKProfileStudio?.animateVaultReveal?.(winCard, lastSpinResult.winner?.rarity);
+    }
   };
 
   const openKeyShopModal = () => {
@@ -1311,9 +1357,12 @@ function modalVault(initialTab = 'roulette') {
       saveState();
 
       if (typeof ringer !== 'undefined') {
-        if (winner.rarity === 'legendary') ringer.beep([523, 659, 784, 1046, 1318], 0.08, 0.2);
-        else if (winner.rarity === 'epic') ringer.beep([523, 659, 784, 1046], 0.07, 0.16);
+        if (winner.rarity === 'legendary') ringer.playLegendary?.();
+        else if (winner.rarity === 'epic' || !isDuplicate) ringer.playChest?.();
         else ringer.beep([523, 659, 784], 0.06, 0.12);
+      }
+      if (!isDuplicate) {
+        window.EKProfileStudio?.celebrateReward?.(winner.rarity);
       }
 
       wrap.querySelectorAll('button').forEach(b => {
@@ -1443,9 +1492,10 @@ function modalVault(initialTab = 'roulette') {
           </div>
         `;
       } else {
-        const isAnimB = c.rarity === 'legendary' || c.rarity === 'epic';
+        const isImgBanner = typeof c.val === 'string' && (/url\(/i.test(c.val) || /^\/files\//.test(c.val) || /^assets\//i.test(c.val));
+        const isAnimB = !isImgBanner && (c.rarity === 'legendary' || c.rarity === 'epic');
         preview = `
-          <div class="${isAnimB ? 'banner-animated' : ''}" style="position:relative;height:46px;border-radius:6px;background:${c.val};background-size:200% 200%;border:1px solid rgba(255,255,255,0.18);overflow:hidden;box-shadow:inset 0 0 12px rgba(0,0,0,0.45);">
+          <div class="${isAnimB ? 'banner-animated' : ''}" style="position:relative;height:72px;border-radius:8px;${bannerCss(c.val)};${isAnimB ? 'background-size:200% 200%;' : ''}border:1px solid rgba(255,255,255,0.22);overflow:hidden;box-shadow:inset 0 0 14px rgba(0,0,0,0.45);">
             ${renderBannerExclusiveArtSvg(c.id + ' ' + c.name)}
           </div>
         `;
@@ -1910,11 +1960,78 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.9.5 (ACTUAL · DOJO ELEMENTAL HD, 60 CARTAS + INVENTARIO CLASH ROYALE & SANTUARIO ARCANO) ==================== -->
+        <!-- ==================== VERSIÓN 1.9.7 (ACTUAL · GALERÍA DE PÓSTERS ANIME & EVENTOS, DEGRADADOS PRO, TURBO CORE CURVAS ARCADE & DOJO REFINADO) ==================== -->
+        <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:#0b1726;box-shadow:0 8px 24px rgba(56,189,248,0.22);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#0284c7;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.7</h2>
+            </div>
+            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Pósters Promocionales Anime 16:5, Galería de Banners Pro, Turbo Core con Perspectiva Curva &amp; Dojo Refinado</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#38bdf8;">🎨 Estudio de Banners Pro (Pósters Promocionales Anime, Eventos &amp; Degradados de Estudio):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>8 Pósters Promocionales Originales Anime &amp; Eventos (16:5 WebP):</b> composiciones estilo key-visual oficial de torneos y convenciones (<i>Elemental Clash</i>, <i>Rival Showdown: Ignis vs. Zero-Frost</i>, <i>Cyber Matsuri: Akira Hoshino</i>, <i>Crimson Moon: Kurogane</i>, <i>Shibuya Drift GP: Renji</i>, <i>Dual-Soul Shinobi: Kaelen</i>, <i>Colossus Raid</i> y <i>Boreal Aurora</i>) diseñadas con zona segura izquierda para que tu avatar nunca tape a los personajes.</li>
+                <li><b>Galería Visual por Categorías + 12 Degradados Multi-Parada Pro:</b> explorador interactivo con pestañas (<i>🔥 Pósters Anime</i>, <i>🌈 Degradados Pro</i>, <i>🏞️ Mundos</i> y <i>🎁 Todos</i>) y tarjeta de perfil 16:5 de alto contraste.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#4ade80;">🏎️ Turbo Core Arcade Circuit &amp; 🏯 Dojo Elemental Refinado:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Turbo Core con Perspectiva Curva y Horizonte Parallax:</b> carretera con curvas sinusoidales y perspectiva hacia el horizonte, cielo temático parallax, tribunas de competición <i>TURBO GP</i>, velocímetro digital <code>KM/H + Marcha</code> en pantalla e IA con separación lateral anti-amontonamiento.</li>
+                <li><b>Dojo Elemental Despejado y Ninjas Expresivos:</b> centro del tatami 100% despejado para apreciar la ventana al Monte Fuji con pétalos de sakura flotando, pergaminos <i>kakemono</i> y ninjas con túnica <i>gi</i> detallada, ojos expresivos y cintas dinámicas.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.6 (PHASER 3 CARTOON 2D, CLOUDFLARE TURN 1TB, MODERACIÓN CLIC DERECHO & ESTUDIO PERFIL PRO) ==================== -->
+        <div style="border:2px solid #22c55e;border-radius:12px;padding:18px;margin-bottom:24px;background:#0d1917;box-shadow:0 8px 24px rgba(34,197,94,0.2);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a2f;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:#16a34a;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.6</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.6</h2>
+            </div>
+            <span style="font-size:12px;color:#86efac;font-weight:700;">Motor Phaser 3 Cartoon 2D, Cloudflare TURN, Moderación Clic Derecho &amp; Estudio de Perfil Pro</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#4ade80;">🎨 Minijuegos con Motor Phaser 3 y Arte Cartoon 2D (Estilo Club Penguin):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Dojo Elemental Phaser 3:</b> escenario animado a 60 FPS con tatami cálido, puertas <i>shoji</i>, ventana al cielo, linternas oscilantes, ninjas cartoon redondeados con tus cosméticos de <i>Mi Ninja</i>, proyectiles elementales y gags cómicos al finalizar cada ronda.</li>
+                <li><b>Turbo Core Phaser 3:</b> motor de carreras pseudo-3D de curvas suaves, paletas diurnas descansadas para las 4 pistas, karts cartoon con inclinación dinámica, normalización 60/120/144 Hz (<code>dtScale</code>) y rivales con evasión inteligente.</li>
+                <li><b>Mazmorras Cartoon 2D &amp; Arte WebP:</b> suelo de adoquines de alto contraste sin fatiga visual, personajes con contorno limpio y 10 ilustraciones cartoon originales optimizadas en <code>.webp</code>.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#38bdf8;">📡 Cloudflare Realtime TURN, Videollamada Directa &amp; Moderación Clic Derecho:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Cloudflare TURN + Watchdog WebRTC:</b> credenciales efímeras TURN/TURNS de baja latencia, control adaptativo de bitrate/FPS con presupuesto de subida de <code>4.8 Mbps</code>, detección de audio unidireccional y botón de <b>Videollamada Directa</b> en chats y amigos.</li>
+                <li><b>Menú Contextual Clic Derecho y Drag &amp; Drop de Voz:</b> clic derecho sobre cualquier cámara o usuario en canal de voz para ajustar volumen individual (<code>0–200%</code>), silenciar, ensordecer, desconectar o mover de canal arrastrando y soltando (<i>SortableJS</i>).</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#c084fc;">🎨 Estudio de Perfil Pro, Sonidos Orgánicos Howler.js &amp; Microsoft Store Compliance:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Estudio de Perfil Pro:</b> selector libre de color sólido o degradado dual (<i>Pickr</i>), recortador interactivo <code>16:5</code> para banners personalizados (<i>CropperJS</i>), 3 fondos ilustrados estilo Club Penguin y animaciones <i>GSAP</i> + confeti en la Bóveda.</li>
+                <li><b>16 Sonidos Orgánicos &amp; Cumplimiento Microsoft Store:</b> motor <i>Howler.js</i> con 16 efectos WAV cálidos, estética de 4 superficies oscuras descansadas y bloqueo automático del auto-updater interno cuando se ejecuta desde Microsoft Store.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.5 (DOJO ELEMENTAL HD, 60 CARTAS + INVENTARIO CLASH ROYALE & SANTUARIO ARCANO) ==================== -->
         <div style="border:2px solid #f59e0b;border-radius:12px;padding:18px;margin-bottom:24px;background:#14111f;box-shadow:0 8px 24px rgba(245,158,11,0.2);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #33274a;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:#d97706;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <span style="background:#d97706;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.5</span>
               <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.5</h2>
             </div>
             <span style="font-size:12px;color:#fcd34d;font-weight:700;">60 Cartas del Dojo (36 Base + 24 Desbloqueables), Inventario Estilo Clash Royale & Ventana Flotante Limpia</span>
@@ -2592,7 +2709,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.5', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, isStore: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.7', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -2601,7 +2718,7 @@ const S = {
 };
 
 function updateVersionBadges() {
-  const verTxt = 'v' + (S.appVer || '1.9.5');
+  const verTxt = 'v' + (S.appVer || '1.9.7');
   const badge = $('ekVersionBadge');
   if (badge) {
     badge.textContent = verTxt;
@@ -2611,6 +2728,8 @@ function updateVersionBadges() {
 $('ekVersionBadge')?.addEventListener('click', () => openOfficialGuide('notas_version'));
 updateVersionBadges();
 
+window.epic.isStore?.().then((v) => { S.isStore = !!v; if (S.isStore) $('updateBar')?.classList.add('hidden'); }).catch(() => {});
+window.epic.onBeforeQuit?.(() => { if (S.call) leaveCall(false); });
 window.epic.version?.().then((v) => { if (v) { S.appVer = v; updateVersionBadges(); renderRail(); } }).catch(() => {});
 window.epic.onMiniChanged?.((val) => {
   S.mini = !!val;
@@ -2636,12 +2755,13 @@ window.epic.onMiniChanged?.((val) => {
 });
 window.epic.onOverlayStatus?.((val) => {
   S.overlayActive = !!val;
+  if (S.overlayActive) syncOverlay();
   updateDock();
   syncFloatingCam();
 });
 window.epic.onShortcut?.((act) => {
   if (act === 'overlay') {
-    toggleOverlay();
+    toast(S.overlayActive ? '🎮 Overlay de voz activado (Alt+O para cerrar)' : 'Overlay cerrado');
     return;
   }
   if (act === 'pip') {
@@ -2865,6 +2985,11 @@ function paintAvatar(el) {
 }
 
 // ---------- sonidos de llamada y sala ----------
+window.EKAudio?.init?.(() => ({
+  dnd: !!(settings.dnd || S.me?.status === 'dnd'),
+  ringVol: settings.ringVol,
+}));
+
 const ringer = {
   ctx: null, timer: null,
   beep(freqs, dur = 0.09, gain = 0.12) {
@@ -2882,47 +3007,49 @@ const ringer = {
       });
     } catch {}
   },
-  playJoin() {
-    // Acorde ascendente suave de bienvenida al unirse a la sala
-    this.beep([440, 554, 659, 880], 0.05, 0.14);
+  _playOr(name, scale, fallbackFreqs, dur = 0.06, gain = 0.12, ignoreDnd) {
+    if (window.EKAudio?.play) {
+      const id = window.EKAudio.play(name, scale, ignoreDnd);
+      if (id != null || settings.dnd || S.me?.status === 'dnd' || Number(settings.ringVol) <= 0) return;
+    }
+    if (fallbackFreqs) this.beep(fallbackFreqs, dur, gain);
   },
-  playLeave() {
-    // Tono descendente sutil al salir alguien de la sala
-    this.beep([784, 587, 392], 0.065, 0.11);
-  },
-  playStreamStart() {
-    // Campana brillante moderna al iniciar transmisión de pantalla
-    this.beep([587, 880, 1175], 0.07, 0.13);
-  },
-  playStreamStop() {
-    // Tono suave al finalizar transmisión de pantalla
-    this.beep([880, 587], 0.07, 0.09);
-  },
+  playJoin() { this._playOr('voice-join', 0.9, [440, 554, 659, 880], 0.05, 0.14); },
+  playLeave() { this._playOr('voice-leave', 0.9, [784, 587, 392], 0.065, 0.11); },
+  playMute() { this._playOr('mute', 0.85, [420, 310], 0.04, 0.08, true); },
+  playUnmute() { this._playOr('unmute', 0.85, [520, 680], 0.04, 0.08, true); },
+  playDeafen() { this._playOr('deafen', 0.85, [360, 260], 0.05, 0.09, true); },
+  playUndeafen() { this._playOr('undeafen', 0.85, [480, 660], 0.05, 0.09, true); },
+  playMove() { this._playOr('user-moved', 0.95, [580, 780], 0.05, 0.11); },
+  playStreamStart() { this._playOr('stream-start', 0.95, [587, 880, 1175], 0.07, 0.13); },
+  playStreamStop() { this._playOr('stream-stop', 0.9, [880, 587], 0.07, 0.09); },
+  playChest() { this._playOr('chest-open', 1, [523, 659, 784], 0.06, 0.14, true); },
+  playLegendary() { this._playOr('legendary-win', 1, [523, 659, 784, 1046, 1318], 0.08, 0.2, true); },
   start(kind) {
-    this.stop(); if (kind === 'in' && settings.dnd) return;
+    this.stop();
+    if ((kind === 'in' || kind === 'video') && (settings.dnd || S.me?.status === 'dnd')) return;
+    if (window.EKAudio?.startRing) {
+      const id = window.EKAudio.startRing(kind);
+      if (id != null || Number(settings.ringVol) <= 0) return;
+    }
     const play = () => {
       try {
         const c = (this.ctx = this.ctx || new AudioContext()); const now = c.currentTime;
-        const vol = Math.max(0, Math.min(1, settings.ringVol)) * (kind === 'in' ? 0.35 : 0.16);
+        const vol = Math.max(0, Math.min(1, settings.ringVol)) * (kind === 'in' || kind === 'video' ? 0.35 : 0.16);
         const tone = (f, t, d) => { const o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, now + t); g.gain.linearRampToValueAtTime(vol, now + t + 0.02); g.gain.setValueAtTime(vol, now + t + d - 0.04); g.gain.linearRampToValueAtTime(0, now + t + d); o.connect(g).connect(c.destination); o.start(now + t); o.stop(now + t + d + 0.02); };
-        if (kind === 'in') { tone(660, 0, 0.18); tone(880, 0.22, 0.18); tone(660, 0.62, 0.18); tone(880, 0.84, 0.18); } else { tone(440, 0, 0.45); tone(480, 0, 0.45); }
+        if (kind === 'in' || kind === 'video') { tone(660, 0, 0.18); tone(880, 0.22, 0.18); tone(660, 0.62, 0.18); tone(880, 0.84, 0.18); } else { tone(440, 0, 0.45); tone(480, 0, 0.45); }
       } catch {}
     };
-    play(); this.timer = setInterval(play, kind === 'in' ? 2200 : 3200);
+    play(); this.timer = setInterval(play, (kind === 'in' || kind === 'video') ? 2200 : 3200);
   },
-  playDm() {
-    // Tono distintivo para mensajes directos privados (doble campana suave cristalina)
-    this.beep([880, 1318], 0.055, 0.14);
+  playDm() { this._playOr('dm-notify', 0.9, [880, 1318], 0.055, 0.14); },
+  playMsgSend() { this._playOr('msg-send', 0.85, [520, 680], 0.035, 0.08); },
+  playAction() { this._playOr('unmute', 0.85, [600, 900], 0.04, 0.09); },
+  stop() {
+    window.EKAudio?.stopRing?.();
+    clearInterval(this.timer);
+    this.timer = null;
   },
-  playMsgSend() {
-    // Sonido sutil al enviar mensaje con éxito (burbuja/pop táctil rápido)
-    this.beep([520, 680], 0.035, 0.08);
-  },
-  playAction() {
-    // Tono positivo para acciones completadas
-    this.beep([600, 900], 0.04, 0.09);
-  },
-  stop() { clearInterval(this.timer); this.timer = null; },
 };
 
 // ---------- red ----------
@@ -2962,7 +3089,24 @@ function scheduleReconnect() {
   const go = async () => {
     try {
       await connect(settings.server);
-      const r = await rpc('resume', { token: S.token });
+      let r;
+      try {
+        r = await rpc('resume', { token: S.token });
+      } catch (resumeErr) {
+        const saved = await window.epic.loadAuth?.().catch(() => null);
+        if (saved?.user && saved?.pass) {
+          r = await rpc('login', { name: saved.user, password: saved.pass });
+          if (r?.token) {
+            S.token = r.token;
+            localStorage.setItem('epickast.token', S.token);
+            window.epic.saveAuth?.({ server: settings.server, user: r.user.name, pass: saved.pass, token: S.token, remember: true });
+          }
+        } else {
+          $('login')?.classList.remove('hidden');
+          toast('Tu sesión expiró tras el reinicio del servidor. Inicia sesión nuevamente.');
+          return;
+        }
+      }
       S.me = r.user; S.ice = r.ice; retry = 0; toast('Reconectado'); await bootstrap();
     } catch (e) { retry = Math.min(retry + 1, 6); setTimeout(go, 1000 * 2 ** retry); }
   };
@@ -3146,6 +3290,7 @@ function onMsg(ev) {
     }
     case 'voice.forceMove': {
       if (S.call && m.toKey) {
+        ringer.playMove?.();
         toast(`📢 Un moderador te movió a "${m.channelName || 'otro canal'}"`);
         joinCall(m.toKey, m.channelName);
       }
@@ -3199,7 +3344,7 @@ function onMsg(ev) {
         } else if (oldScreen && !newScreen) {
           ringer.playStreamStop();
         } else if (!oldCam && newCam) {
-          ringer.beep([523, 784], 0.06, 0.1);
+          ringer.playAction?.();
         }
         renderStage();
       }
@@ -3211,7 +3356,7 @@ function onMsg(ev) {
         toast(`🔊 ${m.name || 'Alguien'} reprodujo: ${SOUND_NAMES[m.sound] || m.sound}`);
       }
       break;
-    case 'voice.kicked': leaveCall(true); toast('Te uniste desde otro dispositivo'); break;
+    case 'voice.kicked': leaveCall(true); toast(m.reason || 'Te uniste desde otro dispositivo'); break;
     case 'rtc.signal': S.call?.handleSignal(m.from, m.data); break;
     case 'call.incoming': showIncoming(m); break;
     case 'call.stop': onCallStop(m); break;
@@ -3450,15 +3595,16 @@ async function syncActivity() {
   } else if (!settings.autoGameDetect) {
     S.detectedGame = null;
   }
-  // Auto-activar Overlay flotante al entrar a un juego (si el usuario no deshabilitó la opción)
-  if (!prevGame && S.detectedGame && settings.autoOverlayOnGame !== false) {
-    if (!S.overlayActive && window.epic?.toggleOverlay) {
+  // Auto-activar Overlay flotante al entrar a un juego ÚNICAMENTE cuando hay una llamada activa
+  if (S.detectedGame && S.call && settings.autoOverlayOnGame !== false) {
+    if (!S.overlayActive && !S.userClosedOverlayInGame && window.epic?.toggleOverlay) {
       S.autoOpenedOverlay = true;
       toggleOverlay(true);
-      toast(`🎮 Juego detectado (${S.detectedGame}) · Overlay activado`);
+      toast(`🎮 Juego detectado (${S.detectedGame}) · Overlay activado (Alt+O para ocultar)`);
     }
-  } else if (prevGame && !S.detectedGame && S.autoOpenedOverlay) {
+  } else if ((!S.detectedGame || !S.call) && S.autoOpenedOverlay) {
     S.autoOpenedOverlay = false;
+    S.userClosedOverlayInGame = false;
     if (S.overlayActive) toggleOverlay(false);
   }
   if (actName === S.lastSentActivity) return;
@@ -3486,6 +3632,11 @@ function isNewerVersion(latest, current) {
 
 async function checkServerUpdate() {
   try {
+    if (S.isStore || (await window.epic?.isStore?.().catch(() => false))) {
+      S.isStore = true;
+      $('updateBar')?.classList.add('hidden');
+      return;
+    }
     if (window.epic?.version) {
       const v = await window.epic.version().catch(() => null);
       if (v) S.appVer = v;
@@ -3576,8 +3727,8 @@ async function checkServerUpdate() {
 }
 
 // ---------- datos ----------
-setInterval(() => { if (S.ws && S.me) checkServerUpdate(); }, 5 * 60 * 1000);
-window.addEventListener('focus', () => { if (S.ws && S.me) checkServerUpdate(); });
+setInterval(() => { if (S.ws && S.me && !S.isStore) checkServerUpdate(); }, 5 * 60 * 1000);
+window.addEventListener('focus', () => { if (S.ws && S.me && !S.isStore) checkServerUpdate(); });
 async function loadFriends() { try { S.friends = await rpc('friends.list'); } catch {} renderSide(); renderHome(); renderCallOverlay(); }
 async function loadServers() {
   try { S.servers = await rpc('servers.list'); } catch { return; }
@@ -4608,8 +4759,11 @@ function renderMe() {
     setTimeout(() => document.addEventListener('click', closeDoc), 10);
   };
 
+  const myBanner = localStorage.getItem('epickast.equipped_banner') || S.me.banner || '';
+  bar.classList.toggle('has-banner', !!myBanner);
   bar.replaceChildren(
-    h('div', { class: 'who', title: 'Editar perfil, cosméticos y actividad', onclick: modalProfile },
+    myBanner ? h('div', { class: 'mebar-banner-bg', style: bannerCss(myBanner) }) : null,
+    h('div', { class: 'who', style: 'position:relative;z-index:1', title: 'Editar perfil, cosméticos y actividad', onclick: modalProfile },
       avatar(S.me, 34, true),
       h('div', { style: 'min-width:0' },
         h('div', { style: 'display:flex;align-items:center;gap:4px;overflow:hidden' },
@@ -4619,7 +4773,7 @@ function renderMe() {
         h('small', { class: S.me.activity?.name ? 'act-live' : '' }, actTxt)
       )
     ),
-    h('div', { style: 'display:flex;gap:4px;align-items:center' },
+    h('div', { style: 'display:flex;gap:4px;align-items:center;position:relative;z-index:1' },
       h('button', { class: 'btn-ico', title: `Cambiar estado (${stLabel})`, style: 'font-size:13px;padding:4px 6px', onclick: toggleStatusPopover }, stIcon),
       h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16))
     )
@@ -4657,19 +4811,131 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.8.0';
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.9.6';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
     title: 'EpicKast ' + verTxt
   }, verTxt));
 }
+function memberRankInServer(sd, uid) {
+  if (!sd || uid == null) return 0;
+  if (Number(sd.owner) === Number(uid)) return ROLES.owner.rank;
+  const mem = (sd.members || []).find((x) => Number(x.id) === Number(uid));
+  const rk = mem?.role || 'member';
+  return ROLES[rk]?.rank ?? 0;
+}
+function resolveServerForVoiceKey(channelKey) {
+  if (!channelKey || String(channelKey)[0] !== 'c') return null;
+  if (S.view.kind === 'server' && S.sdata.has(S.view.sid)) {
+    const cur = S.sdata.get(S.view.sid);
+    if (cur?.channels?.some((c) => c.key === channelKey)) return cur;
+  }
+  for (const sd of S.sdata.values()) {
+    if (sd?.channels?.some((c) => c.key === channelKey)) return sd;
+  }
+  return null;
+}
+function openVoiceContextMenu(ev, user, channelKey, serverData) {
+  if (!window.EKContextMenu?.openVoiceUserMenu || !user?.id) return;
+  ev?.preventDefault?.();
+  ev?.stopPropagation?.();
+  const sd = serverData || resolveServerForVoiceKey(channelKey);
+  const isServerVoice = Boolean(sd && String(channelKey || '')[0] === 'c');
+  const myRank = sd ? memberRankInServer(sd, S.me?.id) : 0;
+  const targetRank = sd ? memberRankInServer(sd, user.id) : 0;
+  const liveUser = (S.rooms.get(channelKey) || []).find((x) => Number(x.id) === Number(user.id)) || user;
+  const peerObj = S.call?.peers?.get(Number(user.id));
+  const mergedState = { ...(liveUser.state || {}), ...(peerObj?.state || {}) };
+  if (Number(user.id) === Number(S.me?.id) && S.call) {
+    mergedState.muted = !!S.call.muted;
+    mergedState.deaf = !!S.call.deaf;
+    mergedState.serverMuted = !!S.call.serverMuted;
+    mergedState.serverDeafened = !!S.call.serverDeafened;
+  }
+  const menuUser = { ...liveUser, state: mergedState };
+  window.EKContextMenu.openVoiceUserMenu(ev, {
+    user: menuUser,
+    channelKey,
+    serverId: sd?.id || null,
+    serverData: sd,
+    isServerVoice,
+    myId: S.me?.id,
+    myRank,
+    targetRank,
+    localVol: getUserVol(user.id),
+    isLocalMuted: isUserLocalMuted(user.id),
+    callbacks: {
+      onVolume: (volRatio) => {
+        setUserVol(user.id, volRatio);
+        for (const [, t] of tiles) {
+          if (String(t.uid) === String(user.id)) {
+            if (t.vRng) t.vRng.value = volRatio;
+            if (t.vTxt) t.vTxt.textContent = `${Math.round(volRatio * 100)}%`;
+            applyTileVolume(t);
+          }
+        }
+      },
+      onLocalMute: () => {
+        const mutedNow = toggleUserLocalMute(user.id);
+        toast(mutedNow ? `🔇 Silenciado solo para ti: ${user.name}` : `🔊 Audio local restaurado: ${user.name}`);
+      },
+      onProfile: () => {
+        const mem = sd?.members?.find((x) => Number(x.id) === Number(user.id))
+          || friendByDm(channelKey)
+          || menuUser;
+        const targetSd = sd || { id: 0, owner: 0, myRole: 'member', channels: [], members: [mem] };
+        modalMemberCard(targetSd, mem);
+      },
+      onAssistAudio: () => modalRemoteAudioEditor(user.id, user.name, channelKey),
+      onServerMute: async (mute) => {
+        await safe(rpc('voice.serverMute', { key: channelKey, userId: user.id, mute: !!mute }));
+        toast(mute ? `🔇 Micrófono de ${user.name} silenciado en servidor` : `🔊 Silencio retirado a ${user.name}`);
+      },
+      onServerDeafen: async (deaf) => {
+        await safe(rpc('voice.serverDeafen', { key: channelKey, userId: user.id, deaf: !!deaf }));
+        toast(deaf ? `🎧❌ ${user.name} ensordecido en servidor` : `🎧 Audio restaurado a ${user.name}`);
+      },
+      onMoveUser: async (targetKey, targetName) => {
+        await safe(rpc('voice.moveUser', { currentKey: channelKey, targetKey, userId: user.id }));
+        toast(`📢 Moviendo a ${user.name} a ${targetName || 'otro canal'}…`);
+      },
+      onDisconnect: async () => {
+        await safe(rpc('voice.disconnect', { key: channelKey, userId: user.id }));
+        toast(`🔌 ${user.name} desconectado del canal de voz`);
+      },
+      onKick: async () => {
+        if (!sd) return;
+        if (confirm(`¿Expulsar a ${user.name} del servidor?`)) {
+          await safe(rpc('server.kick', { id: sd.id, userId: user.id }));
+          toast(`👢 Usuario ${user.name} expulsado`);
+        }
+      },
+      onBan: async () => {
+        if (!sd) return;
+        const reason = prompt(`Motivo del baneo para ${user.name} (opcional):`, 'Comportamiento no adecuado');
+        if (reason !== null) {
+          await safe(rpc('server.ban', { id: sd.id, userId: user.id, reason }));
+          toast(`🚫 Usuario ${user.name} baneado`);
+        }
+      },
+      onBlock: async () => {
+        if (confirm(`¿Bloquear a ${user.name}? Ya no podrá enviarte mensajes ni llamarte.`)) {
+          await safe(rpc('block.add', { targetId: user.id }));
+          toast(`🛡️ ${user.name} bloqueado`);
+        }
+      },
+    },
+  });
+}
 function userItem(u, onclick, extra) {
   const stSub = u.online
     ? (u.activity?.name ? `🎮 ${u.activity.name}` : (u.customStatus || (u.status === 'away' ? '🌙 Ausente' : u.status === 'dnd' ? '⛔ No molestar' : '')))
     : '';
-  return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : ''), onclick },
-    h('span', { class: 'l' },
+  const uBanner = u.banner || '';
+  return h('div', { class: 'item' + (S.chan === u.dm ? ' sel' : '') + (uBanner ? ' has-row-banner' : ''), onclick },
+    uBanner ? h('div', { class: 'mem-row-banner', style: bannerCss(uBanner) }) : null,
+    h('span', { class: 'l', style: 'position:relative;z-index:1' },
       avatar(u, 28, u.online),
       h('div', { class: 'u-stack' },
         h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
@@ -4680,7 +4946,7 @@ function userItem(u, onclick, extra) {
         stSub ? h('small', { class: u.activity?.name ? 'u-act' : 'u-bio' }, stSub) : null
       )
     ),
-    extra
+    extra ? h('span', { style: 'position:relative;z-index:1;display:inline-flex;align-items:center' }, extra) : null
   );
 }
 function renderSide() {
@@ -4711,7 +4977,10 @@ function renderSide() {
   if (S.view.kind === 'home') {
     $('sideTitle').replaceChildren(h('span', null, 'Mensajes directos'));
     for (const f of S.friends.friends) {
-      L.append(userItem(f, () => openChannel(f.dm, 'dm', f.name), h('button', { class: 'side-call', title: `Llamar a ${f.name}`, onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name); } }, icoSvg('phone', 14))));
+      L.append(userItem(f, () => openChannel(f.dm, 'dm', f.name), h('span', { style: 'display:inline-flex;align-items:center;gap:2px;flex:none' },
+        h('button', { class: 'side-call', title: `Llamar a ${f.name}`, onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name); } }, icoSvg('phone', 14)),
+        h('button', { class: 'side-call', title: `Videollamada directa con ${f.name}`, onclick: (e) => { e.stopPropagation(); openChannel(f.dm, 'dm', f.name); joinCall(f.dm, f.name, { video: true }); } }, icoSvg('video', 14))
+      )));
       const room = S.rooms.get(f.dm); if (room?.length) L.append(h('div', { class: 'sub' }, `🔊 en llamada (${room.length})`));
       const pt = S.partyTracks.get(f.dm); if (pt) L.append(h('div', { class: 'sub party-sub' }, `🎵 ${pt}`));
     }
@@ -4746,6 +5015,11 @@ function renderSide() {
       if (type === 'voice') {
         const pt = S.partyTracks.get(c.key);
         if (pt) L.append(h('div', { class: 'sub party-sub' }, `🎵 ${pt}`));
+        const dropZone = h('div', {
+          class: 'voice-drop-zone',
+          'data-voice-key': c.key,
+          'data-server-id': sd.id,
+        });
         for (const u of rUsers) {
           const st = u.state || {};
           const badges = [];
@@ -4763,15 +5037,33 @@ function renderSide() {
           if (st.screen) {
             badges.push(h('span', { class: 'voice-badge screen', title: 'Transmitiendo pantalla' }, '🖥️'));
           }
-          L.append(h('div', { class: 'sub voice-user-row' },
+          const tRank = memberRankInServer(sd, u.id);
+          const canDrag = myRank >= 2 && (Number(u.id) === Number(S.me?.id) || myRank > tRank);
+          dropZone.append(h('div', {
+            class: 'sub voice-user-row ' + (canDrag ? 'is-draggable' : 'not-draggable'),
+            'data-user-id': u.id,
+            title: canDrag ? 'Clic derecho: opciones · Arrastrar: mover a otro canal de voz' : 'Clic derecho: opciones de audio y usuario',
+            oncontextmenu: (e) => openVoiceContextMenu(e, u, c.key, sd),
+          },
             avatar(u, 16, true),
             h('span', { class: 'sub-nm' }, u.name),
             badges.length ? h('span', { class: 'voice-badges-stack' }, ...badges) : null
           ));
         }
+        L.append(dropZone);
       }
     }
   }
+  window.EKContextMenu?.attachVoiceDragDrop?.(L, {
+    serverId: sd.id,
+    myId: S.me?.id,
+    myRank,
+    getMemberRank: (uid) => memberRankInServer(sd, uid),
+    onMove: (uid, fromKey, toKey) => {
+      safe(rpc('voice.moveUser', { currentKey: fromKey, targetKey: toKey, userId: Number(uid) }))
+        .catch(() => renderSide());
+    },
+  });
 }
 function renderMembers() {
   const M = $('members'); M.replaceChildren();
@@ -4788,8 +5080,10 @@ function renderMembers() {
       : (m.bio || '');
     const mColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || rInfo.color || '');
     const mTitle = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_title')) ? localStorage.getItem('epickast.equipped_title') : m.title;
-    return h('div', { class: 'item mem-row' + (m.online ? '' : ' off'), onclick: () => modalMemberCard(sd, m), title: 'Clic para ver perfil o asignar rango' },
-      h('span', { class: 'l' },
+    const mBanner = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_banner')) ? localStorage.getItem('epickast.equipped_banner') : (m.banner || '');
+    return h('div', { class: 'item mem-row' + (m.online ? '' : ' off') + (mBanner ? ' has-row-banner' : ''), onclick: () => modalMemberCard(sd, m), title: 'Clic para ver perfil o asignar rango' },
+      mBanner ? h('div', { class: 'mem-row-banner', style: bannerCss(mBanner) }) : null,
+      h('span', { class: 'l', style: 'position:relative;z-index:1' },
         avatar(m, 30, m.online),
         h('div', { class: 'u-stack' },
           h('span', { class: 'nm', style: 'display:flex;align-items:center;gap:4px' },
@@ -4868,7 +5162,11 @@ function modalMemberCard(sd, m) {
   const memberNameColor = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_color')) ? localStorage.getItem('epickast.equipped_color') : (m.color || (m.id === S.me?.id ? S.me?.color : null) || rInfo.color || 'var(--tx)');
   const memberTitle = (m.id === S.me?.id && localStorage.getItem('epickast.equipped_title')) ? localStorage.getItem('epickast.equipped_title') : m.title;
 
-  const profBannerEl = h('div', { class: 'prof-banner banner-animated', style: `background:${bannerBg};background-size:200% 200%;position:relative;overflow:hidden` });
+  const isBannerImg = typeof bannerBg === 'string' && (/^\/files\//.test(bannerBg.trim()) || /^url\(/i.test(bannerBg.trim()));
+  const profBannerEl = h('div', {
+    class: 'prof-banner' + (isBannerImg ? '' : ' banner-animated'),
+    style: `${bannerCss(bannerBg)};${isBannerImg ? '' : 'background-size:200% 200%;'}position:relative;overflow:hidden`
+  });
   if (window.renderBannerExclusiveArtSvg) profBannerEl.innerHTML = window.renderBannerExclusiveArtSvg(bannerBg);
   const card = h('div', { class: 'prof-card' },
     profBannerEl,
@@ -5077,7 +5375,8 @@ function renderCenter() {
     S.call ? h('button', { class: 'btn-act hdr' + (S.party?.current ? ' call' : ''), title: 'Abrir EpicBot DJ (YouTube & Playlists en conjunto)', onclick: modalParty }, h('span', { class: 'hdr-emo' }, '🎵 '), S.party?.current ? 'Bot DJ (Sonando)' : 'Bot DJ') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver mensajes fijados en este canal', onclick: modalPins }, icoSvg('pin', 14), 'Fijados') : null,
     showChat ? h('button', { class: 'btn-act hdr', title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, icoSvg('gallery', 14), 'Galería') : null,
-    dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar una llamada de voz/video', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null,
+    dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar llamada de voz', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null,
+    dm ? h('button', { class: 'btn-act vcall hdr', title: 'Iniciar videollamada directa', onclick: () => joinCall(S.chan, S.chanName, { video: true }) }, icoSvg('video', 14), 'Video') : null,
     isServer ? h('button', {
       class: 'btn-act hdr' + (!settings.hideMembers ? ' on-pane' : ''),
       title: settings.hideMembers ? 'Mostrar columna de miembros a la derecha' : 'Ocultar columna de miembros para ampliar la pantalla',
@@ -5100,13 +5399,24 @@ function renderCenter() {
     ? ('# ' + (guideTitles[S.guideChannel] || 'guia-oficial'))
     : S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '';
 
-  $('chTitle').replaceChildren(
-    h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
+  const dmFriend = dm ? friendByDm(S.chan) : null;
+  const dmBanner = dmFriend?.banner || '';
+  const chTitleEl = $('chTitle');
+  chTitleEl.classList.toggle('has-dm-banner', !!(dm && dmBanner));
+  chTitleEl.replaceChildren(
+    dm && dmBanner ? h('div', { class: 'ch-dm-banner-bg', style: bannerCss(dmBanner) }) : null,
+    h('div', { style: 'display:flex;align-items:center;gap:8px;min-width:0;position:relative;z-index:1' },
       toggleSideBtn,
-      h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;' }, centerTitleText),
+      dmFriend ? avatar(dmFriend, 26, dmFriend.online) : null,
+      h('span', {
+        style: `overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;${dmFriend?.color ? nameColorStyle(dmFriend.color) : ''}${dmFriend ? ';cursor:pointer' : ''}`,
+        title: dmFriend ? `Ver tarjeta de perfil de ${dmFriend.name}` : '',
+        onclick: dmFriend ? () => modalMemberCard({ id: 0, owner: 0, myRole: 'member', channels: [], members: [dmFriend] }, dmFriend) : null
+      }, centerTitleText),
+      dmFriend?.title ? titleBadgeEl(dmFriend.title, 'pill') : null,
       isGuide ? h('span', { style: 'background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #4338ca;' }, 'Canal Informativo Oficial') : null
     ),
-    rightBtns
+    h('div', { style: 'position:relative;z-index:1;display:flex;align-items:center' }, rightBtns)
   );
 
   // Visibilidad de paneles en section#center
@@ -5125,18 +5435,19 @@ function renderCenter() {
 function renderHome() {
   const H = $('home'); if (H.classList.contains('hidden') && S.view.kind !== 'home') return;
   H.replaceChildren();
+  const mainCol = h('div', { class: 'home-main' });
   const sendFriend = () => {
     const v = inp.value.trim();
     if (v) safe(rpc('friends.add', { name: v })).then(() => { inp.value = ''; toast('Solicitud enviada'); });
   };
   const inp = h('input', { placeholder: 'Escribe el nombre de usuario de tu amigo…', onkeydown: (e) => { if (e.key === 'Enter') sendFriend(); } });
-  H.append(
+  mainCol.append(
     h('h3', null, 'Agregar amigo'),
     h('div', { class: 'add-friend-bar' }, inp, h('button', { class: 'primary', onclick: sendFriend }, icoSvg('userPlus', 15), 'Enviar solicitud'))
   );
-  if (S.friends.incoming.length) H.append(h('h3', null, `Solicitudes recibidas — ${S.friends.incoming.length}`));
+  if (S.friends.incoming.length) mainCol.append(h('h3', null, `Solicitudes recibidas — ${S.friends.incoming.length}`));
   for (const u of S.friends.incoming) {
-    H.append(h('div', { class: 'friend-card' },
+    mainCol.append(h('div', { class: 'friend-card' },
       h('span', { class: 'l' }, avatar(u, 36), h('span', { class: 'nm' }, h('b', { style: 'color:var(--tx)' }, u.name), h('div', { class: 'hint' }, 'Quiere agregarte'))),
       h('div', { class: 'f-actions' },
         h('button', { class: 'btn-act call', onclick: () => rpc('friends.accept', { id: u.id }) }, icoSvg('check', 15), 'Aceptar'),
@@ -5144,36 +5455,44 @@ function renderHome() {
       )
     ));
   }
-  if (S.friends.outgoing.length) H.append(h('h3', null, `Solicitudes enviadas — ${S.friends.outgoing.length}`));
+  if (S.friends.outgoing.length) mainCol.append(h('h3', null, `Solicitudes enviadas — ${S.friends.outgoing.length}`));
   for (const u of S.friends.outgoing) {
-    H.append(h('div', { class: 'friend-card' },
+    mainCol.append(h('div', { class: 'friend-card' },
       h('span', { class: 'l' }, avatar(u, 34), h('span', { class: 'nm' }, u.name, h('div', { class: 'hint' }, 'Pendiente de aceptar'))),
       h('div', { class: 'f-actions' }, h('button', { class: 'btn-act', onclick: () => rpc('friends.remove', { id: u.id }) }, 'Cancelar'))
     ));
   }
-  H.append(h('h3', null, `Amigos — ${S.friends.friends.length}`));
+  mainCol.append(h('h3', null, `Amigos — ${S.friends.friends.length}`));
   if (!S.friends.friends.length) {
-    H.append(h('div', { class: 'hint', style: 'padding:12px 2px' }, 'Aún no has agregado amigos. Envía una solicitud arriba para empezar a chatear y llamar.'));
+    mainCol.append(h('div', { class: 'hint', style: 'padding:12px 2px' }, 'Aún no has agregado amigos. Envía una solicitud arriba para empezar a chatear y llamar.'));
   }
   for (const u of S.friends.friends) {
     const statusLine = u.online
       ? (u.activity?.name ? `${statusBadgeText(u)} · 🎮 Jugando a ${u.activity.name}` : (u.bio ? `${statusBadgeText(u)} · ${u.bio}` : statusBadgeText(u)))
       : '⚫ Desconectado';
     const statusColor = !u.online ? '' : (u.activity?.name ? 'color:#a29bfe;font-weight:600' : u.status === 'away' ? 'color:#f59e0b' : u.status === 'dnd' ? 'color:#ef4444' : 'color:var(--ok)');
-    H.append(h('div', { class: 'friend-card' },
-      h('span', { class: 'l', style: 'cursor:pointer', onclick: () => openChannel(u.dm, 'dm', u.name) },
-        avatar(u, 38, u.online),
+    const uBanner = u.banner || '';
+    mainCol.append(h('div', { class: 'friend-card' + (uBanner ? ' has-friend-banner' : '') },
+      uBanner ? h('div', { class: 'friend-card-banner-bg', style: bannerCss(uBanner) }) : null,
+      h('span', {
+        class: 'l',
+        style: 'cursor:pointer;position:relative;z-index:1',
+        title: `Ver tarjeta de perfil de ${u.name}`,
+        onclick: () => modalMemberCard({ id: 0, owner: 0, myRole: 'member', channels: [], members: [u] }, u)
+      },
+        avatar(u, 42, u.online),
         h('span', { class: 'nm' },
-          h('div', { style: 'display:flex;align-items:center;gap:6px;font-weight:600;color:var(--tx)' },
+          h('div', { style: 'display:flex;align-items:center;gap:6px;font-weight:700;color:var(--tx)' },
             h('span', { style: nameColorStyle(u.color) }, u.name),
             titleBadgeEl(u.title)
           ),
           h('div', { class: 'hint', style: statusColor }, statusLine)
         )
       ),
-      h('div', { class: 'f-actions' },
+      h('div', { class: 'f-actions', style: 'position:relative;z-index:1' },
         h('button', { class: 'btn-act', title: `Abrir chat con ${u.name}`, onclick: () => openChannel(u.dm, 'dm', u.name) }, icoSvg('chat', 15), 'Mensaje'),
         h('button', { class: 'btn-act call', title: `Llamar a ${u.name}`, onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name); } }, icoSvg('phone', 15), 'Llamar'),
+        h('button', { class: 'btn-act vcall', title: `Videollamada directa con ${u.name}`, onclick: () => { openChannel(u.dm, 'dm', u.name); joinCall(u.dm, u.name, { video: true }); } }, icoSvg('video', 15), 'Video'),
         h('button', { class: 'btn-act', title: `Desafiar a ${u.name} al Dojo Elemental`, onclick: () => { modalVault('dojo'); toast(`¡Reto de Dojo enviado a ${u.name}!`); safe(rpc('cardjitsu.challenge', { toUserId: u.id, game: 'dojo' })); } }, '🥋 Dojo'),
         h('button', { class: 'btn-act', title: `Retar a ${u.name} en Turbo Core`, onclick: () => { modalVault('racer'); toast(`¡Reto de Carrera enviado a ${u.name}!`); safe(rpc('cardjitsu.challenge', { toUserId: u.id, game: 'racer' })); } }, '🏎️ Carrera'),
         S.servers.length ? h('button', { class: 'btn-act', title: `Invitar a ${u.name} a un servidor`, onclick: () => modalInviteFriendToAnyServer(u) }, '🏰 Invitar') : null,
@@ -5181,6 +5500,84 @@ function renderHome() {
       )
     ));
   }
+
+  const onlineFriends = S.friends.friends.filter((f) => f.online);
+  let vaultSummary = { coins: 0, keys: 0 };
+  try {
+    const rawV = JSON.parse(localStorage.getItem('epickast.dungeon.v1') || '{}');
+    const ks = rawV.keys || {};
+    vaultSummary = {
+      coins: Number(rawV.coins || 0),
+      keys: Number(ks.copper || 0) + Number(ks.silver || 0) + Number(ks.gold || 0) + Number(ks.obsidian || 0),
+    };
+  } catch {}
+
+  const myEqBanner = localStorage.getItem('epickast.equipped_banner') || S.me?.banner || "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat";
+  const myEqColor = localStorage.getItem('epickast.equipped_color') || S.me?.color || '#38bdf8';
+  const myEqTitle = localStorage.getItem('epickast.equipped_title') || S.me?.title || '';
+
+  const myShowcaseCard = S.me ? h('div', { class: 'home-aside-card home-my-profile-card', style: 'padding:0;overflow:hidden' },
+    h('div', {
+      class: 'home-my-banner',
+      style: `height:86px;${bannerCss(myEqBanner)};position:relative;cursor:pointer`,
+      title: 'Clic para personalizar tu banner y perfil',
+      onclick: () => modalProfile()
+    },
+      h('div', { style: 'position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(13,17,26,0.88) 100%);pointer-events:none' }),
+      h('button', {
+        type: 'button',
+        style: 'position:absolute;top:8px;right:8px;padding:3px 9px;border-radius:999px;background:rgba(11,14,22,0.82);border:1px solid rgba(255,255,255,0.2);color:#f8fafc;font-size:10.5px;font-weight:700;cursor:pointer;backdrop-filter:blur(4px)',
+        onclick: (e) => { e.stopPropagation(); modalProfile(); }
+      }, '🎨 Editar Banner')
+    ),
+    h('div', { style: 'padding:0 14px 12px;margin-top:-26px;position:relative;z-index:2;display:flex;align-items:flex-end;justify-content:space-between;gap:8px' },
+      h('div', { style: 'display:flex;align-items:flex-end;gap:10px;min-width:0' },
+        h('div', { style: 'border-radius:50%;border:3px solid var(--bg-card);box-shadow:0 4px 12px rgba(0,0,0,0.6);flex:none;display:inline-flex' }, avatar(S.me, 46, true)),
+        h('div', { style: 'min-width:0;padding-bottom:2px' },
+          h('div', { style: `font-size:14px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${nameColorStyle(myEqColor)}` }, S.me.name),
+          myEqTitle ? h('div', { style: 'margin-top:2px' }, titleBadgeEl(myEqTitle, 'pill')) : h('div', { class: 'hint', style: 'font-size:11px' }, S.me.bio || 'Personaliza tu estandarte')
+        )
+      )
+    )
+  ) : null;
+
+  const asideCol = h('aside', { class: 'home-aside' },
+    myShowcaseCard,
+    h('div', { class: 'home-aside-card' },
+      h('h4', { class: 'home-aside-title' }, 'Resumen de Red', h('span', { style: 'color:var(--ok)' }, '● En línea')),
+      h('div', { class: 'home-stats-row' },
+        h('div', { class: 'home-stat-pill' }, h('strong', null, `${onlineFriends.length}/${S.friends.friends.length}`), h('span', null, 'Amigos activos')),
+        h('div', { class: 'home-stat-pill' }, h('strong', null, String(S.servers.length)), h('span', null, 'Servidores')),
+        h('div', { class: 'home-stat-pill' }, h('strong', null, String(vaultSummary.coins)), h('span', null, 'Monedas')),
+        h('div', { class: 'home-stat-pill' }, h('strong', null, String(vaultSummary.keys)), h('span', null, 'Llaves Bóveda'))
+      )
+    ),
+    h('div', { class: 'home-aside-card' },
+      h('h4', { class: 'home-aside-title' }, 'Actividad de Amigos'),
+      onlineFriends.length
+        ? h('div', { class: 'home-online-list' }, onlineFriends.slice(0, 5).map((f) =>
+            h('div', { class: 'home-online-row', onclick: () => openChannel(f.dm, 'dm', f.name) },
+              h('span', { style: 'display:flex;align-items:center;gap:8px;min-width:0' },
+                avatar(f, 26, true),
+                h('span', { style: 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px;font-weight:600' }, f.name)
+              ),
+              h('span', { class: 'hint', style: 'font-size:11px;flex:none' }, f.activity?.name ? `🎮 ${f.activity.name}` : '💬 Chat')
+            )
+          ))
+        : h('div', { class: 'hint', style: 'font-size:12px' }, 'Cuando tus amigos se conecten verás su actividad y juegos aquí.')
+    ),
+    h('div', { class: 'home-aside-card' },
+      h('h4', { class: 'home-aside-title' }, 'Accesos Rápidos'),
+      h('div', { class: 'home-quick-grid' },
+        h('button', { type: 'button', class: 'home-quick-btn', onclick: () => modalVault('chests') }, '🎁 Bóveda', h('small', null, 'Cofres y armario')),
+        h('button', { type: 'button', class: 'home-quick-btn', onclick: () => modalVault('dojo') }, '🥋 Dojo', h('small', null, 'Duelos elementales')),
+        h('button', { type: 'button', class: 'home-quick-btn', onclick: () => modalVault('racer') }, '🏎️ Turbo Core', h('small', null, 'Carreras 1v1')),
+        h('button', { type: 'button', class: 'home-quick-btn', onclick: () => modalProfile() }, '🎨 Mi Perfil', h('small', null, 'Banner y colores'))
+      )
+    )
+  );
+
+  H.append(h('div', { class: 'home-layout' }, mainCol, asideCol));
 }
 
 // ---------- modales ----------
@@ -5532,7 +5929,16 @@ function modalProfile() {
     reader.onerror = () => toast('No se pudo leer el archivo');
     reader.readAsDataURL(f);
   } });
-  const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', { class: 'sw' + (c === color ? ' sel' : ''), style: `background:${c}`, onclick: (e) => { color = c; pv.style.backgroundColor = c; localStorage.setItem('epickast.equipped_color', c); sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel')); e.target.classList.add('sel'); } })));
+  const sws = h('div', { class: 'swatches' }, PALETTE.map((c) => h('div', {
+    class: 'sw' + (c === color ? ' sel' : ''),
+    'data-col': c,
+    style: `background:${c}`,
+    onclick: (e) => {
+      applyColorPreview(c);
+      sws.querySelectorAll('.sw').forEach((n) => n.classList.remove('sel'));
+      e.target.classList.add('sel');
+    }
+  })));
   
   // Cosméticos Desbloqueados de la Bóveda (Colores, Marcos, Banners y Títulos)
   let unlockedCosmeticColors = [];
@@ -5560,16 +5966,19 @@ function modalProfile() {
         { id: 'frame-silver', name: 'Marco: Plata Rúnica' },
         { id: 'frame-copper', name: 'Marco: Cobre Forjado' }
       ];
-      const VAULT_BANNERS = [
-        { id: 'banner_colossus_awakening', name: '★ Banner: Despertar del Coloso', val: 'linear-gradient(135deg, #450a0a 0%, #b91c1c 45%, #f59e0b 100%)' },
-        { id: 'banner_molten_lava', name: 'Banner: Lava Fundida', val: 'linear-gradient(135deg, #7f1d1d 0%, #ea580c 50%, #facc15 100%)' },
-        { id: 'banner_void_storm', name: 'Banner: Tormenta del Vacío', val: 'linear-gradient(135deg, #090d16 0%, #3b0764 55%, #7e22ce 100%)' },
-        { id: 'banner_magma_mines', name: 'Banner: Minas de Magma', val: 'linear-gradient(135deg, #27120b 0%, #7c2d12 100%)' },
-        { id: 'banner_amethyst_galleries', name: 'Banner: Galerías de Amatista', val: 'linear-gradient(135deg, #1e1b4b 0%, #581c87 100%)' },
-        { id: 'banner_ancestral_crypt', name: 'Banner: Cripta Ancestral', val: 'linear-gradient(135deg, #0f172a 0%, #334155 100%)' },
-        { id: 'banner_lava_bridges', name: 'Banner: Puentes de Lava', val: 'linear-gradient(135deg, #431407 0%, #9a3412 100%)' },
-        { id: 'banner_core_sanctum', name: 'Banner: Sagrario del Núcleo', val: 'linear-gradient(135deg, #111827 0%, #4f46e5 55%, #9333ea 100%)' }
-      ];
+      const cfgCosmetics = window.EKGameConfig?.COSMETICS || [];
+      const VAULT_BANNERS = cfgCosmetics.filter(c => c.type === 'banner').length > 0
+        ? cfgCosmetics.filter(c => c.type === 'banner').map(c => ({ id: c.id, name: c.name, val: c.val }))
+        : [
+            { id: 'banner_golem_animated', name: '★ Banner: Colossus Raid (Póster Oficial)', val: "url('assets/banners/promo_colossus_raid_event.webp') center/cover no-repeat" },
+            { id: 'banner_fluid_lava', name: 'Banner: Crimson Moon · Kurogane (Anime)', val: "url('assets/banners/promo_crimson_shinobi.webp') center/cover no-repeat" },
+            { id: 'banner_rune_storm', name: 'Banner: Cyber Matsuri · Akira (Anime)', val: "url('assets/banners/promo_cyber_idol_matsuri.webp') center/cover no-repeat" },
+            { id: 'banner_bridges', name: 'Banner: Shibuya Drift GP · Renji (Anime)', val: "url('assets/banners/promo_neotokyo_drift_gp.webp') center/cover no-repeat" },
+            { id: 'banner_amethyst', name: 'Banner: Boreal Aurora · Winter Fest', val: "url('assets/banners/promo_aurora_sanctuary_fest.webp') center/cover no-repeat" },
+            { id: 'banner_mines', name: 'Banner: Elemental Clash · Torneo Dojo (Anime)', val: "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat" },
+            { id: 'banner_crypt', name: 'Banner: Dual-Soul · Kaelen (Anime)', val: "url('assets/banners/promo_shadow_flame_chronicles.webp') center/cover no-repeat" },
+            { id: 'banner_sanctum', name: 'Banner: Rival Showdown · Ignis vs. Zero-Frost', val: "url('assets/banners/promo_frost_vs_ignis_rivals.webp') center/cover no-repeat" }
+          ];
       const VAULT_TITLES = [
         { id: 'title_colossus_slayer', name: '★ Coloso Carmesí' },
         { id: 'title_abyss_guardian', name: '⚔️ Guardián del Abismo' },
@@ -5592,16 +6001,14 @@ function modalProfile() {
       type: 'button',
       style: `background:${vc.val};color:#fff;border:1.5px solid ${color === vc.val ? '#fff' : 'rgba(255,255,255,0.3)'};padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.3);text-shadow:0 1px 2px rgba(0,0,0,0.8);`,
       onclick: () => {
-        color = vc.val;
-        pv.style.backgroundColor = vc.val.startsWith('linear') ? '#1e293b' : vc.val;
-        localStorage.setItem('epickast.equipped_color', vc.val);
+        applyColorPreview(vc.val);
         toast(`Color equipado: ${vc.name}`);
       }
     }, '★ ' + vc.name))
   ) : null;
 
-  const BANNER_PRESETS = [
-    ...unlockedBanners.map(b => ({ name: '🎁 ' + b.name, val: b.val })),
+  const studioPresets = (window.EKProfileStudio?.BANNER_PRESETS || []).map((b) => ({ name: b.name, val: b.value || b.val }));
+  const fallbackPresets = [
     { name: '💜 Púrpura Imperial', val: 'linear-gradient(135deg, #7c5cff, #4f46e5)' },
     { name: '🌊 Océano Cyan', val: 'linear-gradient(135deg, #06b6d4, #2563eb)' },
     { name: '🌲 Esmeralda Cyber', val: 'linear-gradient(135deg, #10b981, #047857)' },
@@ -5609,15 +6016,125 @@ function modalProfile() {
     { name: '⚡ Ámbar Sunset', val: 'linear-gradient(135deg, #f59e0b, #b45309)' },
     { name: '🌑 Obsidiana Gamer', val: 'linear-gradient(135deg, #334155, #0f172a)' }
   ];
+  const BANNER_PRESETS = [
+    ...unlockedBanners.map(b => ({ name: '🎁 ' + b.name, val: b.val })),
+    ...(studioPresets.length ? studioPresets : fallbackPresets),
+  ];
   let banner = localStorage.getItem('epickast.equipped_banner') || me.banner || BANNER_PRESETS[0].val;
-  const bannerPreview = h('div', { class: 'prof-banner', style: `background:${banner};margin-bottom:8px` });
+  if (typeof banner === 'string' && /^\/files\/\d+$/.test(banner.trim()) && !BANNER_PRESETS.some((b) => b.val === banner)) {
+    BANNER_PRESETS.unshift({ name: '🖼️ Banner personalizado subido', val: banner });
+  }
+
+  const liveNameEl = h('span', { style: `font-size:17px;font-weight:800;${nameColorStyle(color)}` }, me.name);
+  const bannerPreview = h('div', { class: 'prof-banner', style: bannerCss(banner) });
+  const applyBannerPreviewStyle = (val) => {
+    bannerPreview.setAttribute('style', bannerCss(val));
+  };
+  const applyColorPreview = (nextColor) => {
+    color = nextColor;
+    pv.style.backgroundColor = String(nextColor).startsWith('linear') ? '#1e293b' : nextColor;
+    liveNameEl.setAttribute('style', `font-size:17px;font-weight:800;${nameColorStyle(nextColor)}`);
+    localStorage.setItem('epickast.equipped_color', nextColor);
+  };
+
   const bannerSelect = h('select', {
+    style: 'margin-top:6px;',
     onchange: (e) => {
       banner = e.target.value;
-      bannerPreview.style.background = banner;
+      applyBannerPreviewStyle(banner);
+      if (refreshBannerGallery && typeof refreshBannerGallery.setSelected === 'function') {
+        refreshBannerGallery.setSelected(banner);
+      }
       localStorage.setItem('epickast.equipped_banner', banner);
     }
   }, BANNER_PRESETS.map((b) => h('option', { value: b.val, selected: banner === b.val }, b.name)));
+
+  const bannerFileInp = h('input', {
+    type: 'file',
+    accept: 'image/png,image/jpeg,image/webp,image/gif',
+    class: 'hidden',
+    onchange: () => {
+      const f = bannerFileInp.files[0];
+      bannerFileInp.value = '';
+      if (!f) return;
+      if (!window.EKProfileStudio?.openBannerCropper) {
+        toast('El editor de banners no está disponible');
+        return;
+      }
+      window.EKProfileStudio.openBannerCropper(f, {
+        onApply: async ({ blob, previewUrl, mime }) => {
+          try {
+            if (previewUrl) {
+              bannerPreview.style.background = '';
+              bannerPreview.style.backgroundImage = `url(${previewUrl})`;
+              bannerPreview.style.backgroundSize = 'cover';
+              bannerPreview.style.backgroundPosition = 'center';
+            }
+            toast('Subiendo banner personalizado…');
+            const ext = /jpeg|jpg/i.test(mime) ? 'jpg' : 'webp';
+            const upUrl = `${httpBase()}/upload?kind=banner&name=${encodeURIComponent('banner.' + ext)}&mime=${encodeURIComponent(mime || 'image/webp')}`;
+            const res = await fetch(upUrl, {
+              method: 'POST',
+              headers: { 'x-token': S.token },
+              body: blob,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data?.ok || !data?.url) {
+              throw new Error(data?.error || `Error HTTP ${res.status}`);
+            }
+            banner = data.url;
+            localStorage.setItem('epickast.equipped_banner', banner);
+            if (![...bannerSelect.options].some((o) => o.value === banner)) {
+              const opt = h('option', { value: banner, selected: true }, '🖼️ Banner personalizado subido');
+              bannerSelect.prepend(opt);
+            }
+            bannerSelect.value = banner;
+            applyBannerPreviewStyle(banner);
+            toast('🖼️ ¡Banner recortado y listo! Pulsa Guardar para aplicarlo a tu perfil');
+          } catch (err) {
+            applyBannerPreviewStyle(banner);
+            toast('Error al subir banner: ' + (err?.message || err));
+          } finally {
+            if (previewUrl) {
+              try { URL.revokeObjectURL(previewUrl); } catch {}
+            }
+          }
+        },
+      });
+    },
+  });
+
+  const bannerGallerySlot = h('div', { class: 'ek-banner-gallery-slot' });
+  let refreshBannerGallery = null;
+  if (window.EKProfileStudio?.mountBannerGallery) {
+    refreshBannerGallery = window.EKProfileStudio.mountBannerGallery(bannerGallerySlot, {
+      initial: banner,
+      customBanners: unlockedBanners.map((b) => ({ id: b.id, name: b.name, value: b.val, category: 'anime', badge: 'RELIQUIA' })),
+      httpBaseFn: httpBase,
+      onSelect: (nextVal) => {
+        banner = nextVal;
+        if (![...bannerSelect.options].some((o) => o.value === banner)) {
+          bannerSelect.prepend(h('option', { value: banner, selected: true }, '🖼️ Banner seleccionado'));
+        }
+        bannerSelect.value = banner;
+        applyBannerPreviewStyle(banner);
+        localStorage.setItem('epickast.equipped_banner', banner);
+      },
+      onUploadClick: () => bannerFileInp.click()
+    });
+  }
+
+  const colorStudioSlot = h('div', { class: 'ek-color-studio' });
+  if (window.EKProfileStudio?.mountColorControl) {
+    const destroyColorCtrl = window.EKProfileStudio.mountColorControl(colorStudioSlot, {
+      initial: color,
+      onChange: (nextColor) => {
+        applyColorPreview(nextColor);
+        sws.querySelectorAll('.sw').forEach((n) => n.classList.toggle('sel', n.dataset.col === nextColor));
+      },
+    });
+    if (typeof destroyColorCtrl === 'function') S.cleanup.push(destroyColorCtrl);
+  }
 
   let selectedFrame = eqF || '';
   const frameSelect = h('select', {
@@ -5655,21 +6172,47 @@ function modalProfile() {
   const bio = h('input', { value: me.bio || '', maxlength: 120, placeholder: 'Estado o frase de perfil (opcional)' });
   const customAct = h('input', { value: settings.customActivity || '', maxlength: 60, placeholder: S.detectedGame ? `Detectado automáticamente: ${S.detectedGame}` : 'Ej. VALORANT, Minecraft, Diseñando en 3D… (vacío = automático)' });
   const autoChk = h('input', { type: 'checkbox', style: 'width:auto', checked: settings.autoGameDetect !== false });
+  const liveCardPreview = h('div', { class: 'ek-profile-studio' },
+    h('div', { class: 'prof-card' },
+      bannerPreview,
+      h('div', { class: 'prof-body' },
+        h('div', { class: 'prof-avatar-row' },
+          h('div', { class: 'prof-avatar-overlap' }, pv),
+          h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' },
+            h('button', { type: 'button', onclick: () => file.click() }, '📷 Foto'),
+            h('button', { type: 'button', onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar'),
+            h('button', { type: 'button', style: 'background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.4);color:#fde047;font-size:11.5px', onclick: () => { closeModal(); modalVault('armory'); } }, '🎁 Armario'),
+            file
+          )
+        ),
+        h('div', { class: 'prof-meta' },
+          h('div', { style: 'display:flex;align-items:center;gap:6px;flex-wrap:wrap' },
+            liveNameEl,
+            titleBadgeEl(selectedTitle)
+          ),
+          h('div', { class: 'hint' }, me.bio ? `“${me.bio}”` : 'Vista previa en vivo de tu tarjeta de perfil')
+        )
+      )
+    )
+  );
   modal('Mi perfil, presencia y cosméticos',
-    h('div', { class: 'prof' }, pv, h('div', { style: 'display:flex;flex-direction:column;gap:6px' },
-      h('button', { onclick: () => file.click() }, '📷 Subir foto'),
-      h('button', { onclick: () => { avatarData = ''; showImg(null); } }, 'Quitar foto'),
-      h('button', { style: 'background:rgba(245,158,11,0.16);border-color:rgba(245,158,11,0.4);color:#fde047;font-size:11.5px', onclick: () => { closeModal(); modalVault('armory'); } }, '🎁 Abrir Mi Armario'),
-      file
-    )),
+    liveCardPreview,
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
       h('label', null, '🚦 Estado de presencia', statusSelect),
       h('label', null, '👑 Título de jugador', titleSelect)
     ),
     unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar (Bóveda)', frameSelect) : null,
-    h('label', null, 'Color del avatar y nombre (Paleta Base)', sws),
+    h('label', null, 'Color del avatar y nombre (Paleta Base + Selector Libre)', sws, colorStudioSlot),
     vaultColorSwatches ? h('label', null, '✨ Colores y Gradientes Desbloqueados en la Bóveda', vaultColorSwatches) : null,
-    h('label', null, 'Banner de perfil estilo Discord', bannerPreview, bannerSelect),
+    h('label', null, '🎨 Estudio de Banners (Pósters Anime, Eventos, Degradados Pro e Imagen 16:5)',
+      bannerGallerySlot,
+      bannerSelect,
+      h('div', { class: 'ek-banner-tools' },
+        h('button', { type: 'button', class: 'primary', onclick: () => bannerFileInp.click() }, '🖼️ Subir y recortar imagen propia (16:5)'),
+        h('span', { class: 'hint', style: 'font-size:11px' }, 'PNG, JPG, WEBP o GIF · Máx. 960×300'),
+        bannerFileInp
+      )
+    ),
     h('label', null, 'Estado / Biografía', bio),
     h('label', null, '🎮 Actividad o juego mostrado a tus amigos', customAct),
     h('label', { style: 'flex-direction:row;align-items:center;gap:8px;color:var(--tx)' }, autoChk, 'Detectar automáticamente juegos abiertos en mi PC (sin afectar rendimiento)'),
@@ -5685,6 +6228,7 @@ function modalProfile() {
       S.me.banner = banner;
       S.me.color = color;
       localStorage.setItem('epickast.equipped_color', color);
+      localStorage.setItem('epickast.equipped_banner', banner);
       localStorage.setItem('epickast.status', selectedStatus);
       await syncActivity();
       await safe(rpc('status.set', { status: selectedStatus, customStatus: bio.value }));
@@ -6349,20 +6893,25 @@ async function modalSettings() {
     chk('stats', 'Mostrar estadísticas de red (CPU, RAM y Ping en vivo)', updateStatTimer)
   );
 
+  const storeDlUrl = 'https://apps.microsoft.com/detail/9NWDBN0SHXQR';
+  const shareUrl = S.isStore ? storeDlUrl : dlLink;
+  const shareLabel = S.isStore ? '🏪 Enlace de Microsoft Store para amigos (clic para copiar)' : '📦 Enlace de descarga para amigos (clic para copiar)';
+
   // Acordeón 5: Conexión y Cuenta
-  const accAccount = acc('🌐', 'Servidor y Cuenta', 'Servidor activo, enlace de descarga para amigos y sesión',
+  const accAccount = acc('🌐', 'Servidor y Cuenta', 'Servidor activo, enlace para amigos y sesión',
     h('label', null, 'Servidor conectado', h('input', { value: settings.server, onchange: (e) => { settings.server = normUrl(e.target.value); saveSettings(); toast('Se aplicará al volver a iniciar sesión'); } })),
-    h('label', null, '📦 Enlace de descarga para amigos (clic para copiar)',
-      h('input', { value: dlLink, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(dlLink); toast('Enlace de descarga copiado'); } })),
+    h('label', null, shareLabel,
+      h('input', { value: shareUrl, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(shareUrl); toast('Enlace copiado'); } })),
     h('button', { style: 'margin-top:6px;padding:9px 12px;font-weight:700;font-size:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:#fff;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico y Error'),
     h('button', { class: 'danger', style: 'margin-top:6px', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, 'Cerrar sesión')
   );
 
   // Acordeón 6: Acerca de EpicKast
-  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '1.9.4'} · Desarrollado por EpicKap`,
+  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '1.9.6'} · Desarrollado por EpicKap`,
     h('div', { style: 'font-size:12px;color:var(--mu);line-height:1.6;display:flex;flex-direction:column;gap:6px' },
       h('div', null, h('b', { style: 'color:var(--tx)' }, 'EpicKast Comunicación Ultraligera (PC & Móvil)')),
-      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '1.9.4'}`)),
+      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '1.9.6'}`)),
+      S.isStore ? h('div', { style: 'color:#a5b4fc;font-weight:600' }, '🏪 Edición Microsoft Store: las actualizaciones se gestionan automáticamente desde Microsoft Store.') : null,
       h('div', null, 'Arquitectura WebRTC P2P directo y servidor en la nube de baja latencia.'),
       h('div', { style: 'font-size:11px;opacity:0.75' }, '© 2026 EpicKap Group. Todos los derechos reservados.')
     )
@@ -6390,7 +6939,7 @@ async function modalSettings() {
   );
 
   const isMobTouch = !!(window.EKPlatform?.isWeb && window.EKPlatform?.isTouch);
-  modal(`Ajustes · EpicKast v${S.appVer || '1.9.4'}`,
+  modal(`Ajustes · EpicKast v${S.appVer || '1.9.6'}`,
     simpleAudioCard,
     micCard,
     spkCard,
@@ -6411,8 +6960,20 @@ async function modalSettings() {
 const friendByDm = (key) => S.friends.friends.find((f) => f.dm === key);
 function showIncoming(m) {
   if (S.callKey === m.key) return;
-  S.incoming = { key: m.key, from: m.from }; ringer.start('in'); renderCallOverlay();
-  if (!settings.dnd) { window.epic.flash(); if (!document.hasFocus()) try { new Notification(`${m.from.name} te está llamando`, { body: 'Abre EpicKast para contestar', silent: true }); } catch {} }
+  S.incoming = { key: m.key, from: m.from, video: !!m.video };
+  ringer.start(m.video ? 'video' : 'in');
+  renderCallOverlay();
+  if (!settings.dnd) {
+    window.epic.flash();
+    if (!document.hasFocus()) {
+      try {
+        new Notification(
+          `${m.from.name} ${m.video ? 'inició una videollamada' : 'te está llamando'}`,
+          { body: 'Abre EpicKast para contestar', silent: true }
+        );
+      } catch {}
+    }
+  }
 }
 function clearIncoming() { S.incoming = null; if (!S.outgoing) ringer.stop(); renderCallOverlay(); }
 function clearOutgoing() { S.outgoing = null; if (!S.incoming) ringer.stop(); renderCallOverlay(); }
@@ -6427,10 +6988,11 @@ function onCallStop(m) {
     else if (m.reason === 'missed') { toast(`${who} no contestó`); leaveCall(false); }
   }
 }
-async function answerIncoming() {
+async function answerIncoming(withVideo) {
   const inc = S.incoming; if (!inc) return; clearIncoming();
+  const useVideo = withVideo === undefined ? !!inc.video : !!withVideo;
   S.view = { kind: 'home', sid: null }; await openChannel(inc.key, 'dm', inc.from.name);
-  joinCall(inc.key, inc.from.name);
+  joinCall(inc.key, inc.from.name, { video: useVideo });
 }
 function declineIncoming() { const inc = S.incoming; if (!inc) return; sendRaw('call.decline', { key: inc.key }); clearIncoming(); }
 function renderCallOverlay() {
@@ -6439,18 +7001,38 @@ function renderCallOverlay() {
   if (!info) { o.classList.add('hidden'); o.replaceChildren(); return; }
   o.classList.remove('hidden');
   if (S.incoming) {
-    o.replaceChildren(h('div', { class: 'callcard' }, h('div', { class: 'pulse' }, avatar(info.u, 110)), h('h2', null, info.u.name), h('p', null, 'te está llamando…'),
+    const isVid = !!S.incoming.video;
+    o.replaceChildren(h('div', { class: 'callcard' },
+      h('div', { class: 'pulse' }, avatar(info.u, 110)),
+      h('h2', null, info.u.name),
+      h('p', null, isVid ? '📹 te está llamando por videollamada…' : 'te está llamando…'),
       S.callKey ? h('p', { class: 'hint' }, 'Si contestas, saldrás de tu llamada actual') : null,
-      h('div', { class: 'btns' }, h('button', { class: 'big btn-call', onclick: answerIncoming }, h('i', null, '📞'), 'Contestar'), h('button', { class: 'big btn-bad', onclick: declineIncoming }, h('i', null, '📵'), 'Rechazar'))));
+      h('div', { class: 'btns' },
+        isVid ? h('button', { class: 'big btn-call', onclick: () => answerIncoming(true) }, h('i', null, '📹'), 'Contestar con video') : null,
+        h('button', { class: 'big btn-call', onclick: () => answerIncoming(false) }, h('i', null, '📞'), isVid ? 'Solo audio' : 'Contestar'),
+        h('button', { class: 'big btn-bad', onclick: declineIncoming }, h('i', null, '📵'), 'Rechazar')
+      )
+    ));
   } else {
-    o.replaceChildren(h('div', { class: 'callcard' }, h('div', { class: 'pulse' }, avatar(info.u, 110)), h('h2', null, info.u.name), h('p', null, 'Llamando…'),
-      h('div', { class: 'btns' }, h('button', { class: 'big btn-bad', onclick: () => leaveCall(false) }, h('i', null, '📵'), 'Cancelar'))));
+    o.replaceChildren(h('div', { class: 'callcard' },
+      h('div', { class: 'pulse' }, avatar(info.u, 110)),
+      h('h2', null, info.u.name),
+      h('p', null, S.outgoing?.video ? '📹 Videollamando…' : 'Llamando…'),
+      h('div', { class: 'btns' }, h('button', { class: 'big btn-bad', onclick: () => leaveCall(false) }, h('i', null, '📵'), 'Cancelar'))
+    ));
   }
 }
 
 // ---------- llamada ----------
-async function joinCall(key, label) {
-  if (S.callKey === key) { if (S.stageCollapsed) toggleStageCollapse(false); return; }
+async function joinCall(key, label, opts = {}) {
+  if (S.callKey === key) {
+    if (S.stageCollapsed) toggleStageCollapse(false);
+    if (opts?.video && S.call && !S.call.camTrack) {
+      await S.call.setCamera(true).catch(() => toast('No se pudo abrir la cámara'));
+      updateDock(); renderStage(); pushState();
+    }
+    return;
+  }
   if (S.incoming?.key === key) clearIncoming();
   leaveCall(false);
   const call = new Call({
@@ -6472,6 +7054,11 @@ async function joinCall(key, label) {
   });
   call.onScreenEnded = () => pushState();
   call.onCamEnded = () => { updateDock(); pushState(); toast('La cámara está ocupada por otra app (ej. Discord) o se desconectó'); };
+  call.onPeerStatus = (pid, st) => {
+    const t = tiles.get('p' + pid);
+    if (!t?.stat || settings.stats) return;
+    t.stat.textContent = st === 'reconnecting' ? '🔄 Reconectando red…' : '';
+  };
   try {
     await call.start();
     if (settings.voiceMode === 'ptt') {
@@ -6480,13 +7067,16 @@ async function joinCall(key, label) {
     if (S.gameMode) {
       call.setGameMode(true);
     }
-    const r = await rpc('voice.join', { key });
+    const r = await rpc('voice.join', { key, video: !!opts?.video });
     call.ice = r.ice; S.call = call; S.callKey = key; S.callLabel = label;
     S.party = r.party || null;
     if (S.party?.current?.title) S.partyTracks.set(key, S.party.current.title);
     r.peers.forEach((p) => call.addPeer(p));
     if (r.offline) { toast(`${label} no está conectado ahora`); S.call = call; leaveCall(false); return; }
-    if (r.ringing) { S.outgoing = { key, name: label }; ringer.start('out'); } else ringer.beep([480, 640]);
+    if (r.ringing) { S.outgoing = { key, name: label, video: !!opts?.video }; ringer.start('out'); } else ringer.playJoin?.();
+    if (opts?.video) {
+      await call.setCamera(true).catch(() => toast('No se pudo abrir la cámara'));
+    }
   } catch (e) { call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return; }
   $('voiceDock').classList.remove('hidden'); $('stageWrap').classList.remove('hidden');
   try { localStorage.setItem('epickast.activeCall', JSON.stringify({ key, label, ts: Date.now() })); } catch {}
@@ -6501,7 +7091,7 @@ function leaveCall(silent) {
   if (!silent) {
     try { localStorage.removeItem('epickast.activeCall'); } catch {}
     sendRaw('voice.leave', {});
-    ringer.beep([520, 360]);
+    ringer.playLeave?.();
   }
   S.call.close(); S.call = null; S.callKey = null; S.focusTile = null; S.party = null; S.meSpeaking = false; S.stageCollapsed = false; S.floatPipDismissed = false; S.floatPipForce = false;
   document.body.classList.remove('spotlight-active', 'cam-ui-pinned');
@@ -7046,7 +7636,7 @@ function toggleGameMode(enable) {
 
 // ---------- Superposición Gamer Flotante (Overlay Transparente) ----------
 function syncOverlay() {
-  if (!window.epic?.updateOverlay) return;
+  if (!window.epic?.updateOverlay || !S.overlayActive) return;
   if (!S.call) {
     window.epic.updateOverlay({ peers: [] });
     return;
@@ -7197,6 +7787,7 @@ $('bMute').onclick = () => {
   if (c.serverDeafened && c.deaf) return toast('🔒 Estás ensordecido por un administrador del servidor');
   if (c.deaf) c.deaf = false;
   c.setMuted(!c.muted);
+  if (c.muted) ringer.playMute?.(); else ringer.playUnmute?.();
   updateDock(); renderStage(); syncPartyTile(); pushState();
 };
 $('bDeaf').onclick = () => {
@@ -7204,6 +7795,7 @@ $('bDeaf').onclick = () => {
   if (c.serverDeafened && c.deaf) return toast('🔒 Estás ensordecido por un administrador del servidor');
   c.deaf = !c.deaf;
   c.setMuted(c.deaf || !!c.serverMuted);
+  if (c.deaf) ringer.playDeafen?.(); else ringer.playUndeafen?.();
   updateDock(); renderStage(); syncPartyTile(); pushState();
 };
 $('bDockMore').onclick = () => { S.dockOpen = !S.dockOpen; updateDock(); };
@@ -7483,7 +8075,7 @@ function applyTileVolume(t) {
     t.video.volume = 0;
     if (!t.boostCtx || t.boostStream !== t.video.srcObject || !t.rxMode) {
       cleanupTileAudio(t);
-      const ctx = new AudioContext();
+      const ctx = new AudioContext({ latencyHint: 'interactive' });
       const src = ctx.createMediaStreamSource(t.video.srcObject);
       const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 120; hp.Q.value = 0.7;
       const deHiss = ctx.createBiquadFilter(); deHiss.type = 'highshelf'; deHiss.frequency.value = 4600; deHiss.gain.value = -6.5;
@@ -7536,7 +8128,7 @@ function applyTileVolume(t) {
     t.boostMuted = true;
     if (!t.boostCtx || t.boostStream !== t.video.srcObject) {
       cleanupTileAudio(t);
-      const ctx = new AudioContext();
+      const ctx = new AudioContext({ latencyHint: 'interactive' });
       const src = ctx.createMediaStreamSource(t.video.srcObject);
       const gain = ctx.createGain();
       src.connect(gain); gain.connect(ctx.destination);
@@ -7729,10 +8321,12 @@ function tile(key, label, user, withVol = false) {
     }
     const tbtns = h('div', { class: 'tbtns' }, hidePrevBtn, zoomBtn, pinBtn, fitBtn, pip, fs);
     let volWrap = null;
+    let vTxt = null;
+    let vRng = null;
     if (withVol && user?.id) {
       const cur = getUserVol(user.id);
-      const vTxt = h('span', null, `${Math.round(cur * 100)}%`);
-      const vRng = h('input', { type: 'range', min: 0, max: 2, step: 0.05, value: cur, title: 'Volumen de este usuario (0% a 200%)', oninput: () => {
+      vTxt = h('span', null, `${Math.round(cur * 100)}%`);
+      vRng = h('input', { type: 'range', min: 0, max: 2, step: 0.05, value: cur, title: 'Volumen de este usuario (0% a 200%)', oninput: () => {
         const val = Number(vRng.value);
         setUserVol(user.id, val);
         vTxt.textContent = `${Math.round(val * 100)}%`;
@@ -7768,12 +8362,20 @@ function tile(key, label, user, withVol = false) {
       volWrap = h('div', { class: 'vol-wrap' }, spkIco, vRng, vTxt, rxBtn, admBtn);
     }
     const badgeOverlay = h('div', { class: 'tile-badges' });
-    const el = h('div', { class: 'tile', 'data-tile': key }, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
+    const bannerBgEl = h('div', { class: 'tile-banner-bg' });
+    const el = h('div', { class: 'tile', 'data-tile': key }, bannerBgEl, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
+    if (withVol && user?.id) {
+      el.addEventListener('contextmenu', (e) => {
+        openVoiceContextMenu(e, t.user || user, S.callKey, resolveServerForVoiceKey(S.callKey));
+      });
+    }
     $('stage').append(el);
     t = {
-      key, el, video, nm, av, stat, tbtns, pinBtn, fitBtn, badgeOverlay,
+      key, el, bannerBgEl, video, nm, av, stat, tbtns, pinBtn, fitBtn, badgeOverlay,
+      vTxt, vRng, user,
       uid: withVol ? user?.id : 0, hasVideo: false,
-      avKey: `${user?.id}:${user?.av}:${user?.color}`,
+      avKey: `${user?.id}:${user?.av}:${user?.color}:${user?.frame}`,
+      bannerKey: '',
       updateBadges: (st = {}) => {
         badgeOverlay.replaceChildren();
         if (st.serverMuted) {
@@ -7788,8 +8390,15 @@ function tile(key, label, user, withVol = false) {
     };
     tiles.set(key, t);
   }
-  const k = `${user?.id}:${user?.av}:${user?.color}`;
+  t.user = user;
+  const k = `${user?.id}:${user?.av}:${user?.color}:${user?.frame}`;
   if (t.avKey !== k) { t.avKey = k; t.av.replaceChildren(avatar(user, 72)); }
+  const uBanner = (key === 'me' ? (localStorage.getItem('epickast.equipped_banner') || user?.banner) : user?.banner) || '';
+  if (t.bannerBgEl && t.bannerKey !== uBanner) {
+    t.bannerKey = uBanner;
+    t.bannerBgEl.setAttribute('style', uBanner ? bannerCss(uBanner) : '');
+    t.el.classList.toggle('has-tile-banner', !!uBanner);
+  }
   t.nm.textContent = label; return t;
 }
 function setStream(t, stream, hasVideo, muted) {
@@ -8164,8 +8773,17 @@ function renderStage() {
     }
   }
   for (const p of c.peers.values()) {
-    const user = { id: p.id, name: p.name, color: p.user?.color, av: p.user?.av };
-    const friend = friendByDm(S.callKey)?.id === p.id ? friendByDm(S.callKey) : null; if (friend) { user.color = friend.color; user.av = friend.av; }
+    const srvMem = resolveServerForVoiceKey(S.callKey)?.members?.find((m) => Number(m.id) === Number(p.id));
+    const friend = S.friends.friends.find((f) => Number(f.id) === Number(p.id)) || (friendByDm(S.callKey)?.id === p.id ? friendByDm(S.callKey) : null);
+    const user = {
+      id: p.id,
+      name: p.name,
+      color: friend?.color || srvMem?.color || p.user?.color,
+      av: friend?.av ?? srvMem?.av ?? p.user?.av,
+      banner: friend?.banner || srvMem?.banner || p.user?.banner,
+      frame: friend?.frame || srvMem?.frame || p.user?.frame,
+      title: friend?.title || srvMem?.title || p.user?.title
+    };
     const pSt = p.state || {};
     const label = p.name + (pSt.serverMuted ? ' (Silenciado por Admin)' : (pSt.muted ? ' 🔇' : ''));
     const k = 'p' + p.id; keep.add(k);

@@ -1,0 +1,144 @@
+/* ==========================================================================
+   EpicKast · Design Tokens & Surface Hierarchy (v1.9.6)
+   Single source of truth for surfaces, borders, spacing, radii, shadows,
+   and theme overrides (amoled, midnight, emerald, crimson, cyberpunk).
+   ========================================================================== */
+
+:root {
+  /* 4-tier surface hierarchy + elevated controls */
+  --bg-rail: #0a0c12;
+  --bg-side: #111521;
+  --bg-main: #161b2a;
+  --bg-card: #1a2031;
+  --bg-elevated: #1e2538;
+  --bg-input: #0e1320;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.10);
+
+  /* Crisp surface dividers */
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+
+  /* Legacy aliases mapped to surface hierarchy */
+  --bg-app: var(--bg-main);
+  --bg-panel: var(--bg-side);
+  --bg-raised: var(--bg-elevated);
+  --border: var(--border-subtle);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+
+  /* Typography & semantic colors */
+  --tx: #eef0f6;
+  --mu: #8c93a8;
+  --ac: #7c5cff;
+  --ac-soft: rgba(124, 92, 255, 0.16);
+  --ok: #2ed573;
+  --bad: #ff5468;
+  --warn: #f59e0b;
+
+  /* Fixed spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+
+  /* Fixed radii */
+  --rad-sm: 6px;
+  --rad-md: 10px;
+  --rad-lg: 14px;
+  --rad-xl: 18px;
+
+  /* Shadows */
+  --shadow-menu: 0 16px 40px rgba(0, 0, 0, 0.62), 0 0 0 1px var(--border-subtle);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.36);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.72);
+}
+
+/* AMOLED: deeper blacks than default while preserving clear surface borders */
+[data-theme="amoled"] {
+  --bg-rail: #030305;
+  --bg-side: #08090d;
+  --bg-main: #0c0e14;
+  --bg-card: #11141c;
+  --bg-elevated: #171b26;
+  --bg-input: #07080b;
+  --bg-hover: rgba(255, 255, 255, 0.055);
+  --border-subtle: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+}
+
+/* Midnight: deep oceanic slate */
+[data-theme="midnight"] {
+  --bg-rail: #060a12;
+  --bg-side: #0c1322;
+  --bg-main: #111b2e;
+  --bg-card: #152138;
+  --bg-elevated: #1b2a46;
+  --bg-input: #0a101d;
+  --bg-hover: rgba(148, 163, 184, 0.08);
+  --border-subtle: rgba(148, 163, 184, 0.12);
+  --border-strong: rgba(148, 163, 184, 0.22);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+}
+
+/* Emerald: dark forest & jade */
+[data-theme="emerald"] {
+  --bg-rail: #040d0a;
+  --bg-side: #091712;
+  --bg-main: #0d2019;
+  --bg-card: #11271f;
+  --bg-elevated: #173329;
+  --bg-input: #07130f;
+  --bg-hover: rgba(46, 213, 115, 0.08);
+  --border-subtle: rgba(46, 213, 115, 0.14);
+  --border-strong: rgba(46, 213, 115, 0.26);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+}
+
+/* Crimson: rich burgundy & rose */
+[data-theme="crimson"] {
+  --bg-rail: #0d0507;
+  --bg-side: #170a0d;
+  --bg-main: #200f13;
+  --bg-card: #281318;
+  --bg-elevated: #32181f;
+  --bg-input: #12070a;
+  --bg-hover: rgba(255, 84, 104, 0.08);
+  --border-subtle: rgba(255, 84, 104, 0.14);
+  --border-strong: rgba(255, 84, 104, 0.26);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+}
+
+/* Cyberpunk: synth violet */
+[data-theme="cyberpunk"] {
+  --bg-rail: #090512;
+  --bg-side: #120b20;
+  --bg-main: #180f2b;
+  --bg-card: #1f1437;
+  --bg-elevated: #281a46;
+  --bg-input: #0e081a;
+  --bg-hover: rgba(124, 92, 255, 0.10);
+  --border-subtle: rgba(124, 92, 255, 0.18);
+  --border-strong: rgba(167, 139, 250, 0.30);
+  --bg: var(--bg-main);
+  --bg2: var(--bg-side);
+  --bg3: var(--bg-elevated);
+  --line: var(--border-subtle);
+}

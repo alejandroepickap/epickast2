@@ -25,3 +25,9 @@ server/data/
 *.db
 server/*firebase-adminsdk*.json
 server/render-env-variable.txt
+.env
+.env.*
+server/.env
+
+# Graphify (grafo local generado)
+graphify-out/

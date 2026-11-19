@@ -1,7 +1,7 @@
 {
-    "version":  "1.9.5",
-    "asarSha256":  "73f583e621c9aceb78ffc5e63a3244ce848cbfcb80faa482bae7f659b19b89be",
-    "asarSize":  23760267,
-    "updatedAt":  "2026-11-17T22:30:28.571Z",
-    "notes":  "EpicKast v1.9.5 - Coleccion de 60 cartas del Dojo (36 base ilustradas + 24 desbloqueables), Inventario estilo Clash Royale, cartas especiales (poder 11-12) con animaciones y cinematicas, pilas visuales Card-Jitsu HD y ventana flotante auto-ocultable."
+    "version":  "1.9.7",
+    "notes":  "v1.9.7: banners visibles en toda la app, overlay click-through con Alt+O y audio/video de baja latencia (jitter buffer reducido, sin falsos reinicios ICE).",
+    "updatedAt":  "2026-11-19T20:18:21.996Z",
+    "asarSha256":  "d4b38271c1f7b5d754be448f827faa62bb169e8477e99820c116375eaa6d6b3b",
+    "asarSize":  27746512
 }

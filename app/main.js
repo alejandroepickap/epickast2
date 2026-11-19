@@ -107,6 +107,7 @@ const KNOWN_GAMES = {
 };
 
 app.setAppUserModelId('com.epickap.epickast');
+const isStoreBuild = () => Boolean(process.windowsStore || process.env.STORE_BUILD === '1' || /\\WindowsApps\\/i.test(process.execPath));
 
 const configPath = path.join(app.getPath('userData'), 'epickast-config.json');
 function readConfig() {
@@ -145,20 +146,62 @@ let pendingSource = null;
 let savedBounds = null;
 let savedMaximized = false;
 let isMiniMode = false;
+let saveBoundsTimer = null;
 let callStatus = { inCall: false, hasVideo: false, autoFloat: true };
+
+function isValidWindowBounds(b) {
+  return Boolean(
+    b && typeof b === 'object'
+    && Number.isFinite(b.x) && Number.isFinite(b.y)
+    && Number.isFinite(b.width) && Number.isFinite(b.height)
+    && b.width >= 820 && b.height >= 520
+  );
+}
+
+function clampBoundsToWorkArea(b, area) {
+  const targetArea = area || screen.getDisplayMatching(
+    isValidWindowBounds(b) ? b : { x: 0, y: 0, width: 1200, height: 770 }
+  ).workArea;
+  const w = Math.min(targetArea.width, Math.max(820, Math.round(b?.width || 1200)));
+  const h = Math.min(targetArea.height, Math.max(520, Math.round(b?.height || 770)));
+  const rawX = Number.isFinite(b?.x) ? Math.round(b.x) : (targetArea.x + Math.round((targetArea.width - w) / 2));
+  const rawY = Number.isFinite(b?.y) ? Math.round(b.y) : (targetArea.y + Math.round((targetArea.height - h) / 2));
+  return {
+    x: Math.max(targetArea.x, Math.min(targetArea.x + targetArea.width - w, rawX)),
+    y: Math.max(targetArea.y, Math.min(targetArea.y + targetArea.height - h, rawY)),
+    width: w,
+    height: h,
+  };
+}
+
+function scheduleSaveWindowBounds() {
+  if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+  saveBoundsTimer = setTimeout(() => {
+    saveBoundsTimer = null;
+    if (!win || win.isDestroyed() || isMiniMode || win.isMaximized() || win.isMinimized()) return;
+    const b = win.getBounds();
+    if (!isValidWindowBounds(b)) return;
+    const nextBounds = { x: b.x, y: b.y, width: b.width, height: b.height };
+    const cur = readConfig();
+    cur.windowBounds = nextBounds;
+    appConfig.windowBounds = nextBounds;
+    writeConfig(cur);
+  }, 400);
+}
 
 function createOverlayWindow() {
   if (overlayWin && !overlayWin.isDestroyed()) return overlayWin;
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width } = primaryDisplay.workAreaSize;
   overlayWin = new BrowserWindow({
-    width: 200, height: 280,
-    x: width - 220, y: 50,
+    width: 210, height: 260,
+    x: width - 226, y: 54,
     transparent: true,
+    backgroundColor: '#00000000',
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: true,
+    resizable: false,
     show: false,
     hasShadow: false,
     focusable: false,
@@ -170,8 +213,15 @@ function createOverlayWindow() {
     },
   });
   overlayWin.setAlwaysOnTop(true, 'screen-saver');
+  overlayWin.setIgnoreMouseEvents(true, { forward: true });
   overlayWin.loadFile(path.join(__dirname, 'overlay.html'));
-  overlayWin.on('closed', () => { overlayWin = null; isOverlayVisible = false; });
+  overlayWin.on('closed', () => {
+    overlayWin = null;
+    isOverlayVisible = false;
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('overlay:status-changed', false);
+    }
+  });
   return overlayWin;
 }
 
@@ -180,8 +230,10 @@ function toggleOverlay(enable) {
   isOverlayVisible = !!enable;
   if (isOverlayVisible) {
     const ow = createOverlayWindow();
+    ow.setIgnoreMouseEvents(true, { forward: true });
     ow.showInactive();
   } else if (overlayWin && !overlayWin.isDestroyed()) {
+    overlayWin.setIgnoreMouseEvents(true, { forward: true });
     overlayWin.hide();
   }
   if (win && !win.isDestroyed()) {
@@ -197,10 +249,10 @@ function setMiniMode(enable) {
     savedMaximized = win.isMaximized();
     if (savedMaximized) win.unmaximize();
     const cur = win.getBounds();
-    if (cur.width >= 760 && cur.height >= 480) {
-      savedBounds = cur;
-    }
     const area = screen.getDisplayMatching(cur).workArea;
+    if (cur.width >= 760 && cur.height >= 480) {
+      savedBounds = clampBoundsToWorkArea(cur, area);
+    }
     const w = 420, h = 270;
     win.setMinimumSize(260, 170);
     win.setBounds({ x: area.x + area.width - w - 20, y: area.y + area.height - h - 20, width: w, height: h });
@@ -211,26 +263,41 @@ function setMiniMode(enable) {
     win.setAlwaysOnTop(false);
     win.setMinimumSize(820, 520);
     const cur = win.getBounds();
-    const area = screen.getDisplayMatching(cur).workArea;
-    const w = Math.min(area.width, Math.max(820, savedBounds?.width || 1200));
-    const h = Math.min(area.height, Math.max(520, savedBounds?.height || 770));
-    let x = savedBounds ? savedBounds.x : (area.x + Math.round((area.width - w) / 2));
-    let y = savedBounds ? savedBounds.y : (area.y + Math.round((area.height - h) / 2));
+    const fallbackBounds = isValidWindowBounds(appConfig.windowBounds) ? appConfig.windowBounds : null;
+    const targetBounds = savedBounds || fallbackBounds;
+    const area = screen.getDisplayMatching(targetBounds || cur).workArea;
     // Asegurar que la ventana restaurada quede 100% dentro del monitor actual y con la barra superior visible
-    x = Math.max(area.x, Math.min(area.x + area.width - w, x));
-    y = Math.max(area.y, Math.min(area.y + area.height - h, y));
-    win.setBounds({ x, y, width: w, height: h });
+    const restored = clampBoundsToWorkArea(targetBounds, area);
+    win.setBounds(restored);
     if (savedMaximized) {
       win.maximize();
     }
   }
-  win.webContents.send('window:mini-changed', isMiniMode);
+  if (win && !win.isDestroyed()) {
+    win.webContents.send('window:mini-changed', isMiniMode);
+  }
   return isMiniMode;
 }
 
 function createWindow() {
+  let initialBounds = null;
+  if (isValidWindowBounds(appConfig.windowBounds)) {
+    const raw = {
+      x: Math.round(appConfig.windowBounds.x),
+      y: Math.round(appConfig.windowBounds.y),
+      width: Math.round(appConfig.windowBounds.width),
+      height: Math.round(appConfig.windowBounds.height),
+    };
+    const area = screen.getDisplayMatching(raw).workArea;
+    initialBounds = clampBoundsToWorkArea(raw, area);
+    savedBounds = { ...initialBounds };
+  }
+
   win = new BrowserWindow({
-    width: 1200, height: 770, minWidth: 820, minHeight: 520, frame: false,
+    width: initialBounds ? initialBounds.width : 1200,
+    height: initialBounds ? initialBounds.height : 770,
+    ...(initialBounds ? { x: initialBounds.x, y: initialBounds.y } : {}),
+    minWidth: 820, minHeight: 520, frame: false,
     backgroundColor: '#0e1015', title: 'EpicKast', show: false, autoHideMenuBar: true,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
@@ -246,12 +313,19 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (e) => e.preventDefault());
 
+  const onWindowBoundsChanged = () => {
+    if (!win || win.isDestroyed() || isMiniMode || win.isMaximized() || win.isMinimized()) return;
+    scheduleSaveWindowBounds();
+  };
+  win.on('resize', onWindowBoundsChanged);
+  win.on('move', onWindowBoundsChanged);
+
   win.on('maximize', () => {
     if (isMiniMode) {
       isMiniMode = false;
       win.setAlwaysOnTop(false);
       win.setMinimumSize(820, 520);
-      win.webContents.send('window:mini-changed', false);
+      if (win && !win.isDestroyed()) win.webContents.send('window:mini-changed', false);
     }
   });
 
@@ -269,9 +343,18 @@ function createWindow() {
   win.on('close', (e) => {
     if (!isQuitting) {
       e.preventDefault();
+      if (isMiniMode) setMiniMode(false);
       win.hide();
       return false;
     }
+  });
+
+  win.on('closed', () => {
+    if (saveBoundsTimer) {
+      clearTimeout(saveBoundsTimer);
+      saveBoundsTimer = null;
+    }
+    win = null;
   });
 
   win.webContents.on('context-menu', (e, params) => {
@@ -325,7 +408,8 @@ function createTray() {
   tray.setToolTip('EpicKast');
 
   const showApp = () => {
-    if (win) {
+    if (win && !win.isDestroyed()) {
+      if (isMiniMode) setMiniMode(false);
       if (!win.isVisible()) win.show();
       if (win.isMinimized()) win.restore();
       win.focus();
@@ -355,8 +439,13 @@ function createTray() {
       label: 'Salir de EpicKast',
       click: () => {
         isQuitting = true;
-        app.quit();
-        process.exit(0);
+        if (win && !win.isDestroyed()) {
+          try { win.webContents.send('app:before-quit'); } catch {}
+        }
+        if (overlayWin && !overlayWin.isDestroyed()) {
+          try { overlayWin.destroy(); } catch {}
+        }
+        setTimeout(() => app.quit(), 180);
       },
     },
   ]);
@@ -424,6 +513,12 @@ app.whenReady().then(() => {
   ipcMain.handle('window:close', () => win?.close());
   ipcMain.handle('window:mini', (e, enable) => setMiniMode(enable === undefined ? !isMiniMode : enable));
   ipcMain.handle('overlay:toggle', (e, enable) => toggleOverlay(enable));
+  ipcMain.handle('overlay:ignore-mouse', (e, ignore) => {
+    if (overlayWin && !overlayWin.isDestroyed()) {
+      overlayWin.setIgnoreMouseEvents(!!ignore, { forward: true });
+    }
+    return true;
+  });
   ipcMain.handle('overlay:update', (e, data) => {
     if (overlayWin && !overlayWin.isDestroyed() && isOverlayVisible) {
       overlayWin.webContents.send('overlay:data', data);
@@ -431,6 +526,9 @@ app.whenReady().then(() => {
   });
   
   ipcMain.handle('app:uninstall', async () => {
+    if (isStoreBuild()) {
+      return { ok: false, storeManaged: true, error: 'Desinstala EpicKast desde Configuración de Windows o Microsoft Store.' };
+    }
     try {
       const { spawn } = require('child_process');
       const localAppDir = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
@@ -456,10 +554,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:version', () => app.getVersion());
-  ipcMain.handle('app:isStore', () => !!(process.windowsStore || process.env.STORE_BUILD === '1'));
+  ipcMain.handle('app:isStore', () => isStoreBuild());
   ipcMain.handle('app:openExternal', (e, url) => { if (/^https?:\/\//i.test(String(url))) shell.openExternal(String(url)); });
   
     ipcMain.handle('app:download-asar-update', async (e, url) => {
+    if (isStoreBuild()) {
+      return { ok: false, storeManaged: true, error: 'En la versión de Microsoft Store, las actualizaciones son automáticas a través de la Store.' };
+    }
     let tempAsar = null;
     try {
       if (!url || typeof url !== 'string') throw new Error('URL de ASAR inválida');
@@ -501,7 +602,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:apply-asar-update', async () => {
-    if (process.windowsStore || process.env.STORE_BUILD === '1') {
+    if (isStoreBuild()) {
       return { ok: false, storeManaged: true, error: 'En la versión de Microsoft Store, las actualizaciones son automáticas a través de la Store.' };
     }
     try {
@@ -568,6 +669,9 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:download-and-install', async (e, url) => {
+    if (isStoreBuild()) {
+      return { ok: false, storeManaged: true, error: 'En la versión de Microsoft Store, las actualizaciones son automáticas a través de la Store.' };
+    }
     try {
       if (!url || typeof url !== 'string') throw new Error('URL inválida');
       const tempExe = path.join(app.getPath('temp'), 'EpicKast-Update.exe');
@@ -741,13 +845,20 @@ app.whenReady().then(() => {
       return true;
     } catch { return false; }
   });
-  ipcMain.handle('shortcuts:set', (e, cfg) => {
+  const applyGlobalShortcuts = (cfg = {}) => {
     try {
       globalShortcut.unregisterAll();
       const bind = (key, act) => {
         if (!key) return;
         try {
           globalShortcut.register(String(key), () => {
+            if (act === 'overlay') {
+              const nextState = toggleOverlay();
+              if (win && !win.isDestroyed()) {
+                win.webContents.send('shortcut:trigger', act, nextState);
+              }
+              return;
+            }
             if (win && !win.isDestroyed()) win.webContents.send('shortcut:trigger', act);
           });
         } catch (err) {
@@ -762,12 +873,15 @@ app.whenReady().then(() => {
       bind(cfg?.hang || 'Alt+Q', 'hang');
       return true;
     } catch { return false; }
-  });
+  };
+  ipcMain.handle('shortcuts:set', (e, cfg) => applyGlobalShortcuts(cfg));
+  applyGlobalShortcuts({});
 
   createWindow();
   createTray();
   app.on('second-instance', () => {
-    if (win) {
+    if (win && !win.isDestroyed()) {
+      if (isMiniMode) setMiniMode(false);
       if (!win.isVisible()) win.show();
       if (win.isMinimized()) win.restore();
       win.focus();
