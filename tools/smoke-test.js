@@ -167,8 +167,9 @@ function client(port) {
   await c2.rpc('voice.leave');
   // subida de banner personalizado (POST /upload?kind=banner) y validación segura en profile.set
   c2.events.length = 0; b2.events.length = 0;
+  const pngBannerBuf = Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), Buffer.from('BANNER-DATA')]);
   const banRes = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=banner.png&mime=image/png`, {
-    method: 'POST', headers: { 'x-token': ra.token }, body: Buffer.from('PNG-BANNER-DATA'),
+    method: 'POST', headers: { 'x-token': ra.token }, body: pngBannerBuf,
   });
   assert.equal(banRes.status, 200);
   const banJson = await banRes.json();
@@ -179,7 +180,17 @@ function client(port) {
   assert.equal(b2.events.some((e) => e.t === 'msg'), false);
   const banDl = await fetch(`http://127.0.0.1:${port}${banJson.url}`);
   assert.equal(banDl.status, 200);
-  assert.equal(await banDl.text(), 'PNG-BANNER-DATA');
+  assert.deepEqual(Buffer.from(await banDl.arrayBuffer()), pngBannerBuf);
+  const nsfwBan = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=nsfw_test.png&mime=image/png`, {
+    method: 'POST', headers: { 'x-token': ra.token }, body: pngBannerBuf,
+  });
+  assert.equal(nsfwBan.status, 400);
+  const fakePngBan = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=fake.png&mime=image/png`, {
+    method: 'POST', headers: { 'x-token': ra.token }, body: Buffer.from('NOT-A-REAL-PNG'),
+  });
+  assert.equal(fakePngBan.status, 400);
+  const catGet = await c2.rpc('creator.catalog.get');
+  assert.ok(Array.isArray(catGet.customRewards));
   const badMimeBan = await fetch(`http://127.0.0.1:${port}/upload?kind=banner&name=doc.pdf&mime=application/pdf`, {
     method: 'POST', headers: { 'x-token': ra.token }, body: Buffer.from('PDF'),
   });

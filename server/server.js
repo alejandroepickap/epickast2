@@ -86,13 +86,16 @@ CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER, blocked_id INTEGER, ts INT
 
 `);
 for (const col of ['avatar TEXT', 'color TEXT', 'banner TEXT', 'bio TEXT', 'av INTEGER DEFAULT 0', 'frame TEXT', 'title TEXT', 'nameplate TEXT', 'profile_fx TEXT', "status TEXT DEFAULT 'online'", "custom_status TEXT DEFAULT ''", "ninja_config TEXT DEFAULT '{}'"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
-for (const col of ["coins INTEGER DEFAULT 0","dust INTEGER DEFAULT 0","keys_copper INTEGER DEFAULT 0","keys_silver INTEGER DEFAULT 0","keys_gold INTEGER DEFAULT 0","keys_obsidian INTEGER DEFAULT 0","pity_epic INTEGER DEFAULT 0","pity_legendary INTEGER DEFAULT 0","daily_keys_date TEXT DEFAULT ''","daily_keys_count INTEGER DEFAULT 0","daily_exchange_date TEXT DEFAULT ''","daily_exchange_copper INTEGER DEFAULT 0","daily_exchange_silver INTEGER DEFAULT 0","unlocked_cosmetics TEXT DEFAULT '[]'","weekly_boss_claimed_week INTEGER DEFAULT 0"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
+for (const col of ["coins INTEGER DEFAULT 0","dust INTEGER DEFAULT 0","keys_copper INTEGER DEFAULT 0","keys_silver INTEGER DEFAULT 0","keys_gold INTEGER DEFAULT 0","keys_obsidian INTEGER DEFAULT 0","pity_epic INTEGER DEFAULT 0","pity_legendary INTEGER DEFAULT 0","daily_keys_date TEXT DEFAULT ''","daily_keys_count INTEGER DEFAULT 0","daily_exchange_date TEXT DEFAULT ''","daily_exchange_copper INTEGER DEFAULT 0","daily_exchange_silver INTEGER DEFAULT 0","unlocked_cosmetics TEXT DEFAULT '[]'","weekly_boss_claimed_week INTEGER DEFAULT 0","created_at INTEGER DEFAULT 0","voice_seconds INTEGER DEFAULT 0","games_seen TEXT DEFAULT '[]'","dojo_pvp_wins INTEGER DEFAULT 0","dojo_pvp_losses INTEGER DEFAULT 0"]) { try { db.exec('ALTER TABLE users ADD COLUMN ' + col); } catch {} }
 
 for (const col of ['file_id INTEGER', 'reply_to INTEGER', 'pinned INTEGER DEFAULT 0', 'thread_id INTEGER DEFAULT NULL']) { try { db.exec('ALTER TABLE messages ADD COLUMN ' + col); } catch {} }
 try { db.exec('CREATE INDEX IF NOT EXISTS msg_thread ON messages(thread_id, id)'); } catch {}
 try { db.exec("ALTER TABLE members ADD COLUMN role TEXT DEFAULT 'member'"); } catch {}
 try { db.exec('ALTER TABLE channels ADD COLUMN user_limit INTEGER DEFAULT 0'); } catch {}
 try { db.exec('ALTER TABLE servers ADD COLUMN icon TEXT'); } catch {}
+try { db.exec('ALTER TABLE servers ADD COLUMN banner TEXT'); } catch {}
+try { db.exec('ALTER TABLE servers ADD COLUMN xp INTEGER DEFAULT 0'); } catch {}
+try { db.exec('UPDATE users SET created_at=' + Date.now() + ' WHERE created_at IS NULL OR created_at=0'); } catch {}
 const stmts = new Map();
 const sql = (s) => { let p = stmts.get(s); if (!p) { p = db.prepare(s); stmts.set(s, p); } return p; };
 const get = (s, ...a) => sql(s).get(...a);
@@ -515,7 +518,7 @@ if (process.env.CF_TURN_TOKEN_ID && process.env.CF_TURN_API_TOKEN && !process.en
   getIceServers(0).catch(() => {});
 }
 const serverView = (sid, uid) => {
-  const s = get('SELECT id,name,owner,invite,icon FROM servers WHERE id=?', sid);
+  const s = get('SELECT id,name,owner,invite,icon,banner,xp FROM servers WHERE id=?', sid);
   if (!s) fail('Servidor inexistente');
   const myRole = roleOf(sid, uid);
   if (!myRole) fail('No eres miembro');
@@ -528,21 +531,22 @@ const serverView = (sid, uid) => {
       partyTrack: c.type === 'voice' ? (parties.get(key)?.current?.title || null) : undefined,
     };
   });
-  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
+  const members = all('SELECT u.id,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status,u.custom_status customStatus,u.created_at createdAt,u.voice_seconds voiceSeconds,u.games_seen gamesSeen,u.dojo_pvp_wins dojoPvpWins,u.dojo_pvp_losses dojoPvpLosses,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av,m.role FROM members m JOIN users u ON u.id=m.user_id WHERE m.server_id=? ORDER BY u.name', sid).map((m) => ({
     id: m.id, name: m.name, color: m.color, banner: m.banner, bio: m.bio, frame: m.frame || null, title: m.title || null, nameplate: m.nameplate || null, profileFx: m.profileFx || null, av: m.av,
+    createdAt: m.createdAt || 0, voiceSeconds: m.voiceSeconds || 0, gamesSeen: (() => { try { return JSON.parse(m.gamesSeen || '[]'); } catch { return []; } })(), dojoPvpWins: m.dojoPvpWins || 0, dojoPvpLosses: m.dojoPvpLosses || 0,
     role: m.id === s.owner ? 'owner' : (m.role || 'member'),
     online: isOnline(m.id),
     status: publicStatusOf(m.id),
     customStatus: m.customStatus || '',
     activity: activities.get(m.id) || null,
   }));
-  return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
+  return { id: s.id, name: s.name, owner: s.owner, icon: s.icon || null, banner: s.banner || null, xp: s.xp || 0, myRole, invite: roleRank(myRole) >= 2 ? s.invite : undefined, channels, members };
 };
 const friendsView = (uid) => {
-  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status ustatus,u.custom_status customStatus,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
+  const rows = all(`SELECT f.a,f.b,f.status,u.id uid,u.name,u.color,u.banner,u.bio,u.frame,u.title,u.nameplate,u.profile_fx profileFx,u.status ustatus,u.custom_status customStatus,u.created_at createdAt,u.voice_seconds voiceSeconds,u.games_seen gamesSeen,u.dojo_pvp_wins dojoPvpWins,u.dojo_pvp_losses dojoPvpLosses,CASE WHEN u.avatar IS NULL THEN 0 ELSE u.av END av FROM friends f JOIN users u ON u.id=CASE WHEN f.a=? THEN f.b ELSE f.a END WHERE f.a=? OR f.b=?`, uid, uid, uid);
   const out = { friends: [], incoming: [], outgoing: [] };
   for (const r of rows) {
-    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, frame: r.frame || null, title: r.title || null, nameplate: r.nameplate || null, profileFx: r.profileFx || null, av: r.av, online: isOnline(r.uid), status: publicStatusOf(r.uid), customStatus: r.customStatus || '', activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
+    const u = { id: r.uid, name: r.name, color: r.color, banner: r.banner, bio: r.bio, frame: r.frame || null, title: r.title || null, nameplate: r.nameplate || null, profileFx: r.profileFx || null, av: r.av, createdAt: r.createdAt || 0, voiceSeconds: r.voiceSeconds || 0, gamesSeen: (() => { try { return JSON.parse(r.gamesSeen || '[]'); } catch { return []; } })(), dojoPvpWins: r.dojoPvpWins || 0, dojoPvpLosses: r.dojoPvpLosses || 0, online: isOnline(r.uid), status: publicStatusOf(r.uid), customStatus: r.customStatus || '', activity: activities.get(r.uid) || null, dm: dmKey(uid, r.uid) };
     if (r.status === 'accepted') out.friends.push(u); else if (r.b === uid) out.incoming.push(u); else out.outgoing.push(u);
   }
   return out;
@@ -552,7 +556,7 @@ const notifyFriends = (...ids) => ids.forEach((i) => toUser(i, { t: 'friends.cha
 const newInvite = () => crypto.randomBytes(5).toString('hex');
 
 const H = {
-  'servers.list': (ws) => all('SELECT s.id,s.name,s.icon FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id', ws.user.id),
+  'servers.list': (ws) => all('SELECT s.id,s.name,s.icon,s.banner,s.xp FROM servers s JOIN members m ON m.server_id=s.id WHERE m.user_id=? ORDER BY s.id', ws.user.id),
   'friends.list': (ws) => friendsView(ws.user.id),
   'friends.add': (ws, d) => {
     const u = get('SELECT id FROM users WHERE name=?', clean(d.name, 24));
@@ -1057,7 +1061,15 @@ const H = {
     let { avatar, av } = cur;
     if (d.avatar !== undefined) {
       if (d.avatar === null || d.avatar === '') { avatar = null; av = Date.now(); }
-      else if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(d.avatar)) && d.avatar.length <= 60000) { avatar = d.avatar; av = Date.now(); }
+      else if (/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(String(d.avatar)) && d.avatar.length <= 60000) {
+        const b64 = String(d.avatar).split(',')[1] || '';
+        const head = Buffer.from(b64.slice(0, 24), 'base64');
+        const isPng = head.length >= 4 && head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4E && head[3] === 0x47;
+        const isJpg = head.length >= 3 && head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF;
+        const isWebp = head.length >= 12 && head.slice(0, 4).toString('ascii') === 'RIFF' && head.slice(8, 12).toString('ascii') === 'WEBP';
+        if (!isPng && !isJpg && !isWebp) fail('Imagen de avatar no válida o dañada');
+        avatar = d.avatar; av = Date.now();
+      }
       else fail('Imagen inválida o demasiado grande');
     }
     const validateBanner = (raw) => {
@@ -1089,10 +1101,126 @@ const H = {
     return pub;
   },
   'profile.get': (ws, d) => {
-    const u = get('SELECT id,name,color,banner,bio,frame,title,nameplate,profile_fx profileFx,av,avatar FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
-    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, frame: u.frame || null, title: u.title || null, nameplate: u.nameplate || null, profileFx: u.profileFx || null, av: u.avatar ? u.av : 0 };
+    const u = get('SELECT id,name,color,banner,bio,frame,title,nameplate,profile_fx profileFx,av,avatar,created_at createdAt,voice_seconds voiceSeconds,games_seen gamesSeen,dojo_pvp_wins dojoPvpWins,dojo_pvp_losses dojoPvpLosses FROM users WHERE id=?', Number(d.id)); if (!u) fail('Usuario inexistente');
+    return { id: u.id, name: u.name, color: u.color, banner: u.banner || null, bio: u.bio, frame: u.frame || null, title: u.title || null, nameplate: u.nameplate || null, profileFx: u.profileFx || null, av: u.avatar ? u.av : 0, createdAt: u.createdAt || 0, voiceSeconds: u.voiceSeconds || 0, gamesSeen: (() => { try { return JSON.parse(u.gamesSeen || '[]'); } catch { return []; } })(), dojoPvpWins: u.dojoPvpWins || 0, dojoPvpLosses: u.dojoPvpLosses || 0 };
+  },
+  'server.setBanner': (ws, d) => {
+    const sid = Number(d.id);
+    if (roleRank(roleOf(sid, ws.user.id)) < 3) fail('Solo administradores o dueño pueden cambiar el banner del servidor');
+    const raw = d.banner;
+    let banner = null;
+    if (raw !== null && raw !== '') {
+      const s = String(raw).trim();
+      if (s.length > 600 || /javascript:|<|>|;|\.\./i.test(s)) fail('Banner inválido');
+      if (/^\/files\/\d+$/.test(s) || /^url\(\/files\/\d+\)$/i.test(s) || /^(?:linear|radial)-gradient\([^;{}<>\\"']+\)$/i.test(s)) {
+        banner = s;
+      } else fail('Banner de servidor inválido');
+    }
+    run('UPDATE servers SET banner=? WHERE id=?', banner, sid);
+    notifyServer(sid);
+    toUsers(memberIds(sid), { t: 'servers.changed' });
+    setTimeout(saveBackup, 300);
+    return { ok: true, banner };
+  },
+  'stats.pingVoice': (ws, d) => {
+    const secs = Math.max(0, Math.min(180, Number(d?.seconds) || 60));
+    run('UPDATE users SET voice_seconds = COALESCE(voice_seconds, 0) + ? WHERE id=?', secs, ws.user.id);
+    if (d?.serverId) {
+      const sid = Number(d.serverId);
+      if (roleOf(sid, ws.user.id)) {
+        run('UPDATE servers SET xp = COALESCE(xp, 0) + ? WHERE id=?', Math.max(1, Math.round(secs / 15)), sid);
+      }
+    }
+    const row = get('SELECT voice_seconds voiceSeconds FROM users WHERE id=?', ws.user.id);
+    return { ok: true, voiceSeconds: row?.voiceSeconds || 0 };
+  },
+  'stats.recordGame': (ws, d) => {
+    const gameName = clean(d?.name || '', 60);
+    if (!gameName) return { ok: false };
+    const row = get('SELECT games_seen FROM users WHERE id=?', ws.user.id);
+    let list = [];
+    try { list = JSON.parse(row?.games_seen || '[]'); } catch { list = []; }
+    if (!Array.isArray(list)) list = [];
+    if (!list.some((g) => String(g).toLowerCase() === gameName.toLowerCase())) {
+      list.push(gameName);
+      run('UPDATE users SET games_seen=? WHERE id=?', JSON.stringify(list.slice(0, 80)), ws.user.id);
+    }
+    return { ok: true, gamesCount: list.length, gamesSeen: list };
+  },
+  'dojo.pvp.result': (ws, d) => {
+    // Estricto: SOLO cuenta partidas contra jugadores reales (jamás contra bots)
+    const oppId = Number(d?.opponentId || 0);
+    if (!d?.isRealPlayer || !oppId || oppId === ws.user.id) {
+      return { ok: false, skipped: 'bots_excluded' };
+    }
+    const oppExists = get('SELECT id FROM users WHERE id=?', oppId);
+    if (!oppExists) return { ok: false, skipped: 'invalid_opponent' };
+    const won = !!d?.won;
+    if (won) {
+      run('UPDATE users SET dojo_pvp_wins = COALESCE(dojo_pvp_wins, 0) + 1 WHERE id=?', ws.user.id);
+    } else {
+      run('UPDATE users SET dojo_pvp_losses = COALESCE(dojo_pvp_losses, 0) + 1 WHERE id=?', ws.user.id);
+    }
+    if (d?.serverId && roleOf(Number(d.serverId), ws.user.id)) {
+      run('UPDATE servers SET xp = COALESCE(xp, 0) + ? WHERE id=?', won ? 25 : 10, Number(d.serverId));
+    }
+    const u = get('SELECT dojo_pvp_wins dojoPvpWins, dojo_pvp_losses dojoPvpLosses FROM users WHERE id=?', ws.user.id);
+    setTimeout(saveBackup, 400);
+    return { ok: true, dojoPvpWins: u?.dojoPvpWins || 0, dojoPvpLosses: u?.dojoPvpLosses || 0 };
+  },
+  'dojo.leaderboard': () => {
+    const rows = all(`
+      SELECT id, name, color, frame, title,
+             COALESCE(dojo_pvp_wins, 0) AS wins,
+             COALESCE(dojo_pvp_losses, 0) AS losses,
+             CASE WHEN avatar IS NULL THEN 0 ELSE av END AS av
+      FROM users
+      WHERE COALESCE(dojo_pvp_wins, 0) > 0 OR COALESCE(dojo_pvp_losses, 0) > 0
+      ORDER BY wins DESC, losses ASC, id ASC
+      LIMIT 25
+    `);
+    return { leaderboard: rows };
   },
   'profile.avatar': (ws, d) => ({ avatar: get('SELECT avatar FROM users WHERE id=?', Number(d.id))?.avatar || null }),
+  'creator.catalog.get': () => {
+    const filePath = path.join(DATA, 'creator_catalog.json');
+    try {
+      if (fs.existsSync(filePath)) {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      }
+    } catch {}
+    return { customRewards: [], hiddenIds: [], grantedCreators: [], moderation: { enabled: true, level: 'balanced' } };
+  },
+  'creator.catalog.save': (ws, d) => {
+    const filePath = path.join(DATA, 'creator_catalog.json');
+    let cur = { customRewards: [], hiddenIds: [], grantedCreators: [], moderation: { enabled: true, level: 'balanced' } };
+    try { if (fs.existsSync(filePath)) cur = JSON.parse(fs.readFileSync(filePath, 'utf8')); } catch {}
+    const uname = String(ws.user?.name || '').trim().toLowerCase();
+    const isMaster = uname === 'epickap' || Number(ws.user?.id) === 1;
+    const isGranted = Array.isArray(cur.grantedCreators) && cur.grantedCreators.some(
+      (c) => Number(c.id) === Number(ws.user?.id) || String(c.name || '').trim().toLowerCase() === uname
+    );
+    if (!isMaster && !isGranted) fail('Solo EpicKap o usuarios con rango Creador pueden modificar el catálogo');
+    const next = {
+      customRewards: Array.isArray(d?.customRewards) ? d.customRewards.slice(0, 120) : cur.customRewards,
+      hiddenIds: Array.isArray(d?.hiddenIds) ? d.hiddenIds.map((x) => clean(x, 80)).slice(0, 200) : cur.hiddenIds,
+      grantedCreators: isMaster && Array.isArray(d?.grantedCreators) ? d.grantedCreators.slice(0, 50) : cur.grantedCreators,
+      moderation: d?.moderation && typeof d.moderation === 'object' ? {
+        enabled: d.moderation.enabled !== false,
+        level: ['strict', 'balanced', 'relaxed'].includes(d.moderation.level) ? d.moderation.level : 'balanced',
+        blockExplicitFilenames: d.moderation.blockExplicitFilenames !== false
+      } : cur.moderation,
+      updatedAt: Date.now()
+    };
+    try { fs.writeFileSync(filePath, JSON.stringify(next, null, 2), 'utf8'); } catch {}
+    // Difundir a todos los clientes conectados
+    for (const sock of wss.clients) {
+      if (sock.readyState === 1 && sock.user) {
+        try { sock.send(JSON.stringify({ t: 'creator.catalog.updated', catalog: next })); } catch {}
+      }
+    }
+    return { ok: true, updatedAt: next.updatedAt };
+  },
   'voice.leave': (ws) => leaveRoom(ws),
   'voice.state': (ws, d) => {
     const r = rooms.get(ws.room); const me = r?.get(ws.user.id); if (!me) return;
@@ -1944,6 +2072,10 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
         res.writeHead(400, { 'content-type': 'application/json' });
         return res.end('{"error":"Formato de banner no permitido (PNG, JPEG, WebP o GIF)"}');
       }
+      if (/(?:^|[^a-z])(nsfw|porn|porno|xxx|nude|nudes|desnud[oa]s?|hentai|gore|bdsm|fetish|ecchi|r18|rule34|onlyfans)(?:[^a-z]|$)/i.test(name)) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        return res.end('{"error":"Banner bloqueado por Normas de la Comunidad"}');
+      }
     } else {
       try { auth = authorize(channel, usr.id); if (auth.type === 'voice') fail('Canal de voz'); }
       catch (e) { res.writeHead(403, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ error: e.message })); }
@@ -1965,6 +2097,23 @@ p,li{color:#94a3b8;font-size:14px}strong{color:#fff}</style></head><body><div cl
       if (aborted) return;
       wsOut.end(() => {
         if (!size) { try { fs.unlinkSync(destPath); } catch {} res.writeHead(400, { 'content-type': 'application/json' }); return res.end('{"error":"Archivo vacío"}'); }
+        if (isBanner) {
+          try {
+            const fd = fs.openSync(destPath, 'r');
+            const head = Buffer.alloc(12);
+            fs.readSync(fd, head, 0, 12, 0);
+            fs.closeSync(fd);
+            const isPng = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4E && head[3] === 0x47;
+            const isJpg = head[0] === 0xFF && head[1] === 0xD8 && head[2] === 0xFF;
+            const isGif = head.slice(0, 4).toString('ascii') === 'GIF8';
+            const isWebp = head.slice(0, 4).toString('ascii') === 'RIFF' && head.slice(8, 12).toString('ascii') === 'WEBP';
+            if (!isPng && !isJpg && !isGif && !isWebp) {
+              try { fs.unlinkSync(destPath); } catch {}
+              res.writeHead(400, { 'content-type': 'application/json' });
+              return res.end('{"error":"El archivo de banner no es una imagen válida"}');
+            }
+          } catch {}
+        }
         const ts = Date.now();
         const fileId = Number(run('INSERT INTO files(channel,user_id,name,mime,size,disk,ts) VALUES(?,?,?,?,?,?,?)', channel, usr.id, name, mime, size, disk, ts).lastInsertRowid);
         if (isBanner) {

@@ -289,12 +289,16 @@ html.ek-no-screen #mScreen { display: none !important; }
     max-height: 60vh !important;
   }
   #stage {
-    padding: 6px 6px 54px !important;
+    padding: 6px 6px 4px !important;
     gap: 6px !important;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
   }
   #meetBar {
-    bottom: 8px !important;
+    position: relative !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 2px auto 6px !important;
     gap: 6px !important;
     padding: 5px 8px !important;
     max-width: calc(100vw - 16px) !important;

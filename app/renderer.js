@@ -278,7 +278,11 @@ function modalVault(initialTab = 'roulette') {
       }
     };
   }
-  const getProfileCosmeticsList = () => [...window.EKCreatorSystem.getCustomRewards(), ...(cfg.COSMETICS || [])];
+  const getProfileCosmeticsList = () => (
+    window.EKCreatorSystem?.getActiveCosmetics
+      ? window.EKCreatorSystem.getActiveCosmetics()
+      : [...(window.EKCreatorSystem?.getCustomRewards?.() || []), ...(cfg.COSMETICS || [])]
+  );
   let PROFILE_COSMETICS = getProfileCosmeticsList();
   const RARITY_COLORS = cfg.RARITY_TOKENS ? {
     common: cfg.RARITY_TOKENS.common.color,
@@ -319,10 +323,16 @@ function modalVault(initialTab = 'roulette') {
     try { localStorage.setItem('epickast.dungeon.v1', JSON.stringify(dData)); } catch {}
   }
 
-  let activeTab = (typeof initialTab === 'string' && ['roulette', 'collection', 'dojo', 'racer', 'ninja', 'creator'].includes(initialTab)) ? initialTab : 'roulette';
-  let activeFilter = 'all'; // 'all' | 'frame' | 'banner' | 'color' | 'title' | 'nameplate' | 'profile_fx'
+  let activeGame = initialTab === 'racer' ? 'racer' : 'dojo'; // 'dojo' | 'racer'
+  let activeDojoSub = initialTab === 'ninja' ? 'ninja' : 'play'; // 'play' | 'ninja' | 'cards'
+  let activeRacerSub = 'races'; // 'races' | 'upgrades'
+  let activeTab = 'roulette'; // 'roulette' | 'minigames' | 'collection'
+  if (initialTab === 'collection') activeTab = 'collection';
+  else if (initialTab === 'minigames' || initialTab === 'dojo' || initialTab === 'racer' || initialTab === 'ninja') activeTab = 'minigames';
+  let activeFilter = 'all'; // 'all' | 'frame' | 'banner' | 'color'
   let activeRarityFilter = 'all'; // 'all' | 'common' | 'rare' | 'epic' | 'legendary'
   let sortNewestFirst = true;
+  let activeCardElFilter = 'all';
 
   let selectedTier = 'copper';
   if ((dData.keys.obsidian || 0) > 0) selectedTier = 'obsidian';
@@ -658,17 +668,19 @@ function modalVault(initialTab = 'roulette') {
       try { activeRacerInstance.destroy(); } catch {}
       activeRacerInstance = null;
     }
-    if (activeDojoInstance && activeTab !== 'dojo') {
+    if (activeDojoInstance && !(activeTab === 'minigames' && activeGame === 'dojo' && activeDojoSub === 'play')) {
       try { activeDojoInstance.destroy(); } catch {}
       activeDojoInstance = null;
+    }
+    if (activeRacerInstance && !(activeTab === 'minigames' && activeGame === 'racer' && activeRacerSub === 'races')) {
+      try { activeRacerInstance.destroy(); } catch {}
+      activeRacerInstance = null;
     }
 
     wrap.innerHTML = '';
     PROFILE_COSMETICS = getProfileCosmeticsList();
-    const isCreatorUser = window.EKCreatorSystem?.isCreator(S.me);
     const totalCosmetics = PROFILE_COSMETICS.length;
-    const unlockedCount = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
-    const pctUnlocked = Math.round((unlockedCount / Math.max(1, totalCosmetics)) * 100);
+    const unlockedCount = PROFILE_COSMETICS.filter(c => !!(dData.cosmetics && dData.cosmetics[c.id])).length;
 
     const renderTabIco = (key, scale = 1) => {
       if (window.EKSprites && window.EKSprites.renderSpriteHtml) {
@@ -678,79 +690,27 @@ function modalVault(initialTab = 'roulette') {
     };
 
     wrap.innerHTML = `
-      <!-- Cabecera de la Bóveda -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2638;padding-bottom:14px;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-          <span style="font-size:24px;">🏛️</span>
-          <div style="min-width:0;">
-            <h2 style="font-size:15px;font-weight:900;color:#f8fafc;margin:0;letter-spacing:0.5px;font-family:'Press Start 2P','Courier New',monospace;white-space:nowrap;">BÓVEDA DE RELIQUIAS · v${S.appVer || window.EKGameConfig?.APP_VERSION || '1.9.7'}</h2>
-            <p style="font-size:11.5px;color:#94a3b8;margin:3px 0 0 0;white-space:nowrap;">Santuario Arcano · Cosméticos Pro, Dojo Elemental 1v1 y Turbo Core 1v1</p>
-          </div>
+      <!-- Cabecera Minimalista v2.0.0: 3 Botones Principales + Recursos Compactos -->
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2638;padding-bottom:12px;margin-bottom:14px;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;background:#090c13;padding:4px;border-radius:10px;border:1px solid #1e293b;gap:4px;">
+          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'linear-gradient(135deg,#2563eb,#1d4ed8)':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-weight:800;font-size:12.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_roulette', 1)} <span>Ruleta</span>
+          </button>
+          <button id="vTabBtnMinigames" style="background:${activeTab==='minigames'?'linear-gradient(135deg,#7c3aed,#6d28d9)':'transparent'};color:${activeTab==='minigames'?'#fff':'#94a3b8'};border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-weight:800;font-size:12.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            <span>🎮</span> <span>Minijuegos</span>
+          </button>
+          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'linear-gradient(135deg,#d97706,#b45309)':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:none;padding:8px 16px;border-radius:7px;cursor:pointer;font-weight:800;font-size:12.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
+            ${renderTabIco('tab_armory', 1)} <span>Inventario (${unlockedCount}/${totalCosmetics})</span>
+          </button>
         </div>
 
-        <!-- 5 Pestañas Modulares con Sprites Pixel-Art -->
-        <div style="display:flex;background:#0b0e14;padding:3px;border-radius:8px;border:1px solid #1a2233;gap:4px;margin-left:auto;flex-wrap:wrap;">
-          <button id="vTabBtnRoulette" style="background:${activeTab==='roulette'?'#1e2638':'transparent'};color:${activeTab==='roulette'?'#fff':'#94a3b8'};border:${activeTab==='roulette'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_roulette', 1)} <span>Ruleta y Cofres</span>
-          </button>
-          <button id="vTabBtnCollection" style="background:${activeTab==='collection'?'#1e2638':'transparent'};color:${activeTab==='collection'?'#fff':'#94a3b8'};border:${activeTab==='collection'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_armory', 1)} <span>Mi Armario (${unlockedCount}/${totalCosmetics})</span>
-          </button>
-          <button id="vTabBtnDojo" style="background:${activeTab==='dojo'?'#1e2638':'transparent'};color:${activeTab==='dojo'?'#fff':'#94a3b8'};border:${activeTab==='dojo'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_dojo', 1)} <span>Dojo Elemental</span>
-          </button>
-          <button id="vTabBtnRacer" style="background:${activeTab==='racer'?'#1e2638':'transparent'};color:${activeTab==='racer'?'#fff':'#94a3b8'};border:${activeTab==='racer'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_racer', 1)} <span>Turbo Core</span>
-          </button>
-          <button id="vTabBtnNinja" style="background:${activeTab==='ninja'?'#1e2638':'transparent'};color:${activeTab==='ninja'?'#fff':'#94a3b8'};border:${activeTab==='ninja'?'1px solid #3b82f6':'1px solid transparent'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-            ${renderTabIco('tab_ninja', 1)} <span>Mi Ninja</span>
-          </button>
-          ${isCreatorUser ? `
-            <button id="vTabBtnCreator" style="background:${activeTab==='creator'?'linear-gradient(135deg,#9333ea,#db2777)':'rgba(168,85,247,0.14)'};color:#fff;border:1px solid ${activeTab==='creator'?'#f472b6':'#a855f7'};padding:6px 11px;border-radius:6px;cursor:pointer;font-weight:800;font-size:11.5px;display:flex;align-items:center;gap:6px;transition:0.15s;">
-              <span>🎨</span> <span>Creador</span>
-            </button>
-          ` : ''}
-        </div>
-
-        <!-- Botón de Cerrar formal -->
-        <button id="vCloseBtn" style="background:#1e2638;border:1px solid #3b4660;color:#f8fafc;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:800;transition:0.15s;flex-shrink:0;" title="Cerrar Bóveda (o presiona ESC)">✕ Cerrar</button>
-      </div>
-
-      <!-- Barra de Recursos y Llaves con Tienda Ilimitada -->
-      <div style="background:#131826;border:1px solid #1f273b;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;flex-direction:column;gap:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <div style="display:flex;gap:14px;align-items:center;font-size:12.5px;">
-            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('coin', 1)} <b>${(dData.coins || 0).toLocaleString()}</b> Monedas</span>
-            <span style="color:#334155;">|</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;">${renderTabIco('essence', 1)} <b id="vDustCount">${dData.dust || 0}</b> Esencia Arcana</span>
-            <span style="color:#334155;">|</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;color:#94a3b8;">${renderTabIco('pity_star', 1)} Sintonía: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
-          </div>
-
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button id="vBtnDailyBonus" style="background:linear-gradient(135deg, #d97706, #b45309);color:#fff;border:1px solid #fbbf24;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:5px;" title="Reclama tu recompensa diaria gratuita">
-              <span>🎁</span> <span>Bono Diario</span>
-            </button>
-            <button id="vBtnProbabilities" style="background:#1e2638;color:#94a3b8;border:1px solid #2d3748;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:4px;" title="Ver tabla de probabilidades y sintonía">
-              <span>ⓘ</span> Probabilidades
-            </button>
-            <button id="vBtnOpenKeyShop" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;box-shadow:0 2px 8px rgba(37,99,235,0.4);display:flex;align-items:center;gap:6px;">
-              ${renderTabIco('shop_cart', 1)} <span>Comprar Llaves con Monedas</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Inventario de Llaves en Posesión con Siluetas Unificadas -->
-        <div style="display:flex;justify-content:space-between;align-items:center;background:#090d14;border:1px solid #161e2e;border-radius:6px;padding:6px 14px;font-size:11.5px;flex-wrap:wrap;gap:8px;">
-          <div style="font-weight:800;color:#94a3b8;display:flex;align-items:center;gap:6px;">
-            <span>🗝️</span> TUS LLAVES DISPONIBLES:
-          </div>
-          <div style="display:flex;gap:14px;align-items:center;font-weight:800;">
-            <span style="color:#d97706;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_copper', 1)} Cobre: <b style="color:#fff;">${dData.keys.copper || 0}</b></span>
-            <span style="color:#cbd5e1;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_silver', 1)} Plata: <b style="color:#fff;">${dData.keys.silver || 0}</b></span>
-            <span style="color:#fbbf24;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_gold', 1)} Oro: <b style="color:#fff;">${dData.keys.gold || 0}</b></span>
-            <span style="color:#c084fc;display:inline-flex;align-items:center;gap:4px;">${renderTabIco('key_obsidian', 1)} Obsidiana: <b style="color:#fff;">${dData.keys.obsidian || 0}</b></span>
-          </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;">
+          <span style="background:#0f1420;border:1px solid #1e293b;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:5px;" title="Monedas">${renderTabIco('coin', 1)} ${(dData.coins || 0).toLocaleString()}</span>
+          <span style="background:#0f1420;border:1px solid #1e293b;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:800;display:inline-flex;align-items:center;gap:5px;" title="Esencia Arcana">${renderTabIco('essence', 1)} <b id="vDustCount">${dData.dust || 0}</b></span>
+          <button id="vBtnDailyBonus" style="background:linear-gradient(135deg,#d97706,#b45309);color:#fff;border:0;padding:6px 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:800;" title="Bono Diario">🎁 Bono</button>
+          <button id="vBtnOpenKeyShop" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;padding:6px 11px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:800;" title="Comprar llaves con monedas">🛒 Llaves</button>
+          <button id="vBtnProbabilities" style="background:transparent;color:#94a3b8;border:1px solid #263147;padding:6px 9px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;" title="Probabilidades y Sintonía (${dData.pity.withoutLegendary || 0}/60)">ⓘ</button>
+          <button id="vCloseBtn" style="background:#1e2638;border:1px solid #3b4660;color:#f8fafc;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:800;" title="Cerrar (ESC)">✕</button>
         </div>
       </div>
 
@@ -760,36 +720,52 @@ function modalVault(initialTab = 'roulette') {
           ${['copper','silver','gold','obsidian'].map(tier => {
             const count = dData.keys[tier] || 0;
             const isSel = selectedTier === tier;
-            const names = { copper: 'Cofre de Cobre', silver: 'Cofre de Plata', gold: 'Cofre de Oro', obsidian: 'Cofre de Obsidiana' };
-            const sub = { copper: 'Común · Raro · Épico', silver: '1% Legendario', gold: '5% Legendario', obsidian: '15% Legendario · 0% Común' }[tier];
+            const names = { copper: 'Cobre', silver: 'Plata', gold: 'Oro', obsidian: 'Obsidiana' };
+            const sub = { copper: 'Común · Raro', silver: '1% Legendario', gold: '5% Legendario', obsidian: '15% Legendario' }[tier];
             const keySprite = 'key_' + tier;
             const color = { copper: '#d97706', silver: '#cbd5e1', gold: '#fbbf24', obsidian: '#a855f7' }[tier];
             const bgGrad = {
-              copper: 'radial-gradient(circle at 50% 25%, rgba(217,119,6,0.24), #111622 80%)',
+              copper: 'radial-gradient(circle at 50% 25%, rgba(217,119,6,0.26), #111622 80%)',
               silver: 'radial-gradient(circle at 50% 25%, rgba(203,213,225,0.22), #111622 80%)',
-              gold: 'radial-gradient(circle at 50% 25%, rgba(251,191,36,0.26), #111622 80%)',
-              obsidian: 'radial-gradient(circle at 50% 25%, rgba(168,85,247,0.28), #111622 80%)'
+              gold: 'radial-gradient(circle at 50% 25%, rgba(251,191,36,0.28), #111622 80%)',
+              obsidian: 'radial-gradient(circle at 50% 25%, rgba(168,85,247,0.3), #111622 80%)'
             }[tier];
             return `
-              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? bgGrad : '#111622'};border:${isSel ? '2px solid ' + color : '1.5px solid #20283a'};border-radius:10px;padding:10px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all 0.18s ease;box-shadow:${isSel ? '0 6px 18px ' + color + '33, inset 0 1px 0 rgba(255,255,255,0.2)' : 'none'};transform:${isSel ? 'translateY(-2px)' : 'none'};">
+              <button class="vTabBtn" data-tier="${tier}" style="background:${isSel ? bgGrad : '#111622'};border:${isSel ? '2px solid ' + color : '1.5px solid #20283a'};border-radius:10px;padding:10px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all 0.18s ease;box-shadow:${isSel ? '0 6px 18px ' + color + '33' : 'none'};transform:${isSel ? 'translateY(-2px)' : 'none'};">
                 <span style="display:flex;align-items:center;justify-content:center;height:26px;filter:drop-shadow(0 2px 6px ${color}88);">${renderTabIco(keySprite, 1.35)}</span>
-                <span style="font-size:12px;font-weight:900;color:${isSel ? '#fff' : '#cbd5e1'};">${names[tier]}</span>
+                <span style="font-size:12.5px;font-weight:900;color:${isSel ? '#fff' : '#cbd5e1'};">${names[tier]}</span>
                 <span style="font-size:9.5px;color:#94a3b8;">${sub}</span>
-                <span style="font-size:10.5px;font-weight:800;color:${color};background:rgba(0,0,0,0.45);padding:2px 8px;border-radius:999px;border:1px solid ${color}55;margin-top:2px;">${count} Llave${count === 1 ? '' : 's'}</span>
+                <span style="font-size:10.5px;font-weight:800;color:${color};background:rgba(0,0,0,0.45);padding:2px 9px;border-radius:999px;border:1px solid ${color}55;margin-top:2px;">${count} llave${count === 1 ? '' : 's'}</span>
               </button>
             `;
           }).join('')}
         </div>
 
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8;padding:0 4px;">
-          <span>Probabilidades Nominales: Común ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.common || 0)*100)}% · Raro ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.rare || 0)*100)}% · Épico ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.epic || 0)*100)}% · Legendario ${Math.round((cfg.CHESTS?.[selectedTier]?.odds?.legendary || 0)*100)}%</span>
+          <span>Sintonía Legendaria: <b style="color:#fbbf24;">${dData.pity.withoutLegendary || 0}/60</b></span>
           <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none;">
             <input type="checkbox" id="vChkSkipAnim" ${localStorage.getItem('epickast.skip_chest_anim')==='1'?'checked':''} style="cursor:pointer;" />
             <span style="color:#cbd5e1;">Saltar animación</span>
           </label>
         </div>
 
-        <!-- Visor de la Ruleta Honesta -->
+        <!-- Propuesta 4: Vista Previa del Botín Destacado de este Cofre -->
+        ${(() => {
+          const allowedRarities = selectedTier === 'copper' ? ['epic', 'rare'] : ['legendary', 'epic'];
+          const featured = PROFILE_COSMETICS.filter((c) => allowedRarities.includes(c.rarity)).slice(0, 6);
+          if (!featured.length) return '';
+          return `
+            <div style="background:#0c101b;border:1px solid #1e293b;border-radius:9px;padding:7px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;">
+              <span style="font-size:10px;font-weight:900;color:#fbbf24;white-space:nowrap;letter-spacing:.5px;">🎁 BOTÍN DESTACADO:</span>
+              ${featured.map((item) => {
+                const rc = RARITY_COLORS[item.rarity] || '#a855f7';
+                return `<button type="button" class="vLootPrevChip" data-id="${item.id}" style="background:rgba(255,255,255,0.04);border:1px solid ${rc}66;color:#f1f5f9;padding:3px 9px;border-radius:999px;font-size:10.5px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;"><span style="color:${rc};">●</span>${item.name.replace(/^(Banner|Marco|Letra):\s*/i, '')}</button>`;
+              }).join('')}
+            </div>
+          `;
+        })()}
+
+        <!-- Visor de la Ruleta -->
         <div style="position:relative;background:radial-gradient(circle at 50% 50%, #131b2e 0%, #070a10 90%);border:1.5px solid #26334d;border-radius:10px;height:126px;overflow:hidden;box-shadow:inset 0 0 28px rgba(0,0,0,0.88), 0 6px 20px rgba(0,0,0,0.45);">
           <div style="position:absolute;top:0;bottom:0;left:50%;width:2.5px;background:linear-gradient(180deg,#fbbf24,#38bdf8,#fbbf24);z-index:10;transform:translateX(-50%);box-shadow:0 0 12px #38bdf8;">
             <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fbbf24;"></div>
@@ -798,161 +774,137 @@ function modalVault(initialTab = 'roulette') {
           <div id="vTrack" style="display:flex;height:100%;align-items:center;position:absolute;left:0;top:0;will-change:transform;"></div>
         </div>
 
-        <!-- Botones de Acción de Apertura -->
-        <div style="display:flex;justify-content:center;gap:12px;margin-top:6px;">
+        <!-- Botón de Apertura -->
+        <div style="display:flex;justify-content:center;gap:12px;margin-top:4px;">
           ${(dData.keys[selectedTier] || 0) > 0 ? `
-            <button id="vBtnSpin" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:1px solid #3b82f6;font-size:13px;font-weight:900;padding:11px 32px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(37,99,235,0.4);display:flex;align-items:center;gap:8px;transition:0.15s;">
+            <button id="vBtnSpin" style="background:linear-gradient(135deg, #2563eb, #1d4ed8);color:#fff;border:1px solid #3b82f6;font-size:13px;font-weight:900;padding:11px 32px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 14px rgba(37,99,235,0.4);display:flex;align-items:center;gap:8px;">
               <span>🔓</span>
-              <span>ABRIR COFRE (${dData.keys[selectedTier] || 0} Llave${(dData.keys[selectedTier]||0)>1?'s':''})</span>
+              <span>ABRIR COFRE (${dData.keys[selectedTier] || 0})</span>
             </button>
           ` : `
-            <button id="vBtnSpin" style="background:#1a2233;color:#fbbf24;border:1.5px solid #d97706;font-size:13px;font-weight:900;padding:11px 28px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;box-shadow:0 4px 12px rgba(217,119,6,0.25);display:flex;align-items:center;gap:8px;transition:0.15s;">
+            <button id="vBtnSpin" style="background:#1a2233;color:#fbbf24;border:1.5px solid #d97706;font-size:13px;font-weight:900;padding:11px 28px;border-radius:8px;cursor:pointer;letter-spacing:0.5px;display:flex;align-items:center;gap:8px;">
               <span>🛒</span>
-              <span>COMPRAR 1 LLAVE (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙) Y ABRIR</span>
+              <span>COMPRAR LLAVE (${(KEY_PRICES[selectedTier]||250).toLocaleString()} 🪙) Y ABRIR</span>
             </button>
           `}
         </div>
 
         <!-- Notificación de Ganador -->
         ${lastSpinResult ? `
-          <div id="vWinnerArea" style="margin-top:12px;padding:14px 18px;background:${lastSpinResult.isDuplicate ? '#161426' : '#0a1d15'};border:2px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};border-radius:10px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.6);animation:cjCardFlipIn 0.3s ease;">
+          <div id="vWinnerArea" style="margin-top:8px;padding:14px 18px;background:${lastSpinResult.isDuplicate ? '#161426' : '#0a1d15'};border:2px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};border-radius:10px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.6);">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <div style="font-size:11px;font-weight:900;letter-spacing:0.8px;padding:3px 10px;border-radius:6px;background:${lastSpinResult.isDuplicate ? 'rgba(168,85,247,0.2)' : 'rgba(16,185,129,0.2)'};color:${lastSpinResult.isDuplicate ? '#c084fc' : '#34d399'};border:1px solid ${lastSpinResult.isDuplicate ? '#a855f7' : '#10b981'};">
-                ${lastSpinResult.isDuplicate ? '♻️ [ COSMÉTICO REPETIDO · YA EN TU COLECCIÓN ]' : '🎉 [ ¡NUEVO COSMÉTICO DESBLOQUEADO! ]'}
+              <div style="font-size:11px;font-weight:900;padding:3px 10px;border-radius:6px;background:${lastSpinResult.isDuplicate ? 'rgba(168,85,247,0.2)' : 'rgba(16,185,129,0.2)'};color:${lastSpinResult.isDuplicate ? '#c084fc' : '#34d399'};">
+                ${lastSpinResult.isDuplicate ? '♻️ REPETIDO → +' + lastSpinResult.dustAward + ' ESENCIA' : '🎉 ¡DESBLOQUEADO!'}
               </div>
-              <button id="vBtnCloseWinnerNotice" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:13px;padding:2px 6px;" title="Cerrar aviso">✕</button>
+              <button id="vBtnCloseWinnerNotice" style="background:transparent;border:none;color:#94a3b8;cursor:pointer;font-size:13px;">✕</button>
             </div>
-            
             <div style="font-size:16px;font-weight:900;color:#fff;margin:6px 0;display:flex;align-items:center;justify-content:center;gap:8px;">
               ${lastSpinResult.previewHtml} <span>${lastSpinResult.winner.name}</span>
-              <span style="font-size:10.5px;font-weight:800;color:${RARITY_COLORS[lastSpinResult.winner.rarity]};text-transform:uppercase;background:rgba(0,0,0,0.5);padding:2px 8px;border-radius:4px;border:1px solid ${RARITY_COLORS[lastSpinResult.winner.rarity]};">
-                ${lastSpinResult.winner.rarity}
-              </span>
+              <span style="font-size:10px;font-weight:900;color:${RARITY_COLORS[lastSpinResult.winner.rarity]};text-transform:uppercase;padding:2px 8px;border-radius:4px;border:1px solid ${RARITY_COLORS[lastSpinResult.winner.rarity]};">${lastSpinResult.winner.rarity}</span>
             </div>
-
-            <div style="font-size:12px;color:#cbd5e1;margin-bottom:8px;">
-              ${lastSpinResult.winner.desc || ''}
-            </div>
-
-            ${lastSpinResult.bonusDojoCard ? `
-              <div style="font-size:11.5px;color:#fde047;font-weight:800;background:rgba(245,158,11,0.14);border:1px solid rgba(251,191,36,0.45);border-radius:6px;padding:5px 12px;margin-bottom:6px;display:inline-block;">
-                🎴 ¡Bono de Mazo Dojo: Desbloqueaste la carta <b>${lastSpinResult.bonusDojoCard.code} · ${lastSpinResult.bonusDojoCard.name}</b> (Poder ${lastSpinResult.bonusDojoCard.power})!
+            ${lastSpinResult.bonusDojoCard ? `<div style="font-size:11.5px;color:#fde047;font-weight:800;margin:6px 0;">🎴 Carta Dojo: ${lastSpinResult.bonusDojoCard.code} · ${lastSpinResult.bonusDojoCard.name}</div>` : ''}
+            ${!lastSpinResult.isDuplicate ? `
+              <div style="display:flex;justify-content:center;gap:10px;margin-top:8px;">
+                <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 20px;border-radius:6px;cursor:pointer;">✨ Equipar</button>
+                <button id="vBtnPreviewWinner" style="background:#1e2638;border:1px solid #3b82f6;color:#93c5fd;font-weight:800;font-size:12px;padding:8px 14px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">${MINIMAL_EYE_SVG} <span>Probar</span></button>
               </div>
             ` : ''}
-
-            ${lastSpinResult.isDuplicate ? `
-              <div style="font-size:12px;color:#e9d5ff;font-weight:800;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);border-radius:6px;padding:6px 14px;display:inline-block;margin-bottom:4px;">
-                ✨ Duplicado convertido automáticamente en <b>+${lastSpinResult.dustAward} Esencia Arcana</b> (Saldo: ${dData.dust} Esencia)
-              </div>
-            ` : `
-              <div style="display:flex;justify-content:center;gap:12px;align-items:center;margin-top:8px;">
-                <button id="vBtnEquipWinner" style="background:#10b981;border:none;color:#fff;font-weight:900;font-size:12px;padding:8px 22px;border-radius:6px;cursor:pointer;box-shadow:0 2px 10px rgba(16,185,129,0.4);">
-                  ✨ EQUIPAR EN MI PERFIL AHORA
-                </button>
-                <button id="vBtnPreviewWinner" style="background:#1e2638;border:1px solid #3b82f6;color:#93c5fd;font-weight:800;font-size:12px;padding:8px 16px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
-                  ${MINIMAL_EYE_SVG} <span>Probar en Perfil</span>
-                </button>
-              </div>
-            `}
           </div>
-        ` : `
-          <div id="vWinnerArea" style="display:none;"></div>
-        `}
+        ` : '<div id="vWinnerArea" style="display:none;"></div>'}
       </div>
 
-      <!-- VISTA 2: MI ARMARIO Y COLECCIÓN DISCRETA -->
-      <div id="vViewCollection" style="display:${activeTab==='collection'?'flex':'none'};flex-direction:column;gap:12px;">
-        <!-- Banner del Set del Coloso -->
-        ${(() => {
-          const colosoItems = ['frame_colossus_legend', 'banner_colossus_awakening', 'title_colossus_slayer', 'plate_colossus'];
-          const ownedColoso = colosoItems.filter(id => !!(dData.cosmetics && dData.cosmetics[id])).length;
-          const isComplete = ownedColoso >= 4;
-          return `
-            <div style="background:linear-gradient(135deg, rgba(69,10,10,0.5), rgba(24,24,27,0.8));border:1.5px solid ${isComplete ? '#fbbf24' : '#ef4444'};border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-              <div>
-                <b style="color:${isComplete ? '#fbbf24' : '#f87171'};font-size:13px;">${isComplete ? '⚡ Set del Coloso (4/4 COMPLETADO)' : '🛡️ Set del Coloso (' + ownedColoso + '/4 Desbloqueados)'}</b>
-                <p style="margin:2px 0 0 0;font-size:11px;color:#94a3b8;">Marco Núcleo + Banner Despertar + Título Coloso Caído + Placa del Coloso</p>
-              </div>
-              <span style="font-size:11px;font-weight:800;background:${isComplete ? '#fbbf24' : '#222838'};color:${isComplete ? '#000' : '#cbd5e1'};padding:3px 10px;border-radius:4px;">
-                ${isComplete ? '✓ Conquistador del Coloso' : ownedColoso + ' de 4 obtenidos'}
-              </span>
-            </div>
-          `;
-        })()}
-
-        <!-- Barra de Filtros por Categoría y Rareza -->
-        <div style="display:flex;flex-direction:column;gap:8px;background:#131826;padding:10px 12px;border-radius:8px;border:1px solid #1f273b;">
-          <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;">
-            <div style="display:flex;gap:4px;flex-wrap:wrap;">
-              ${[
-                ['all', 'Todos (' + totalCosmetics + ')'],
-                ['frame', '🖼️ Marcos'],
-                ['banner', '🏷️ Banners'],
-                ['color', '🎨 Colores'],
-                ['title', '👑 Títulos'],
-                ['nameplate', '📛 Placas'],
-                ['profile_fx', '✨ Efectos Nitro']
-              ].map(([k, lbl]) => `
-                <button class="vFilterBtn" data-filter="${k}" style="background:${activeFilter===k?'#2563eb':'transparent'};color:${activeFilter===k?'#fff':'#94a3b8'};border:${activeFilter===k?'1px solid #3b82f6':'1px solid transparent'};padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;">${lbl}</button>
-              `).join('')}
-            </div>
-
-            <div style="display:flex;align-items:center;gap:10px;font-size:11px;color:#94a3b8;">
-              <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">
-                <input type="checkbox" id="vChkNewestFirst" ${sortNewestFirst ? 'checked' : ''} style="cursor:pointer;" />
-                <span>Nuevos primero</span>
-              </label>
-              <span>Colección: <b style="color:#e2e8f0;">${unlockedCount} / ${totalCosmetics}</b> (${pctUnlocked}%)</span>
-              <div style="width:60px;height:5px;background:#1a2233;border-radius:3px;overflow:hidden;">
-                <div style="width:${pctUnlocked}%;height:100%;background:#38bdf8;"></div>
-              </div>
-            </div>
+      <!-- VISTA 2: MINIJUEGOS (Dojo Elemental + Turbo Core) -->
+      <div id="vViewMinigames" style="display:${activeTab==='minigames'?'flex':'none'};flex-direction:column;gap:12px;width:100%;">
+        <!-- Selector de Juego + Sub-pestañas en 1 barra limpia -->
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#0c101b;border:1px solid #1e293b;border-radius:10px;padding:8px 12px;">
+          <div style="display:flex;gap:6px;">
+            <button id="vGameBtnDojo" style="background:${activeGame==='dojo'?'linear-gradient(135deg,#dc2626,#991b1b)':'#131929'};color:#fff;border:1px solid ${activeGame==='dojo'?'#f87171':'#263147'};padding:7px 14px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              ${renderTabIco('tab_dojo', 1)} <span>Dojo Elemental</span>
+            </button>
+            <button id="vGameBtnRacer" style="background:${activeGame==='racer'?'linear-gradient(135deg,#0284c7,#1d4ed8)':'#131929'};color:#fff;border:1px solid ${activeGame==='racer'?'#38bdf8':'#263147'};padding:7px 14px;border-radius:8px;font-size:12px;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              ${renderTabIco('tab_racer', 1)} <span>Turbo Core</span>
+            </button>
           </div>
 
-          <!-- Filtro secundario por rareza -->
-          <div style="display:flex;gap:4px;align-items:center;border-top:1px solid #1c2333;padding-top:6px;font-size:11px;">
-            <span style="color:#64748b;font-weight:700;margin-right:4px;">Rareza:</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${activeGame === 'dojo' ? `
+              <button class="vSubTabBtn" data-sub="play" style="background:${activeDojoSub==='play'?'#1e293b':'transparent'};color:${activeDojoSub==='play'?'#fff':'#94a3b8'};border:1px solid ${activeDojoSub==='play'?'#38bdf8':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">⚔️ Dojo</button>
+              <button class="vSubTabBtn" data-sub="ninja" style="background:${activeDojoSub==='ninja'?'#1e293b':'transparent'};color:${activeDojoSub==='ninja'?'#fff':'#94a3b8'};border:1px solid ${activeDojoSub==='ninja'?'#a855f7':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">🥷 Armario Ninja</button>
+              <button class="vSubTabBtn" data-sub="cards" style="background:${activeDojoSub==='cards'?'#1e293b':'transparent'};color:${activeDojoSub==='cards'?'#fff':'#94a3b8'};border:1px solid ${activeDojoSub==='cards'?'#fbbf24':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">🎴 Mis Cartas</button>
+              <button class="vSubTabBtn" data-sub="leaderboard" style="background:${activeDojoSub==='leaderboard'?'#1e293b':'transparent'};color:${activeDojoSub==='leaderboard'?'#fff':'#94a3b8'};border:1px solid ${activeDojoSub==='leaderboard'?'#10b981':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">🏆 Marcador PvP</button>
+            ` : `
+              <button class="vSubTabBtn" data-sub="races" style="background:${activeRacerSub==='races'?'#1e293b':'transparent'};color:${activeRacerSub==='races'?'#fff':'#94a3b8'};border:1px solid ${activeRacerSub==='races'?'#38bdf8':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">🏁 Carreras Disponibles</button>
+              <button class="vSubTabBtn" data-sub="upgrades" style="background:${activeRacerSub==='upgrades'?'#1e293b':'transparent'};color:${activeRacerSub==='upgrades'?'#fff':'#94a3b8'};border:1px solid ${activeRacerSub==='upgrades'?'#fbbf24':'transparent'};padding:6px 12px;border-radius:7px;font-size:11.5px;font-weight:800;cursor:pointer;">🔧 Mejoras Disponibles</button>
+            `}
+          </div>
+        </div>
+
+        <div id="vViewDojo" style="display:${activeGame==='dojo' && activeDojoSub==='play'?'block':'none'};width:100%;"></div>
+        <div id="vViewNinja" style="display:${activeGame==='dojo' && activeDojoSub==='ninja'?'block':'none'};width:100%;"></div>
+        <div id="vViewDojoCards" style="display:${activeGame==='dojo' && activeDojoSub==='cards'?'block':'none'};width:100%;"></div>
+        <div id="vViewDojoLeaderboard" style="display:${activeGame==='dojo' && activeDojoSub==='leaderboard'?'block':'none'};width:100%;"></div>
+        <div id="vViewRacer" style="display:${activeGame==='racer' && activeRacerSub==='races'?'block':'none'};width:100%;"></div>
+        <div id="vViewRacerUpgrades" style="display:${activeGame==='racer' && activeRacerSub==='upgrades'?'block':'none'};width:100%;"></div>
+      </div>
+
+      <!-- VISTA 3: INVENTARIO MINIMALISTA ORDENADO POR RAREZA -->
+      <div id="vViewCollection" style="display:${activeTab==='collection'?'flex':'none'};flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:#0c101b;padding:8px 12px;border-radius:10px;border:1px solid #1e293b;">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            ${[
+              ['all', 'Todos'],
+              ['frame', '✨ Bordes'],
+              ['banner', '🖼️ Banners'],
+              ['color', '🎨 Colores'],
+              ['title', '👑 Títulos']
+            ].map(([k, lbl]) => `
+              <button class="vFilterBtn" data-filter="${k}" style="background:${activeFilter===k?'#2563eb':'transparent'};color:${activeFilter===k?'#fff':'#94a3b8'};border:none;padding:5px 11px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:800;">${lbl}</button>
+            `).join('')}
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
             ${[
               ['all', 'Todas'],
-              ['common', 'Común'],
-              ['rare', 'Raro'],
-              ['epic', 'Épico'],
-              ['legendary', 'Legendario']
+              ['legendary', '👑 Legendario'],
+              ['epic', '💎 Épico'],
+              ['rare', '🔷 Raro'],
+              ['common', '⚪ Común']
             ].map(([rKey, rLbl]) => `
-              <button class="vRarityFilterBtn" data-rarity="${rKey}" style="background:${activeRarityFilter===rKey?'#1e2638':'transparent'};color:${activeRarityFilter===rKey?(RARITY_COLORS[rKey]||'#fff'):'#64748b'};border:${activeRarityFilter===rKey?'1px solid #3b4660':'1px solid transparent'};padding:2px 8px;border-radius:4px;cursor:pointer;font-size:10.5px;font-weight:700;">${rLbl}</button>
+              <button class="vRarityFilterBtn" data-rarity="${rKey}" style="background:${activeRarityFilter===rKey?'#1e293b':'transparent'};color:${activeRarityFilter===rKey?(RARITY_COLORS[rKey]||'#fff'):'#64748b'};border:1px solid ${activeRarityFilter===rKey?'#3b4660':'transparent'};padding:4px 9px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:800;">${rLbl}</button>
             `).join('')}
           </div>
         </div>
 
-        <!-- Cuadrícula Sobria y Ordenada -->
-        <div id="vCosmeticsGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));gap:10px;width:100%;box-sizing:border-box;"></div>
+        <div id="vCosmeticsGrid" style="display:flex;flex-direction:column;width:100%;box-sizing:border-box;"></div>
       </div>
-
-      <!-- VISTA 3: DOJO ELEMENTAL -->
-      <div id="vViewDojo" style="display:${activeTab==='dojo'?'block':'none'};width:100%;"></div>
-
-      <!-- VISTA 4: TURBO CORE -->
-      <div id="vViewRacer" style="display:${activeTab==='racer'?'block':'none'};width:100%;"></div>
-
-      <!-- VISTA 5: PERSONALIZACIÓN NINJA -->
-      <div id="vViewNinja" style="display:${activeTab==='ninja'?'block':'none'};width:100%;"></div>
-
-      <!-- VISTA 6: ESTUDIO DE CREADOR (Exclusivo EpicKap y rango Creador) -->
-      <div id="vViewCreator" style="display:${activeTab==='creator'?'block':'none'};width:100%;"></div>
     `;
 
-    // Eventos de Pestañas
+    const confirmLeaveActiveMatch = () => {
+      if (activeDojoInstance && activeDojoInstance.hasActiveMatch && activeDojoInstance.hasActiveMatch()) {
+        if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return false;
+      }
+      if (activeRacerInstance && activeRacerInstance.hasActiveMatch && activeRacerInstance.hasActiveMatch()) {
+        if (!confirm('¿Salir? Perderás esta carrera (sin recompensas)')) return false;
+      }
+      return true;
+    };
+
+    const mountCurrentMinigameSub = () => {
+      if (activeGame === 'dojo') {
+        if (activeDojoSub === 'play') mountDojo();
+        else if (activeDojoSub === 'ninja') mountNinja();
+        else if (activeDojoSub === 'leaderboard') mountDojoLeaderboard();
+        else mountDojoCards();
+      } else {
+        if (activeRacerSub === 'races') mountRacer();
+        else mountRacerUpgrades();
+      }
+    };
+
     const bindTab = (id, tabName, mountFn) => {
       const btn = wrap.querySelector(id);
       if (btn) {
         btn.onclick = () => {
-          if (isSpinning) return;
-          if (activeDojoInstance && activeDojoInstance.hasActiveMatch && activeDojoInstance.hasActiveMatch()) {
-            if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
-          }
-          if (activeRacerInstance && activeRacerInstance.hasActiveMatch && activeRacerInstance.hasActiveMatch()) {
-            if (!confirm('¿Salir? Perderás esta partida (sin recompensas)')) return;
-          }
+          if (isSpinning || !confirmLeaveActiveMatch()) return;
           activeTab = tabName;
           renderView();
           if (mountFn) mountFn();
@@ -961,17 +913,46 @@ function modalVault(initialTab = 'roulette') {
     };
 
     bindTab('#vTabBtnRoulette', 'roulette', populatePreview);
+    bindTab('#vTabBtnMinigames', 'minigames', mountCurrentMinigameSub);
     bindTab('#vTabBtnCollection', 'collection', renderCosmeticsGrid);
-    bindTab('#vTabBtnDojo', 'dojo', mountDojo);
-    bindTab('#vTabBtnRacer', 'racer', mountRacer);
-    bindTab('#vTabBtnNinja', 'ninja', mountNinja);
-    bindTab('#vTabBtnCreator', 'creator', mountCreator);
+
+    const gDojoBtn = wrap.querySelector('#vGameBtnDojo');
+    if (gDojoBtn) gDojoBtn.onclick = () => {
+      if (!confirmLeaveActiveMatch()) return;
+      activeGame = 'dojo';
+      renderView();
+      mountCurrentMinigameSub();
+    };
+    const gRacerBtn = wrap.querySelector('#vGameBtnRacer');
+    if (gRacerBtn) gRacerBtn.onclick = () => {
+      if (!confirmLeaveActiveMatch()) return;
+      activeGame = 'racer';
+      renderView();
+      mountCurrentMinigameSub();
+    };
+    wrap.querySelectorAll('.vSubTabBtn').forEach((b) => {
+      b.onclick = () => {
+        if (!confirmLeaveActiveMatch()) return;
+        const sub = b.getAttribute('data-sub');
+        if (activeGame === 'dojo') activeDojoSub = sub;
+        else activeRacerSub = sub;
+        renderView();
+        mountCurrentMinigameSub();
+      };
+    });
 
     const closeBtn = wrap.querySelector('#vCloseBtn');
     if (closeBtn) closeBtn.onclick = closeVaultOrModal;
 
     const probBtn = wrap.querySelector('#vBtnProbabilities');
     if (probBtn) probBtn.onclick = openProbabilitiesModal;
+
+    wrap.querySelectorAll('.vLootPrevChip').forEach((chip) => {
+      chip.onclick = () => {
+        const item = PROFILE_COSMETICS.find((x) => x.id === chip.getAttribute('data-id'));
+        if (item) openCosmeticLivePreviewModal(item);
+      };
+    });
 
     const dailyBtn = wrap.querySelector('#vBtnDailyBonus');
     if (dailyBtn) {
@@ -1370,7 +1351,7 @@ function modalVault(initialTab = 'roulette') {
         b.style.pointerEvents = '';
       });
 
-      const currentUnlocked = Object.keys(dData.cosmetics || {}).filter(k => dData.cosmetics[k]).length + (dData.founderFrameUnlocked ? 1 : 0);
+      const currentUnlocked = PROFILE_COSMETICS.filter(c => !!(dData.cosmetics && dData.cosmetics[c.id])).length;
       const dustAward = isDuplicate ? (DUST_DUPLICATE[winner.rarity] || 5) : 0;
 
       let previewHtml = '';
@@ -1420,148 +1401,149 @@ function modalVault(initialTab = 'roulette') {
     const eqPlate = localStorage.getItem('epickast.equipped_nameplate') || S.me?.nameplate;
     const eqFx = localStorage.getItem('epickast.equipped_profile_fx') || S.me?.profile_fx;
 
-    const rarityRank = { legendary: 4, epic: 3, rare: 2, common: 1 };
-    let filtered = PROFILE_COSMETICS.filter(c => {
+    const rarityMeta = [
+      { key: 'legendary', title: '👑 Legendario · Reliquias Únicas' },
+      { key: 'epic', title: '💎 Épico · Edición Especial' },
+      { key: 'rare', title: '🔷 Raro · Colección Destacada' },
+      { key: 'common', title: '⚪ Común · Esenciales' }
+    ];
+
+    const filtered = PROFILE_COSMETICS.filter(c => {
       const matchType = activeFilter === 'all' || c.type === activeFilter;
       const matchRarity = activeRarityFilter === 'all' || c.rarity === activeRarityFilter;
       return matchType && matchRarity;
     });
 
-    filtered.sort((a, b) => {
-      if (sortNewestFirst) {
-        const isAUnl = !!(dData.cosmetics && dData.cosmetics[a.id]);
-        const isBUnl = !!(dData.cosmetics && dData.cosmetics[b.id]);
-        if (isAUnl !== isBUnl) return isAUnl ? -1 : 1;
-      }
-      return (rarityRank[b.rarity] || 0) - (rarityRank[a.rarity] || 0);
-    });
+    if (!filtered.length) {
+      grid.innerHTML = '<div style="padding:28px;text-align:center;color:#64748b;font-size:12.5px;">No hay recompensas en esta categoría.</div>';
+      return;
+    }
 
-    filtered.forEach(c => {
-      const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
-      const isEquipped = (c.type === 'frame' && eqFrame === c.val) ||
-                         (c.type === 'color' && eqColor === c.val) ||
-                         (c.type === 'banner' && eqBanner === c.val) ||
-                         (c.type === 'title' && eqTitle === c.val) ||
-                         (c.type === 'nameplate' && eqPlate === c.val) ||
-                         (c.type === 'profile_fx' && eqFx === c.val);
+    rarityMeta.forEach((rm) => {
+      const groupItems = filtered.filter((c) => (c.rarity || 'common') === rm.key);
+      if (!groupItems.length) return;
+      groupItems.sort((a, b) => {
+        const aUnl = !!(dData.cosmetics && dData.cosmetics[a.id]);
+        const bUnl = !!(dData.cosmetics && dData.cosmetics[b.id]);
+        if (aUnl !== bUnl) return aUnl ? -1 : 1;
+        return 0;
+      });
 
-      const rColor = RARITY_COLORS[c.rarity] || '#60a5fa';
-      const craftCost = DUST_CRAFT[c.rarity] || 40;
-      const canCraft = !isUnlocked && (dData.dust || 0) >= craftCost;
+      const sec = document.createElement('div');
+      sec.className = 'v2-rarity-section';
+      const head = document.createElement('div');
+      head.className = `v2-rarity-head ${rm.key}`;
+      const ownInGroup = groupItems.filter((c) => !!(dData.cosmetics && dData.cosmetics[c.id])).length;
+      head.innerHTML = `<span>${rm.title}</span><span style="opacity:0.85;">${ownInGroup}/${groupItems.length}</span>`;
+      const secGrid = document.createElement('div');
+      secGrid.className = 'v2-rarity-grid';
 
-      const card = document.createElement('div');
-      card.className = `rarity-card-${c.rarity}`;
-      card.style.cssText = `box-sizing:border-box;background:#141824;border:1px solid ${isEquipped ? '#10b981' : '#222838'};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;position:relative;`;
+      groupItems.forEach((c) => {
+        const isUnlocked = !!(dData.cosmetics && dData.cosmetics[c.id]) || (c.id === 'founder_frame' && dData.founderFrameUnlocked);
+        const isEquipped = (c.type === 'frame' && eqFrame === c.val) ||
+                           (c.type === 'color' && eqColor === c.val) ||
+                           (c.type === 'banner' && eqBanner === c.val) ||
+                           (c.type === 'title' && eqTitle === c.val) ||
+                           (c.type === 'nameplate' && eqPlate === c.val) ||
+                           (c.type === 'profile_fx' && eqFx === c.val);
 
-      let preview = '';
-      if (c.type === 'frame') {
-        const frameCls = c.val === 'founder_blue' ? 'frame-founder' : c.val;
-        preview = `
-          <div style="display:flex;align-items:center;gap:10px;background:#0d1017;padding:6px 10px;border-radius:6px;border:1px solid #1a202c;">
-            <div class="avatar ${frameCls}" style="width:36px;height:36px;font-size:14px;background:#2563eb;flex-shrink:0;">EK</div>
-            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;">Vista previa en avatar</div>
-          </div>
-        `;
-      } else if (c.type === 'color') {
-        preview = `
-          <div style="display:flex;align-items:center;gap:8px;background:#0d1017;padding:6px 10px;border-radius:6px;border:1px solid #1a202c;">
-            <span style="width:16px;height:16px;border-radius:50%;background:${c.val};flex-shrink:0;"></span>
-            <span style="font-size:11.5px;font-weight:800;${nameColorStyle(c.val)}">@${S.me?.name || 'Usuario'}</span>
-          </div>
-        `;
-      } else if (c.type === 'title') {
-        const isLegend = c.rarity === 'legendary';
-        preview = `
-          <div style="display:flex;align-items:center;justify-content:center;background:#0d1017;padding:6px;border-radius:6px;border:1px solid #1a202c;">
-            <div class="user-title-badge ${isLegend ? 'legendary' : ''}" style="font-size:10.5px;padding:2px 8px;">👑 ${c.val}</div>
-          </div>
-        `;
-      } else if (c.type === 'nameplate') {
-        preview = `
-          <div style="display:flex;align-items:center;justify-content:center;background:#0d1017;padding:6px;border-radius:6px;border:1px solid #1a202c;">
-            <div class="plate-${c.val.replace(/_/g, '-')}" style="padding:3px 10px;border-radius:6px;font-size:11.5px;font-weight:800;">
-              @${S.me?.name || 'Usuario'}
+        const craftCost = DUST_CRAFT[c.rarity] || 40;
+        const canCraft = !isUnlocked && (dData.dust || 0) >= craftCost;
+
+        const card = document.createElement('div');
+        card.className = `v2-item-card rarity-${c.rarity || 'common'}${isEquipped ? ' is-equipped' : ''}`;
+
+        let preview = '';
+        if (c.type === 'frame') {
+          const frameCls = c.val === 'founder_blue' ? 'frame-founder' : c.val;
+          preview = `
+            <div style="display:flex;align-items:center;justify-content:center;background:#090c14;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">
+              <div class="avatar ${frameCls}" style="width:44px;height:44px;font-size:16px;background:#1e293b;">${(S.me?.name || 'EK').slice(0,2).toUpperCase()}</div>
             </div>
-          </div>
-        `;
-      } else if (c.type === 'profile_fx') {
-        preview = `
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(168,85,247,0.1);padding:6px;border-radius:6px;border:1px solid rgba(168,85,247,0.3);">
-            <span style="font-size:15px;">✨</span>
-            <span style="font-size:11px;font-weight:800;color:#c084fc;">Efecto Nitro Animado</span>
-          </div>
-        `;
-      } else {
-        const isImgBanner = typeof c.val === 'string' && (/url\(/i.test(c.val) || /^\/files\//.test(c.val) || /^assets\//i.test(c.val));
-        const isAnimB = !isImgBanner && (c.rarity === 'legendary' || c.rarity === 'epic');
-        preview = `
-          <div class="${isAnimB ? 'banner-animated' : ''}" style="position:relative;height:72px;border-radius:8px;${bannerCss(c.val)};${isAnimB ? 'background-size:200% 200%;' : ''}border:1px solid rgba(255,255,255,0.22);overflow:hidden;box-shadow:inset 0 0 14px rgba(0,0,0,0.45);">
-            ${renderBannerExclusiveArtSvg(c.id + ' ' + c.name)}
-          </div>
-        `;
-      }
+          `;
+        } else if (c.type === 'color') {
+          preview = `
+            <div style="display:flex;align-items:center;justify-content:center;background:#090c14;padding:12px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);min-height:42px;">
+              <span style="font-size:15px;${nameColorStyle(c.val)}">@${S.me?.name || 'Usuario'}</span>
+            </div>
+          `;
+        } else if (c.type === 'title') {
+          preview = `
+            <div style="display:flex;align-items:center;justify-content:center;background:#090c14;padding:14px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);min-height:42px;">
+              <span class="title-badge" style="font-size:11.5px;padding:4px 10px;">👑 ${escapeHtml(c.val || c.name.replace(/^Título:\s*/i, ''))}</span>
+            </div>
+          `;
+        } else {
+          const isImgBanner = typeof c.val === 'string' && (/url\(/i.test(c.val) || /^\/files\//.test(c.val) || /^assets\//i.test(c.val));
+          const isAnimB = !isImgBanner && (c.rarity === 'legendary' || c.rarity === 'epic');
+          preview = `
+            <div class="${isAnimB ? 'banner-animated' : ''}" style="position:relative;height:68px;border-radius:8px;${bannerCss(c.val)};${isAnimB ? 'background-size:200% 200%;' : ''}border:1px solid rgba(255,255,255,0.18);overflow:hidden;"></div>
+          `;
+        }
 
-      let actionHtml = '';
-      if (isEquipped) {
-        actionHtml = '<button style="width:100%;background:#0f291e;border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:default;">✓ Equipado en Perfil</button>';
-      } else if (isUnlocked) {
-        actionHtml = `
-          <div style="display:flex;gap:5px;">
-            <button class="vEqBtn" style="flex:1;background:#2563eb;border:1px solid #3b82f6;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;">Equipar</button>
-            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
+        let actionHtml = '';
+        if (isEquipped) {
+          actionHtml = '<button style="width:100%;background:rgba(16,185,129,0.16);border:1px solid rgba(16,185,129,0.45);color:#6ee7b7;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:default;">✓ Equipado</button>';
+        } else if (isUnlocked) {
+          actionHtml = `
+            <div style="display:flex;gap:5px;">
+              <button class="vEqBtn" style="flex:1;background:#2563eb;border:0;color:#fff;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:pointer;">Equipar</button>
+              <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:#e2e8f0;padding:6px 9px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;" title="Vista previa">${MINIMAL_EYE_SVG}</button>
+            </div>
+          `;
+        } else if (canCraft) {
+          actionHtml = `
+            <div style="display:flex;gap:5px;">
+              <button class="vCraftBtn" style="flex:1;background:#4c1d95;border:1px solid #8b5cf6;color:#ede9fe;font-size:11px;font-weight:800;padding:6px;border-radius:6px;cursor:pointer;">🔨 Fabricar (${craftCost} ✨)</button>
+              <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:#e2e8f0;padding:6px 9px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;" title="Vista previa">${MINIMAL_EYE_SVG}</button>
+            </div>
+          `;
+        } else {
+          actionHtml = `
+            <div style="display:flex;gap:5px;">
+              <button disabled style="flex:1;background:rgba(15,20,32,0.7);border:1px solid rgba(255,255,255,0.07);color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:6px;cursor:not-allowed;">🔒 ${craftCost} ✨</button>
+              <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.14);color:#e2e8f0;padding:6px 9px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;" title="Vista previa">${MINIMAL_EYE_SVG}</button>
+            </div>
+          `;
+        }
+
+        const typeTag = { frame: 'BORDE', banner: 'BANNER', color: 'COLOR', title: 'TÍTULO' }[c.type] || c.type.toUpperCase();
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <span style="font-size:12px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name.replace(/^(Banner|Marco|Letra|Título):\s*/i, '')}</span>
+            <span style="font-size:9px;font-weight:800;color:#94a3b8;background:rgba(0,0,0,0.4);padding:2px 6px;border-radius:4px;flex:none;">${typeTag}</span>
           </div>
+          ${preview}
+          <div style="margin-top:auto;">${actionHtml}</div>
         `;
-      } else if (canCraft) {
-        actionHtml = `
-          <div style="display:flex;gap:5px;">
-            <button class="vCraftBtn" style="flex:1;background:#2a2040;border:1px solid rgba(124,58,237,0.3);color:#c4b5fd;font-size:11px;font-weight:800;padding:6px;border-radius:5px;cursor:pointer;" title="Fabricar permanente">🔨 Fabricar (${craftCost} ✨)</button>
-            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
-          </div>
-        `;
-      } else {
-        actionHtml = `
-          <div style="display:flex;gap:5px;">
-            <button disabled style="flex:1;background:#151922;border:1px solid #202634;color:#64748b;font-size:10.5px;font-weight:700;padding:6px;border-radius:5px;cursor:not-allowed;">🔒 Bloqueado (${craftCost} ✨)</button>
-            <button class="vPrevBtn" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.16);color:#e2e8f0;font-size:11px;padding:6px 10px;border-radius:5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Vista previa en tu perfil">${MINIMAL_EYE_SVG}</button>
-          </div>
-        `;
-      }
 
-      card.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:9px;font-weight:800;color:${rColor};text-transform:uppercase;">● ${c.rarity.toUpperCase()} · ${c.type.toUpperCase()}</span>
-          ${isEquipped ? '<span style="font-size:9.5px;color:#10b981;font-weight:800;">ACTIVO</span>' : (isUnlocked ? '<span style="font-size:9px;color:#38bdf8;font-weight:800;">EN POSESIÓN</span>' : '')}
-        </div>
-        <div style="font-size:12px;font-weight:800;color:#f1f5f9;line-height:1.2;">${c.name}</div>
-        ${preview}
-        <div style="font-size:10px;color:#94a3b8;line-height:1.3;min-height:24px;">${c.desc || ''}</div>
-        <div style="margin-top:auto;padding-top:2px;">
-          ${actionHtml}
-        </div>
-      `;
+        const eqBtn = card.querySelector('.vEqBtn');
+        if (eqBtn) eqBtn.onclick = () => equipCosmeticItem(c);
 
-      const eqBtn = card.querySelector('.vEqBtn');
-      if (eqBtn) eqBtn.onclick = () => equipCosmeticItem(c);
+        const prevBtn = card.querySelector('.vPrevBtn');
+        if (prevBtn) prevBtn.onclick = () => openCosmeticLivePreviewModal(c);
 
-      const prevBtn = card.querySelector('.vPrevBtn');
-      if (prevBtn) prevBtn.onclick = () => openCosmeticLivePreviewModal(c);
+        const craftBtn = card.querySelector('.vCraftBtn');
+        if (craftBtn) {
+          craftBtn.onclick = () => {
+            if ((dData.dust || 0) < craftCost) return;
+            dData.dust -= craftCost;
+            if (!dData.cosmetics) dData.cosmetics = {};
+            dData.cosmetics[c.id] = true;
+            if (c.id === 'founder_frame') dData.founderFrameUnlocked = true;
+            saveState();
+            if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784], 0.06, 0.12);
+            toast(`✨ ¡Has fabricado: ${c.name}!`);
+            equipCosmeticItem(c);
+          };
+        }
 
-      const craftBtn = card.querySelector('.vCraftBtn');
-      if (craftBtn) {
-        craftBtn.onclick = () => {
-          if ((dData.dust || 0) < craftCost) return;
-          dData.dust -= craftCost;
-          if (!dData.cosmetics) dData.cosmetics = {};
-          dData.cosmetics[c.id] = true;
-          if (c.id === 'founder_frame') dData.founderFrameUnlocked = true;
-          saveState();
-          if (typeof ringer !== 'undefined') ringer.beep([523, 659, 784], 0.06, 0.12);
-          toast(`✨ ¡Has fabricado: ${c.name}!`);
-          equipCosmeticItem(c);
-        };
-      }
+        secGrid.appendChild(card);
+      });
 
-      grid.appendChild(card);
+      sec.appendChild(head);
+      sec.appendChild(secGrid);
+      grid.appendChild(sec);
     });
   };
 
@@ -1589,6 +1571,17 @@ function modalVault(initialTab = 'roulette') {
         onChallengePlayer: (uid, game) => {
           safe(rpc('cardjitsu.challenge', { toUserId: uid, game: game || 'dojo' }));
           toast('⚔️ ¡Reto de Dojo 1v1 enviado! Esperando a que acepte…');
+        },
+        onPvpResult: ({ won, opponentId }) => {
+          if (!opponentId) return;
+          const sid = S.view?.kind === 'server' ? S.view.sid : null;
+          rpc('dojo.pvp.result', { isRealPlayer: true, opponentId, won: !!won, serverId: sid }).then((res) => {
+            if (res?.ok && S.me) {
+              S.me.dojoPvpWins = res.dojoPvpWins;
+              S.me.dojoPvpLosses = res.dojoPvpLosses;
+              if (won) toast(`🏆 ¡Victoria PvP registrada en el Marcador Global (${res.dojoPvpWins} W)!`);
+            }
+          }).catch(() => {});
         },
         onReward: (reward) => {
           if (reward.coins) dData.coins = (dData.coins || 0) + reward.coins;
@@ -1679,7 +1672,9 @@ function modalVault(initialTab = 'roulette') {
       try {
         fn(ninjaContainer, () => {
           saveState();
-          activeTab = 'dojo';
+          activeTab = 'minigames';
+          activeGame = 'dojo';
+          activeDojoSub = 'play';
           renderView();
           mountDojo();
         });
@@ -1690,6 +1685,178 @@ function modalVault(initialTab = 'roulette') {
     } else {
       ninjaContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;">Cargando Estudio Ninja...</div>';
     }
+  };
+
+  const mountDojoLeaderboard = async () => {
+    const box = wrap.querySelector('#vViewDojoLeaderboard');
+    if (!box) return;
+    box.innerHTML = '<div style="padding:28px;text-align:center;color:#94a3b8;font-size:13px;">Cargando Marcador Global PvP…</div>';
+    try {
+      const res = await rpc('dojo.leaderboard');
+      const rows = Array.isArray(res?.leaderboard) ? res.leaderboard : [];
+      box.innerHTML = `
+        <div style="background:#0f1422;border:1px solid #1e293b;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:15px;font-weight:900;color:#fbbf24;">🏆 Marcador Global de Card-Jitsu (PvP Real)</div>
+              <div style="font-size:11.5px;color:#94a3b8;">Solo cuenta partidas ganadas contra jugadores reales · Los duelos contra bots están excluidos.</div>
+            </div>
+            <span style="background:rgba(16,185,129,0.14);border:1px solid #10b981;color:#6ee7b7;font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:999px;">SOLO JUGADORES REALES</span>
+          </div>
+          ${rows.length === 0
+            ? '<div style="padding:28px;text-align:center;color:#64748b;font-size:12.5px;">Aún no hay duelos PvP registrados. ¡Reta a un amigo desde su perfil o desde el Dojo para inaugurar el marcador!</div>'
+            : `<div style="display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto;">
+                ${rows.map((r, i) => {
+                  const total = (r.wins || 0) + (r.losses || 0);
+                  const wr = total > 0 ? Math.round((r.wins / total) * 100) : 0;
+                  const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`;
+                  const isMe = Number(r.id) === Number(S.me?.id);
+                  return `
+                    <div style="display:grid;grid-template-columns:44px 1fr auto auto auto;align-items:center;gap:12px;background:${isMe ? 'rgba(124,92,255,0.16)' : '#090d16'};border:1px solid ${i === 0 ? '#fbbf24' : (isMe ? '#8b5cf6' : '#1e293b')};border-radius:9px;padding:9px 12px;">
+                      <span style="font-size:15px;font-weight:900;text-align:center;color:${i < 3 ? '#fbbf24' : '#94a3b8'};">${medal}</span>
+                      <span style="font-size:13px;font-weight:800;${nameColorStyle(r.color)}">${r.name}${isMe ? ' (Tú)' : ''}</span>
+                      <span style="font-size:12px;font-weight:900;color:#4ade80;">${r.wins} V</span>
+                      <span style="font-size:11.5px;font-weight:700;color:#f87171;">${r.losses} D</span>
+                      <span style="font-size:11px;font-weight:800;color:#38bdf8;min-width:46px;text-align:right;">${wr}%</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>`
+          }
+        </div>
+      `;
+    } catch {
+      box.innerHTML = `
+        <div style="background:#0f1422;border:1px solid #1e293b;border-radius:12px;padding:24px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;">
+          <span style="font-size:28px;">🏆</span>
+          <div style="font-size:14px;font-weight:900;color:#fbbf24;">Marcador Global PvP (Solo Jugadores Reales)</div>
+          <div style="font-size:12px;color:#94a3b8;max-width:440px;">El servidor activo aún no tiene desplegado el módulo de Marcador PvP v2.0.0. Al subir el servidor a la nube (o conectarte a <code>ws://localhost:7777</code>), aquí aparecerá el Top 25 global de victorias reales.</div>
+        </div>
+      `;
+    }
+  };
+
+  const mountDojoCards = () => {
+    const box = wrap.querySelector('#vViewDojoCards');
+    if (!box) return;
+    const col = window.DojoCardCollection;
+    if (!col?.CATALOG) {
+      box.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;">Catálogo de cartas del Dojo no disponible.</div>';
+      return;
+    }
+    const unlockedSet = new Set(col.getUnlockedCardNumbers ? col.getUnlockedCardNumbers() : []);
+    const allCards = col.CATALOG || [];
+    const customMap = window.EKCreatorSystem?.getCustomDojoCards?.() || {};
+    const unlockedCards = allCards.filter((c) => unlockedSet.has(c.no) || c.isBase);
+    const filtered = unlockedCards.filter((c) => activeCardElFilter === 'all' || c.element === activeCardElFilter);
+    const elStyle = {
+      fire: { icon: '🔥', border: '#ef4444', bg: 'linear-gradient(160deg,#450a0a,#1a0b12)', color: '#fca5a5' },
+      water: { icon: '💧', border: '#3b82f6', bg: 'linear-gradient(160deg,#172554,#0c1324)', color: '#93c5fd' },
+      snow: { icon: '❄️', border: '#38bdf8', bg: 'linear-gradient(160deg,#083344,#0b1724)', color: '#bae6fd' }
+    };
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:900;color:#fff;">🎴 Cartas Desbloqueadas (${unlockedCards.length} / ${allCards.length})</div>
+        <div style="display:flex;gap:5px;">
+          ${[['all', 'Todas'], ['fire', '🔥 Fuego'], ['water', '💧 Agua'], ['snow', '❄️ Nieve']].map(([k, l]) => `
+            <button class="vCardElBtn" data-el="${k}" style="background:${activeCardElFilter===k?'#2563eb':'#131826'};color:${activeCardElFilter===k?'#fff':'#94a3b8'};border:1px solid ${activeCardElFilter===k?'#3b82f6':'#1f2937'};padding:4px 10px;border-radius:6px;font-size:11px;font-weight:800;cursor:pointer;">${l}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));gap:10px;max-height:460px;overflow-y:auto;padding-right:4px;">
+        ${filtered.map((c) => {
+          const st = elStyle[c.element] || elStyle.fire;
+          const custom = customMap[String(c.no)] || {};
+          const name = custom.name || c.name;
+          const isSpec = Number(c.power) >= 11;
+          const copies = col.getCardCopies ? col.getCardCopies(c.no) : 1;
+          return `
+            <div style="background:${st.bg};border:${isSpec ? '2px solid #fbbf24' : '1.5px solid ' + st.border};border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:5px;position:relative;box-shadow:${isSpec ? '0 0 14px rgba(251,191,36,0.35)' : 'none'};">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:900;">
+                <span>${st.icon}</span>
+                <span style="background:rgba(0,0,0,0.55);color:${isSpec ? '#fde047' : '#fff'};padding:1px 6px;border-radius:5px;">${c.power}</span>
+              </div>
+              <div style="height:64px;border-radius:7px;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:26px;">
+                ${custom.imgUrl ? `<img src="${custom.imgUrl}" style="width:100%;height:100%;object-fit:cover;">` : st.icon}
+              </div>
+              <div style="font-size:11px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${name}">${name}</div>
+              <div style="display:flex;justify-content:space-between;font-size:9.5px;color:${st.color};font-weight:700;">
+                <span>${c.code || ('#' + c.no)}</span>
+                ${copies > 1 ? `<span>×${copies}</span>` : (isSpec ? '<span style="color:#fde047;">★ ESP</span>' : '')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    box.querySelectorAll('.vCardElBtn').forEach((b) => {
+      b.onclick = () => {
+        activeCardElFilter = b.getAttribute('data-el') || 'all';
+        mountDojoCards();
+      };
+    });
+  };
+
+  const mountRacerUpgrades = () => {
+    const box = wrap.querySelector('#vViewRacerUpgrades');
+    if (!box) return;
+    const upgMeta = cfg.WORKSHOP_UPGRADES || {
+      engine: { name: 'Motor V12', desc: 'Aumenta la velocidad máxima del Hover-Kart', maxLevel: 5, baseCost: 120, costStep: 110, icon: '⚡' },
+      turbo: { name: 'Inyector Nitro', desc: 'Mayor empuje y recarga más rápida del Nitro', maxLevel: 5, baseCost: 110, costStep: 100, icon: '🔥' },
+      shield: { name: 'Estabilizador Pro', desc: 'Mejor agarre en curvas y resistencia a impactos', maxLevel: 5, baseCost: 100, costStep: 90, icon: '🛡️' }
+    };
+    let rSave = { upgrades: { engine: 0, turbo: 0, shield: 0 }, clearedTracks: {} };
+    try {
+      const raw = JSON.parse(localStorage.getItem('epickast.racer.v1') || '{}');
+      rSave = {
+        ...raw,
+        upgrades: { engine: 0, turbo: 0, shield: 0, ...(raw.upgrades || {}) },
+        clearedTracks: raw.clearedTracks || {}
+      };
+    } catch {}
+
+    const entries = Object.entries(upgMeta);
+    box.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+        ${entries.map(([key, meta]) => {
+          const lv = Number(rSave.upgrades?.[key] || 0);
+          const maxLv = Number(meta.maxLevel || 5);
+          const isMax = lv >= maxLv;
+          const cost = Number(meta.baseCost || 100) + lv * Number(meta.costStep || 100);
+          const canBuy = !isMax && (dData.coins || 0) >= cost;
+          return `
+            <div style="background:#111625;border:1.5px solid ${isMax ? '#10b981' : '#263147'};border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:15px;font-weight:900;color:#fff;">${meta.icon || '🔧'} ${meta.name || key}</span>
+                <span style="font-size:11px;font-weight:900;color:${isMax ? '#4ade80' : '#fbbf24'};">Nv. ${lv}/${maxLv}</span>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;min-height:32px;">${meta.desc || ''}</div>
+              <div style="display:flex;gap:4px;">
+                ${Array.from({ length: maxLv }).map((_, i) => `<div style="flex:1;height:6px;border-radius:999px;background:${i < lv ? '#38bdf8' : '#1e293b'};"></div>`).join('')}
+              </div>
+              ${isMax
+                ? '<button disabled style="width:100%;padding:8px;border-radius:8px;background:rgba(16,185,129,0.16);border:1px solid #10b981;color:#6ee7b7;font-size:12px;font-weight:800;">✓ Nivel Máximo</button>'
+                : `<button class="vBuyRacerUpg" data-key="${key}" data-cost="${cost}" ${canBuy ? '' : 'disabled'} style="width:100%;padding:9px;border-radius:8px;border:0;background:${canBuy ? 'linear-gradient(135deg,#2563eb,#1d4ed8)' : '#1e2638'};color:${canBuy ? '#fff' : '#64748b'};font-size:12px;font-weight:900;cursor:${canBuy ? 'pointer' : 'not-allowed'};">Mejorar · ${cost.toLocaleString()} 🪙</button>`
+              }
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    box.querySelectorAll('.vBuyRacerUpg').forEach((btn) => {
+      btn.onclick = () => {
+        const key = btn.getAttribute('data-key');
+        const cost = Number(btn.getAttribute('data-cost') || 0);
+        if ((dData.coins || 0) < cost) return toast('🪙 Monedas insuficientes');
+        dData.coins -= cost;
+        rSave.upgrades[key] = (Number(rSave.upgrades[key] || 0)) + 1;
+        try { localStorage.setItem('epickast.racer.v1', JSON.stringify(rSave)); } catch {}
+        saveState();
+        toast(`🔧 ¡Mejora instalada (-${cost} 🪙)!`);
+        renderView();
+        mountRacerUpgrades();
+      };
+    });
   };
 
   let creatorUploadDataUrl = '';
@@ -1928,12 +2095,34 @@ function modalVault(initialTab = 'roulette') {
 
   m.appendChild(wrap);
   renderView();
-  if (activeTab === 'creator') mountCreator();
-  else if (activeTab === 'ninja') mountNinja();
-  else if (activeTab === 'racer') mountRacer();
-  else if (activeTab === 'dojo') mountDojo();
-  else if (activeTab === 'collection') renderCosmeticsGrid();
+  if (activeTab === 'minigames') {
+    if (activeGame === 'dojo') {
+      if (activeDojoSub === 'ninja') mountNinja();
+      else if (activeDojoSub === 'cards') mountDojoCards();
+      else mountDojo();
+    } else {
+      if (activeRacerSub === 'upgrades') mountRacerUpgrades();
+      else mountRacer();
+    }
+  } else if (activeTab === 'collection') renderCosmeticsGrid();
   else populatePreview();
+}
+
+// ---------- ESTUDIO DE CREADOR (VISTA TIPO SERVIDOR v2.0.0) ----------
+async function syncCreatorCatalogToServer() {
+  if (!window.EKCreatorSystem?.exportServerCatalog || !S.ws || S.ws.readyState !== 1) return;
+  try {
+    await rpc('creator.catalog.save', window.EKCreatorSystem.exportServerCatalog());
+  } catch {}
+}
+
+function openCreatorStudio(chKey = 'banners') {
+  window.EKMobile?.closeDrawers?.();
+  S.view = { kind: 'creator' };
+  S.creatorChannel = chKey;
+  S.chan = null;
+  S.chanType = 'creator';
+  render();
 }
 
 // ---------- CENTRO DE GUÍAS OFICIAL EPICKAST ----------
@@ -1960,11 +2149,77 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 1.9.8 (ACTUAL · MENÚS UNIFICADOS CON DESPLEGABLES, BANNERS EN TODA LA APP, OVERLAY CLICK-THROUGH & BAJA LATENCIA WEBRTC) ==================== -->
-        <div style="border:2px solid #a855f7;border-radius:12px;padding:18px;margin-bottom:24px;background:#130e24;box-shadow:0 8px 24px rgba(168,85,247,0.22);">
+        <!-- ==================== VERSIÓN 2.0.0 (ACTUAL · INTERFAZ SIMPLIFICADA, ESTUDIO CREADOR TIPO SERVIDOR, MODERACIÓN DE IMÁGENES Y BARRA DE LLAMADA LIMPIA) ==================== -->
+        <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:linear-gradient(135deg,#0c192c,#17102e);box-shadow:0 8px 28px rgba(56,189,248,0.24);">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="background:linear-gradient(90deg,#0284c7,#7c3aed);color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL · v2.0.0</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 2.0.0</h2>
+            </div>
+            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Ajustes Simplificados, Estudio de Creador Completo, Filtro de Normas y Botones de Llamada Reubicados</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#38bdf8;">✨ Ajustes Simplificados y Solucionador Rápido en 1 Clic:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Solucionador Directo de Llamadas:</b> botones claros para <i>"No me escuchan"</i> (reactiva micrófono, desactiva PTT accidental y abre el medidor en vivo) y <i>"Unos sí me escuchan y otros no"</i> (activa Ruta Segura TURN y reconecta la llamada).</li>
+                <li><b>Filtros de Voz en 3 Botones:</b> elige entre <i>🤖 Automático</i>, <i>🎧 Audífonos HD</i> o <i>🔊 Altavoces Anti-Eco</i> sin perderte en parámetros técnicos.</li>
+                <li><b>Dispositivos Agrupados y Modo Experto (Pro):</b> Micrófono, Altavoces y Cámara en una sola tarjeta ordenada; las opciones técnicas avanzadas quedan guardadas bajo <i>Modo Experto (Pro)</i>.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#e879f9;">🎨 Estudio de Creador como Página / Servidor Independiente:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Acceso Directo en el Riel Izquierdo (🎨):</b> nueva vista tipo servidor con canales dedicados para <b>Banners</b>, <b>Colores de Usuario</b>, <b>Bordes de Perfil</b>, <b>Cartas del Dojo</b> y <b>Moderación/Rangos</b>.</li>
+                <li><b>Crear y Borrar Elementos Existentes:</b> crea nuevos banners (imagen/GIF o degradado), colores de nombre y bordes animados de avatar, o elimina y restaura cualquiera de los existentes del catálogo con sincronización en vivo.</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#4ade80;">🛡️ Filtro Automático de Normas de la Comunidad &amp; Barra de Llamada Limpia:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Moderación de Imágenes (Avatares y Banners):</b> filtro local + verificación de archivos en el servidor que bloquea imágenes que puedan infringir las Normas de la Comunidad (NSFW/explícitas) antes de publicarse.</li>
+                <li><b>Botones de Llamada Debajo de las Cámaras:</b> la barra de controles de videollamada (<code>#meetBar</code>) ahora vive en una franja propia justo debajo de las cámaras, sin flotar semitransparente encima del borde del video.</li>
+                <li><b>Nueva Guía Oficial <code># 🆘-ayuda-audio-y-llamadas</code>:</b> respuestas claras sobre audio, filtros, arrastrar usuarios, llamadas de más de 4 personas y personalización de perfil.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== VERSIÓN 1.9.9 (BÓVEDA RENOVADA 20 RELIQUIAS & OVERLAY INTELIGENTE) ==================== -->
+        <div style="border:1px solid #312354;border-radius:12px;padding:18px;margin-bottom:24px;background:#130e24;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #312354;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:#9333ea;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL</span>
+              <span style="background:#6d28d9;color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">v1.9.9</span>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.9</h2>
+            </div>
+            <span style="font-size:12px;color:#d8b4fe;font-weight:700;">Bóveda Renovada (20 Reliquias Exclusivas) &amp; Corrección de Overlay en Juegos</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
+            <div>
+              <b style="color:#fbbf24;">✨ Nueva Colección de la Bóveda (20 Recompensas):</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>3 Marcos de Perfil:</b> <i>Eclipse Solar</i> (Legendario), <i>Prisma Neón</i> (Épico) y <i>Cristal Glaciar</i> (Raro).</li>
+                <li><b>8 Banners Superiores:</b> <i>Eclipse Nebular</i>, <i>Titán de Magma</i>, <i>Turbo Drift Neón</i>, <i>Luna Carmesí</i>, <i>Aurora Glaciar</i>, <i>Lluvia Neón</i>, <i>Crepúsculo Sakura</i> y <i>Horizonte Esmeralda</i>.</li>
+                <li><b>9 Estilos de Letras Únicos para Nombres:</b> tipografías exclusivas con brillo y degradado propio (<i>Oro Imperial</i>, <i>Ciber Cromo</i>, <i>Plasma Neón</i>, <i>Katana Carmesí</i>, <i>Runa Glaciar</i>, <i>Código Esmeralda</i>, <i>Caligrafía Sakura</i>, <i>Turbo Atardecer</i> y <i>Acero Estelar</i>).</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#4ade80;">🎮 Corrección del Overlay Gamer:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Respeto al Cierre Manual:</b> al cerrar el overlay durante una partida (con <code>✕</code>, <code>ESC</code>, <code>Alt+O</code> o desde el menú), ya no vuelve a reabrirse automáticamente cada 18 segundos ni se superpone sobre el modo flotante mini.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #312354;border-radius:12px;padding:18px;margin-bottom:24px;background:#110d1e;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #312354;padding-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
               <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 1.9.8</h2>
             </div>
             <span style="font-size:12px;color:#d8b4fe;font-weight:700;">Menús Unificados con Desplegables, Banners Globales, Overlay Click-Through &amp; Audio/Video Baja Latencia</span>
@@ -2443,6 +2698,96 @@ function renderGuideContent(chKey) {
           </ul>
         </div>
       </div>`;
+  } else if (chKey === 'ayuda_llamadas') {
+    container.innerHTML = `
+      <div style="max-width:840px;margin:0 auto;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;border-bottom:1px solid #28193f;padding-bottom:14px;">
+          <span style="font-size:34px;">🆘</span>
+          <div>
+            <h1 style="color:#f8fafc;font-size:22px;font-weight:900;margin:0;">Guía Rápida: Audio, Llamadas, Filtros y Perfil</h1>
+            <p style="color:#94a3b8;font-size:13px;margin:0;">Soluciones paso a paso en lenguaje sencillo para los casos más comunes en EpicKast v2.0.0.</p>
+          </div>
+        </div>
+
+        <!-- 1. No me escuchan -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#f87171;font-size:16px;font-weight:900;margin:0 0 8px 0;">🔇 1. No me escuchan en una llamada</h2>
+          <ol style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Revisa el botón de Micrófono:</b> asegúrate de que el icono 🎙️ debajo de las cámaras o en la barra lateral no esté en rojo (atajo rápido: <code>Alt + M</code>).</li>
+            <li><b>Usa la solución en 1 clic:</b> abre <b>⚙️ Ajustes</b> (esquina inferior izquierda) y pulsa el botón <b>🔇 No me escuchan</b>. Eso reactiva tu micrófono, desactiva "Pulsar para hablar" si se activó por error y enciende la barra verde de prueba.</li>
+            <li><b>Verifica el micrófono correcto:</b> en <b>Dispositivos → Micrófono</b> elige tus audífonos o micrófono real (evita dispositivos "Virtual" o "Monitor") y habla para ver que la barra verde se mueva.</li>
+          </ol>
+        </div>
+
+        <!-- 2. Unos sí me escuchan y otros no -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#fbbf24;font-size:16px;font-weight:900;margin:0 0 8px 0;">👥 2. Unos sí me escuchan y otros NO</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 8px 0;">
+            Esto ocurre cuando tu red (router/NAT estricto o datos móviles) conecta directo con algunos amigos pero bloquea la ruta directa con otros.
+          </p>
+          <ol style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Pulsa 🔄 Reconectar:</b> en la barra debajo de las cámaras haz clic en el botón <b>🔄</b> para restablecer el enlace P2P sin salir de la sala.</li>
+            <li><b>Activa la Ruta Segura (TURN):</b> abre <b>⚙️ Ajustes</b> y pulsa <b>👥 Unos sí y otros no</b>. Esto cambia tu conexión al servidor puente seguro (Cloudflare TURN) y reconecta automáticamente para que todos te escuchen.</li>
+            <li><b>Revisa el volumen individual:</b> dile a la persona que no te escucha que haga <b>clic derecho sobre tu cámara o nombre</b> y revise que no te tenga silenciado localmente ni con el volumen en <code>0%</code>.</li>
+          </ol>
+        </div>
+
+        <!-- 3. Cómo usar los filtros de voz -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#38bdf8;font-size:16px;font-weight:900;margin:0 0 8px 0;">✨ 3. Cómo usar los Filtros de Voz y Anti-Eco</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0 0 8px 0;">
+            En <b>⚙️ Ajustes → Filtro de Voz y Anti-Eco</b> solo necesitas elegir el botón que coincida con cómo hablas:
+          </p>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:5px;">
+            <li><b>🤖 Automático (Recomendado):</b> equilibra la claridad vocal y elimina teclado, ventilador y respiraciones con IA (RNNoise).</li>
+            <li><b>🎧 Audífonos HD:</b> máxima fidelidad de voz (<code>128 kbps</code>) con puerta suave para cuando usas diadema o micrófono dedicado.</li>
+            <li><b>🔊 Altavoces:</b> refuerza la cancelación de eco y la puerta de voz para que tus amigos no se escuchen a sí mismos (doble voz).</li>
+            <li><b>¿Quieres ajustar más fino?</b> Abre <b>⚙️ Modo Experto (Pro)</b> al final de Ajustes para mover el deslizador de <i>Filtro Anti-Respiración</i> o cambiar el volumen del micrófono.</li>
+          </ul>
+        </div>
+
+        <!-- 4. Cómo arrastrar usuarios a un nuevo canal de voz -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#c084fc;font-size:16px;font-weight:900;margin:0 0 8px 0;">🔀 4. Cómo arrastrar usuarios a un nuevo canal de voz</h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Método 1 — Arrastrar y Soltar:</b> en la columna izquierda del servidor, haz clic sostenido sobre el nombre del usuario conectado a un canal de voz y arrástralo directamente hasta el otro canal de voz donde quieras moverlo.</li>
+            <li><b>Método 2 — Clic Derecho:</b> haz clic derecho sobre el usuario (en la lista lateral o en su cámara) → selecciona <b>Mover a canal</b> y elige el canal destino.</li>
+            <li><b>Permisos necesarios:</b> para mover a otros usuarios debes tener rango <b>⚔️ Moderador</b>, <b>🛡️ Administrador</b> o <b>👑 Dueño</b> del servidor (y un rango superior al del usuario que mueves).</li>
+          </ul>
+        </div>
+
+        <!-- 5. Llamadas de más de 4 personas -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#4ade80;font-size:16px;font-weight:900;margin:0 0 8px 0;">📹 5. Llamadas de más de 4 personas</h2>
+          <ul style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Cuadrícula Automática:</b> al unirse 5 o más personas a una sala de voz, el escenario reorganiza las cámaras automáticamente y ajusta la calidad de subida para mantener la latencia baja en todos los equipos.</li>
+            <li><b>Enfocar una Cámara o Pantalla:</b> haz clic en el botón de enfocar sobre cualquier cámara o transmisión para verla en grande mientras el resto queda en la franja lateral.</li>
+            <li><b>Ajustar Altura del Escenario:</b> arrastra la barra divisoria debajo de los controles de llamada (o usa el menú <b>⋯</b> → tamaños <code>S / M / L / XL</code>) para dar más espacio al video o al chat.</li>
+            <li><b>Consejo de rendimiento:</b> si juegas en una llamada grupal grande, activa el botón <b>🎮 Juegos</b> en la barra de voz para priorizar FPS y ping.</li>
+          </ul>
+        </div>
+
+        <!-- 6. Perfil, cambio de Banner y Moderación -->
+        <div style="background:#130f24;border:1px solid #312354;border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+          <h2 style="color:#f472b6;font-size:16px;font-weight:900;margin:0 0 8px 0;">🖼️ 6. Configuración de Perfil, Cambio de Banner y Normas</h2>
+          <ol style="font-size:13px;color:#cbd5e1;padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px;">
+            <li><b>Abrir Mi Perfil:</b> haz clic sobre tu avatar o nombre en la esquina inferior izquierda.</li>
+            <li><b>Cambiar Foto de Perfil:</b> toca el botón <b>Cambiar foto</b> y selecciona una imagen PNG, JPG o WebP.</li>
+            <li><b>Cambiar Imagen de Banner:</b> despliega <b>🖼️ Banner y Fondo</b> para elegir pósters anime, degradados Pro, banners de la Bóveda, o pulsa <b>Subir imagen personalizada</b> para recortar tu propia foto en formato panorámico <code>16:5</code>.</li>
+            <li><b>Colores, Marcos y Títulos:</b> despliega <b>🎨 Color, Marco y Título</b> para elegir color sólido, degradado o tus recompensas desbloqueadas de la Bóveda. Pulsa <b>Guardar</b> al terminar.</li>
+            <li><b>🛡️ Filtro de Normas de la Comunidad:</b> todas las fotos de perfil y banners subidos pasan automáticamente por el filtro de seguridad para bloquear contenido NSFW o inapropiado y mantener una comunidad segura.</li>
+          </ol>
+        </div>
+
+        <!-- 7. Estudio de Creador -->
+        <div style="background:#130f24;border:1px solid #a855f7;border-radius:12px;padding:18px 20px;">
+          <h2 style="color:#e879f9;font-size:16px;font-weight:900;margin:0 0 8px 0;">🎨 7. Estudio de Creador (Página tipo Servidor)</h2>
+          <p style="font-size:13px;color:#cbd5e1;margin:0;">
+            Si eres <b>EpicKap</b> o tienes rango <b>Creador</b>, verás el icono <b>🎨</b> en la barra lateral izquierda. Desde ahí puedes abrir la página completa de Creador para <b>crear y eliminar</b> banners, colores de usuario y bordes de perfil (incluidos los del catálogo oficial), personalizar cartas del Dojo y configurar el filtro de moderación de imágenes.
+          </p>
+        </div>
+      </div>
+    `;
   } else if (chKey === 'como_funciona') {
     container.innerHTML = `
       <div style="max-width:820px;margin:0 auto;">
@@ -2747,7 +3092,7 @@ const S = {
   rooms: new Map(), partyTracks: new Map(), unread: new Set(), mentionsByChannel: new Map(), call: null, callKey: null, callLabel: '',
   oldest: null, loadingOld: false, statTimer: null, pingTimer: null, gameTimer: null,
   incoming: null, outgoing: null, cleanup: [],
-  mini: false, isStore: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.8', srvRelease: null, typingTimer: null, lastTypingSent: 0,
+  mini: false, isStore: false, appVer: window.EKGameConfig?.APP_VERSION || '1.9.9', srvRelease: null, typingTimer: null, lastTypingSent: 0,
   replyTo: null, editingMsg: null, vrec: null, focusTile: null, dockOpen: false,
   party: null, partyModalUpdater: null, detectedGame: null, lastSentActivity: '',
   gameMode: false, overlayActive: false, meSpeaking: false, pttPressed: false,
@@ -2756,7 +3101,7 @@ const S = {
 };
 
 function updateVersionBadges() {
-  const verTxt = 'v' + (S.appVer || '1.9.8');
+  const verTxt = 'v' + (S.appVer || '1.9.9');
   const badge = $('ekVersionBadge');
   if (badge) {
     badge.textContent = verTxt;
@@ -2782,6 +3127,7 @@ window.epic.onMiniChanged?.((val) => {
     // Ocultar el overlay externo redundante porque la ventana flotante ya integra los nombres e indicadores de voz
     if (S.overlayActive) {
       S.wasOverlayBeforeMini = true;
+      S._autoClosingOverlay = true;
       toggleOverlay(false);
     }
   } else if (S.wasOverlayBeforeMini) {
@@ -2792,7 +3138,19 @@ window.epic.onMiniChanged?.((val) => {
   syncFloatingCam();
 });
 window.epic.onOverlayStatus?.((val) => {
-  S.overlayActive = !!val;
+  const next = !!val;
+  const wasActive = !!S.overlayActive;
+  S.overlayActive = next;
+  if (!next && wasActive) {
+    if (S._autoClosingOverlay) {
+      S._autoClosingOverlay = false;
+    } else if (S.detectedGame && S.call && !S.mini) {
+      S.userClosedOverlayInGame = true;
+    }
+  } else if (next) {
+    S._autoClosingOverlay = false;
+    S.userClosedOverlayInGame = false;
+  }
   if (S.overlayActive) syncOverlay();
   updateDock();
   syncFloatingCam();
@@ -2952,7 +3310,17 @@ window.ensureContrast = ensureContrast;
 
 function nameColorStyle(col, minRatio = 4.5) {
   if (!col) return '';
-  const safeCol = ensureContrast(col, '#0b0e14', minRatio);
+  const raw = String(col).trim();
+  const cfgList = window.EKGameConfig?.COSMETICS || [];
+  const matchedStyle = cfgList.find((c) => c.type === 'color' && (c.val === raw || c.id === raw));
+  if (matchedStyle && matchedStyle.fontCss) {
+    const grad = matchedStyle.val;
+    if (grad.startsWith('linear-gradient') || grad.startsWith('radial-gradient')) {
+      return `background:${grad};-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;${matchedStyle.fontCss}`;
+    }
+    return `color:${ensureContrast(grad, '#0b0e14', minRatio)};${matchedStyle.fontCss}`;
+  }
+  const safeCol = ensureContrast(raw, '#0b0e14', minRatio);
   if (safeCol.startsWith('linear-gradient') || safeCol.startsWith('radial-gradient')) {
     return `background:${safeCol};-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:inline-block;font-weight:800;`;
   }
@@ -3409,6 +3777,13 @@ function onMsg(ev) {
     case 'call.incoming': showIncoming(m); break;
     case 'call.stop': onCallStop(m); break;
     case 'profile.changed': onProfile(m.profile); break;
+    case 'creator.catalog.updated':
+      if (m.catalog && window.EKCreatorSystem?.applyServerCatalog) {
+        window.EKCreatorSystem.applyServerCatalog(m.catalog);
+        renderRail();
+        if (S.view.kind === 'creator') renderCenter();
+      }
+      break;
   }
 }
 
@@ -3643,26 +4018,44 @@ async function syncActivity() {
   } else if (!settings.autoGameDetect) {
     S.detectedGame = null;
   }
-  // Auto-activar Overlay flotante al entrar a un juego ÚNICAMENTE cuando hay una llamada activa
-  if (S.detectedGame && S.call && settings.autoOverlayOnGame !== false) {
+  if (S.detectedGame !== prevGame) {
+    S.userClosedOverlayInGame = false;
+  }
+  // Auto-activar Overlay flotante al entrar a un juego ÚNICAMENTE cuando hay una llamada activa (y no está en modo mini)
+  if (S.detectedGame && S.call && !S.mini && settings.autoOverlayOnGame !== false) {
     if (!S.overlayActive && !S.userClosedOverlayInGame && window.epic?.toggleOverlay) {
       S.autoOpenedOverlay = true;
       toggleOverlay(true);
       toast(`🎮 Juego detectado (${S.detectedGame}) · Overlay activado (Alt+O para ocultar)`);
     }
-  } else if ((!S.detectedGame || !S.call) && S.autoOpenedOverlay) {
-    S.autoOpenedOverlay = false;
+  } else if (!S.detectedGame || !S.call) {
     S.userClosedOverlayInGame = false;
-    if (S.overlayActive) toggleOverlay(false);
+    if (S.autoOpenedOverlay) {
+      S.autoOpenedOverlay = false;
+      if (S.overlayActive) {
+        S._autoClosingOverlay = true;
+        toggleOverlay(false);
+      }
+    }
   }
   if (actName === S.lastSentActivity) return;
   S.lastSentActivity = actName;
   rpc('activity.set', { name: actName, kind: 'game' }).catch(() => {});
+  if (actName) rpc('stats.recordGame', { name: actName }).catch(() => {});
 }
 function startGameDetection() {
   clearInterval(S.gameTimer);
   setTimeout(syncActivity, 800);
   S.gameTimer = setInterval(syncActivity, 18000);
+  clearInterval(S.voiceStatsTimer);
+  S.voiceStatsTimer = setInterval(() => {
+    if (S.call && S.ws && S.ws.readyState === 1) {
+      const sid = S.view?.kind === 'server' ? S.view.sid : null;
+      rpc('stats.pingVoice', { seconds: 60, serverId: sid }).then((res) => {
+        if (res?.ok && S.me) S.me.voiceSeconds = res.voiceSeconds;
+      }).catch(() => {});
+    }
+  }, 60000);
 }
 function isNewerVersion(latest, current) {
   if (!latest || !current) return false;
@@ -3780,6 +4173,12 @@ window.addEventListener('focus', () => { if (S.ws && S.me && !S.isStore) checkSe
 async function loadFriends() { try { S.friends = await rpc('friends.list'); } catch {} renderSide(); renderHome(); renderCallOverlay(); }
 async function loadServers() {
   try { S.servers = await rpc('servers.list'); } catch { return; }
+  try {
+    const cat = await rpc('creator.catalog.get');
+    if (cat && window.EKCreatorSystem?.applyServerCatalog) {
+      window.EKCreatorSystem.applyServerCatalog(cat);
+    }
+  } catch {}
   if (S.view.kind === 'server' && !S.servers.some((s) => s.id === S.view.sid)) goHome();
   renderRail(); renderSide();
 }
@@ -4811,7 +5210,7 @@ function renderMe() {
   bar.classList.toggle('has-banner', !!myBanner);
   bar.replaceChildren(...[
     myBanner ? h('div', { class: 'mebar-banner-bg', style: bannerCss(myBanner) }) : null,
-    h('div', { class: 'who', style: 'position:relative;z-index:1', title: 'Editar perfil, cosméticos y actividad', onclick: modalProfile },
+    h('div', { class: 'who', style: 'position:relative;z-index:1', title: 'Mi Perfil — Haz clic aquí para editar tu foto, banner, color de nombre, marco e insignias', onclick: modalProfile },
       avatar(S.me, 34, true),
       h('div', { style: 'min-width:0' },
         h('div', { style: 'display:flex;align-items:center;gap:4px;overflow:hidden' },
@@ -4823,7 +5222,7 @@ function renderMe() {
     ),
     h('div', { style: 'display:flex;gap:4px;align-items:center;position:relative;z-index:1' },
       h('button', { class: 'btn-ico', title: `Cambiar estado (${stLabel})`, style: 'font-size:13px;padding:4px 6px', onclick: toggleStatusPopover }, stIcon),
-      h('button', { class: 'btn-ico', title: 'Ajustes', onclick: modalSettings }, icoSvg('settings', 16))
+      h('button', { class: 'btn-ico', title: 'Ajustes de la App — Audio, Video, Estilo y acceso rápido a tu Perfil', onclick: modalSettings }, icoSvg('settings', 16))
     )
   ].filter(Boolean));
 }
@@ -4859,7 +5258,15 @@ function renderRail() {
     style: 'background:linear-gradient(135deg, #78350f, #d97706);color:#fde047;border:1px solid #fbbf24;box-shadow:0 0 10px rgba(251,191,36,0.35);font-size:18px;margin-top:6px;',
     onclick: modalVault
   }, '🎁'));
-  const verTxt = S.appVer ? ('v' + S.appVer) : 'v1.9.6';
+  if (window.EKCreatorSystem?.isCreator?.(S.me)) {
+    r.append(h('div', {
+      class: 'ico creator-ico' + (S.view.kind === 'creator' ? ' sel' : ''),
+      title: 'Estudio de Creador • Crear y borrar banners, colores de usuario, bordes de perfil y moderación',
+      style: 'background:linear-gradient(135deg, #581c87, #db2777);color:#f5d0fe;border:1px solid #e879f9;box-shadow:0 0 10px rgba(217,70,239,0.35);font-size:16px;',
+      onclick: () => openCreatorStudio(S.creatorChannel || 'banners')
+    }, '🎨'));
+  }
+  const verTxt = S.appVer ? ('v' + S.appVer) : 'v2.0.0';
   r.append(h('div', {
     class: 'rail-version',
     style: 'margin-top:auto;font-size:10.5px;font-weight:700;color:var(--mu);opacity:0.65;padding:8px 2px 4px;letter-spacing:0.5px;user-select:none;text-align:center;white-space:nowrap',
@@ -4999,14 +5406,16 @@ function userItem(u, onclick, extra) {
 }
 function renderSide() {
   const L = $('sideList'); L.replaceChildren();
+  $('sideTitle')?.classList.remove('has-srv-banner');
 
   // MODO 1: GUÍAS OFICIALES (Activado desde el botón especial 📘 del riel)
   if (S.view.kind === 'guide') {
     $('sideTitle').replaceChildren(h('span', { style: 'font-weight:800;color:#c7d2fe;display:flex;align-items:center;gap:6px;' }, '📘 Guías Oficiales'));
     const sGuides = [
       { key: 'notas_version', name: '🚀-notas-de-la-version', title: 'Registro histórico y novedades de versión de EpicKast' },
-      { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, streaming, bot DJ y controles' },
-      { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, roles y permisos' },
+      { key: 'ayuda_llamadas', name: '🆘-ayuda-audio-y-llamadas', title: 'Qué hacer si no te escuchan, filtros, arrastrar usuarios y llamadas de 4+ personas' },
+      { key: 'como_funciona', name: '📖-como-funciona', title: 'Llamadas, perfil, banners, streaming, bot DJ y controles' },
+      { key: 'servidores', name: '🏰-guia-de-servidores', title: 'Crear servidores, canales, arrastrar usuarios, roles y permisos' },
       { key: 'mazmorras', name: '⚔️-boveda-y-dojo-de-cartas', title: 'Bóveda de Reliquias, Dojo de Cartas y Recompensas' }
     ];
     sGuides.forEach(g => {
@@ -5017,6 +5426,22 @@ function renderSide() {
         title: g.title,
         onclick: () => openOfficialGuide(g.key)
       }, h('span', { class: 'nm' }, '# ' + g.name)));
+    });
+    return;
+  }
+
+  // MODO 1B: ESTUDIO DE CREADOR (Página completa tipo servidor v2.0.0)
+  if (S.view.kind === 'creator') {
+    $('sideTitle').replaceChildren(h('span', { style: 'font-weight:900;color:#f5d0fe;display:flex;align-items:center;gap:6px;' }, '🎨 Estudio de Creador'));
+    const cChans = window.EKCreatorStudio?.CHANNELS || [];
+    cChans.forEach((c) => {
+      const isSel = (S.creatorChannel || 'banners') === c.key;
+      L.append(h('div', {
+        class: 'item' + (isSel ? ' sel' : ''),
+        style: isSel ? 'background:#2d1646;border-left:3px solid #e879f9;color:#fff;font-weight:700;' : 'color:#f5d0fe;font-size:13px;',
+        title: c.title,
+        onclick: () => openCreatorStudio(c.key)
+      }, h('span', { class: 'nm' }, '# ' + c.name)));
     });
     return;
   }
@@ -5039,11 +5464,21 @@ function renderSide() {
   // MODO 3: SERVIDOR (Exclusivamente canales de texto y voz normales, sin guías adentro)
   const sd = S.sdata.get(S.view.sid); if (!sd) return;
   const myRank = ROLES[sd.myRole || (sd.owner === S.me.id ? 'owner' : 'member')]?.rank ?? 0;
-  $('sideTitle').replaceChildren(
-    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1' }, sd.name),
+  const srvLv = window.EKAchievements?.getServerLevel?.(sd.xp || 0);
+  const sideTitleEl = $('sideTitle');
+  sideTitleEl.classList.toggle('has-srv-banner', !!sd.banner);
+  sideTitleEl.replaceChildren(...[
+    sd.banner ? h('div', { class: 'srv-banner-bg', style: bannerCss(sd.banner) }) : null,
+    h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;display:flex;align-items:center;gap:6px' },
+      h('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, sd.name),
+      srvLv ? h('span', {
+        style: 'font-size:9.5px;font-weight:900;background:rgba(251,191,36,0.2);border:1px solid rgba(251,191,36,0.5);color:#fde047;padding:1px 6px;border-radius:999px;flex:none',
+        title: `Servidor Nivel ${srvLv.level} (${srvLv.title}) · ${srvLv.xp} XP · Recompensa: ${srvLv.reward}`
+      }, `${srvLv.badge} Nv.${srvLv.level}`) : null
+    ),
     h('button', { class: 'btn-ico', onclick: () => modalInviteFriends(sd.id), title: 'Invitar amigos directamente a este servidor' }, '👥'),
-    h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, canales y rangos' }, '⋯')
-  );
+    h('button', { class: 'btn-ico', onclick: modalServerManage, title: 'Administrar servidor, banner, nivel, canales y rangos' }, '⋯')
+  ].filter(Boolean));
 
   for (const type of ['text', 'voice']) {
     L.append(h('div', { class: 'sect' }, type === 'text' ? 'Canales de texto' : 'Canales de voz',
@@ -5237,7 +5672,28 @@ function modalMemberCard(sd, m) {
         h('div', { class: 'hint' }, `Rango: ${rInfo.label} · ${statusBadgeText(m)}`),
         m.activity?.name ? h('div', { class: 'act-pill', style: 'margin-top:2px' }, `🎮 Jugando a ${m.activity.name}`) : null,
         userVoiceName ? h('div', { class: 'hint', style: 'color:#a29bfe;margin-top:2px' }, `🔊 En llamada: ${userVoiceName}`) : null,
-        m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null
+        m.bio ? h('div', { style: 'font-size:12.5px;color:var(--tx);margin-top:4px' }, `“${m.bio}”`) : null,
+        (() => {
+          if (!window.EKAchievements?.evaluate) return null;
+          const ev = window.EKAchievements.evaluate(m, m.id);
+          if (!ev.unlocked.length) return null;
+          return h('div', { style: 'margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)' },
+            h('div', { style: 'font-size:10.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between' },
+              h('span', null, `🏅 Insignias y Logros (${ev.unlocked.length}/${ev.total})`),
+              h('span', { style: 'color:#64748b' }, `${ev.stats.voiceHours}h voz · ${ev.stats.dojoPvpWins}V PvP`)
+            ),
+            h('div', { class: 'ach-strip' },
+              ev.unlocked.map((a) => {
+                const st = window.EKAchievements.TIER_STYLES[a.tier] || window.EKAchievements.TIER_STYLES.common;
+                return h('span', {
+                  class: 'ach-badge',
+                  style: `background:${st.bg};border-color:${st.border};color:${st.color}`,
+                  title: `${a.name} — ${a.desc}`
+                }, a.icon, ' ', a.name);
+              })
+            )
+          );
+        })()
       ),
       window.EKCreatorSystem?.isMasterCreator(S.me) && m.id !== S.me.id ? h('button', {
         class: 'btn-act',
@@ -5411,7 +5867,8 @@ function renderCenter() {
   applyPanelsLayout();
   const dm = S.chan && S.chan[0] === 'd';
   const isGuide = S.view.kind === 'guide';
-  const showChat = !!S.chan && S.chanType !== 'voice' && !isGuide;
+  const isCreatorView = S.view.kind === 'creator';
+  const showChat = !!S.chan && S.chanType !== 'voice' && !isGuide && !isCreatorView;
   const isServer = S.view.kind === 'server';
 
   const toggleSideBtn = h('button', {
@@ -5424,10 +5881,31 @@ function renderCenter() {
     }
   }, icoSvg('panelLeft', 16));
 
+  let chMoreMenu = null;
+  const chMoreWrap = showChat ? (() => {
+    chMoreMenu = h('div', { class: 'ch-more-menu hidden' },
+      h('button', { type: 'button', class: 'ch-more-item', onclick: () => { chMoreMenu.classList.add('hidden'); modalPins(); } }, icoSvg('pin', 14), 'Mensajes fijados'),
+      h('button', { type: 'button', class: 'ch-more-item', onclick: () => { chMoreMenu.classList.add('hidden'); modalGallery(); } }, icoSvg('gallery', 14), 'Galería de archivos')
+    );
+    const btn = h('button', {
+      type: 'button',
+      class: 'btn-act hdr',
+      title: 'Más opciones del canal (Fijados y Galería)',
+      onclick: (ev) => {
+        ev.stopPropagation();
+        chMoreMenu.classList.toggle('hidden');
+      }
+    }, '⋯');
+    const closeOnOut = (ev) => {
+      if (chMoreMenu && !chMoreMenu.contains(ev.target) && ev.target !== btn) chMoreMenu.classList.add('hidden');
+    };
+    document.addEventListener('click', closeOnOut, { once: false });
+    return h('div', { class: 'ch-more-wrap' }, btn, chMoreMenu);
+  })() : null;
+
   const rightBtns = h('div', { style: 'display:flex;gap:8px;align-items:center' },
     S.call ? h('button', { class: 'btn-act hdr' + (S.party?.current ? ' call' : ''), title: 'Abrir EpicBot DJ (YouTube & Playlists en conjunto)', onclick: modalParty }, h('span', { class: 'hdr-emo' }, '🎵 '), S.party?.current ? 'Bot DJ (Sonando)' : 'Bot DJ') : null,
-    showChat ? h('button', { class: 'btn-act hdr', title: 'Ver mensajes fijados en este canal', onclick: modalPins }, icoSvg('pin', 14), 'Fijados') : null,
-    showChat ? h('button', { class: 'btn-act hdr', title: 'Ver galería de imágenes y documentos enviados', onclick: modalGallery }, icoSvg('gallery', 14), 'Galería') : null,
+    chMoreWrap,
     dm ? h('button', { class: 'btn-act call hdr', title: 'Iniciar llamada de voz', onclick: () => joinCall(S.chan, S.chanName) }, icoSvg('phone', 14), 'Llamar') : null,
     dm ? h('button', { class: 'btn-act vcall hdr', title: 'Iniciar videollamada directa', onclick: () => joinCall(S.chan, S.chanName, { video: true }) }, icoSvg('video', 14), 'Video') : null,
     isServer ? h('button', {
@@ -5443,14 +5921,18 @@ function renderCenter() {
 
   const guideTitles = {
     notas_version: '🚀-notas-de-la-version',
+    ayuda_llamadas: '🆘-ayuda-audio-y-llamadas',
     como_funciona: '📖-como-funciona',
     servidores: '🏰-guia-de-servidores',
     mazmorras: '⚔️-boveda-y-dojo-de-cartas'
   };
+  const creatorChObj = (window.EKCreatorStudio?.CHANNELS || []).find((x) => x.key === (S.creatorChannel || 'banners'));
 
-  const centerTitleText = isGuide 
+  const centerTitleText = isGuide
     ? ('# ' + (guideTitles[S.guideChannel] || 'guia-oficial'))
-    : S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '';
+    : isCreatorView
+      ? ('# ' + (creatorChObj?.name || 'estudio-de-creador'))
+      : S.chan ? (S.chanType === 'text' ? '# ' : dm ? '@ ' : '') + S.chanName : S.view.kind === 'home' ? 'Amigos' : '';
 
   const dmFriend = dm ? friendByDm(S.chan) : null;
   const dmBanner = dmFriend?.banner || '';
@@ -5467,7 +5949,8 @@ function renderCenter() {
         onclick: dmFriend ? () => modalMemberCard({ id: 0, owner: 0, myRole: 'member', channels: [], members: [dmFriend] }, dmFriend) : null
       }, centerTitleText),
       dmFriend?.title ? titleBadgeEl(dmFriend.title, 'pill') : null,
-      isGuide ? h('span', { style: 'background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #4338ca;' }, 'Canal Informativo Oficial') : null
+      isGuide ? h('span', { style: 'background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #4338ca;' }, 'Canal Informativo Oficial') : null,
+      isCreatorView ? h('span', { style: 'background:#3b0764;color:#f5d0fe;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;border:1px solid #c026d3;' }, 'Panel Oficial de Creador') : null
     ),
     h('div', { style: 'position:relative;z-index:1;display:flex;align-items:center' }, rightBtns)
   ].filter(Boolean));
@@ -5475,13 +5958,28 @@ function renderCenter() {
   // Visibilidad de paneles en section#center
   $('msgs').classList.toggle('hidden', !showChat);
   $('composer').classList.toggle('hidden', !showChat);
-  $('home').classList.toggle('hidden', isGuide || showChat || S.view.kind !== 'home');
+  $('home').classList.toggle('hidden', isGuide || isCreatorView || showChat || S.view.kind !== 'home');
 
   const gView = $('guideView');
   if (gView) {
     gView.classList.toggle('hidden', !isGuide);
     if (isGuide) {
-      gView.replaceChildren(renderGuideContent(S.guideChannel || 'como_funciona'));
+      gView.replaceChildren(renderGuideContent(S.guideChannel || 'ayuda_llamadas'));
+    }
+  }
+
+  const cView = $('creatorView');
+  if (cView) {
+    cView.classList.toggle('hidden', !isCreatorView);
+    if (isCreatorView && window.EKCreatorStudio?.render) {
+      cView.replaceChildren(window.EKCreatorStudio.render(S.creatorChannel || 'banners', {
+        me: S.me,
+        toast,
+        syncServerCatalog: syncCreatorCatalogToServer,
+        rerender: () => { renderSide(); renderCenter(); renderMe(); },
+        nameColorStyle,
+        bannerCss
+      }));
     }
   }
 }
@@ -5880,6 +6378,89 @@ function modalServerManage() {
     }, isMuted ? '🔔 Desmutear notificaciones de este servidor' : '🔕 Silenciar notificaciones de este servidor')
   );
   if (myRank >= 3) {
+    // Propuesta 1: Nivel, Recompensas y Banner del Servidor
+    const srvLv = window.EKAchievements?.getServerLevel?.(sd.xp || 0) || { level: 1, title: 'Base', xp: 0, pct: 0, badge: '🏠', reward: 'Banner de Servidor', next: null };
+    const srvBannerPresets = window.EKAchievements?.SERVER_BANNER_PRESETS || [];
+    const srvBannerPv = h('div', {
+      style: `height:74px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);${sd.banner ? bannerCss(sd.banner) : 'background:linear-gradient(135deg,#0b0e18,#1e293b)'};display:flex;align-items:flex-end;padding:8px 10px;box-sizing:border-box;margin-bottom:8px`
+    }, h('span', { style: 'background:rgba(9,13,22,0.8);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:800;color:#fff' }, `${srvLv.badge} ${sd.name} · Nivel ${srvLv.level} (${srvLv.xp} XP)`));
+
+    const srvBannerFile = h('input', {
+      type: 'file',
+      accept: 'image/png,image/jpeg,image/webp,image/gif',
+      class: 'hidden',
+      onchange: async () => {
+        const f = srvBannerFile.files[0];
+        srvBannerFile.value = '';
+        if (!f) return;
+        if (window.EKImageModeration?.checkImage) {
+          const mod = await window.EKImageModeration.checkImage(f, { kind: 'banner', fileName: f.name, mime: f.type });
+          if (!mod.allowed) return toast('🛡️ ' + mod.reason);
+        }
+        try {
+          toast('Subiendo banner de servidor…');
+          const upUrl = `${httpBase()}/upload?kind=banner&name=${encodeURIComponent(f.name || 'server-banner.png')}&mime=${encodeURIComponent(f.type || 'image/png')}`;
+          const res = await fetch(upUrl, { method: 'POST', headers: { 'x-token': S.token }, body: f });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data?.ok || !data?.url) throw new Error(data?.error || 'Error al subir');
+          await rpc('server.setBanner', { id: sd.id, banner: data.url });
+          sd.banner = data.url;
+          srvBannerPv.setAttribute('style', `height:74px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);${bannerCss(data.url)};display:flex;align-items:flex-end;padding:8px 10px;box-sizing:border-box;margin-bottom:8px`);
+          renderSide();
+          toast('🏰 ¡Banner del servidor actualizado!');
+        } catch (err) {
+          toast('Error: ' + (err?.message || err));
+        }
+      }
+    });
+
+    parts.push(
+      h('div', { style: 'background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px' },
+        h('div', { style: 'display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:800;color:#fde047' },
+          h('span', null, `🏰 Nivel ${srvLv.level} · ${srvLv.title}`),
+          h('span', { style: 'font-size:11px;color:#94a3b8' }, srvLv.next ? `${srvLv.xp}/${srvLv.next.minXp} XP` : 'Nivel Máximo')
+        ),
+        h('div', { style: 'height:6px;background:#1e293b;border-radius:999px;overflow:hidden' },
+          h('div', { style: `width:${srvLv.pct}%;height:100%;background:linear-gradient(90deg,#fbbf24,#a855f7)` })
+        ),
+        h('div', { style: 'font-size:11px;color:#94a3b8' }, `Recompensa activa: `, h('b', { style: 'color:#e2e8f0' }, srvLv.reward)),
+        srvBannerPv,
+        h('div', { style: 'display:flex;flex-wrap:wrap;gap:5px' },
+          ...srvBannerPresets.map((bp) => {
+            const locked = srvLv.level < bp.minLevel;
+            return h('button', {
+              type: 'button',
+              disabled: locked,
+              style: `padding:4px 8px;border-radius:6px;font-size:10.5px;font-weight:700;border:1px solid ${locked ? '#334155' : 'rgba(255,255,255,0.22)'};background:${bp.val};color:#fff;cursor:${locked ? 'not-allowed' : 'pointer'};opacity:${locked ? '0.45' : '1'}`,
+              title: locked ? `Se desbloquea en Nivel ${bp.minLevel} de Servidor` : `Aplicar banner ${bp.name}`,
+              onclick: async () => {
+                await safe(rpc('server.setBanner', { id: sd.id, banner: bp.val }));
+                sd.banner = bp.val;
+                srvBannerPv.setAttribute('style', `height:74px;border-radius:10px;border:1px solid rgba(255,255,255,0.14);${bannerCss(bp.val)};display:flex;align-items:flex-end;padding:8px 10px;box-sizing:border-box;margin-bottom:8px`);
+                renderSide();
+                toast(`🏰 Banner "${bp.name}" aplicado`);
+              }
+            }, locked ? `🔒 Nv.${bp.minLevel}` : bp.name);
+          })
+        ),
+        h('div', { style: 'display:flex;gap:6px;margin-top:2px' },
+          srvBannerFile,
+          h('button', { type: 'button', style: 'flex:1;padding:7px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer', onclick: () => srvBannerFile.click() }, '📁 Subir Banner de Servidor'),
+          sd.banner ? h('button', {
+            type: 'button',
+            style: 'padding:7px 10px;border-radius:7px;font-size:11.5px;cursor:pointer',
+            onclick: async () => {
+              await safe(rpc('server.setBanner', { id: sd.id, banner: null }));
+              sd.banner = null;
+              renderSide();
+              closeModal();
+              toast('Banner del servidor eliminado');
+            }
+          }, 'Quitar') : null
+        )
+      )
+    );
+
     const srvIcoPv = h('div', {
       class: 'avatar',
       style: `width:60px;height:60px;font-size:24px;border-radius:18px;background:#1e2230;background-size:cover;background-position:center;${sd.icon ? `background-image:url(${sd.icon})` : ''}`
@@ -5994,8 +6575,17 @@ function modalProfile() {
   const pv = h('div', { class: 'avatar' + fCls, style: `width:96px;height:96px;font-size:42px;background-color:${color}` }, ini);
   const showImg = (url) => { pv.style.backgroundImage = url ? `url(${url})` : ''; pv.classList.toggle('img', !!url); };
   if (me.av && avCache.get(`${me.id}:${me.av}`)) showImg(avCache.get(`${me.id}:${me.av}`));
-  const file = h('input', { type: 'file', accept: 'image/*', class: 'hidden', onchange: () => {
-    const f = file.files[0]; if (!f) return;
+  const file = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', class: 'hidden', onchange: async () => {
+    const f = file.files[0];
+    file.value = '';
+    if (!f) return;
+    if (window.EKImageModeration?.checkImage) {
+      const mod = await window.EKImageModeration.checkImage(f, { kind: 'avatar', fileName: f.name, mime: f.type });
+      if (!mod.allowed) {
+        toast('🛡️ ' + mod.reason);
+        return;
+      }
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
@@ -6035,52 +6625,57 @@ function modalProfile() {
     const rawVault = localStorage.getItem('epickast.dungeon.v1');
     if (rawVault) {
       const vData = JSON.parse(rawVault);
-      const VAULT_COLORS = [
-        { id: 'color_aurora', name: 'Aurora Boreal', val: 'linear-gradient(90deg, #00e5ff, #a855f7)' },
-        { id: 'color_volcanic_flame', name: 'Fuego Volcánico', val: 'linear-gradient(90deg, #ff3366, #ffb300)' },
-        { id: 'color_amber', name: 'Ámbar Volcánico', val: '#f59e0b' },
-        { id: 'color_amethyst', name: 'Púrpura Amatista', val: '#a855f7' },
-        { id: 'color_emerald', name: 'Verde Esmeralda', val: '#10b981' },
-        { id: 'color_cyan', name: 'Cian Neón', val: '#06b6d4' },
-        { id: 'color_magma', name: 'Rojo Magma', val: '#ef4444' }
-      ];
-      const VAULT_FRAMES = [
-        { id: 'founder_blue', name: '★ Marco de Avatar: Fundador del Núcleo' },
-        { id: 'frame-colossus-legend', name: '★ Marco: Núcleo del Coloso' },
-        { id: 'frame-runic', name: 'Marco: Partículas Rúnicas' },
-        { id: 'frame-amethyst', name: 'Marco: Cristal de Amatista' },
-        { id: 'frame-silver', name: 'Marco: Plata Rúnica' },
-        { id: 'frame-copper', name: 'Marco: Cobre Forjado' }
-      ];
-      const cfgCosmetics = window.EKGameConfig?.COSMETICS || [];
-      const VAULT_BANNERS = cfgCosmetics.filter(c => c.type === 'banner').length > 0
-        ? cfgCosmetics.filter(c => c.type === 'banner').map(c => ({ id: c.id, name: c.name, val: c.val }))
-        : [
-            { id: 'banner_golem_animated', name: '★ Banner: Colossus Raid (Póster Oficial)', val: "url('assets/banners/promo_colossus_raid_event.webp') center/cover no-repeat" },
-            { id: 'banner_fluid_lava', name: 'Banner: Crimson Moon · Kurogane (Anime)', val: "url('assets/banners/promo_crimson_shinobi.webp') center/cover no-repeat" },
-            { id: 'banner_rune_storm', name: 'Banner: Cyber Matsuri · Akira (Anime)', val: "url('assets/banners/promo_cyber_idol_matsuri.webp') center/cover no-repeat" },
-            { id: 'banner_bridges', name: 'Banner: Shibuya Drift GP · Renji (Anime)', val: "url('assets/banners/promo_neotokyo_drift_gp.webp') center/cover no-repeat" },
-            { id: 'banner_amethyst', name: 'Banner: Boreal Aurora · Winter Fest', val: "url('assets/banners/promo_aurora_sanctuary_fest.webp') center/cover no-repeat" },
-            { id: 'banner_mines', name: 'Banner: Elemental Clash · Torneo Dojo (Anime)', val: "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat" },
-            { id: 'banner_crypt', name: 'Banner: Dual-Soul · Kaelen (Anime)', val: "url('assets/banners/promo_shadow_flame_chronicles.webp') center/cover no-repeat" },
-            { id: 'banner_sanctum', name: 'Banner: Rival Showdown · Ignis vs. Zero-Frost', val: "url('assets/banners/promo_frost_vs_ignis_rivals.webp') center/cover no-repeat" }
-          ];
-      const VAULT_TITLES = [
-        { id: 'title_colossus_slayer', name: '★ Coloso Carmesí' },
-        { id: 'title_abyss_guardian', name: '⚔️ Guardián del Abismo' },
-        { id: 'title_rune_master', name: '✨ Maestro Rúnico' },
-        { id: 'title_flame_herald', name: '🔥 Heraldo de la Llama' },
-        { id: 'title_core_explorer', name: '🧭 Explorador del Núcleo' },
-        { id: 'title_shadow_hunter', name: '🗡️ Cazador de Sombras' },
-        { id: 'title_crypt_sentinel', name: '🛡️ Centinela de la Cripta' },
-        { id: 'title_novice_delver', name: '⛏️ Aventurero de las Minas' }
-      ];
+      const cfgCosmetics = window.EKCreatorSystem?.getActiveCosmetics
+        ? window.EKCreatorSystem.getActiveCosmetics()
+        : (window.EKGameConfig?.COSMETICS || []);
+      const VAULT_COLORS = cfgCosmetics
+        .filter(c => c.type === 'color')
+        .map(c => ({ id: c.id, name: c.name, val: c.val }));
+      const VAULT_FRAMES = cfgCosmetics
+        .filter(c => c.type === 'frame')
+        .map(c => ({ id: c.val, cosmeticId: c.id, name: c.name }));
+      const VAULT_BANNERS = cfgCosmetics
+        .filter(c => c.type === 'banner')
+        .map(c => ({ id: c.id, name: c.name, val: c.val }));
+      const VAULT_TITLES = cfgCosmetics
+        .filter(c => c.type === 'title')
+        .map(c => ({ id: c.id, name: c.val || c.name.replace(/^Título:\s*/i, '') }));
       unlockedCosmeticColors = VAULT_COLORS.filter(vc => vData.cosmetics && vData.cosmetics[vc.id]);
-      unlockedFrames = VAULT_FRAMES.filter(vf => vData.cosmetics && vData.cosmetics[vf.id]);
+      unlockedFrames = VAULT_FRAMES.filter(vf => vData.cosmetics && (vData.cosmetics[vf.cosmeticId] || vData.cosmetics[vf.id]));
       unlockedBanners = VAULT_BANNERS.filter(vb => vData.cosmetics && vData.cosmetics[vb.id]);
       unlockedTitles = VAULT_TITLES.filter(vt => vData.cosmetics && vData.cosmetics[vt.id]);
     }
   } catch {}
+
+  // Títulos base disponibles para todos + títulos por logros reales + títulos de Bóveda
+  const BASE_TITLES = [
+    'Viajero del Núcleo',
+    'Jugador Nocturno',
+    'Estratega',
+    'Voz del Escuadrón',
+    'Explorador del Núcleo',
+    'Lobo Solitario',
+    'Guardián del Chat',
+    'Piloto Novato',
+    'Aprendiz Shinobi',
+    'Cazador de Bugs'
+  ];
+  const ACHIEVEMENT_TITLES = [];
+  if (Number(me.dojoPvpWins || 0) >= 5) ACHIEVEMENT_TITLES.push('Sensei del Dojo');
+  if (Number(me.voiceSeconds || 0) >= 36000) ACHIEVEMENT_TITLES.push('Veterano de Voz');
+  if (Array.isArray(me.gamesSeen) && me.gamesSeen.length >= 5) ACHIEVEMENT_TITLES.push('Maestro Gamer');
+  if (window.EKCreatorSystem?.isMasterCreator?.(me)) ACHIEVEMENT_TITLES.push('Fundador de EpicKast');
+  const seenTitleNames = new Set();
+  const allAvailableTitles = [];
+  const pushTitle = (name, group) => {
+    if (!name || seenTitleNames.has(name)) return;
+    seenTitleNames.add(name);
+    allAvailableTitles.push({ name, group });
+  };
+  unlockedTitles.forEach((t) => pushTitle(t.name, '✨ Bóveda'));
+  ACHIEVEMENT_TITLES.forEach((n) => pushTitle(n, '🏅 Logros'));
+  BASE_TITLES.forEach((n) => pushTitle(n, '📌 Básicos'));
+  if (me.title) pushTitle(me.title, '📌 Actual');
 
   const vaultColorSwatches = unlockedCosmeticColors.length > 0 ? h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;' },
     unlockedCosmeticColors.map(vc => h('button', {
@@ -6093,7 +6688,10 @@ function modalProfile() {
     }, '★ ' + vc.name))
   ) : null;
 
-  const studioPresets = (window.EKProfileStudio?.BANNER_PRESETS || []).map((b) => ({ name: b.name, val: b.value || b.val }));
+  const studioPresets = (window.EKCreatorSystem?.getActiveProfileBannerPresets
+    ? window.EKCreatorSystem.getActiveProfileBannerPresets()
+    : (window.EKProfileStudio?.BANNER_PRESETS || [])
+  ).map((b) => ({ name: b.name, val: b.value || b.val }));
   const fallbackPresets = [
     { name: '💜 Púrpura Imperial', val: 'linear-gradient(135deg, #7c5cff, #4f46e5)' },
     { name: '🌊 Océano Cyan', val: 'linear-gradient(135deg, #06b6d4, #2563eb)' },
@@ -6139,10 +6737,17 @@ function modalProfile() {
     type: 'file',
     accept: 'image/png,image/jpeg,image/webp,image/gif',
     class: 'hidden',
-    onchange: () => {
+    onchange: async () => {
       const f = bannerFileInp.files[0];
       bannerFileInp.value = '';
       if (!f) return;
+      if (window.EKImageModeration?.checkImage) {
+        const mod = await window.EKImageModeration.checkImage(f, { kind: 'banner', fileName: f.name, mime: f.type });
+        if (!mod.allowed) {
+          toast('🛡️ ' + mod.reason);
+          return;
+        }
+      }
       if (!window.EKProfileStudio?.openBannerCropper) {
         toast('El editor de banners no está disponible');
         return;
@@ -6242,7 +6847,7 @@ function modalProfile() {
     }
   },
     h('option', { value: '', selected: !selectedTitle }, 'Sin título equipado'),
-    ...unlockedTitles.map(t => h('option', { value: t.name, selected: selectedTitle === t.name }, t.name))
+    ...allAvailableTitles.map(t => h('option', { value: t.name, selected: selectedTitle === t.name }, `${t.name} (${t.group})`))
   );
 
   let selectedStatus = me.status || localStorage.getItem('epickast.status') || 'online';
@@ -6293,14 +6898,14 @@ function modalProfile() {
   const accColors = makeAccordion(
     '🎨',
     'Color de Nombre, Marco y Título',
-    'Paleta base, degradado libre, cosméticos de Bóveda y título equipado',
+    'Color sólido base, degradados de Bóveda, marco de avatar y título',
     false,
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
       h('label', null, '👑 Título de jugador', titleSelect),
       unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar', frameSelect) : h('div')
     ),
-    h('label', null, 'Paleta base y selector libre (Sólido / Degradado)', sws, colorStudioSlot),
-    vaultColorSwatches ? h('label', null, '✨ Desbloqueados en la Bóveda', vaultColorSwatches) : null
+    h('label', null, 'Paleta base y color sólido personalizado', sws, colorStudioSlot),
+    vaultColorSwatches ? h('label', null, '✨ Degradados y Estilos de la Bóveda', vaultColorSwatches) : null
   );
 
   const accPresence = makeAccordion(
@@ -6825,30 +7430,73 @@ async function modalSettings() {
     }
   }, '🎯 Diagnóstico y Calibración Rápida de Audio y Video');
 
-  // Tarjeta 1: Micrófono (lo esencial para saber si se escucha)
-  const micCard = h('div', { class: 'settings-card' },
+  // Tarjeta Única de Dispositivos Esenciales (Micrófono, Altavoces y Cámara agrupados)
+  const devicesCard = h('div', { class: 'settings-card', style: 'gap:10px' },
     h('div', { class: 'settings-card-title' },
-      h('span', null, '🎙️ Micrófono de entrada'),
+      h('span', null, '🎙️ Micrófono'),
       testBtn
     ),
     sel('audioinput', 'mic'),
     meter,
-    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--tx);cursor:pointer;margin-top:2px' }, mon, 'Escucharme en audífonos durante la prueba')
-  );
-
-  // Tarjeta 2: Altavoces / Auriculares
-  const spkCard = h('div', { class: 'settings-card' },
+    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;font-size:11.5px;color:var(--mu);cursor:pointer;margin-top:0' }, mon, 'Escucharme en audífonos durante la prueba'),
+    h('div', { style: 'height:1px;background:rgba(255,255,255,0.07);margin:2px 0' }),
     h('div', { class: 'settings-card-title' },
       h('span', null, '🔊 Altavoces / Auriculares'),
       testSpkBtn
     ),
-    sel('audiooutput', 'spk')
-  );
-
-  // Tarjeta 3: Cámara
-  const camCard = h('div', { class: 'settings-card' },
+    sel('audiooutput', 'spk'),
+    h('div', { style: 'height:1px;background:rgba(255,255,255,0.07);margin:2px 0' }),
     h('div', { class: 'settings-card-title' }, '📷 Cámara Web'),
     sel('videoinput', 'cam')
+  );
+
+  // Tarjeta Solucionador Rápido de Llamadas (v2.0.0: sin tecnicismos)
+  const quickFixCard = h('div', { class: 'settings-card', style: 'border-color:rgba(124,92,255,0.35);background:linear-gradient(135deg,rgba(124,92,255,0.08),rgba(56,189,248,0.05))' },
+    h('div', { class: 'settings-card-title' }, '🆘 ¿Problemas en llamada? Solución en 1 clic'),
+    h('div', { class: 'quick-fix-grid' },
+      h('button', {
+        type: 'button',
+        class: 'quick-fix-btn',
+        onclick: async () => {
+          settings.voiceMode = 'vad';
+          settings.micGain = Math.max(1.15, Number(settings.micGain || 1));
+          settings.voiceGate = 0.004;
+          saveSettings();
+          if (S.call) {
+            try {
+              S.call.setMuted(false);
+              await S.call.rebuildMic(settings);
+              updateDock();
+            } catch {}
+          }
+          startTest();
+          toast('🎙️ Micrófono reactivado (115% · Activación por voz). Habla para ver la barra verde.');
+        }
+      }, h('b', null, '🔇 No me escuchan'), h('small', null, 'Reactiva micro, quita PTT accidental y abre prueba en vivo')),
+      h('button', {
+        type: 'button',
+        class: 'quick-fix-btn',
+        onclick: async () => {
+          settings.icePolicy = 'relay';
+          saveSettings();
+          if (S.call && typeof reconnectActiveCall === 'function') {
+            toast('🔄 Reconectando llamada con Ruta Segura (TURN)...');
+            closeModal();
+            reconnectActiveCall();
+          } else {
+            toast('🛡️ Ruta Segura (TURN) activada. Si algunos amigos no te oyen, pulsa 🔄 Reconectar en la llamada.');
+          }
+        }
+      }, h('b', null, '👥 Unos sí y otros no'), h('small', null, 'Activa ruta segura TURN y reconecta las conexiones P2P')),
+      h('button', {
+        type: 'button',
+        class: 'quick-fix-btn',
+        onclick: () => {
+          closeModal();
+          openOfficialGuide('ayuda_llamadas');
+        }
+      }, h('b', null, '📘 Guía de Ayuda'), h('small', null, 'Filtros, arrastrar usuarios, 4+ personas y banners'))
+    )
   );
 
   // Tarjeta 4: Modo de transmisión
@@ -7010,52 +7658,166 @@ async function modalSettings() {
   );
 
   // Acordeón 6: Acerca de EpicKast
-  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '1.9.6'} · Desarrollado por EpicKap`,
+  const accAbout = acc('ℹ️', 'Acerca de EpicKast', `Versión v${S.appVer || '2.0.0'} · Desarrollado por EpicKap`,
     h('div', { style: 'font-size:12px;color:var(--mu);line-height:1.6;display:flex;flex-direction:column;gap:6px' },
       h('div', null, h('b', { style: 'color:var(--tx)' }, 'EpicKast Comunicación Ultraligera (PC & Móvil)')),
-      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '1.9.6'}`)),
+      h('div', null, 'Versión de la aplicación: ', h('code', { style: 'background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px;color:#fff' }, `v${S.appVer || '2.0.0'}`)),
       S.isStore ? h('div', { style: 'color:#a5b4fc;font-weight:600' }, '🏪 Edición Microsoft Store: las actualizaciones se gestionan automáticamente desde Microsoft Store.') : null,
       h('div', null, 'Arquitectura WebRTC P2P directo y servidor en la nube de baja latencia.'),
+      h('button', {
+        type: 'button',
+        style: 'margin-top:4px;padding:8px 12px;border-radius:8px;background:rgba(99,102,241,0.18);border:1px solid #6366f1;color:#c7d2fe;font-size:12px;font-weight:700;cursor:pointer',
+        onclick: () => { closeModal(); openOfficialGuide('notas_version'); }
+      }, '📘 Abrir Guías Oficiales y Novedades v2.0.0'),
       h('div', { style: 'font-size:11px;opacity:0.75' }, '© 2026 EpicKap Group. Todos los derechos reservados.')
     )
   );
 
-  const simpleAudioCard = h('div', { class: 'settings-card' },
-    h('div', { class: 'settings-card-title' }, '✨ Perfil Rápido de Audio y Anti-Eco'),
-    simpleProfileSel,
-    window.EKPlatform?.isWeb ? null : chk('autoOverlayOnGame', '🎮 Activar Overlay flotante automáticamente al entrar a un juego')
+  const curProf = settings.audioProfile || 'auto';
+  const chipBtns = [
+    ['auto', '🤖 Automático', 'Voz clara equilibrada'],
+    ['headset', '🎧 Audífonos HD', 'Máxima calidad (128 kbps)'],
+    ['speakers', '🔊 Altavoces', 'Anti-eco reforzado']
+  ].map(([id, label, tip]) => {
+    const b = h('button', {
+      type: 'button',
+      class: 'audio-chip' + (curProf === id ? ' active' : ''),
+      title: tip,
+      onclick: async () => {
+        chipBtns.forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        await applyAudioProfile(id);
+      }
+    }, label);
+    return b;
+  });
+
+  const simpleAudioCard = h('div', { class: 'settings-card set-card-colored', style: '--set-accent:#38bdf8' },
+    h('div', { class: 'settings-card-title', style: 'color:#7dd3fc' }, '✨ Filtro de Voz y Anti-Eco (1 clic)'),
+    h('div', { class: 'audio-chip-row' }, ...chipBtns)
   );
 
-  const isAdv = !!settings.advancedMode;
-  const advToggleBtn = h('button', {
-    type: 'button',
-    class: 'settings-adv-btn' + (isAdv ? ' active' : ''),
-    onclick: () => {
-      settings.advancedMode = !settings.advancedMode;
-      saveSettings();
-      closeModal();
-      modalSettings();
-    }
-  },
-    h('span', null, isAdv ? '⚙️ Ocultar Ajustes Avanzados (Pro)' : '⚙️ Ajustes Avanzados (Pro)'),
-    h('span', { style: 'font-size:11px;opacity:0.8' }, isAdv ? 'Activo ▲' : 'Mostrar ▼')
+  // Tarjeta limpia de Cámara separada para la pestaña Video (Verde Esmeralda)
+  const camOnlyCard = h('div', { class: 'settings-card set-card-colored', style: '--set-accent:#10b981' },
+    h('div', { class: 'settings-card-title', style: 'color:#6ee7b7' }, '📷 Cámara Web'),
+    sel('videoinput', 'cam'),
+    window.EKPlatform?.isWeb ? null : chk('autoOverlayOnGame', '🎮 Mostrar Overlay flotante al entrar a un juego')
   );
 
+  // Tarjeta limpia de Audio (Micrófono + Altavoces) con borde Azul Cian
+  const audioDevicesCard = h('div', { class: 'settings-card set-card-colored', style: '--set-accent:#38bdf8;gap:12px' },
+    h('div', { class: 'settings-card-title', style: 'color:#7dd3fc' },
+      h('span', null, '🎙️ Micrófono'),
+      testBtn
+    ),
+    sel('audioinput', 'mic'),
+    meter,
+    h('label', { style: 'flex-direction:row;align-items:center;gap:8px;font-size:11.5px;color:var(--mu);cursor:pointer;margin-top:0' }, mon, 'Escucharme en audífonos durante la prueba'),
+    h('div', { style: 'height:1px;background:rgba(255,255,255,0.07);margin:2px 0' }),
+    h('div', { class: 'settings-card-title', style: 'color:#7dd3fc' },
+      h('span', null, '🔊 Altavoces / Auriculares'),
+      testSpkBtn
+    ),
+    sel('audiooutput', 'spk')
+  );
+
+  quickFixCard.classList.add('set-card-colored');
+  quickFixCard.style.setProperty('--set-accent', '#a855f7');
+
+  const isMasterCreator = !!window.EKCreatorSystem?.isMasterCreator?.(S.me);
   const isMobTouch = !!(window.EKPlatform?.isWeb && window.EKPlatform?.isTouch);
-  modal(`Ajustes · EpicKast v${S.appVer || '1.9.6'}`,
-    simpleAudioCard,
-    micCard,
-    spkCard,
-    camCard,
-    accVisual,
-    accAccount,
-    accAbout,
-    advToggleBtn,
-    isAdv ? diagBtn : null,
-    isAdv && !isMobTouch ? modeCard : null,
-    isAdv ? accAudio : null,
-    isAdv ? accVideo : null,
-    isAdv && !isMobTouch ? accShortcuts : null
+
+  // Botón discreto de cerrar sesión (sin exponer ajustes internos de servidor a usuarios normales)
+  const logoutCard = h('div', { class: 'settings-card set-card-colored', style: '--set-accent:#ec4899;gap:10px' },
+    h('div', { class: 'settings-card-title', style: 'color:#f9a8d4' }, '👤 Sesión y Enlace para Amigos'),
+    h('label', null, shareLabel,
+      h('input', { value: shareUrl, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(shareUrl); toast('Enlace copiado'); } })),
+    h('div', { style: 'display:flex;gap:8px;margin-top:2px' },
+      h('button', { type: 'button', style: 'flex:1;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: () => { closeModal(); openOfficialGuide('notas_version'); } }, '📘 Guías Oficiales'),
+      h('button', { type: 'button', class: 'danger', style: 'padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, '🚪 Cerrar sesión')
+    )
+  );
+
+  // Abrir acordeones dentro de sus pestañas propias para lectura limpia sin clics extra
+  accVisual.open = true;
+  accVisual.classList.add('set-card-colored');
+  accVisual.style.setProperty('--set-accent', '#ec4899');
+  accVideo.open = true;
+  accVideo.classList.add('set-card-colored');
+  accVideo.style.setProperty('--set-accent', '#10b981');
+  accAudio.classList.add('set-card-colored');
+  accAudio.style.setProperty('--set-accent', '#f59e0b');
+  accShortcuts.classList.add('set-card-colored');
+  accShortcuts.style.setProperty('--set-accent', '#f59e0b');
+  modeCard.classList.add('set-card-colored');
+  modeCard.style.setProperty('--set-accent', '#f59e0b');
+
+  const paneAudio = h('div', { class: 'set-pane' }, quickFixCard, simpleAudioCard, audioDevicesCard);
+  const paneVideo = h('div', { class: 'set-pane hidden' }, camOnlyCard, accVideo);
+  const paneVisual = h('div', { class: 'set-pane hidden' }, accVisual, logoutCard, accAbout);
+  const panePro = h('div', { class: 'set-pane hidden' },
+    diagBtn,
+    !isMobTouch ? modeCard : null,
+    accAudio,
+    !isMobTouch ? accShortcuts : null,
+    isMasterCreator ? accAccount : h('button', { style: 'padding:9px 12px;font-weight:700;font-size:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico')
+  );
+
+  const panes = { audio: paneAudio, video: paneVideo, visual: paneVisual, pro: panePro };
+  const tabMeta = [
+    { id: 'audio', label: 'Audio', color: '#38bdf8', cls: 'c-audio' },
+    { id: 'video', label: 'Video', color: '#10b981', cls: 'c-video' },
+    { id: 'visual', label: 'Estilo', color: '#ec4899', cls: 'c-visual' },
+    { id: 'pro', label: 'Experto', color: '#f59e0b', cls: 'c-pro' }
+  ];
+  const tabBtns = {};
+  const setTab = (id) => {
+    Object.entries(panes).forEach(([k, el]) => el.classList.toggle('hidden', k !== id));
+    Object.entries(tabBtns).forEach(([k, b]) => b.classList.toggle('on', k === id));
+  };
+  const tabsBar = h('div', { class: 'set-tabs' },
+    tabMeta.map((t) => {
+      const b = h('button', {
+        type: 'button',
+        class: `set-tab ${t.cls}` + (t.id === 'audio' ? ' on' : ''),
+        onclick: () => setTab(t.id)
+      }, h('span', { class: 'st-dot', style: `background:${t.color}` }), h('span', null, t.label));
+      tabBtns[t.id] = b;
+      return b;
+    })
+  );
+
+  // Tarjeta puente a Mi Perfil (para usuarios acostumbrados a Discord que entran por el engrane ⚙️)
+  const profileBridgeCard = S.me ? h('div', {
+    class: 'settings-card set-card-colored',
+    style: '--set-accent:#a855f7;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:linear-gradient(135deg,rgba(168,85,247,0.12),rgba(15,23,42,0.75))'
+  },
+    h('div', { style: 'display:flex;align-items:center;gap:11px;min-width:0' },
+      avatar(S.me, 40, false),
+      h('div', { style: 'min-width:0;display:flex;flex-direction:column;gap:2px' },
+        h('div', { style: 'font-size:13px;font-weight:800;color:#f8fafc;display:flex;align-items:center;gap:6px' },
+          h('span', null, 'Mi Perfil y Cosméticos'),
+          h('span', { style: 'font-size:9.5px;padding:1px 6px;border-radius:999px;background:rgba(168,85,247,0.22);color:#e9d5ff;font-weight:700' }, S.me.name)
+        ),
+        h('div', { style: 'font-size:11px;color:#cbd5e1;line-height:1.3' }, 'Foto, banner, color de nombre, marco, título e insignias.'),
+        h('div', { style: 'font-size:10px;color:#94a3b8' }, 'Tip: también puedes abrirlo haciendo clic directo en tu nombre abajo a la izquierda.')
+      )
+    ),
+    h('button', {
+      type: 'button',
+      class: 'primary',
+      style: 'padding:8px 13px;border-radius:9px;font-size:12px;font-weight:800;white-space:nowrap;flex-shrink:0;cursor:pointer',
+      onclick: () => { closeModal(); modalProfile(); }
+    }, 'Personalizar →')
+  ) : null;
+
+  modal(`Ajustes · EpicKast v${S.appVer || '2.0.0'}`,
+    profileBridgeCard,
+    tabsBar,
+    paneAudio,
+    paneVideo,
+    paneVisual,
+    panePro
   );
 }
 
@@ -7221,6 +7983,14 @@ function leaveCall(silent) {
   $('meetMenu')?.classList.add('hidden');
   tiles.forEach((t) => { cleanupTileAudio(t); t.el.remove(); });
   tiles.clear(); renderCenter(); updateStatTimer(); updatePingTimer();
+  S.userClosedOverlayInGame = false;
+  if (S.autoOpenedOverlay) {
+    S.autoOpenedOverlay = false;
+    if (S.overlayActive) {
+      S._autoClosingOverlay = true;
+      toggleOverlay(false);
+    }
+  }
   syncOverlay();
   syncFloatingCam();
 }
@@ -7496,16 +8266,24 @@ function updateVoicePill() {
   }
 }
 
-// ---------- Tablero de Sonidos (Soundboard) Sincronizado ----------
+// ---------- Tablero de Sonidos (Soundboard) Sincronizado v2.0 ----------
 const SOUND_NAMES = {
-  victory: '🎺 Fanfarria de Victoria',
-  airhorn: '📯 Bocina de Fiesta (Airhorn)',
-  badumtss: '🥁 Ba-Dum-Tss (Chiste)',
-  applause: '👏 Aplausos',
+  victory: '🏆 Fanfarria Épica',
+  applause: '👏 Ovación / Aplausos',
+  airhorn: '📯 Airhorn de Fiesta',
   levelup: '⭐ Level Up (Arcade)',
-  ding: '🔔 Campana / Ding',
-  boing: '🌀 Resorte Cómico (Boing)',
-  gameover: '👾 Game Over (8-Bit)',
+  badumtss: '🥁 Ba-Dum-Tss',
+  sadtrombone: '🎺 Trombón Triste',
+  crickets: '🦗 Grillos (Silencio)',
+  bruh: '💥 Bass Drop / Boom',
+  boing: '🌀 Resorte Cómico',
+  ko: '🥊 Campana K.O.',
+  headshot: '🎯 Impacto Crítico',
+  gameover: '👾 Game Over 8-Bit',
+  laser: '⚡ Láser Sci-Fi',
+  drumroll: '🪘 Redoble de Suspenso',
+  suspense: '🎬 Braaam Dramático',
+  ding: '🔔 Respuesta Correcta',
 };
 
 let soundCtx = null;
@@ -7521,176 +8299,321 @@ function playSoundEffect(name) {
   try {
     const ctx = getSoundCtx();
     const now = ctx.currentTime;
+    const masterVol = Math.max(0.15, Math.min(1.2, Number(localStorage.getItem('epickast.soundboard.vol') || '0.85')));
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(masterVol, now);
+    master.connect(ctx.destination);
+
+    const mkNoise = (dur) => {
+      const len = Math.max(1, Math.round(ctx.sampleRate * dur));
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      return src;
+    };
+
     switch (name) {
       case 'victory': {
         const notes = [
-          { f: 261.63, t: 0, d: 0.14 },
-          { f: 329.63, t: 0.14, d: 0.14 },
-          { f: 392.00, t: 0.28, d: 0.14 },
-          { f: 523.25, t: 0.42, d: 0.65 },
-          { f: 659.25, t: 0.42, d: 0.65 },
-          { f: 783.99, t: 0.42, d: 0.65 },
+          { f: 261.63, t: 0, d: 0.13 },
+          { f: 329.63, t: 0.12, d: 0.13 },
+          { f: 392.00, t: 0.24, d: 0.14 },
+          { f: 523.25, t: 0.38, d: 0.72 },
+          { f: 659.25, t: 0.38, d: 0.72 },
+          { f: 783.99, t: 0.38, d: 0.72 },
+          { f: 1046.5, t: 0.44, d: 0.65 },
         ];
         notes.forEach(({ f, t, d }) => {
-          const osc = ctx.createOscillator();
-          const g = ctx.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(f, now + t);
-          g.gain.setValueAtTime(0.001, now + t);
-          g.gain.exponentialRampToValueAtTime(0.28, now + t + 0.03);
-          g.gain.exponentialRampToValueAtTime(0.0001, now + t + d);
-          osc.connect(g);
-          g.connect(ctx.destination);
-          osc.start(now + t);
-          osc.stop(now + t + d + 0.04);
+          ['triangle', 'sawtooth'].forEach((type, idx) => {
+            const osc = ctx.createOscillator();
+            const flt = ctx.createBiquadFilter();
+            const g = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(f * (idx === 1 ? 1.003 : 1), now + t);
+            flt.type = 'lowpass';
+            flt.frequency.setValueAtTime(idx === 1 ? 2200 : 4000, now + t);
+            g.gain.setValueAtTime(0.001, now + t);
+            g.gain.exponentialRampToValueAtTime(idx === 1 ? 0.08 : 0.22, now + t + 0.025);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + t + d);
+            osc.connect(flt); flt.connect(g); g.connect(master);
+            osc.start(now + t); osc.stop(now + t + d + 0.05);
+          });
         });
         break;
       }
       case 'applause': {
-        const dur = 2.0;
-        const bufSize = ctx.sampleRate * dur;
-        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
-        const filter = ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1200, now);
-        filter.Q.setValueAtTime(2.0, now);
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.01, now);
-        g.gain.linearRampToValueAtTime(0.25, now + 0.25);
-        g.gain.setValueAtTime(0.25, now + 1.2);
-        g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-        src.connect(filter);
-        filter.connect(g);
-        g.connect(ctx.destination);
-        src.start(now);
-        src.stop(now + dur);
+        // Múltiples palmadas rítmicas escalonadas + ambiente cálido
+        for (let c = 0; c < 18; c++) {
+          const t = (c * 0.085) + (Math.random() * 0.04);
+          const src = mkNoise(0.075);
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass';
+          bp.frequency.setValueAtTime(950 + Math.random() * 1400, now + t);
+          bp.Q.setValueAtTime(1.8 + Math.random() * 1.4, now + t);
+          const g = ctx.createGain();
+          const env = c < 3 ? 0.14 : (c > 13 ? 0.12 : 0.22);
+          g.gain.setValueAtTime(0.001, now + t);
+          g.gain.linearRampToValueAtTime(env, now + t + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.07);
+          src.connect(bp); bp.connect(g); g.connect(master);
+          src.start(now + t); src.stop(now + t + 0.08);
+        }
         break;
       }
       case 'airhorn': {
-        const blasts = [
-          { t: 0, d: 0.11 },
-          { t: 0.14, d: 0.11 },
-          { t: 0.28, d: 0.11 },
-          { t: 0.42, d: 0.5 },
-        ];
+        const blasts = [{ t: 0, d: 0.11 }, { t: 0.13, d: 0.11 }, { t: 0.26, d: 0.11 }, { t: 0.40, d: 0.56 }];
         blasts.forEach(({ t, d }) => {
-          [466, 622].forEach((freq) => {
+          [466.16, 470.5, 622.25].forEach((freq) => {
             const osc = ctx.createOscillator();
+            const flt = ctx.createBiquadFilter();
             const g = ctx.createGain();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(freq, now + t);
-            osc.frequency.linearRampToValueAtTime(freq * 1.02, now + t + d);
+            osc.frequency.setValueAtTime(freq * 0.96, now + t);
+            osc.frequency.exponentialRampToValueAtTime(freq, now + t + 0.025);
+            osc.frequency.linearRampToValueAtTime(freq * 1.015, now + t + d);
+            flt.type = 'bandpass';
+            flt.frequency.setValueAtTime(1400, now + t);
+            flt.Q.setValueAtTime(0.9, now + t);
             g.gain.setValueAtTime(0.001, now + t);
-            g.gain.linearRampToValueAtTime(0.16, now + t + 0.02);
+            g.gain.linearRampToValueAtTime(0.15, now + t + 0.015);
             g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
-            osc.connect(g);
-            g.connect(ctx.destination);
-            osc.start(now + t);
-            osc.stop(now + t + d + 0.02);
+            osc.connect(flt); flt.connect(g); g.connect(master);
+            osc.start(now + t); osc.stop(now + t + d + 0.03);
           });
         });
         break;
       }
       case 'badumtss': {
-        const hits = [
-          { t: 0, f: 140, d: 0.11 },
-          { t: 0.16, f: 160, d: 0.11 },
-        ];
-        hits.forEach(({ t, f, d }) => {
+        [{ t: 0, f: 155, d: 0.11 }, { t: 0.16, f: 195, d: 0.12 }].forEach(({ t, f, d }) => {
           const osc = ctx.createOscillator();
           const g = ctx.createGain();
           osc.type = 'sine';
           osc.frequency.setValueAtTime(f, now + t);
-          osc.frequency.exponentialRampToValueAtTime(45, now + t + d);
-          g.gain.setValueAtTime(0.32, now + t);
+          osc.frequency.exponentialRampToValueAtTime(48, now + t + d);
+          g.gain.setValueAtTime(0.42, now + t);
           g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
-          osc.connect(g);
-          g.connect(ctx.destination);
-          osc.start(now + t);
-          osc.stop(now + t + d);
+          osc.connect(g); g.connect(master);
+          osc.start(now + t); osc.stop(now + t + d + 0.02);
         });
-        const cDur = 0.75;
-        const cBuf = ctx.createBuffer(1, Math.round(ctx.sampleRate * cDur), ctx.sampleRate);
-        const cd = cBuf.getChannelData(0);
-        for (let i = 0; i < cd.length; i++) cd[i] = Math.random() * 2 - 1;
-        const cSrc = ctx.createBufferSource();
-        cSrc.buffer = cBuf;
+        const cSrc = mkNoise(0.85);
         const cFilt = ctx.createBiquadFilter();
-        cFilt.type = 'highpass';
-        cFilt.frequency.setValueAtTime(6000, now + 0.34);
+        cFilt.type = 'highpass'; cFilt.frequency.setValueAtTime(5200, now + 0.34);
         const cGain = ctx.createGain();
         cGain.gain.setValueAtTime(0.001, now);
-        cGain.gain.setValueAtTime(0.26, now + 0.34);
-        cGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34 + cDur);
-        cSrc.connect(cFilt);
-        cFilt.connect(cGain);
-        cGain.connect(ctx.destination);
-        cSrc.start(now + 0.34);
-        cSrc.stop(now + 0.34 + cDur);
+        cGain.gain.setValueAtTime(0.32, now + 0.34);
+        cGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.15);
+        cSrc.connect(cFilt); cFilt.connect(cGain); cGain.connect(master);
+        cSrc.start(now + 0.34); cSrc.stop(now + 1.18);
+        break;
+      }
+      case 'sadtrombone': {
+        const steps = [
+          { f1: 293.66, f2: 286, t: 0.00, d: 0.28 },
+          { f1: 277.18, f2: 270, t: 0.30, d: 0.28 },
+          { f1: 261.63, f2: 254, t: 0.60, d: 0.28 },
+          { f1: 246.94, f2: 218, t: 0.90, d: 0.85 },
+        ];
+        steps.forEach(({ f1, f2, t, d }, idx) => {
+          const osc = ctx.createOscillator();
+          const flt = ctx.createBiquadFilter();
+          const g = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f1, now + t);
+          osc.frequency.linearRampToValueAtTime(f2, now + t + d);
+          if (idx === 3) {
+            const lfo = ctx.createOscillator();
+            const lfoG = ctx.createGain();
+            lfo.frequency.setValueAtTime(5.5, now + t);
+            lfoG.gain.setValueAtTime(6.5, now + t);
+            lfo.connect(lfoG); lfoG.connect(osc.frequency);
+            lfo.start(now + t); lfo.stop(now + t + d);
+          }
+          flt.type = 'lowpass';
+          flt.frequency.setValueAtTime(980, now + t);
+          flt.frequency.exponentialRampToValueAtTime(420, now + t + d);
+          g.gain.setValueAtTime(0.001, now + t);
+          g.gain.linearRampToValueAtTime(0.26, now + t + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
+          osc.connect(flt); flt.connect(g); g.connect(master);
+          osc.start(now + t); osc.stop(now + t + d + 0.03);
+        });
+        break;
+      }
+      case 'crickets': {
+        [0, 0.55, 1.1].forEach((offset) => {
+          for (let p = 0; p < 3; p++) {
+            const t = offset + p * 0.065;
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(4200, now + t);
+            osc.frequency.linearRampToValueAtTime(4550, now + t + 0.045);
+            g.gain.setValueAtTime(0.001, now + t);
+            g.gain.linearRampToValueAtTime(0.14, now + t + 0.008);
+            g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.05);
+            osc.connect(g); g.connect(master);
+            osc.start(now + t); osc.stop(now + t + 0.055);
+          }
+        });
+        break;
+      }
+      case 'bruh': {
+        // Sub-bass Vine Boom cinematográfico
+        const sub = ctx.createOscillator();
+        const g = ctx.createGain();
+        sub.type = 'sine';
+        sub.frequency.setValueAtTime(115, now);
+        sub.frequency.exponentialRampToValueAtTime(34, now + 0.55);
+        g.gain.setValueAtTime(0.65, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.95);
+        sub.connect(g); g.connect(master);
+        sub.start(now); sub.stop(now + 0.98);
+        const punch = mkNoise(0.14);
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass'; lp.frequency.setValueAtTime(480, now);
+        const pg = ctx.createGain();
+        pg.gain.setValueAtTime(0.35, now);
+        pg.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        punch.connect(lp); lp.connect(pg); pg.connect(master);
+        punch.start(now); punch.stop(now + 0.15);
+        break;
+      }
+      case 'ko': {
+        [0, 0.22].forEach((offset) => {
+          [880, 1318, 2140, 3190].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now + offset);
+            g.gain.setValueAtTime(idx === 0 ? 0.25 : 0.12 / idx, now + offset);
+            g.gain.exponentialRampToValueAtTime(0.0005, now + offset + 1.0);
+            osc.connect(g); g.connect(master);
+            osc.start(now + offset); osc.stop(now + offset + 1.05);
+          });
+        });
+        break;
+      }
+      case 'headshot': {
+        const hit = mkNoise(0.06);
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'bandpass'; hp.frequency.setValueAtTime(2800, now); hp.Q.setValueAtTime(2.5, now);
+        const hg = ctx.createGain();
+        hg.gain.setValueAtTime(0.4, now); hg.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        hit.connect(hp); hp.connect(hg); hg.connect(master);
+        hit.start(now); hit.stop(now + 0.07);
+        const ping = ctx.createOscillator();
+        const pg = ctx.createGain();
+        ping.type = 'triangle'; ping.frequency.setValueAtTime(2200, now + 0.02); ping.frequency.exponentialRampToValueAtTime(920, now + 0.22);
+        pg.gain.setValueAtTime(0.28, now + 0.02); pg.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        ping.connect(pg); pg.connect(master);
+        ping.start(now + 0.02); ping.stop(now + 0.26);
+        break;
+      }
+      case 'laser': {
+        [0, 0.14].forEach((offset) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(1500, now + offset);
+          osc.frequency.exponentialRampToValueAtTime(160, now + offset + 0.13);
+          g.gain.setValueAtTime(0.22, now + offset);
+          g.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.14);
+          osc.connect(g); g.connect(master);
+          osc.start(now + offset); osc.stop(now + offset + 0.15);
+        });
+        break;
+      }
+      case 'drumroll': {
+        for (let i = 0; i < 20; i++) {
+          const t = i * 0.058;
+          const src = mkNoise(0.05);
+          const bp = ctx.createBiquadFilter();
+          bp.type = 'bandpass'; bp.frequency.setValueAtTime(1600, now + t);
+          const g = ctx.createGain();
+          const amp = 0.08 + (i / 20) * 0.26;
+          g.gain.setValueAtTime(amp, now + t);
+          g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.048);
+          src.connect(bp); bp.connect(g); g.connect(master);
+          src.start(now + t); src.stop(now + t + 0.052);
+        }
+        break;
+      }
+      case 'suspense': {
+        [55, 82.41, 110.4, 164.8].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const flt = ctx.createBiquadFilter();
+          const g = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.linearRampToValueAtTime(freq * 0.96, now + 1.3);
+          flt.type = 'lowpass';
+          flt.frequency.setValueAtTime(180, now);
+          flt.frequency.exponentialRampToValueAtTime(950, now + 0.35);
+          flt.frequency.exponentialRampToValueAtTime(240, now + 1.3);
+          g.gain.setValueAtTime(0.001, now);
+          g.gain.linearRampToValueAtTime(idx < 2 ? 0.2 : 0.1, now + 0.09);
+          g.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+          osc.connect(flt); flt.connect(g); g.connect(master);
+          osc.start(now); osc.stop(now + 1.4);
+        });
         break;
       }
       case 'gameover': {
-        const seq = [
-          { f: 493.88, t: 0, d: 0.2 },
-          { f: 466.16, t: 0.2, d: 0.2 },
-          { f: 440.00, t: 0.4, d: 0.2 },
-          { f: 415.30, t: 0.6, d: 0.5 },
-        ];
-        seq.forEach(({ f, t, d }) => {
+        [{ f: 493.88, t: 0, d: 0.19 }, { f: 466.16, t: 0.19, d: 0.19 }, { f: 440.00, t: 0.38, d: 0.19 }, { f: 392.00, t: 0.57, d: 0.52 }].forEach(({ f, t, d }) => {
           const osc = ctx.createOscillator();
           const g = ctx.createGain();
           osc.type = 'square';
           osc.frequency.setValueAtTime(f, now + t);
-          g.gain.setValueAtTime(0.12, now + t);
+          g.gain.setValueAtTime(0.14, now + t);
           g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
-          osc.connect(g);
-          g.connect(ctx.destination);
-          osc.start(now + t);
-          osc.stop(now + t + d + 0.02);
+          osc.connect(g); g.connect(master);
+          osc.start(now + t); osc.stop(now + t + d + 0.02);
         });
         break;
       }
       case 'ding': {
-        const osc = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const g = ctx.createGain();
-        osc.type = 'sine'; osc.frequency.setValueAtTime(1760, now);
-        osc2.type = 'sine'; osc2.frequency.setValueAtTime(3520, now);
-        g.gain.setValueAtTime(0.26, now);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + 1.1);
-        osc.connect(g); osc2.connect(g); g.connect(ctx.destination);
-        osc.start(now); osc2.start(now);
-        osc.stop(now + 1.15); osc2.stop(now + 1.15);
+        [1318.5, 2637].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = 'sine'; osc.frequency.setValueAtTime(freq, now);
+          g.gain.setValueAtTime(idx === 0 ? 0.28 : 0.12, now);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+          osc.connect(g); g.connect(master);
+          osc.start(now); osc.stop(now + 1.05);
+        });
         break;
       }
       case 'boing': {
         const osc = ctx.createOscillator();
+        const lfo = ctx.createOscillator();
+        const lfoG = ctx.createGain();
         const g = ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.exponentialRampToValueAtTime(750, now + 0.4);
-        g.gain.setValueAtTime(0.28, now);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-        osc.connect(g); g.connect(ctx.destination);
-        osc.start(now); osc.stop(now + 0.55);
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.38);
+        lfo.frequency.setValueAtTime(18, now);
+        lfoG.gain.setValueAtTime(48, now);
+        lfo.connect(lfoG); lfoG.connect(osc.frequency);
+        g.gain.setValueAtTime(0.32, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+        osc.connect(g); g.connect(master);
+        osc.start(now); lfo.start(now);
+        osc.stop(now + 0.55); lfo.stop(now + 0.55);
         break;
       }
       case 'levelup': {
-        const notes = [330, 392, 523, 659, 784, 1046];
-        notes.forEach((freq, idx) => {
-          const t = idx * 0.075;
-          const d = idx === notes.length - 1 ? 0.4 : 0.075;
+        [330, 392, 523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const t = idx * 0.068;
+          const d = idx === 5 ? 0.45 : 0.08;
           const osc = ctx.createOscillator();
           const g = ctx.createGain();
-          osc.type = 'sine';
+          osc.type = 'triangle';
           osc.frequency.setValueAtTime(freq, now + t);
-          g.gain.setValueAtTime(0.18, now + t);
+          g.gain.setValueAtTime(0.22, now + t);
           g.gain.exponentialRampToValueAtTime(0.001, now + t + d);
-          osc.connect(g); g.connect(ctx.destination);
+          osc.connect(g); g.connect(master);
           osc.start(now + t); osc.stop(now + t + d + 0.02);
         });
         break;
@@ -7702,45 +8625,87 @@ function playSoundEffect(name) {
 }
 
 function modalSoundboard() {
-  const SOUNDS = [
-    { key: 'victory', name: 'Victoria', icon: '🏆', desc: 'Fanfarria triunfal de victoria' },
-    { key: 'airhorn', name: 'Airhorn', icon: '📯', desc: 'El clásico sonido de fiesta' },
-    { key: 'badumtss', name: 'Ba-Dum-Tss', icon: '🥁', desc: 'Remate de chiste gracioso' },
-    { key: 'applause', name: 'Aplausos', icon: '👏', desc: 'Ovación del público' },
-    { key: 'levelup', name: 'Level Up', icon: '⭐', desc: 'Subida de nivel retro arcade' },
-    { key: 'ding', name: 'Campana', icon: '🔔', desc: 'Campanita cristalina' },
-    { key: 'boing', name: 'Boing', icon: '🌀', desc: 'Resorte cómico de caricatura' },
-    { key: 'gameover', name: 'Game Over', icon: '👾', desc: 'Melodía de derrota 8-bit' },
+  const GROUPS = [
+    {
+      title: '🎉 Celebración y Reacciones',
+      color: '#10b981',
+      items: [
+        { key: 'victory', name: 'Victoria', icon: '🏆', desc: 'Fanfarria épica' },
+        { key: 'applause', name: 'Aplausos', icon: '👏', desc: 'Ovación realista' },
+        { key: 'airhorn', name: 'Airhorn', icon: '📯', desc: 'Bocina de fiesta' },
+        { key: 'levelup', name: 'Level Up', icon: '⭐', desc: 'Subida de nivel' },
+      ]
+    },
+    {
+      title: '😂 Humor y Memes',
+      color: '#f59e0b',
+      items: [
+        { key: 'badumtss', name: 'Ba-Dum-Tss', icon: '🥁', desc: 'Remate de chiste' },
+        { key: 'sadtrombone', name: 'Trombón Triste', icon: '🎺', desc: 'Wah-wah-waaah' },
+        { key: 'crickets', name: 'Grillos', icon: '🦗', desc: 'Silencio incómodo' },
+        { key: 'bruh', name: 'Bass Drop', icon: '💥', desc: 'Impacto Vine Boom' },
+        { key: 'boing', name: 'Boing', icon: '🌀', desc: 'Resorte caricatura' },
+      ]
+    },
+    {
+      title: '🎮 Gaming y Suspenso',
+      color: '#38bdf8',
+      items: [
+        { key: 'ko', name: 'Campana K.O.', icon: '🥊', desc: 'Ring de combate' },
+        { key: 'headshot', name: 'Crítico', icon: '🎯', desc: 'Impacto hitmarker' },
+        { key: 'laser', name: 'Láser', icon: '⚡', desc: 'Disparo sci-fi' },
+        { key: 'gameover', name: 'Game Over', icon: '👾', desc: 'Derrota 8-bit' },
+        { key: 'drumroll', name: 'Redoble', icon: '🪘', desc: 'Suspenso rápido' },
+        { key: 'suspense', name: 'Braaam', icon: '🎬', desc: 'Tensión de cine' },
+        { key: 'ding', name: 'Correcto', icon: '🔔', desc: 'Campana limpia' },
+      ]
+    }
   ];
 
-  const grid = h('div', {
-    style: 'display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px',
-  }, SOUNDS.map((s) => {
-    return h('button', {
-      style: 'display:flex;align-items:center;gap:10px;padding:11px;background:#181b28;border:1px solid rgba(255,255,255,0.08);border-radius:10px;text-align:left;cursor:pointer;transition:all 0.15s ease',
-      onclick: () => {
-        playSoundEffect(s.key);
-        if (S.call) {
-          sendRaw('voice.sound', { sound: s.key, name: S.me?.name || 'Tú' });
-          toast(`🔊 Has enviado "${s.name}" a la llamada`);
-        } else {
-          toast(`🔊 Reproduciendo: ${s.name} (Prueba local)`);
-        }
+  const curVol = Math.round(Number(localStorage.getItem('epickast.soundboard.vol') || '0.85') * 100);
+  const volValEl = h('span', { style: 'font-size:11px;font-weight:800;color:#cbd5e1;min-width:34px;text-align:right' }, `${curVol}%`);
+  const volBar = h('div', { style: 'display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:10px;margin-bottom:10px' },
+    h('span', { style: 'font-size:11.5px;font-weight:700;color:#94a3b8;white-space:nowrap' }, '🔊 Volumen local'),
+    h('input', {
+      type: 'range', min: 20, max: 120, value: curVol, style: 'flex:1;accent-color:#7c5cff',
+      oninput: (e) => {
+        const v = Number(e.target.value) || 85;
+        localStorage.setItem('epickast.soundboard.vol', String(v / 100));
+        volValEl.textContent = `${v}%`;
+      }
+    }),
+    volValEl
+  );
+
+  const sections = GROUPS.map((grp) => h('div', { style: 'margin-bottom:12px' },
+    h('div', { style: `font-size:11px;font-weight:800;color:${grp.color};text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px` }, grp.title),
+    h('div', { style: 'display:grid;grid-template-columns:repeat(2,1fr);gap:8px' },
+      grp.items.map((s) => h('button', {
+        style: `display:flex;align-items:center;gap:10px;padding:9px 11px;background:#141826;border:1px solid rgba(255,255,255,0.08);border-left:3px solid ${grp.color};border-radius:10px;text-align:left;cursor:pointer;transition:transform 0.12s ease`,
+        onclick: () => {
+          playSoundEffect(s.key);
+          if (S.call) {
+            sendRaw('voice.sound', { sound: s.key, name: S.me?.name || 'Tú' });
+            toast(`🔊 "${s.name}" enviado a todos en la llamada`);
+          } else {
+            toast(`🔊 ${s.name} (Vista previa local)`);
+          }
+        },
       },
-    },
-      h('span', { style: 'font-size:22px;line-height:1' }, s.icon),
-      h('div', { style: 'flex:1;overflow:hidden' },
-        h('div', { style: 'font-weight:700;font-size:12.5px;color:#f1f5f9' }, s.name),
-        h('div', { style: 'font-size:11px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, s.desc)
-      )
-    );
-  }));
+        h('span', { style: 'font-size:20px;line-height:1' }, s.icon),
+        h('div', { style: 'flex:1;min-width:0' },
+          h('div', { style: 'font-weight:700;font-size:12px;color:#f1f5f9' }, s.name),
+          h('div', { style: 'font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, s.desc)
+        )
+      ))
+    )
+  ));
 
   const info = h('div', {
-    style: 'font-size:11.5px;color:var(--mu);margin-top:12px;line-height:1.4;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px'
-  }, S.call ? '✨ Los sonidos se reproducen sincronizados para todos los miembros conectados a la llamada.' : 'ℹ️ Conéctate a una llamada para compartir los sonidos con tus amigos en tiempo real.');
+    style: 'font-size:11px;color:var(--mu);margin-top:4px;line-height:1.4;padding:8px 10px;background:rgba(255,255,255,0.03);border-radius:8px'
+  }, S.call ? '✨ Los sonidos se reproducen sincronizados para todos los miembros conectados a la llamada.' : 'ℹ️ Conéctate a una llamada grupal o privada para reproducirlos en vivo para todos.');
 
-  modal('Tablero de Sonidos (Soundboard) 🔊', grid, info);
+  modal('Tablero de Sonidos (Soundboard) 🔊', volBar, ...sections, info);
 }
 
 // ---------- Modo Juego (Baja Latencia / Mínimo Ping) ----------
@@ -7786,7 +8751,7 @@ function toggleOverlay(enable) {
     syncOverlay();
     toast(active ? '🎮 Overlay de voz sobre juegos activado' : 'Overlay cerrado');
     updateDock();
-  }).catch(() => {});
+  }).catch(() => { S._autoClosingOverlay = false; });
 }
 
 // ---------- Pulsar para Hablar (Push-to-Talk / PTT) ----------
@@ -8061,7 +9026,7 @@ $('mMore').onclick = (e) => {
   const tipBar = h('div', { id: 'meetMenuTip', class: 'menu-tip' }, 'Panel de Controles Rápidos');
   const setTip = (txt) => { tipBar.textContent = txt; };
 
-  const tileBtn = (icon, tip, onClick, active = false, extraCls = '') => {
+  const tileBtn = (icon, tip, onClick, active = false, extraCls = '', shortLbl = '') => {
     const b = h('button', {
       type: 'button',
       class: 'meet-tile' + (active ? ' on' : '') + (extraCls ? ' ' + extraCls : ''),
@@ -8070,7 +9035,7 @@ $('mMore').onclick = (e) => {
       onmouseenter: () => setTip(tip),
       onmouseleave: () => setTip('Panel de Controles Rápidos'),
       onclick: (ev) => { ev.stopPropagation(); onClick(); }
-    }, icon);
+    }, h('span', null, icon), shortLbl ? h('span', { class: 'mt-lbl' }, shortLbl) : null);
     return b;
   };
 
@@ -8082,35 +9047,54 @@ $('mMore').onclick = (e) => {
     tileBtn('XL', 'Modo Teatro XL (94% pantalla)', () => { setStagePreset(94); menu.classList.add('hidden'); }, Math.abs(curVh - 94) <= 5, 'sz')
   );
 
-  // 2. Modos de Vista y Pantalla
+  const svgIcon = (pathD) => {
+    const s = document.createElement('span');
+    s.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;';
+    s.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${pathD}</svg>`;
+    return s;
+  };
+  const IC = {
+    chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    video: '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    pin: '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16h14v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
+    overlay: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/>',
+    flip: '<polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>',
+    music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    sound: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+    game: '<rect x="2" y="6" width="20" height="12" rx="4"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="15" cy="13" r="1"/><circle cx="17.5" cy="11" r="1"/>',
+    ear: '<path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0"/><path d="M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4"/>',
+    stats: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    diag: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+  };
+
+  // 2. Modos de Vista y Pantalla (iconos SVG minimalistas)
   const gridVistas = h('div', { class: 'meet-grid' },
-    tileBtn(S.stageCollapsed ? '🔼' : '🔽', S.stageCollapsed ? 'Expandir escenario de video' : 'Minimizar escenario (ver chat)', () => { toggleStageCollapse(); menu.classList.add('hidden'); }, S.stageCollapsed),
-    tileBtn('⊞', !settings.hideNoVideo ? 'Modo Cuadrícula: Mostrando todos (clic para ocultar sin cámara)' : 'Modo Cuadrícula: Solo cámaras (clic para ver todos)', () => {
+    tileBtn(svgIcon(S.stageCollapsed ? IC.video : IC.chat), S.stageCollapsed ? 'Expandir escenario de video' : 'Minimizar escenario (ver chat)', () => { toggleStageCollapse(); menu.classList.add('hidden'); }, S.stageCollapsed, '', S.stageCollapsed ? 'Video' : 'Chat'),
+    tileBtn(svgIcon(IC.grid), !settings.hideNoVideo ? 'Modo Cuadrícula: Mostrando todos (clic para ocultar sin cámara)' : 'Modo Cuadrícula: Solo cámaras (clic para ver todos)', () => {
       settings.hideNoVideo = !settings.hideNoVideo;
       saveSettings();
       toast(settings.hideNoVideo ? 'Solo cámaras y pantallas activas' : 'Todos los participantes en cuadrícula');
       renderStage();
       menu.classList.add('hidden');
-    }, !settings.hideNoVideo),
-    // Ventana flotante y Overlay Gamer solo existen en escritorio (Electron)
-    window.EKPlatform?.isWeb ? null : tileBtn('📌', S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini),
-    window.EKPlatform?.isWeb ? null : tileBtn('🪟', S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive),
-    // Móvil: alternar cámara frontal / trasera
-    window.EKPlatform?.isTouch ? tileBtn('🔄', 'Girar cámara (frontal / trasera)', () => { window.EKMobile?.flipCamera?.(); menu.classList.add('hidden'); }) : null
+    }, !settings.hideNoVideo, '', settings.hideNoVideo ? 'Solo Cams' : 'Todos'),
+    window.EKPlatform?.isWeb ? null : tileBtn(svgIcon(IC.pin), S.mini ? 'Ventana flotante: ON (Always-on-top)' : 'Ventana flotante PiP (sobre juegos)', () => { $('bMini').click(); menu.classList.add('hidden'); }, S.mini, '', 'Flotante'),
+    window.EKPlatform?.isWeb ? null : tileBtn(svgIcon(IC.overlay), S.overlayActive ? 'Overlay Gamer: ON (clic para ocultar)' : 'Overlay Gamer: OFF (superposición en juego)', () => { toggleOverlay(); menu.classList.add('hidden'); }, S.overlayActive, '', 'Overlay'),
+    window.EKPlatform?.isTouch ? tileBtn(svgIcon(IC.flip), 'Girar cámara (frontal / trasera)', () => { window.EKMobile?.flipCamera?.(); menu.classList.add('hidden'); }, false, '', 'Girar') : null
   );
 
   // 3. Audio, Música y Gaming
   const gridAudioGaming = h('div', { class: 'meet-grid' },
-    tileBtn('🎵', 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current),
-    tileBtn('🔊', 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }),
-    tileBtn('🎮', S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode),
-    tileBtn('👂', c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring)
+    tileBtn(svgIcon(IC.music), 'Bot DJ (YouTube / Música sincronizada)', () => { modalParty(); menu.classList.add('hidden'); }, !!S.party?.current, '', 'Bot DJ'),
+    tileBtn(svgIcon(IC.sound), 'Tablero de Sonidos (Soundboard)', () => { modalSoundboard(); menu.classList.add('hidden'); }, false, '', 'Sonidos'),
+    tileBtn(svgIcon(IC.game), S.gameMode ? 'Modo Juego: ON (Baja latencia activada)' : 'Modo Juego: OFF (Optimizar para jugar)', () => { toggleGameMode(); menu.classList.add('hidden'); }, S.gameMode, '', 'Juegos'),
+    tileBtn(svgIcon(IC.ear), c?.mic?.monitoring ? 'Escuchar mi voz: ON (clic para apagar)' : 'Escuchar mi voz: OFF (auto-monitoreo)', () => { $('bLoop').click(); menu.classList.add('hidden'); }, !!c?.mic?.monitoring, '', 'Oírme')
   );
 
   // 4. Diagnóstico y Utilidades
   const gridUtil = h('div', { class: 'meet-grid util-grid' },
-    tileBtn('📊', settings.stats ? 'Estadísticas HW/Ping: ON' : 'Estadísticas HW y Ping: OFF', () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); }, settings.stats),
-    tileBtn('🎯', 'Diagnóstico y Códigos de Error', () => { modalDiagnostics(); menu.classList.add('hidden'); })
+    tileBtn(svgIcon(IC.stats), settings.stats ? 'Estadísticas HW/Ping: ON' : 'Estadísticas HW y Ping: OFF', () => { settings.stats = !settings.stats; saveSettings(); updateStatTimer(); menu.classList.add('hidden'); }, settings.stats, '', 'Stats'),
+    tileBtn(svgIcon(IC.diag), 'Diagnóstico y Códigos de Error', () => { modalDiagnostics(); menu.classList.add('hidden'); }, false, '', 'Diagnóstico')
   );
 
   // Control deslizante de filtro anti-respiración

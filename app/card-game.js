@@ -206,6 +206,11 @@
     water: { 11: '¡TENTÁCULOS DEL KRAKEN ABISAL!', 12: '¡EL MAESTRO DEL AGUA DOBLA LA MAREA!' },
     snow: { 11: '¡ALIENTO DEL DRAGÓN DE HIELO!', 12: '¡EL MAESTRO DEL HIELO CONGELA EL TIEMPO!' }
   };
+  const BASE_MOTIFS = {
+    fire: ['campfire', 'shuriken_fire', 'torch', 'wildfire', 'volcano', 'inferno', 'sun', 'flame_spirit', 'lava_knight', 'dragon_fire', 'phoenix', 'fire_master'],
+    water: ['droplet', 'stream', 'waterfall', 'torrent', 'flood', 'whirlpool', 'tsunami', 'water_spirit', 'sea_knight', 'leviathan', 'kraken', 'water_master'],
+    snow: ['crystal', 'snowflake', 'blizzard', 'icicles', 'glacier', 'avalanche', 'tundra', 'ice_spirit', 'frost_knight', 'yeti', 'dragon_ice', 'ice_master']
+  };
   const ELEM_ORDER = ['fire', 'water', 'snow'];
   const ELEM_LETTER = { fire: 'F', water: 'A', snow: 'N' };
   const BASE_CARDS = [];
@@ -215,39 +220,39 @@
         no: ei * 12 + p,
         code: ELEM_LETTER[el] + String(p).padStart(2, '0'),
         element: el, power: p, name: BASE_NAMES[el][p - 1],
+        motif: BASE_MOTIFS[el][p - 1],
         accent: BASE_ACCENT[el], starter: true, rarity: p > 10 ? 'special' : 'base',
-        imgUrl: `assets/cards/std/${el}_${p}.jpg`,
         ...(p > 10 ? { cineTitle: BASE_CINE[el][p] } : {})
       });
     }
   });
 
-  // Desbloqueables (no 101+): pueden repetir poder pero cada una tiene carátula propia.
+  // Desbloqueables (no 101+): estilo caricatura unificado con el Dojo y Ninjas.
   const UNLOCK_RAW = [
     [1, 'fire', 2, 'Ascua Shinobi', '#ef4444', 'shuriken_fire'],
     [2, 'fire', 4, 'Zorro de Brasas', '#f97316', 'kitsune'],
     [3, 'fire', 6, 'Katana Carmesí', '#f59e0b', 'katana_fire'],
     [4, 'fire', 7, 'Lámpara del Templo', '#ec4899', 'lantern'],
-    [5, 'fire', 8, 'Tigre Volcánico', '#eab308', 'tiger', 'assets/cards/fire.jpg'],
-    [6, 'fire', 10, 'Oni de Obsidiana', '#dc2626', 'oni', 'assets/cards/fire.jpg'],
-    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', 'assets/cartoon/card_fire_phoenix.webp', '¡LLAMARADA DEL FÉNIX SOLAR!'],
-    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', 'assets/cartoon/card_fire_dragon.webp', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
+    [5, 'fire', 8, 'Tigre Volcánico', '#eab308', 'tiger'],
+    [6, 'fire', 10, 'Oni de Obsidiana', '#dc2626', 'oni'],
+    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', '', '¡LLAMARADA DEL FÉNIX SOLAR!'],
+    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', '', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
     [9, 'water', 2, 'Gota Serena', '#38bdf8', 'droplet'],
     [10, 'water', 4, 'Koi Imperial', '#06b6d4', 'koi'],
     [11, 'water', 5, 'Tortuga Acorazada', '#10b981', 'turtle'],
     [12, 'water', 7, 'Abanico de Marea', '#3b82f6', 'fan_water'],
-    [13, 'water', 8, 'Tiburón Abisal', '#6366f1', 'shark', 'assets/cards/water.jpg'],
-    [14, 'water', 10, 'Serpiente Midgard', '#0ea5e9', 'serpent', 'assets/cards/water.jpg'],
-    [15, 'water', 11, 'Nutria Marejada', '#38bdf8', 'kraken', 'assets/cartoon/card_water_splash.webp', '¡OLA GIGANTE DE LA MAREA!'],
-    [16, 'water', 12, 'Leviatán Tsunami', '#2563eb', 'leviathan', 'assets/cards/card_water_leviathan.jpg', '¡MAREMOTO DEL LEVIATÁN SUPREMO!'],
+    [13, 'water', 8, 'Tiburón Abisal', '#6366f1', 'shark'],
+    [14, 'water', 10, 'Serpiente Midgard', '#0ea5e9', 'serpent'],
+    [15, 'water', 11, 'Nutria Marejada', '#38bdf8', 'kraken', '', '¡OLA GIGANTE DE LA MAREA!'],
+    [16, 'water', 12, 'Leviatán Tsunami', '#2563eb', 'leviathan', '', '¡MAREMOTO DEL LEVIATÁN SUPREMO!'],
     [17, 'snow', 3, 'Cristal Boreal', '#7dd3fc', 'crystal'],
     [18, 'snow', 4, 'Puffle Glacial', '#38bdf8', 'penguin'],
-    [19, 'snow', 6, 'Búho Nival', '#a855f7', 'owl', 'assets/cards/snow.jpg'],
+    [19, 'snow', 6, 'Búho Nival', '#a855f7', 'owl'],
     [20, 'snow', 7, 'Shuriken Cero', '#06b6d4', 'shuriken_ice'],
-    [21, 'snow', 9, 'Lobo Ventisca', '#60a5fa', 'wolf', 'assets/cards/card_snow_titan.jpg'],
-    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti', 'assets/cartoon/card_snow_yeti.webp'],
-    [23, 'snow', 11, 'Pingüino Yeti Glaciar', '#7dd3fc', 'dragon_ice', 'assets/cartoon/card_snow_yeti.webp', '¡VENTISCA DEL YETI GLACIAR!'],
-    [24, 'snow', 12, 'Titán Cero Absoluto', '#e0f2fe', 'titan_ice', 'assets/cards/card_snow_titan.jpg', '¡ERA GLACIAL: CERO ABSOLUTO!']
+    [21, 'snow', 9, 'Lobo Ventisca', '#60a5fa', 'wolf'],
+    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti'],
+    [23, 'snow', 11, 'Pingüino Yeti Glaciar', '#7dd3fc', 'dragon_ice', '', '¡VENTISCA DEL YETI GLACIAR!'],
+    [24, 'snow', 12, 'Titán Cero Absoluto', '#e0f2fe', 'titan_ice', '', '¡ERA GLACIAL: CERO ABSOLUTO!']
   ];
   const UNLOCK_CARDS = UNLOCK_RAW.map(([n, element, power, name, accent, motif, imgUrl, cineTitle]) => ({
     no: 100 + n, code: 'X' + String(n).padStart(2, '0'), element, power, name, accent, starter: false, motif,
@@ -521,24 +526,87 @@
 
         ${frontWeaponSvg}
 
-        <!-- Mascota Compañera Redondeada junto al Ninja -->
+        <!-- Mascota Compañera Estilo Caricatura Detallada junto al Ninja -->
         ${(() => {
           const pet = cfg.pet || 'none';
-          const py = 67 - (frame % 2) * 2.5;
+          const py = 65 - (frame % 2) * 2.5;
           if (pet === 'kitsune') {
-            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><ellipse cx="5" cy="14" rx="5.5" ry="4" fill="#fb923c" stroke="${OL}" stroke-width="2"/><circle cx="12" cy="14" r="7.5" fill="#f97316" stroke="${OL}" stroke-width="2.2"/><polygon points="6,9 8,2 11,8" fill="#f97316" stroke="${OL}" stroke-width="1.8"/><polygon points="18,9 16,2 13,8" fill="#f97316" stroke="${OL}" stroke-width="1.8"/><ellipse cx="13" cy="16.5" rx="5" ry="3" fill="#fef3c7"/><circle cx="10.5" cy="13.5" r="1.4" fill="${OL}"/><circle cx="15" cy="13.5" r="1.4" fill="${OL}"/><circle cx="10.1" cy="13" r="0.5" fill="#fff"/><circle cx="14.6" cy="13" r="0.5" fill="#fff"/></g>`;
+            return `<g transform="translate(-6,${py})">
+              <ellipse cx="12" cy="24" rx="10" ry="3.2" fill="rgba(20,16,12,0.28)"/>
+              <path d="M4,18 Q-5,10 2,5 Q7,8 7,15 Z" fill="#fb923c" stroke="${OL}" stroke-width="1.9" stroke-linejoin="round"/>
+              <path d="M2,7 Q-1,9 2,12" stroke="#fef3c7" stroke-width="2" stroke-linecap="round" fill="none"/>
+              <ellipse cx="12" cy="18" rx="6.5" ry="5.5" fill="#ea580c" stroke="${OL}" stroke-width="2"/>
+              <ellipse cx="12.5" cy="19" rx="3.8" ry="3.2" fill="#fef3c7"/>
+              <circle cx="12.5" cy="11.5" r="7.5" fill="#f97316" stroke="${OL}" stroke-width="2.1"/>
+              <polygon points="6,7 7.5,-1 11.5,5.5" fill="#f97316" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>
+              <polygon points="7.5,5.5 8.2,1.5 10.3,5" fill="#fef3c7"/>
+              <polygon points="19,7 17.5,-1 13.5,5.5" fill="#f97316" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>
+              <polygon points="17.5,5.5 16.8,1.5 14.7,5" fill="#fef3c7"/>
+              <ellipse cx="12.5" cy="14" rx="5.2" ry="3.2" fill="#fef3c7"/>
+              <ellipse cx="8.5" cy="13.5" rx="1.6" ry="0.9" fill="#f43f5e" opacity="0.5"/>
+              <ellipse cx="16.5" cy="13.5" rx="1.6" ry="0.9" fill="#f43f5e" opacity="0.5"/>
+              <circle cx="10.2" cy="11.2" r="1.7" fill="${OL}"/><circle cx="15" cy="11.2" r="1.7" fill="${OL}"/>
+              <circle cx="9.7" cy="10.6" r="0.65" fill="#fff"/><circle cx="14.5" cy="10.6" r="0.65" fill="#fff"/>
+              <polygon points="11.6,13.2 13.4,13.2 12.5,14.4" fill="${OL}"/>
+            </g>`;
           }
           if (pet === 'axolotl') {
-            return `<g transform="translate(-4,${py - 4})"><ellipse cx="11" cy="20" rx="8.5" ry="3" fill="rgba(62,45,29,0.2)"/><path d="M3,11 L-2,8 M3,14 L-3,14 M19,11 L24,8 M19,14 L25,14" stroke="#db2777" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="11" cy="14" rx="8" ry="6.8" fill="#f472b6" stroke="${OL}" stroke-width="2.2"/><ellipse cx="12" cy="16" rx="4.5" ry="2.8" fill="#fbcfe8"/><circle cx="9" cy="13" r="1.4" fill="${OL}"/><circle cx="14" cy="13" r="1.4" fill="${OL}"/><circle cx="8.6" cy="12.5" r="0.5" fill="#fff"/><circle cx="13.6" cy="12.5" r="0.5" fill="#fff"/></g>`;
+            return `<g transform="translate(-6,${py - 3})">
+              <ellipse cx="12" cy="23" rx="9.5" ry="3" fill="rgba(20,16,12,0.24)"/>
+              <path d="M4,11 L-3,6 M3.5,14 L-3.5,13.5 M4.5,17 L-1.5,19 M20,11 L27,6 M20.5,14 L27.5,13.5 M19.5,17 L25.5,19" stroke="#ec4899" stroke-width="2.6" stroke-linecap="round"/>
+              <ellipse cx="12" cy="15.5" rx="8.8" ry="7.4" fill="#f472b6" stroke="${OL}" stroke-width="2.1"/>
+              <ellipse cx="12" cy="17.5" rx="5.4" ry="3.8" fill="#fce7f3"/>
+              <circle cx="9" cy="13.8" r="1.8" fill="${OL}"/><circle cx="15" cy="13.8" r="1.8" fill="${OL}"/>
+              <circle cx="8.4" cy="13.1" r="0.7" fill="#fff"/><circle cx="14.4" cy="13.1" r="0.7" fill="#fff"/>
+              <path d="M10.2,16.8 Q12,18.4 13.8,16.8" stroke="${OL}" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+              <ellipse cx="6.8" cy="16" rx="1.4" ry="0.8" fill="#db2777" opacity="0.55"/>
+              <ellipse cx="17.2" cy="16" rx="1.4" ry="0.8" fill="#db2777" opacity="0.55"/>
+            </g>`;
           }
           if (pet === 'shiba') {
-            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><circle cx="11" cy="14" r="7.5" fill="#eab308" stroke="${OL}" stroke-width="2.2"/><polygon points="5,9 6.5,2 10,8" fill="#ca8a04" stroke="${OL}" stroke-width="1.8"/><polygon points="17,9 15.5,2 12,8" fill="#ca8a04" stroke="${OL}" stroke-width="1.8"/><ellipse cx="12" cy="16.5" rx="5.2" ry="3.4" fill="#fef9c3"/><circle cx="9.5" cy="13" r="1.4" fill="${OL}"/><circle cx="14" cy="13" r="1.4" fill="${OL}"/><circle cx="12" cy="15.5" r="1.3" fill="${OL}"/></g>`;
+            return `<g transform="translate(-6,${py})">
+              <ellipse cx="12" cy="24" rx="9.5" ry="3.2" fill="rgba(20,16,12,0.26)"/>
+              <path d="M5,17 Q-1,12 4,9" stroke="#f59e0b" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+              <ellipse cx="12" cy="18.5" rx="6.5" ry="5" fill="#d97706" stroke="${OL}" stroke-width="2"/>
+              <circle cx="12" cy="11.5" r="7.6" fill="#f59e0b" stroke="${OL}" stroke-width="2.1"/>
+              <polygon points="5.5,7 6.5,-0.5 10.5,5.5" fill="#d97706" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>
+              <polygon points="18.5,7 17.5,-0.5 13.5,5.5" fill="#d97706" stroke="${OL}" stroke-width="1.8" stroke-linejoin="round"/>
+              <ellipse cx="12" cy="14" rx="5.6" ry="3.8" fill="#fef3c7"/>
+              <circle cx="9.6" cy="9.4" r="1" fill="#fef3c7"/><circle cx="14.4" cy="9.4" r="1" fill="#fef3c7"/>
+              <circle cx="9.6" cy="11.4" r="1.7" fill="${OL}"/><circle cx="14.4" cy="11.4" r="1.7" fill="${OL}"/>
+              <circle cx="9.1" cy="10.8" r="0.65" fill="#fff"/><circle cx="13.9" cy="10.8" r="0.65" fill="#fff"/>
+              <ellipse cx="12" cy="13.5" rx="1.5" ry="1.1" fill="${OL}"/>
+              <path d="M10.5,15.2 Q12,16.5 13.5,15.2" stroke="${OL}" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+            </g>`;
           }
           if (pet === 'penguin') {
-            return `<g transform="translate(-4,${py})"><ellipse cx="11" cy="22" rx="9" ry="3.2" fill="rgba(62,45,29,0.22)"/><ellipse cx="11" cy="14" rx="7.6" ry="8.4" fill="#0284c7" stroke="${OL}" stroke-width="2.2"/><ellipse cx="12" cy="15.5" rx="4.8" ry="5.5" fill="#f8fafc"/><rect x="4" y="8" width="14" height="3.2" rx="1.5" fill="#ef4444" stroke="${OL}" stroke-width="1.4"/><polygon points="10.5,14 14.5,15 10.5,17" fill="#fbbf24" stroke="${OL}" stroke-width="1.4"/><circle cx="9.5" cy="12.5" r="1.3" fill="${OL}"/><circle cx="13.8" cy="12.5" r="1.3" fill="${OL}"/></g>`;
+            return `<g transform="translate(-6,${py})">
+              <ellipse cx="12" cy="24" rx="9.5" ry="3.2" fill="rgba(20,16,12,0.26)"/>
+              <ellipse cx="9" cy="22.5" rx="2.6" ry="1.5" fill="#f59e0b" stroke="${OL}" stroke-width="1.4"/>
+              <ellipse cx="15" cy="22.5" rx="2.6" ry="1.5" fill="#f59e0b" stroke="${OL}" stroke-width="1.4"/>
+              <ellipse cx="12" cy="14" rx="8.2" ry="9" fill="#0284c7" stroke="${OL}" stroke-width="2.1"/>
+              <ellipse cx="12" cy="16" rx="5.2" ry="6.2" fill="#f8fafc"/>
+              <rect x="4" y="7.5" width="16" height="3.6" rx="1.8" fill="#ef4444" stroke="${OL}" stroke-width="1.5"/>
+              <path d="M19,9 L23,7.5 L22,11 Z" fill="#ef4444" stroke="${OL}" stroke-width="1.3"/>
+              <polygon points="10.2,13.8 13.8,13.8 12,16.8" fill="#fbbf24" stroke="${OL}" stroke-width="1.4" stroke-linejoin="round"/>
+              <circle cx="9.2" cy="12" r="1.7" fill="${OL}"/><circle cx="14.8" cy="12" r="1.7" fill="${OL}"/>
+              <circle cx="8.7" cy="11.4" r="0.65" fill="#fff"/><circle cx="14.3" cy="11.4" r="0.65" fill="#fff"/>
+            </g>`;
           }
           if (pet === 'dragon') {
-            return `<g transform="translate(-4,${py - 6})"><path d="M4,12 L-3,5 L5,8 Z" fill="#a855f7" stroke="${OL}" stroke-width="1.8"/><circle cx="11" cy="13" r="7.2" fill="#7e22ce" stroke="${OL}" stroke-width="2.2"/><polygon points="7,7 5,1 10,6" fill="#fbbf24" stroke="${OL}" stroke-width="1.5"/><polygon points="15,7 17,1 12,6" fill="#fbbf24" stroke="${OL}" stroke-width="1.5"/><circle cx="9.5" cy="12.5" r="1.6" fill="#fde047"/><circle cx="14" cy="12.5" r="1.6" fill="#fde047"/></g>`;
+            return `<g transform="translate(-6,${py - 5})">
+              <ellipse cx="12" cy="25" rx="9" ry="2.8" fill="rgba(88,28,135,0.3)"/>
+              <path d="M5,14 L-4,5 L2,12 L-2,15 L6,16 Z" fill="#c084fc" stroke="${OL}" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M19,14 L28,5 L22,12 L26,15 L18,16 Z" fill="#c084fc" stroke="${OL}" stroke-width="1.7" stroke-linejoin="round"/>
+              <ellipse cx="12" cy="17.5" rx="6.2" ry="5.5" fill="#6b21a8" stroke="${OL}" stroke-width="2"/>
+              <ellipse cx="12" cy="18.2" rx="3.4" ry="3.8" fill="#fde047"/>
+              <circle cx="12" cy="11" r="7.4" fill="#7e22ce" stroke="${OL}" stroke-width="2.1"/>
+              <polygon points="7,5.5 4.5,-1.5 10,4.5" fill="#fbbf24" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>
+              <polygon points="17,5.5 19.5,-1.5 14,4.5" fill="#fbbf24" stroke="${OL}" stroke-width="1.6" stroke-linejoin="round"/>
+              <circle cx="9.5" cy="10.8" r="1.9" fill="#fde047" stroke="${OL}" stroke-width="1.1"/>
+              <circle cx="14.5" cy="10.8" r="1.9" fill="#fde047" stroke="${OL}" stroke-width="1.1"/>
+              <circle cx="9.5" cy="10.8" r="0.8" fill="${OL}"/><circle cx="14.5" cy="10.8" r="0.8" fill="${OL}"/>
+            </g>`;
           }
           return '';
         })()}
@@ -848,23 +916,141 @@
           <polygon points="28,40 37,44 29,46" fill="#e0f2fe"/><polygon points="52,40 43,44 51,46" fill="#e0f2fe"/>
           <polygon points="36,58 44,58 40,64" fill="#090d16"/>`;
         break;
+      case 'campfire':
+      case 'torch':
+      case 'wildfire':
+      case 'inferno':
+        artBody = `
+          <rect x="20" y="60" width="40" height="7" rx="3.5" fill="#7c2d12" stroke="#141824" stroke-width="2" transform="rotate(-8 40 63)"/>
+          <rect x="20" y="60" width="40" height="7" rx="3.5" fill="#9a3412" stroke="#141824" stroke-width="2" transform="rotate(8 40 63)"/>
+          <path d="M40,12 C56,28 64,44 56,59 C50,67 30,67 24,59 C16,44 24,28 40,12 Z" fill="#ef4444" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
+          <path d="M40,22 C50,34 54,46 48,57 C44,62 36,62 32,57 C26,46 30,34 40,22 Z" fill="#f97316" stroke="#141824" stroke-width="1.6"/>
+          <path d="M40,36 C46,44 47,52 43,58 C41,60 39,60 37,58 C33,52 34,44 40,36 Z" fill="#fde047"/>
+          <circle cx="23" cy="24" r="2.8" fill="#fde047"/><circle cx="58" cy="20" r="2.2" fill="#fb923c"/>`;
+        break;
+      case 'volcano':
+        artBody = `
+          <polygon points="10,74 30,30 50,30 70,74" fill="#57534e" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
+          <path d="M30,30 Q35,44 40,37 Q45,46 50,30 L47,30 L33,30 Z" fill="#f97316" stroke="#141824" stroke-width="1.8"/>
+          <path d="M40,6 C52,14 55,24 48,30 L32,30 C25,24 28,14 40,6 Z" fill="#ef4444" stroke="#141824" stroke-width="2.2"/>
+          <path d="M40,14 C46,19 47,25 43,29 L37,29 C33,25 34,19 40,14 Z" fill="#fde047"/>
+          <circle cx="24" cy="16" r="3" fill="#fb923c" stroke="#141824" stroke-width="1.4"/>
+          <circle cx="56" cy="14" r="3.4" fill="#fde047" stroke="#141824" stroke-width="1.4"/>`;
+        break;
+      case 'sun':
+        artBody = `
+          <g transform="translate(40,40)">
+            <polygon points="0,-31 5,-19 16,-27 14,-14 27,-16 19,-5 31,0 19,5 27,16 14,14 16,27 5,19 0,31 -5,19 -16,27 -14,14 -27,16 -19,5 -31,0 -19,-5 -27,-16 -14,-14 -16,-27 -5,-19" fill="#f97316" stroke="#141824" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="0" cy="0" r="17" fill="#fde047" stroke="#141824" stroke-width="2.2"/>
+            <circle cx="-5" cy="-3" r="2.2" fill="#141824"/><circle cx="5" cy="-3" r="2.2" fill="#141824"/>
+            <path d="M-5,4 Q0,9 5,4" stroke="#141824" stroke-width="2" fill="none" stroke-linecap="round"/>
+          </g>`;
+        break;
+      case 'flame_spirit':
+      case 'lava_knight':
+      case 'fire_master':
+        artBody = `
+          <path d="M40,10 C56,22 62,38 56,56 L24,56 C18,38 24,22 40,10 Z" fill="#dc2626" stroke="#141824" stroke-width="2.4"/>
+          <circle cx="40" cy="39" r="16" fill="#1e293b" stroke="#141824" stroke-width="2.2"/>
+          <rect x="24" y="29" width="32" height="7" rx="3" fill="#ef4444" stroke="#141824" stroke-width="1.8"/>
+          <polygon points="30,39 38,42 31,45" fill="#fde047"/><polygon points="50,39 42,42 49,45" fill="#fde047"/>
+          <rect x="24" y="54" width="32" height="16" rx="6" fill="#7f1d1d" stroke="#141824" stroke-width="2.2"/>
+          <path d="M32,54 L40,62 L48,54" fill="#fbbf24" stroke="#141824" stroke-width="1.5"/>`;
+        break;
+      case 'stream':
+      case 'waterfall':
+      case 'torrent':
+      case 'flood':
+      case 'tsunami':
+        artBody = `
+          <path d="M8,54 Q20,24 44,24 Q58,24 62,36 Q52,32 45,38 Q38,44 48,52 L72,52 L72,74 L8,74 Z" fill="#0284c7" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
+          <path d="M16,58 Q28,36 46,34 Q54,34 57,41" stroke="#bae6fd" stroke-width="4" stroke-linecap="round" fill="none"/>
+          <circle cx="58" cy="24" r="3.5" fill="#e0f2fe" stroke="#141824" stroke-width="1.4"/>
+          <circle cx="65" cy="31" r="2.6" fill="#e0f2fe" stroke="#141824" stroke-width="1.2"/>
+          <path d="M12,66 Q26,60 40,66 T68,66" stroke="#7dd3fc" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+        break;
+      case 'whirlpool':
+        artBody = `
+          <g transform="translate(40,42)">
+            <circle cx="0" cy="0" r="27" fill="#0284c7" stroke="#141824" stroke-width="2.4"/>
+            <path d="M0,-20 A20,20 0 1,1 -18,9" stroke="#e0f2fe" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M0,-11 A11,11 0 1,1 -9,5" stroke="#7dd3fc" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <circle cx="0" cy="0" r="5" fill="#1e3a8a" stroke="#fff" stroke-width="1.8"/>
+          </g>`;
+        break;
+      case 'water_spirit':
+      case 'sea_knight':
+      case 'water_master':
+        artBody = `
+          <path d="M40,10 C55,22 61,38 55,56 L25,56 C19,38 25,22 40,10 Z" fill="#0284c7" stroke="#141824" stroke-width="2.4"/>
+          <circle cx="40" cy="39" r="16" fill="#0f172a" stroke="#141824" stroke-width="2.2"/>
+          <rect x="24" y="29" width="32" height="7" rx="3" fill="#38bdf8" stroke="#141824" stroke-width="1.8"/>
+          <polygon points="30,39 38,42 31,45" fill="#7dd3fc"/><polygon points="50,39 42,42 49,45" fill="#7dd3fc"/>
+          <rect x="24" y="54" width="32" height="16" rx="6" fill="#1e3a8a" stroke="#141824" stroke-width="2.2"/>
+          <path d="M32,54 L40,62 L48,54" fill="#38bdf8" stroke="#141824" stroke-width="1.5"/>`;
+        break;
+      case 'snowflake':
+      case 'blizzard':
+      case 'icicles':
+      case 'glacier':
+      case 'avalanche':
+      case 'tundra':
+        artBody = `
+          <polygon points="10,72 28,28 46,72" fill="#38bdf8" stroke="#141824" stroke-width="2.2" stroke-linejoin="round"/>
+          <polygon points="32,72 52,18 72,72" fill="#7dd3fc" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
+          <polygon points="44,38 52,18 60,38 52,33" fill="#ffffff"/>
+          <polygon points="21,44 28,28 35,44 28,40" fill="#e0f2fe"/>
+          <circle cx="20" cy="20" r="3" fill="#fff" stroke="#0284c7" stroke-width="1.2"/>
+          <circle cx="64" cy="22" r="2.5" fill="#fff" stroke="#0284c7" stroke-width="1.2"/>`;
+        break;
+      case 'ice_spirit':
+      case 'frost_knight':
+      case 'ice_master':
+        artBody = `
+          <polygon points="40,8 60,28 54,56 26,56 20,28" fill="#7dd3fc" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
+          <circle cx="40" cy="39" r="15" fill="#0f172a" stroke="#141824" stroke-width="2.2"/>
+          <rect x="25" y="29" width="30" height="7" rx="3" fill="#e0f2fe" stroke="#141824" stroke-width="1.8"/>
+          <polygon points="30,39 38,42 31,45" fill="#ffffff"/><polygon points="50,39 42,42 49,45" fill="#ffffff"/>
+          <rect x="24" y="54" width="32" height="16" rx="6" fill="#0369a1" stroke="#141824" stroke-width="2.2"/>
+          <path d="M32,54 L40,62 L48,54" fill="#e0f2fe" stroke="#141824" stroke-width="1.5"/>`;
+        break;
       case 'yeti':
       case 'titan_ice':
       default:
         artBody = `
-          <polygon points="40,10 62,26 56,64 24,64 18,26" fill="${baseCol}" stroke="#ffffff" stroke-width="2"/>
+          <polygon points="40,10 62,26 56,64 24,64 18,26" fill="${baseCol}" stroke="#141824" stroke-width="2.4" stroke-linejoin="round"/>
           <polygon points="40,15 56,28 51,59 29,59 24,28" fill="${midCol}"/>
-          <polygon points="40,15 56,28 40,42 24,28" fill="#e0f2fe" opacity="0.85"/>
+          <polygon points="40,15 56,28 40,42 24,28" fill="#e0f2fe" opacity="0.88"/>
           <rect x="28" y="36" width="8" height="4.5" rx="1.5" fill="#090d16"/>
           <rect x="44" y="36" width="8" height="4.5" rx="1.5" fill="#090d16"/>
           <circle cx="32" cy="38" r="1.4" fill="#fff"/><circle cx="48" cy="38" r="1.4" fill="#fff"/>
-          ${m === 'titan_ice' ? `<polygon points="40,2 46,14 34,14" fill="#fde047"/><circle cx="18" cy="18" r="3.5" fill="#fff"/><circle cx="62" cy="18" r="3.5" fill="#fff"/>` : ''}`;
+          ${m === 'titan_ice' ? `<polygon points="40,2 46,14 34,14" fill="#fde047" stroke="#141824" stroke-width="1.4"/><circle cx="18" cy="18" r="3.5" fill="#fff"/><circle cx="62" cy="18" r="3.5" fill="#fff"/>` : ''}`;
         break;
     }
 
+    const bgTop = element === 'fire' ? '#7f1d1d' : element === 'water' ? '#0c4a6e' : '#1e3a8a';
+    const bgBot = element === 'fire' ? '#ea580c' : element === 'water' ? '#0284c7' : '#38bdf8';
+    const groundCol = element === 'fire' ? '#450a0a' : element === 'water' ? '#082f49' : '#0f172a';
+    const gid = `cjbg_${element}_${power}_${String(m).replace(/[^a-z0-9]/gi, '')}`;
+    const burstRays = power >= 7 ? `
+      <g opacity="0.22" stroke="#ffffff" stroke-width="2.5">
+        <line x1="40" y1="40" x2="0" y2="0"/><line x1="40" y1="40" x2="40" y2="0"/><line x1="40" y1="40" x2="80" y2="0"/>
+        <line x1="40" y1="40" x2="80" y2="40"/><line x1="40" y1="40" x2="80" y2="80"/><line x1="40" y1="40" x2="0" y2="80"/>
+        <line x1="40" y1="40" x2="0" y2="40"/>
+      </g>` : '';
+
     return `
-      <svg viewBox="0 0 80 80" width="74" height="74" style="overflow:visible;">
-        <circle cx="40" cy="42" r="32" fill="${glowCol}" opacity="0.22"/>
+      <svg viewBox="0 0 80 80" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" style="display:block;border-radius:7px;">
+        <defs>
+          <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${bgTop}"/>
+            <stop offset="100%" stop-color="${bgBot}"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="80" height="80" fill="url(#${gid})"/>
+        ${burstRays}
+        <circle cx="40" cy="40" r="28" fill="${glowCol}" opacity="0.28"/>
+        <ellipse cx="40" cy="76" rx="46" ry="14" fill="${groundCol}" opacity="0.65"/>
         ${artBody}
       </svg>`;
   }
@@ -2251,8 +2437,30 @@
             const aCharBox = this.container?.querySelector('#cjAiCharBox');
             const hasPhaser = !!(this.phaserArena && this.phaserArena.isReady());
 
-            // 3) Ganadora escala ×1.15 con halo; perdedora se rompe en 24 partículas pixel (600ms)
-            // 4) Cuando no hay Phaser activo, fallback DOM embiste/tiembla y muestra gag SVG
+            // Banner inconfundible del ganador de la ronda
+            const elLabels = { fire: '🔥 Fuego', water: '💧 Agua', snow: '❄️ Nieve' };
+            const rivalLabel = (this.pvp?.opponent?.name || this.selectedFloor?.name || 'Rival').toUpperCase();
+            let reasonTxt = '';
+            if (outcome === 'tie') {
+              reasonTxt = `${elLabels[pCard.element] || pCard.element} ${pCard.power} = ${aCard.power}`;
+            } else if (pCard.element !== aCard.element) {
+              const winEl = outcome === 'player' ? pCard.element : aCard.element;
+              const loseEl = outcome === 'player' ? aCard.element : pCard.element;
+              reasonTxt = `${elLabels[winEl] || winEl} vence a ${elLabels[loseEl] || loseEl}`;
+            } else {
+              reasonTxt = outcome === 'player'
+                ? `Mismo elemento · Poder ${pCard.power} > ${aCard.power}`
+                : `Mismo elemento · Poder ${aCard.power} > ${pCard.power}`;
+            }
+            const bannerColor = outcome === 'player' ? '#10b981' : (outcome === 'ai' ? '#ef4444' : '#f59e0b');
+            const bannerTitle = outcome === 'player' ? '🏆 ¡GANAS LA RONDA!' : (outcome === 'ai' ? `💀 GANA ${rivalLabel}` : '🤝 EMPATE DE RONDA');
+            const roundBanner = document.createElement('div');
+            roundBanner.style.cssText = `position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(9,13,22,0.95);border:2px solid ${bannerColor};border-radius:12px;padding:7px 18px;text-align:center;box-shadow:0 8px 26px ${bannerColor}55;pointer-events:none;white-space:nowrap;`;
+            roundBanner.innerHTML = `<div style="font-size:13.5px;font-weight:900;color:${bannerColor};letter-spacing:.6px;">${bannerTitle}</div><div style="font-size:11px;font-weight:700;color:#e2e8f0;margin-top:2px;">${reasonTxt}</div>`;
+            stage.appendChild(roundBanner);
+            this.scope.timeout(() => roundBanner.remove(), 1450);
+
+            // 3) Ganadora escala ×1.15 con halo; perdedora se atenúa y se rompe
             if (outcome === 'player') {
               this.sfx.winRound();
               this.playerPoints.push(pCard);
@@ -2262,10 +2470,13 @@
                 this.refreshArenaSprites();
               }
 
-              if (pSlot) pSlot.classList.add('cj-card-winner-scale');
+              if (pSlot) {
+                pSlot.classList.add('cj-card-winner-scale');
+                pSlot.style.filter = 'drop-shadow(0 0 18px rgba(16,185,129,0.95))';
+              }
               if (aSlot) {
                 const cardNode = aSlot.querySelector('.cj-card-v191');
-                if (cardNode) cardNode.style.opacity = '0';
+                if (cardNode) { cardNode.style.opacity = '0.28'; cardNode.style.filter = 'grayscale(0.85)'; }
                 this.shatterLoserCard(aSlot, aCard.element);
               }
               if (!hasPhaser) {
@@ -2287,10 +2498,13 @@
                 this.refreshArenaSprites();
               }
 
-              if (aSlot) aSlot.classList.add('cj-card-winner-scale');
+              if (aSlot) {
+                aSlot.classList.add('cj-card-winner-scale');
+                aSlot.style.filter = 'drop-shadow(0 0 18px rgba(239,68,68,0.95))';
+              }
               if (pSlot) {
                 const cardNode = pSlot.querySelector('.cj-card-v191');
-                if (cardNode) cardNode.style.opacity = '0';
+                if (cardNode) { cardNode.style.opacity = '0.28'; cardNode.style.filter = 'grayscale(0.85)'; }
                 this.shatterLoserCard(pSlot, pCard.element);
               }
               if (!hasPhaser) {
@@ -2314,9 +2528,9 @@
               const aScore = this.container?.querySelector('#cjAiScoreRow');
               if (pScore) pScore.innerHTML = this.formatPointsRow(this.playerPoints);
               if (aScore) aScore.innerHTML = this.formatPointsRow(this.aiPoints);
-            }, 380);
+            }, 420);
 
-            // Reemplazar cartas jugadas y evaluar condición de victoria tras los 600ms de partículas
+            // Ritmo más pausado y claro antes de iniciar la siguiente ronda (1450ms)
             this.scope.timeout(() => {
               if (this.destroyed) return;
               this.playerPose = 'idle';
@@ -2335,7 +2549,7 @@
                 this.setSpeech('Elige tu siguiente carta elemental…');
                 this.startTurnTimer();
               }
-            }, 850);
+            }, 1450);
           }, 80); // fin hit-stop 80ms
         };
 
@@ -2350,7 +2564,8 @@
         }
       };
 
-      this.scope.timeout(runResolutionAfterRise, 250);
+      // +1.2 segundos extra para comparar ambas cartas cara a cara sin sensación frenética
+      this.scope.timeout(runResolutionAfterRise, 1450);
     }
 
     checkWinCondition(points) {
@@ -2416,6 +2631,15 @@
         }
       } else if (!playerWon) {
         this.sfx.loseMatch();
+      }
+      if (this.pvp && this.pvp.opponent?.id && typeof this.opts?.onPvpResult === 'function') {
+        try {
+          this.opts.onPvpResult({
+            won: !!playerWon,
+            opponentId: Number(this.pvp.opponent.id),
+            opponentName: this.pvp.opponent.name || ''
+          });
+        } catch {}
       }
 
       const table = this.container?.querySelector('#cjArenaTable');
@@ -2534,27 +2758,28 @@
           <!-- Columna Izquierda: Vista Previa Animada + Poses -->
           <div style="background:#141926;border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;">
             <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
-              <span class="ek-pixel-font" style="font-size:10px;color:#38bdf8;">VISTA PREVIA 24×30</span>
+              <span style="font-size:11px;font-weight:900;color:#fbbf24;letter-spacing:0.6px;">🏯 DOJO NINJA · EN VIVO</span>
               <span id="njDirtyBadge" style="display:${isDirty ? 'inline-flex' : 'none'};align-items:center;gap:4px;font-size:10px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,0.14);border:1px solid rgba(251,191,36,0.4);padding:2px 7px;border-radius:999px;">
-                ● Cambios sin guardar
+                ● Sin guardar
               </span>
             </div>
 
-            <div style="position:relative;width:180px;height:200px;background:radial-gradient(circle at 50% 60%, #1e293b 0%, #0b0e14 80%);border:2px solid #334155;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
-              <canvas id="njPreviewAuraCanvas" width="180" height="200" style="position:absolute;inset:0;pointer-events:none;"></canvas>
-              <div id="njPreviewSpriteHolder">
-                ${renderPixelNinjaSvg(draft, { size: 136, pose: currentPose, frame: animFrame })}
+            <div style="position:relative;width:210px;height:216px;background:radial-gradient(circle at 50% 32%, rgba(251,191,36,0.22) 0%, rgba(124,58,237,0.14) 48%, #0b0e17 85%);border:2px solid rgba(251,191,36,0.38);border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:inset 0 -36px 40px rgba(146,64,14,0.28), 0 8px 24px rgba(0,0,0,0.5);">
+              <div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:linear-gradient(180deg,rgba(180,83,9,0.22),rgba(120,53,15,0.45));border-top:1px solid rgba(251,191,36,0.25);pointer-events:none;"></div>
+              <canvas id="njPreviewAuraCanvas" width="210" height="216" style="position:absolute;inset:0;pointer-events:none;"></canvas>
+              <div id="njPreviewSpriteHolder" style="position:relative;z-index:2;filter:drop-shadow(0 10px 14px rgba(0,0,0,0.6));">
+                ${renderPixelNinjaSvg(draft, { size: 152, pose: currentPose, frame: animFrame })}
               </div>
             </div>
 
-            <!-- Botones de Pose: Idle / Ataque / Victoria -->
+            <!-- Botones de Pose: Reposo / Ataque / Victoria -->
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;">
               ${[
-                { id: 'idle', label: 'Idle' },
-                { id: 'attack', label: 'Ataque' },
-                { id: 'victory', label: 'Victoria' }
+                { id: 'idle', label: '🧘 Reposo' },
+                { id: 'attack', label: '⚔️ Ataque' },
+                { id: 'victory', label: '🏆 Victoria' }
               ].map((p) => `
-                <button class="njPoseBtn" data-pose="${p.id}" style="background:${currentPose === p.id ? '#2563eb' : '#0b0e14'};border:1px solid ${currentPose === p.id ? '#60a5fa' : '#334155'};color:#fff;font-size:11px;font-weight:800;padding:6px 4px;border-radius:6px;cursor:pointer;">
+                <button class="njPoseBtn" data-pose="${p.id}" style="background:${currentPose === p.id ? 'linear-gradient(135deg,#2563eb,#7c3aed)' : '#0b0e14'};border:1px solid ${currentPose === p.id ? '#60a5fa' : '#334155'};color:#fff;font-size:11px;font-weight:800;padding:7px 4px;border-radius:8px;cursor:pointer;">
                   ${p.label}
                 </button>
               `).join('')}

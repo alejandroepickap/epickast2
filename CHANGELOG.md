@@ -4,6 +4,23 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ---
 
+## [2.0.0] - 2026-11-20
+
+### ✨ Ajustes Simplificados, Estudio de Creador Tipo Servidor, Filtro de Normas de la Comunidad, Guías Oficiales v2 y Barra de Llamada Limpia
+- **Ajustes Simplificados y Solucionador Rápido (`app/renderer.js`, `app/style.css`):**
+  - Nueva tarjeta **🆘 Solucionador Rápido de Llamadas** con acciones en 1 clic para *"No me escuchan"* y *"Unos sí me escuchan y otros no"* (Ruta Segura TURN + reconexión).
+  - **Filtros de Voz en 3 botones** (*Automático*, *Audífonos HD*, *Altavoces Anti-Eco*) y dispositivos agrupados en una sola tarjeta, dejando las opciones técnicas bajo *Modo Experto (Pro)*.
+- **Estudio de Creador Completo como Página / Servidor (`app/creator-studio.js`, `app/renderer.js`, `app/index.html`, `server/server.js`):**
+  - Icono dedicado **🎨** en el riel lateral izquierdo con canales para crear, eliminar y restaurar **Banners**, **Colores de Usuario**, **Bordes de Perfil** (con generación dinámica de CSS), **Cartas del Dojo** y **Moderación / Rangos**, sincronizado con el servidor (`creator.catalog.get` / `creator.catalog.save`).
+- **Filtro de Moderación de Imágenes — Normas de la Comunidad (`app/image-moderation.js`, `app/renderer.js`, `server/server.js`):**
+  - Análisis visual local (YCbCr + HSV + continuidad/bordes) + validación de formato y *magic bytes* en servidor para bloquear imágenes NSFW o dañadas en avatares y banners antes de publicarse.
+- **Botones de Llamada Reubicados (`app/style.css`, `app/mobile.css`):**
+  - `#meetBar` reubicado en una franja dedicada justo debajo de las cámaras (`#stage`), evitando que flote semitransparente sobre el borde del video.
+- **Guías Oficiales Actualizadas (`app/renderer.js`):**
+  - Nuevo canal oficial **`# 🆘-ayuda-audio-y-llamadas`** y notas de versión `v2.0.0` cubriendo audio, filtros, arrastrar usuarios, llamadas de 4+ personas, perfil/banner y Estudio de Creador.
+
+---
+
 ## [1.9.8] - 2026-11-19
 
 ### 🧩 Menús Unificados con Desplegables, Corrección del Brillo Verde en Videollamadas, Banners Globales, Overlay Click-Through y Baja Latencia WebRTC

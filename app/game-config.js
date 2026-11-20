@@ -13,7 +13,7 @@
 })(typeof window !== 'undefined' ? window : globalThis, function () {
   'use strict';
 
-  const APP_VERSION = '1.9.8';
+  const APP_VERSION = '2.0.0';
 
   const RARITY_TOKENS = {
     common: {
@@ -159,58 +159,261 @@
     }
   };
 
-  // CATÁLOGO UNIFICADO DE COSMÉTICOS (Lore unificado a "Coloso")
+  // CATÁLOGO UNIFICADO DE COSMÉTICOS DE LA BÓVEDA (20 Reliquias: 3 Marcos · 8 Banners · 9 Estilos de Nombre)
   const COSMETICS = [
-    // --- LEGENDARIOS (6) ---
-    { id: 'founder_frame', name: '★ Marco de Avatar FUNDADOR ★', type: 'frame', val: 'founder_blue', rarity: 'legendary', desc: 'Marco Azul Neón con insignia «FUNDADOR» para llamadas, chat y perfil (Prestigio Edición 1).' },
-    { id: 'frame_colossus_legend', name: 'Marco: Núcleo del Coloso', type: 'frame', val: 'frame-colossus-legend', rarity: 'legendary', desc: 'Doble halo dorado y cian con rotación continua forjado en el corazón del Coloso.' },
-    { id: 'banner_golem_animated', name: 'Banner: Colossus Raid (Póster Oficial)', type: 'banner', val: "url('assets/banners/promo_colossus_raid_event.webp') center/cover no-repeat", animated: true, rarity: 'legendary', desc: 'Póster promocional legendario del evento Raid: Titán de Obsidiana.' },
-    { id: 'title_colossus_slayer', name: 'Título: Coloso Caído', type: 'title', val: 'Coloso Caído', badgeIcon: '👑', rarity: 'legendary', desc: 'Título resplandeciente reservado para quienes derriban al Coloso.' },
-    { id: 'plate_colossus', name: 'Placa: Fragua del Coloso', type: 'plate', val: 'plate_colossus', cssClass: 'plate-colossus', animated: true, previewBg: 'linear-gradient(90deg, rgba(251,191,36,0.42), rgba(239,68,68,0.32), rgba(120,53,15,0.25))', rarity: 'legendary', desc: 'Placa de nombre legendaria del Set del Coloso con brasas incandescentes.' },
-    { id: 'fx_void', name: 'Efecto: Vórtice Abisal', type: 'fx', val: 'fx_void', fxKind: 'void', particleColor: '#fbbf24', rarity: 'legendary', desc: 'Partículas gravitatorias doradas y violetas del vacío sobre tu tarjeta de perfil.' },
+    // --- LEGENDARIOS (3) ---
+    {
+      id: 'frame_solar_eclipse',
+      name: 'Marco: Eclipse Solar',
+      type: 'frame',
+      val: 'frame-solar-eclipse',
+      rarity: 'legendary',
+      desc: 'Doble corona de oro líquido y fuego estelar con brillo pulsante alrededor de tu avatar.'
+    },
+    {
+      id: 'banner_nebula_eclipse',
+      name: 'Banner: Eclipse Nebular',
+      type: 'banner',
+      val: 'linear-gradient(125deg, #09061a 0%, #311068 38%, #a855f7 68%, #fbbf24 100%)',
+      animated: true,
+      rarity: 'legendary',
+      desc: 'Horizonte cósmico animado en índigo profundo, violeta estelar y oro solar.'
+    },
+    {
+      id: 'style_imperial_gold',
+      name: 'Letra: Oro Imperial',
+      type: 'color',
+      val: 'linear-gradient(90deg, #fef08a, #f59e0b, #fde047)',
+      fontCss: "font-family:'Georgia','Palatino Linotype',serif;letter-spacing:0.9px;font-weight:900;text-transform:uppercase;filter:drop-shadow(0 0 6px rgba(251,191,36,0.55));",
+      rarity: 'legendary',
+      desc: 'Tipografía serif imperial en mayúsculas con brillo de oro líquido.'
+    },
 
-    // --- ÉPICOS (7) ---
-    { id: 'frame_runic', name: 'Marco: Partículas Rúnicas', type: 'frame', val: 'frame-runic', rarity: 'epic', desc: 'Marco pulsante con chispas mágicas alrededor de tu avatar.' },
-    { id: 'color_aurora', name: 'Color: Aurora Boreal', type: 'color', val: 'linear-gradient(90deg, #38bdf8, #a855f7)', rarity: 'epic', desc: 'Gradiente animado estilo aurora boreal para tu nombre.' },
-    { id: 'color_volcanic_flame', name: 'Color: Fuego Volcánico', type: 'color', val: 'linear-gradient(90deg, #fb7185, #fbbf24)', rarity: 'epic', desc: 'Gradiente ardiente en movimiento continuo.' },
-    { id: 'banner_fluid_lava', name: 'Banner: Crimson Moon · Kurogane (Anime)', type: 'banner', val: "url('assets/banners/promo_crimson_shinobi.webp') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Póster clave de anime: Kurogane bajo la luna carmesí en Neo-Tokyo.' },
-    { id: 'banner_rune_storm', name: 'Banner: Cyber Matsuri · Akira (Anime)', type: 'banner', val: "url('assets/banners/promo_cyber_idol_matsuri.webp') center/cover no-repeat", animated: true, rarity: 'epic', desc: 'Póster promocional de convención anime en Akihabara con Akira Hoshino.' },
-    { id: 'plate_runic_storm', name: 'Placa: Tormenta Rúnica', type: 'plate', val: 'plate_runic_storm', cssClass: 'plate-runic-storm', animated: true, previewBg: 'linear-gradient(90deg, rgba(168,85,247,0.42), rgba(59,130,246,0.28), rgba(236,72,153,0.22))', rarity: 'epic', desc: 'Placa arcana con brillo animado recorriendo tu fila de miembro.' },
-    { id: 'fx_embers', name: 'Efecto: Brasas del Núcleo', type: 'fx', val: 'fx_embers', fxKind: 'embers', particleColor: '#fb923c', rarity: 'epic', desc: 'Chispas ascendentes de fuego elemental sobre tu tarjeta de perfil.' },
+    // --- ÉPICOS (5) ---
+    {
+      id: 'frame_cyber_prism',
+      name: 'Marco: Prisma Neón',
+      type: 'frame',
+      val: 'frame-cyber-prism',
+      rarity: 'epic',
+      desc: 'Aro cibernético bicolor que oscila suavemente entre cian eléctrico y magenta neón.'
+    },
+    {
+      id: 'banner_titan_magma',
+      name: 'Banner: Forja de Magma',
+      type: 'banner',
+      val: 'linear-gradient(130deg, #160505 0%, #7f1d1d 35%, #ea580c 72%, #fbbf24 100%)',
+      animated: true,
+      rarity: 'epic',
+      desc: 'Degradado volcánico animado en obsidiana, brasa carmesí y magma dorado.'
+    },
+    {
+      id: 'banner_cyber_drift',
+      name: 'Banner: Pulso Cyberpunk',
+      type: 'banner',
+      val: 'linear-gradient(130deg, #09061a 0%, #4c1d95 36%, #db2777 70%, #06b6d4 100%)',
+      animated: true,
+      rarity: 'epic',
+      desc: 'Horizonte nocturno animado en violeta neón, magenta eléctrico y cian.'
+    },
+    {
+      id: 'style_cyber_chrome',
+      name: 'Letra: Ciber Cromo',
+      type: 'color',
+      val: 'linear-gradient(90deg, #38bdf8, #e0f2fe, #818cf8)',
+      fontCss: "font-family:'Consolas','Cascadia Mono','Courier New',monospace;letter-spacing:1.4px;font-weight:900;text-transform:uppercase;filter:drop-shadow(0 0 6px rgba(56,189,248,0.6));",
+      rarity: 'epic',
+      desc: 'Letras tecnológicas monoespaciadas con destello cian cromado.'
+    },
+    {
+      id: 'style_plasma_neon',
+      name: 'Letra: Plasma Neón',
+      type: 'color',
+      val: 'linear-gradient(90deg, #f472b6, #c084fc, #38bdf8)',
+      fontCss: "font-family:'Trebuchet MS','Segoe UI',sans-serif;font-style:italic;letter-spacing:0.7px;font-weight:900;filter:drop-shadow(0 0 7px rgba(217,70,239,0.65));",
+      rarity: 'epic',
+      desc: 'Estilo cursivo de alto impacto con resplandor neón fucsia-cian.'
+    },
 
-    // --- RAROS (9) ---
-    { id: 'frame_copper', name: 'Marco: Cobre Forjado', type: 'frame', val: 'frame-copper', rarity: 'rare', desc: 'Bisel de cobre bruñido para tu avatar.' },
-    { id: 'frame_silver', name: 'Marco: Plata Rúnica', type: 'frame', val: 'frame-silver', rarity: 'rare', desc: 'Bisel plateado brillante con runas grabadas.' },
-    { id: 'frame_amethyst', name: 'Marco: Geoda Amatista', type: 'frame', val: 'frame-amethyst', rarity: 'rare', desc: 'Cristales de amatista facetados que rodean tu avatar.' },
-    { id: 'title_explorer', name: 'Título: Explorador del Núcleo', type: 'title', val: 'Explorador del Núcleo', badgeIcon: '🧭', rarity: 'rare', desc: 'Distintivo para quienes descienden a las profundidades.' },
-    { id: 'title_smith', name: 'Título: Herrero de Magma', type: 'title', val: 'Herrero de Magma', badgeIcon: '⚒️', rarity: 'rare', desc: 'Insignia rúnica de maestro forjador de reliquias.' },
-    { id: 'title_shadow', name: 'Título: Cazador de Sombras', type: 'title', val: 'Cazador de Sombras', badgeIcon: '🗡️', rarity: 'rare', desc: 'Otorgado a quienes purgan las galerías oscuras.' },
-    { id: 'title_pioneer', name: 'Título: Pionero', type: 'title', val: 'Pionero', badgeIcon: '🛡️', rarity: 'rare', desc: 'Título honorable para los primeros aventureros.' },
-    { id: 'plate_glacier', name: 'Placa: Ventisca Glaciar', type: 'plate', val: 'plate_glacier', cssClass: 'plate-glacier', previewBg: 'linear-gradient(90deg, rgba(59,130,246,0.34), rgba(125,211,252,0.12))', rarity: 'rare', desc: 'Placa cristalina con destellos helados detrás de tu nombre.' },
-    { id: 'fx_snow', name: 'Efecto: Cristales de Escarcha', type: 'fx', val: 'fx_snow', fxKind: 'snow', particleColor: '#7dd3fc', rarity: 'rare', desc: 'Capa de copos y cristales helados flotando sobre tu tarjeta de perfil.' },
+    // --- RAROS (6) ---
+    {
+      id: 'frame_frost_crystal',
+      name: 'Marco: Cristal Glaciar',
+      type: 'frame',
+      val: 'frame-frost-crystal',
+      rarity: 'rare',
+      desc: 'Bisel helado azul diamante con destello cristalino limpio y elegante.'
+    },
+    {
+      id: 'banner_crimson_moon',
+      name: 'Banner: Eclipse Carmesí',
+      type: 'banner',
+      val: 'linear-gradient(135deg, #12040b 0%, #881337 45%, #e11d48 80%, #fda4af 100%)',
+      rarity: 'rare',
+      desc: 'Tonalidad nocturna carmesí con destello lunar escarlata.'
+    },
+    {
+      id: 'banner_glacial_aurora',
+      name: 'Banner: Aurora Glaciar',
+      type: 'banner',
+      val: 'linear-gradient(135deg, #021024 0%, #0369a1 40%, #2dd4bf 75%, #a78bfa 100%)',
+      rarity: 'rare',
+      desc: 'Destello polar en azul abisal, turquesa boreal y violeta ártico.'
+    },
+    {
+      id: 'banner_neon_rain',
+      name: 'Banner: Lluvia Neón',
+      type: 'banner',
+      val: 'linear-gradient(135deg, #090d1e 0%, #312e81 42%, #7c3aed 74%, #38bdf8 100%)',
+      rarity: 'rare',
+      desc: 'Reflejos nocturnos en índigo profundo, púrpura y cian brillante.'
+    },
+    {
+      id: 'style_crimson_katana',
+      name: 'Letra: Katana Carmesí',
+      type: 'color',
+      val: 'linear-gradient(90deg, #fb7185, #ef4444, #fca5a5)',
+      fontCss: "font-family:'Impact','Arial Black',sans-serif;letter-spacing:1.1px;font-weight:700;filter:drop-shadow(0 0 5px rgba(244,63,94,0.55));",
+      rarity: 'rare',
+      desc: 'Trazo grueso y afilado estilo arcade en rojo carmesí intenso.'
+    },
+    {
+      id: 'style_glacial_rune',
+      name: 'Letra: Runa Glaciar',
+      type: 'color',
+      val: 'linear-gradient(90deg, #e0f2fe, #7dd3fc, #38bdf8)',
+      fontCss: "font-family:'Palatino Linotype','Book Antiqua',Georgia,serif;font-variant:small-caps;letter-spacing:1.2px;font-weight:800;filter:drop-shadow(0 0 5px rgba(125,211,252,0.6));",
+      rarity: 'rare',
+      desc: 'Versalitas elegantes con reflejo cristalino de escarcha polar.'
+    },
 
-    // --- COMUNES (11) ---
-    { id: 'color_amber', name: 'Color: Ámbar Volcánico', type: 'color', val: '#f59e0b', rarity: 'common', desc: 'Tinte ígneo de magma ardiente para tu nombre y perfil.' },
-    { id: 'color_amethyst', name: 'Color: Púrpura Amatista', type: 'color', val: '#c084fc', rarity: 'common', desc: 'Resplandor amatista para tu nombre en la lista de miembros.' },
-    { id: 'color_emerald', name: 'Color: Verde Esmeralda', type: 'color', val: '#34d399', rarity: 'common', desc: 'Tinte resplandeciente esmeralda del Núcleo.' },
-    { id: 'color_cyan', name: 'Color: Cian Neón', type: 'color', val: '#38bdf8', rarity: 'common', desc: 'Destello ciberpunk cian brillante para tu nombre.' },
-    { id: 'color_crimson', name: 'Color: Rojo Magma', type: 'color', val: '#fb7185', rarity: 'common', desc: 'Tono carmesí ardiente de roca fundida.' },
-    { id: 'banner_mines', name: 'Banner: Elemental Clash · Torneo Dojo (Anime)', type: 'banner', val: "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat", rarity: 'common', desc: 'Póster triple del Gran Torneo del Dojo: Ignis, Maestro Ryūjin y Torrente.' },
-    { id: 'banner_amethyst', name: 'Banner: Boreal Aurora · Winter Fest', type: 'banner', val: "url('assets/banners/promo_aurora_sanctuary_fest.webp') center/cover no-repeat", rarity: 'rare', desc: 'Póster de convención invernal en el Santuario Cristalino bajo la aurora.' },
-    { id: 'banner_crypt', name: 'Banner: Dual-Soul · Kaelen (Anime)', type: 'banner', val: "url('assets/banners/promo_shadow_flame_chronicles.webp') center/cover no-repeat", rarity: 'common', desc: 'Arte promocional de Kaelen dominando la llama solar y el vórtice arcano.' },
-    { id: 'banner_bridges', name: 'Banner: Shibuya Drift GP · Renji (Anime)', type: 'banner', val: "url('assets/banners/promo_neotokyo_drift_gp.webp') center/cover no-repeat", rarity: 'epic', desc: 'Póster oficial del torneo nocturno Turbo Core GP con Renji Takahashi.' },
-    { id: 'banner_sanctum', name: 'Banner: Rival Showdown · Ignis vs. Zero-Frost', type: 'banner', val: "url('assets/banners/promo_frost_vs_ignis_rivals.webp') center/cover no-repeat", rarity: 'common', desc: 'Póster promocional Versus de choque elemental: Fuego Inmortal contra Hielo Cero.' },
-    { id: 'plate_copper_forge', name: 'Placa: Forja de Cobre', type: 'plate', val: 'plate_copper_forge', cssClass: 'plate-copper-forge', previewBg: 'linear-gradient(90deg, rgba(194,65,12,0.32), rgba(124,45,18,0.08))', rarity: 'common', desc: 'Franja metálica de cobre templado detrás de tu nombre en miembros y mensajes directos.' }
+    // --- COMUNES (6) ---
+    {
+      id: 'banner_sakura_dusk',
+      name: 'Banner: Crepúsculo Sakura',
+      type: 'banner',
+      val: 'linear-gradient(135deg, #1e1035 0%, #9d174d 50%, #f472b6 100%)',
+      rarity: 'common',
+      desc: 'Degradado sereno de atardecer japonés en índigo y rosa cerezo.'
+    },
+    {
+      id: 'banner_emerald_horizon',
+      name: 'Banner: Horizonte Esmeralda',
+      type: 'banner',
+      val: 'linear-gradient(135deg, #041c1a 0%, #0f766e 52%, #34d399 100%)',
+      rarity: 'common',
+      desc: 'Atmósfera nocturna esmeralda con brillos turquesa cristalinos.'
+    },
+    {
+      id: 'style_emerald_matrix',
+      name: 'Letra: Código Esmeralda',
+      type: 'color',
+      val: 'linear-gradient(90deg, #6ee7b7, #10b981, #34d399)',
+      fontCss: "font-family:'Lucida Console','Consolas',monospace;letter-spacing:0.8px;font-weight:800;filter:drop-shadow(0 0 4px rgba(16,185,129,0.5));",
+      rarity: 'common',
+      desc: 'Estilo terminal hacker en verde esmeralda luminoso.'
+    },
+    {
+      id: 'style_sakura_script',
+      name: 'Letra: Caligrafía Sakura',
+      type: 'color',
+      val: 'linear-gradient(90deg, #fbcfe8, #f472b6, #fda4af)',
+      fontCss: "font-family:'Segoe Script','Brush Script MT',Georgia,cursive;font-style:italic;letter-spacing:0.5px;font-weight:800;filter:drop-shadow(0 0 4px rgba(244,114,182,0.5));",
+      rarity: 'common',
+      desc: 'Trazo caligráfico suave en tonos rosa cerezo.'
+    },
+    {
+      id: 'style_sunset_drift',
+      name: 'Letra: Turbo Atardecer',
+      type: 'color',
+      val: 'linear-gradient(90deg, #fde047, #fb923c, #f43f5e)',
+      fontCss: "font-family:'Arial Black','Segoe UI',sans-serif;font-style:italic;letter-spacing:0.6px;font-weight:900;filter:drop-shadow(0 0 4px rgba(251,146,60,0.5));",
+      rarity: 'common',
+      desc: 'Tipografía deportiva inclinada con degradado atardecer cálido.'
+    },
+    {
+      id: 'style_obsidian_silver',
+      name: 'Letra: Acero Estelar',
+      type: 'color',
+      val: 'linear-gradient(90deg, #f8fafc, #94a3b8, #e2e8f0)',
+      fontCss: "font-family:'Verdana','Geneva',sans-serif;font-variant:small-caps;letter-spacing:1.5px;font-weight:800;filter:drop-shadow(0 0 4px rgba(226,232,240,0.45));",
+      rarity: 'common',
+      desc: 'Letras metálicas espaciadas con acabado plata pulida.'
+    },
+    {
+      id: 'title_emperor_core',
+      name: 'Título: Emperador del Núcleo',
+      type: 'title',
+      val: 'Emperador del Núcleo',
+      rarity: 'legendary',
+      desc: 'Título supremo reservado para los coleccionistas legendarios de EpicKast.'
+    },
+    {
+      id: 'title_stellar_architect',
+      name: 'Título: Arquitecto Estelar',
+      type: 'title',
+      val: 'Arquitecto Estelar',
+      rarity: 'legendary',
+      desc: 'Sello mítico de quienes dominan las constelaciones del Núcleo.'
+    },
+    {
+      id: 'title_elemental_master',
+      name: 'Título: Maestro Elemental',
+      type: 'title',
+      val: 'Maestro Elemental',
+      rarity: 'epic',
+      desc: 'Honra a los duelistas que equilibran Fuego, Agua y Nieve.'
+    },
+    {
+      id: 'title_drift_king',
+      name: 'Título: Rey del Drift',
+      type: 'title',
+      val: 'Rey del Drift',
+      rarity: 'epic',
+      desc: 'Insignia de los corredores más rápidos de Turbo Core.'
+    },
+    {
+      id: 'title_immortal_shadow',
+      name: 'Título: Sombra Inmortal',
+      type: 'title',
+      val: 'Sombra Inmortal',
+      rarity: 'rare',
+      desc: 'Para ninjas silenciosos que siempre sorprenden en el último turno.'
+    },
+    {
+      id: 'title_cyber_guardian',
+      name: 'Título: Guardián Ciber-Neón',
+      type: 'title',
+      val: 'Guardián Ciber-Neón',
+      rarity: 'rare',
+      desc: 'Protector incansable de los canales nocturnos.'
+    },
+    {
+      id: 'title_night_owl',
+      name: 'Título: Búho de Madrugada',
+      type: 'title',
+      val: 'Búho de Madrugada',
+      rarity: 'common',
+      desc: 'Para quienes nunca cierran la llamada antes de las 3 AM.'
+    },
+    {
+      id: 'title_squad_captain',
+      name: 'Título: Capitán del Escuadrón',
+      type: 'title',
+      val: 'Capitán del Escuadrón',
+      rarity: 'common',
+      desc: 'Siempre organiza las partidas y mantiene unido al equipo.'
+    }
   ];
 
   const SETS = [
     {
-      id: 'colossus_set',
-      name: 'Set del Coloso',
-      items: ['frame_colossus_legend', 'banner_golem_animated', 'title_colossus_slayer', 'plate_colossus'],
-      rewardBadge: 'Conquistador del Coloso',
-      rewardIcon: '👑',
-      desc: 'Completa las 4 reliquias del Coloso (Marco Núcleo del Coloso + Banner Despertar del Coloso + Título Coloso Caído + Placa Fragua del Coloso) para desbloquear la insignia «Conquistador del Coloso» y el destello dorado permanente en tu marco.'
+      id: 'eclipse_set',
+      name: 'Set Eclipse Supremo',
+      items: ['frame_solar_eclipse', 'banner_nebula_eclipse', 'style_imperial_gold'],
+      rewardBadge: 'Señor del Eclipse',
+      rewardIcon: '🌟',
+      desc: 'Reúne las 3 reliquias legendarias de la Bóveda: Marco Eclipse Solar + Banner Eclipse Nebular + Letra Oro Imperial.'
     }
   ];
 

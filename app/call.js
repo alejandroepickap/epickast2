@@ -656,10 +656,18 @@ class Call {
       if (this.gameMode) {
         e.maxBitrate = Math.min(kindBudget, 320000, Math.round(preset.kbps * 1000 * 0.35 * this.bwScale));
         e.maxFramerate = 15;
+        if (kind === 'cam') e.scaleResolutionDownBy = peers >= 4 ? 2 : 1.5;
       } else {
         const scaled = Math.max(80000, Math.round(preset.kbps * 1000 * this.share() * this.bwScale));
         e.maxBitrate = Math.min(kindBudget, scaled);
-        e.maxFramerate = this.bwScale < 0.45 ? Math.min(preset.fps, 24) : preset.fps;
+        if (kind === 'cam') {
+          // Malla P2P de 5-8 personas (4-7 pares salientes): escalar resolución y FPS para evitar saturar CPU/GPU
+          e.scaleResolutionDownBy = peers >= 6 ? 2.0 : (peers >= 4 ? 1.5 : 1.0);
+          e.maxFramerate = peers >= 5 ? Math.min(preset.fps, 20) : (peers >= 4 || this.bwScale < 0.45 ? Math.min(preset.fps, 24) : preset.fps);
+        } else {
+          e.scaleResolutionDownBy = 1.0;
+          e.maxFramerate = peers >= 5 ? Math.min(preset.fps, 24) : (this.bwScale < 0.45 ? Math.min(preset.fps, 24) : preset.fps);
+        }
       }
       // El video nunca debe competir con el audio: prioridad más baja que la voz
       e.networkPriority = kind === 'screen' ? 'very-low' : 'low';

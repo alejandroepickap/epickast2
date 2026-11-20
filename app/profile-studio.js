@@ -4,64 +4,6 @@
   const MAX_BANNER_BYTES = 140 * 1024;
 
   const BANNER_PRESETS = [
-    // --- Categoría 'anime': 🔥 Pósters Anime & Eventos (8) ---
-    {
-      id: 'promo-crimson-shinobi',
-      name: 'Crimson Moon · Kurogane',
-      category: 'anime',
-      badge: 'ANIME EXPO',
-      value: "url('assets/banners/promo_crimson_shinobi.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-neotokyo-drift-gp',
-      name: 'Shibuya Drift GP · Renji',
-      category: 'anime',
-      badge: 'DRIFT GP',
-      value: "url('assets/banners/promo_neotokyo_drift_gp.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-cyber-idol-matsuri',
-      name: 'Cyber Matsuri · Akira',
-      category: 'anime',
-      badge: 'LIVE STAGE',
-      value: "url('assets/banners/promo_cyber_idol_matsuri.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-elemental-clash-tournament',
-      name: 'Elemental Clash · Torneo Dojo',
-      category: 'anime',
-      badge: 'TORNEO DOJO',
-      value: "url('assets/banners/promo_elemental_clash_tournament.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-shadow-flame-chronicles',
-      name: 'Dual-Soul · Kaelen',
-      category: 'anime',
-      badge: 'KEY VISUAL',
-      value: "url('assets/banners/promo_shadow_flame_chronicles.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-frost-vs-ignis-rivals',
-      name: 'Rival Showdown · Ignis vs. Zero-Frost',
-      category: 'anime',
-      badge: 'VERSUS',
-      value: "url('assets/banners/promo_frost_vs_ignis_rivals.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-colossus-raid-event',
-      name: 'Colossus Raid · Titán de Obsidiana',
-      category: 'anime',
-      badge: 'RAID BOSS',
-      value: "url('assets/banners/promo_colossus_raid_event.webp') center/cover no-repeat"
-    },
-    {
-      id: 'promo-aurora-sanctuary-fest',
-      name: 'Boreal Aurora · Winter Fest',
-      category: 'anime',
-      badge: 'FESTIVAL',
-      value: "url('assets/banners/promo_aurora_sanctuary_fest.webp') center/cover no-repeat"
-    },
-
     // --- Categoría 'gradient': 🌈 Degradados de Estudio Pro (12) ---
     {
       id: 'grad-aurora-hyperion',
@@ -439,221 +381,35 @@
       });
     }
 
-    // Mode tabs
-    const tabs = el('div', 'ek-color-tabs');
-    if (needsFallbackTheme) {
-      applyStyle(tabs, {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '6px'
-      });
-    }
-    const solidTabBtn = el('button', 'ek-color-tab', 'Color sólido');
-    solidTabBtn.type = 'button';
-    const gradTabBtn = el('button', 'ek-color-tab', 'Degradado libre');
-    gradTabBtn.type = 'button';
-
-    tabs.appendChild(solidTabBtn);
-    tabs.appendChild(gradTabBtn);
-    root.appendChild(tabs);
-
-    // Solid panel
+    // Solo color sólido libre (los degradados y brillos especiales son exclusivos de la Bóveda)
+    state.mode = 'solid';
     const solidPanel = el('div', 'ek-color-panel ek-color-panel-solid');
     const solidPicker = createColorPickerField(
       state.solidHex,
-      'Color sólido',
+      'Color sólido personalizado',
       (hex) => {
         if (destroyed) return;
         state.solidHex = hex;
-        if (state.mode === 'solid' && onChange) {
+        if (onChange) {
           onChange(state.solidHex);
         }
       },
       needsFallbackTheme
     );
+    const vaultHint = el('div', 'ek-color-vault-hint', '✨ Los colores con degradado y brillo son exclusivos de la Bóveda.');
+    applyStyle(vaultHint, {
+      fontSize: '11px',
+      color: '#94a3b8',
+      marginTop: '6px'
+    });
     solidPanel.appendChild(solidPicker.row);
-
-    // Gradient panel
-    const gradPanel = el('div', 'ek-color-panel ek-color-panel-grad');
-    if (needsFallbackTheme) {
-      applyStyle(gradPanel, {
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px'
-      });
-    }
-
-    const gradPreview = el('div', 'ek-grad-preview');
-    if (needsFallbackTheme) {
-      applyStyle(gradPreview, {
-        height: '32px',
-        borderRadius: '8px',
-        border: '1px solid rgba(255, 255, 255, 0.14)'
-      });
-    }
-
-    const emitGradient = () => {
-      const val = buildGradientString(state.gradDeg, state.gradColor1, state.gradColor2);
-      gradPreview.style.background = val;
-      if (!destroyed && state.mode === 'gradient' && onChange) {
-        onChange(val);
-      }
-    };
-
-    const gradPickersRow = el('div', 'ek-grad-pickers');
-    if (needsFallbackTheme) {
-      applyStyle(gradPickersRow, {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-        gap: '8px'
-      });
-    }
-
-    const picker1 = createColorPickerField(
-      state.gradColor1,
-      'Color 1',
-      (hex) => {
-        state.gradColor1 = hex;
-        emitGradient();
-      },
-      needsFallbackTheme
-    );
-    const picker2 = createColorPickerField(
-      state.gradColor2,
-      'Color 2',
-      (hex) => {
-        state.gradColor2 = hex;
-        emitGradient();
-      },
-      needsFallbackTheme
-    );
-    gradPickersRow.appendChild(picker1.row);
-    gradPickersRow.appendChild(picker2.row);
-
-    const angleRow = el('div', 'ek-grad-angle');
-    if (needsFallbackTheme) {
-      applyStyle(angleRow, {
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        fontSize: '12px',
-        color: '#cbd5e1'
-      });
-    }
-    const angleLabel = el('span', null, 'Ángulo');
-    const angleSlider = el('input', 'ek-grad-slider');
-    angleSlider.type = 'range';
-    angleSlider.min = '0';
-    angleSlider.max = '360';
-    angleSlider.step = '1';
-    angleSlider.value = String(state.gradDeg);
-    angleSlider.setAttribute('aria-label', 'Ángulo del degradado');
-    if (needsFallbackTheme) {
-      applyStyle(angleSlider, {
-        flex: '1',
-        accentColor: '#7c3aed',
-        cursor: 'pointer'
-      });
-    }
-    const angleVal = el('span', 'ek-grad-deg', `${state.gradDeg}°`);
-    if (needsFallbackTheme) {
-      applyStyle(angleVal, {
-        minWidth: '38px',
-        textAlign: 'right',
-        fontVariantNumeric: 'tabular-nums',
-        fontWeight: '600'
-      });
-    }
-    angleSlider.addEventListener('input', () => {
-      state.gradDeg = Math.max(0, Math.min(360, Math.round(Number(angleSlider.value) || 0)));
-      angleVal.textContent = `${state.gradDeg}°`;
-      emitGradient();
-    });
-
-    angleRow.appendChild(angleLabel);
-    angleRow.appendChild(angleSlider);
-    angleRow.appendChild(angleVal);
-
-    gradPreview.style.background = buildGradientString(
-      state.gradDeg,
-      state.gradColor1,
-      state.gradColor2
-    );
-
-    gradPanel.appendChild(gradPreview);
-    gradPanel.appendChild(gradPickersRow);
-    gradPanel.appendChild(angleRow);
-
+    solidPanel.appendChild(vaultHint);
     root.appendChild(solidPanel);
-    root.appendChild(gradPanel);
-
-    const syncModeUI = (emitChange) => {
-      const isSolid = state.mode === 'solid';
-      solidPanel.style.display = isSolid ? '' : 'none';
-      gradPanel.style.display = isSolid ? 'none' : 'flex';
-
-      solidTabBtn.classList.toggle('active', isSolid);
-      gradTabBtn.classList.toggle('active', !isSolid);
-      solidTabBtn.setAttribute('aria-pressed', isSolid ? 'true' : 'false');
-      gradTabBtn.setAttribute('aria-pressed', !isSolid ? 'true' : 'false');
-
-      if (needsFallbackTheme) {
-        const styleTab = (btn, active) => {
-          applyStyle(btn, {
-            minHeight: '34px',
-            padding: '6px 10px',
-            borderRadius: '8px',
-            border: active
-              ? '1px solid rgba(139, 92, 246, 0.7)'
-              : '1px solid rgba(255, 255, 255, 0.1)',
-            background: active ? 'rgba(124, 58, 237, 0.28)' : 'rgba(255, 255, 255, 0.04)',
-            color: active ? '#f5f3ff' : '#9ca3af',
-            fontSize: '12.5px',
-            fontWeight: active ? '600' : '500',
-            cursor: 'pointer',
-            touchAction: 'manipulation'
-          });
-        };
-        styleTab(solidTabBtn, isSolid);
-        styleTab(gradTabBtn, !isSolid);
-      }
-
-      if (!isSolid) {
-        solidPicker.hide();
-      } else {
-        picker1.hide();
-        picker2.hide();
-      }
-
-      if (emitChange && !destroyed && onChange) {
-        onChange(
-          isSolid
-            ? state.solidHex
-            : buildGradientString(state.gradDeg, state.gradColor1, state.gradColor2)
-        );
-      }
-    };
-
-    solidTabBtn.addEventListener('click', () => {
-      if (state.mode === 'solid') return;
-      state.mode = 'solid';
-      syncModeUI(true);
-    });
-
-    gradTabBtn.addEventListener('click', () => {
-      if (state.mode === 'gradient') return;
-      state.mode = 'gradient';
-      syncModeUI(true);
-    });
-
-    syncModeUI(false);
 
     return function destroy() {
       if (destroyed) return;
       destroyed = true;
       solidPicker.destroy();
-      picker1.destroy();
-      picker2.destroy();
       if (root.parentNode === container) {
         container.removeChild(root);
       }
@@ -1234,7 +990,7 @@
       typeof safeOpts.onUploadClick === 'function' ? safeOpts.onUploadClick : null;
     const httpBaseFn = safeOpts.httpBaseFn || null;
     let selectedValue = typeof safeOpts.initial === 'string' ? safeOpts.initial.trim() : '';
-    let activeCategory = 'anime';
+    let activeCategory = 'gradient';
     let destroyed = false;
 
     const mergedPresets = BANNER_PRESETS.map((p) => Object.assign({}, p));
@@ -1300,7 +1056,6 @@
     });
 
     const categories = [
-      { id: 'anime', label: '🔥 Pósters Anime' },
       { id: 'gradient', label: '🌈 Degradados Pro' },
       { id: 'world', label: '🏞️ Mundos' },
       { id: 'all', label: '🎁 Todos' }
