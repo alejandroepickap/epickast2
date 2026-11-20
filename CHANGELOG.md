@@ -6,18 +6,25 @@ Todas las notas notables sobre el desarrollo y cambios de EpicKast se documentan
 
 ## [2.0.0] - 2026-11-20
 
-### ✨ Ajustes Simplificados, Estudio de Creador Tipo Servidor, Filtro de Normas de la Comunidad, Guías Oficiales v2 y Barra de Llamada Limpia
-- **Ajustes Simplificados y Solucionador Rápido (`app/renderer.js`, `app/style.css`):**
-  - Nueva tarjeta **🆘 Solucionador Rápido de Llamadas** con acciones en 1 clic para *"No me escuchan"* y *"Unos sí me escuchan y otros no"* (Ruta Segura TURN + reconexión).
-  - **Filtros de Voz en 3 botones** (*Automático*, *Audífonos HD*, *Altavoces Anti-Eco*) y dispositivos agrupados en una sola tarjeta, dejando las opciones técnicas bajo *Modo Experto (Pro)*.
-- **Estudio de Creador Completo como Página / Servidor (`app/creator-studio.js`, `app/renderer.js`, `app/index.html`, `server/server.js`):**
-  - Icono dedicado **🎨** en el riel lateral izquierdo con canales para crear, eliminar y restaurar **Banners**, **Colores de Usuario**, **Bordes de Perfil** (con generación dinámica de CSS), **Cartas del Dojo** y **Moderación / Rangos**, sincronizado con el servidor (`creator.catalog.get` / `creator.catalog.save`).
-- **Filtro de Moderación de Imágenes — Normas de la Comunidad (`app/image-moderation.js`, `app/renderer.js`, `server/server.js`):**
-  - Análisis visual local (YCbCr + HSV + continuidad/bordes) + validación de formato y *magic bytes* en servidor para bloquear imágenes NSFW o dañadas en avatares y banners antes de publicarse.
-- **Botones de Llamada Reubicados (`app/style.css`, `app/mobile.css`):**
-  - `#meetBar` reubicado en una franja dedicada justo debajo de las cámaras (`#stage`), evitando que flote semitransparente sobre el borde del video.
-- **Guías Oficiales Actualizadas (`app/renderer.js`):**
-  - Nuevo canal oficial **`# 🆘-ayuda-audio-y-llamadas`** y notas de versión `v2.0.0` cubriendo audio, filtros, arrastrar usuarios, llamadas de 4+ personas, perfil/banner y Estudio de Creador.
+### ✨ Temporada 1: Bóveda Minimalista, Dojo 9 Cinturones de Karate, Soundboard Pro, Insignias, Estudio de Creador y Ajustes por Código de Color
+- **Bóveda Minimalista, Títulos y Reinicio de Temporada 1 (`app/renderer.js`, `app/game-config.js`, `app/profile-studio.js`, `server/server.js`):**
+  - Cabecera minimalista de 3 botones (*Ruleta*, *Minijuegos*, *Inventario*) con vista previa de recompensas por cofre e inventario ordenado por rareza (Legendario → Épico → Raro → Común).
+  - **Nuevos Títulos de Jugador:** 10 títulos básicos, títulos por logros reales y 8 títulos exclusivos en la Bóveda (`👑 Títulos`). Se eliminó el degradado libre en perfil para preservar la exclusividad de la Bóveda, y se corrigió el cierre del selector de color (`Listo ✓`, clic fuera y `Esc`).
+  - **Reinicio de Temporada 1 (`season_v200_reset`):** reinicio global en 0 en servidor y clientes para iniciar la temporada desde cero.
+- **Dojo Elemental Renovado (`app/card-game.js`, `app/game-config.js`, `app/style.css`, `server/server.js`):**
+  - **9 Maestros de Cinturón de Karate** (Blanco → Amarillo → Naranja → Verde → Azul → Rojo → Morado → Café → Negro Supremo) con avatares únicos, personalidades, frases y dificultad progresiva (`18% → 95%`).
+  - **Ritmo y Claridad de Combate:** +1.2 s extra para comparar cartas antes de resolver, banner de alto contraste indicando ganador y motivo, escenario completo sin franjas laterales vacías y mascotas cel-shaded mejoradas.
+  - **Marcador Global PvP Real (`dojo.leaderboard` / `dojo.pvp.result`):** Top 25 exclusivo de duelos contra jugadores reales (excluye bots).
+- **Insignias estilo Steam y Niveles/Banners de Servidor (`app/achievements.js`, `app/renderer.js`, `server/server.js`):**
+  - Insignias automáticas por antigüedad, juegos detectados, horas en llamada y victorias PvP, más 5 niveles de servidor y banners personalizables.
+- **Llamadas Grupales 6–8 Personas, Soundboard Pro y Overlay Limpio (`app/call.js`, `app/renderer.js`, `app/overlay.html`, `app/style.css`):**
+  - Escalado adaptativo WebRTC para 5–8 cámaras simultáneas, `#meetBar` debajo de las cámaras con iconos SVG monocromáticos, brillo al hablar según el **Marco de Avatar**, dock de llamada en 2 filas para evitar texto cortado y **Overlay limpio sin barra superior** (`Alt+O`).
+  - **Soundboard Pro:** 16 sonidos sintetizados en 3 categorías con control de volumen local sincronizados para toda la llamada.
+- **Ajustes por Código de Color y Seguridad (`app/renderer.js`, `app/style.css`):**
+  - 4 pestañas minimalistas con código de color (*🔵 Audio*, *🟢 Video*, *🩷 Estilo*, *🟡 Experto*), Solucionador Rápido en 1 clic, tarjeta puente directa a **Mi Perfil**, y eliminación total de URLs internas del servidor en Ajustes.
+- **Estudio de Creador Completo y Filtro de Normas (`app/creator-studio.js`, `app/image-moderation.js`, `server/server.js`):**
+  - Vista independiente (`🎨`) en el riel izquierdo para crear/eliminar/restaurar Banners, Colores, Bordes animados y editar cualquiera de las **60 cartas del Dojo** con vista previa en vivo.
+  - Moderación automática local + validación en servidor contra imágenes inapropiadas (NSFW) en avatares y banners.
 
 ---
 

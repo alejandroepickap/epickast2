@@ -2167,40 +2167,50 @@ function renderGuideContent(chKey) {
           </div>
         </div>
 
-        <!-- ==================== VERSIÓN 2.0.0 (ACTUAL · INTERFAZ SIMPLIFICADA, ESTUDIO CREADOR TIPO SERVIDOR, MODERACIÓN DE IMÁGENES Y BARRA DE LLAMADA LIMPIA) ==================== -->
+        <!-- ==================== VERSIÓN 2.0.0 (TEMPORADA 1 · BÓVEDA MINIMALISTA, DOJO 9 CINTURONES, SOUNDBOARD PRO, INSIGNIAS Y AJUSTES POR COLOR) ==================== -->
         <div style="border:2px solid #38bdf8;border-radius:12px;padding:18px;margin-bottom:24px;background:linear-gradient(135deg,#0c192c,#17102e);box-shadow:0 8px 28px rgba(56,189,248,0.24);">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;border-bottom:1px solid #1e3a5f;padding-bottom:10px;">
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="background:linear-gradient(90deg,#0284c7,#7c3aed);color:#fff;font-size:11px;font-weight:900;padding:3px 10px;border-radius:20px;">ACTUAL · v2.0.0</span>
-              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 2.0.0</h2>
+              <h2 style="font-size:18px;font-weight:900;color:#fff;margin:0;">Versión 2.0.0 · Temporada 1</h2>
             </div>
-            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Ajustes Simplificados, Estudio de Creador Completo, Filtro de Normas y Botones de Llamada Reubicados</span>
+            <span style="font-size:12px;color:#7dd3fc;font-weight:700;">Bóveda Minimalista, Dojo 9 Cinturones, Soundboard Pro, Insignias, Estudio de Creador y Llamadas 6–8 Personas</span>
           </div>
 
           <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;color:#cbd5e1;">
             <div>
-              <b style="color:#38bdf8;">✨ Ajustes Simplificados y Solucionador Rápido en 1 Clic:</b>
+              <b style="color:#fbbf24;">🏛️ Bóveda Minimalista, Títulos y Reinicio de Temporada 1:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li><b>Solucionador Directo de Llamadas:</b> botones claros para <i>"No me escuchan"</i> (reactiva micrófono, desactiva PTT accidental y abre el medidor en vivo) y <i>"Unos sí me escuchan y otros no"</i> (activa Ruta Segura TURN y reconecta la llamada).</li>
-                <li><b>Filtros de Voz en 3 Botones:</b> elige entre <i>🤖 Automático</i>, <i>🎧 Audífonos HD</i> o <i>🔊 Altavoces Anti-Eco</i> sin perderte en parámetros técnicos.</li>
-                <li><b>Dispositivos Agrupados y Modo Experto (Pro):</b> Micrófono, Altavoces y Cámara en una sola tarjeta ordenada; las opciones técnicas avanzadas quedan guardadas bajo <i>Modo Experto (Pro)</i>.</li>
+                <li><b>Navegación Limpia en 3 Pestañas:</b> <i>Ruleta</i> (con vista previa de recompensas por cofre), <i>Minijuegos</i> (Dojo Elemental y Turbo Core unificados) e <i>Inventario</i> ordenado por rareza (Legendario dorado → Épico → Raro → Común).</li>
+                <li><b>Nuevos Títulos de Jugador:</b> 10 títulos básicos, títulos por logros reales y 8 títulos exclusivos en la Bóveda (con su propia pestaña <code>👑 Títulos</code>). Se retiró el degradado libre para que los degradados de la Bóveda sean verdaderamente exclusivos.</li>
+                <li><b>Insignias estilo Steam y Niveles de Servidor:</b> logros automáticos por antigüedad, juegos detectados, horas en llamada y duelos PvP reales, más 5 niveles y banners personalizables para servidores.</li>
+                <li><b>Inicio Justo de Temporada 1:</b> reinicio global en 0 de monedas, llaves, esencia y progreso competitivo para estrenar la temporada en igualdad de condiciones.</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#e879f9;">🎨 Estudio de Creador como Página / Servidor Independiente:</b>
+              <b style="color:#f87171;">🥋 Dojo Elemental Renovado (9 Maestros de Karate &amp; Marcador PvP):</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li><b>Acceso Directo en el Riel Izquierdo (🎨):</b> nueva vista tipo servidor con canales dedicados para <b>Banners</b>, <b>Colores de Usuario</b>, <b>Bordes de Perfil</b>, <b>Cartas del Dojo</b> y <b>Moderación/Rangos</b>.</li>
-                <li><b>Crear y Borrar Elementos Existentes:</b> crea nuevos banners (imagen/GIF o degradado), colores de nombre y bordes animados de avatar, o elimina y restaura cualquiera de los existentes del catálogo con sincronización en vivo.</li>
+                <li><b>9 Maestros de Cinturón de Karate:</b> desde <i>Cinturón Blanco (Novicio Kenji · IA 18%)</i> hasta <i>Cinturón Negro Supremo (Gran Sensei · IA 95%)</i>, cada uno con su propio avatar ninja, personalidad, frases y recompensas progresivas.</li>
+                <li><b>Ritmo Más Claro y Ganador Inconfundible:</b> +1.2 s extra para comparar las cartas antes de resolver la ronda, banner de alto contraste indicando quién ganó y por qué, escenario completo sin bordes vacíos y mascotas detalladas.</li>
+                <li><b>Marcador Global PvP Real:</b> ranking Top 25 exclusivo de victorias contra jugadores reales (excluye bots).</li>
               </ul>
             </div>
 
             <div>
-              <b style="color:#4ade80;">🛡️ Filtro Automático de Normas de la Comunidad &amp; Barra de Llamada Limpia:</b>
+              <b style="color:#38bdf8;">🎧 Llamadas Grupales, Soundboard Pro, Overlay Limpio y Ajustes por Color:</b>
               <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
-                <li><b>Moderación de Imágenes (Avatares y Banners):</b> filtro local + verificación de archivos en el servidor que bloquea imágenes que puedan infringir las Normas de la Comunidad (NSFW/explícitas) antes de publicarse.</li>
-                <li><b>Botones de Llamada Debajo de las Cámaras:</b> la barra de controles de videollamada (<code>#meetBar</code>) ahora vive en una franja propia justo debajo de las cámaras, sin flotar semitransparente encima del borde del video.</li>
-                <li><b>Nueva Guía Oficial <code># 🆘-ayuda-audio-y-llamadas</code>:</b> respuestas claras sobre audio, filtros, arrastrar usuarios, llamadas de más de 4 personas y personalización de perfil.</li>
+                <li><b>Ajustes Minimalistas con Código de Color:</b> 4 pestañas claras (<i>🔵 Audio</i>, <i>🟢 Video</i>, <i>🩷 Estilo</i>, <i>🟡 Experto</i>), Solucionador Rápido en 1 clic, acceso directo a <b>Mi Perfil</b> desde Ajustes y URLs internas del servidor ocultas por seguridad.</li>
+                <li><b>Soundboard Pro (16 Sonidos):</b> 3 categorías con control de volumen local (<i>Aplausos realistas, Trombón Triste, Grillos, Bass Drop, Campana K.O., Impacto Crítico, Redoble, Braaam</i> y más) sincronizados en llamada.</li>
+                <li><b>Videollamadas Limpias (hasta 6–8 personas):</b> escalado adaptativo WebRTC, barra de controles debajo de las cámaras con iconos SVG monocromáticos, brillo al hablar del <b>color de tu Marco de Avatar</b>, texto de llamada completo en el dock inferior y <b>Overlay sin barra superior</b> (solo nombres flotantes limpios).</li>
+              </ul>
+            </div>
+
+            <div>
+              <b style="color:#e879f9;">🎨 Estudio de Creador Independiente &amp; 🛡️ Moderación de Imágenes:</b>
+              <ul style="margin:4px 0 0 20px;padding:0;display:flex;flex-direction:column;gap:4px;">
+                <li><b>Acceso Directo en el Riel Izquierdo (🎨):</b> gestiona Banners, Colores, Bordes animados y sube o renombra cualquiera de las <b>60 cartas del Dojo</b> con vista previa en vivo sincronizada para todos.</li>
+                <li><b>Filtro Automático de Normas de la Comunidad:</b> análisis visual local + validación de archivos en servidor contra imágenes inapropiadas en avatares y banners.</li>
               </ul>
             </div>
           </div>
@@ -8813,9 +8823,13 @@ window.addEventListener('keyup', (e) => {
 
 function updateDock() {
   const c = S.call; if (!c) return;
-  const ns = c.noiseMode === 'high' ? ' · 🔇 RNNoise' : '';
+  const ns = c.noiseMode === 'high' ? ' · RNNoise' : '';
   const cleanLabel = (S.callLabel || '').replace(/^🔊\s*/, '');
-  if (!settings.stats) $('voiceInfo').textContent = `🔊 ${cleanLabel}${ns}`;
+  const vi = $('voiceInfo');
+  if (vi) {
+    vi.textContent = `🔊 ${cleanLabel}${ns}`;
+    vi.title = `En llamada: ${cleanLabel}${ns}`;
+  }
   const setQ = (id, cls, icoKey, sz = 16) => {
     const el = $(id); if (!el) return;
     el.className = 'qbtn' + (id === 'bLeave' ? ' hang' : '') + (cls ? ' ' + cls : '');
@@ -10033,7 +10047,8 @@ function updateStatTimer() {
     if (!S.call) return;
     const m = await window.epic.metrics().catch(() => []); const cpu = m.reduce((a, x) => a + x.cpu, 0); const mem = m.reduce((a, x) => a + x.mem, 0) / 1024;
     const cleanLabel = (S.callLabel || '').replace(/^🔊\s*/, '');
-    $('voiceInfo').textContent = `🔊 ${cleanLabel} · CPU ${cpu.toFixed(0)}% · RAM ${(mem / 1024).toFixed(0)} MB`;
+    const vi = $('voiceInfo');
+    if (vi) vi.title = `${cleanLabel} · CPU ${cpu.toFixed(0)}% · RAM ${(mem / 1024).toFixed(0)} MB`;
     const st = await S.call.stats();
     for (const [id, txt] of st) { const t = tiles.get('p' + id); if (t) t.stat.textContent = txt; }
   }, 2000);

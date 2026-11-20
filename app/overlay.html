@@ -142,53 +142,18 @@
 </head>
 <body>
   <div class="hud">
-    <div id="hudHead" class="hud-head">
-      <span>🎮 Overlay</span>
-      <span class="hud-key">Alt+O</span>
-      <button id="closeBtn" class="hud-close" title="Cerrar overlay (Alt+O)">✕</button>
-    </div>
     <div id="speakers" class="speaker-list"></div>
   </div>
 
   <script>
     const speakersEl = document.getElementById('speakers');
-    const hudHeadEl = document.getElementById('hudHead');
-    let ignoringMouse = true;
 
-    function setClickThrough(ignore) {
-      const next = !!ignore;
-      if (ignoringMouse === next) return;
-      ignoringMouse = next;
-      window.epic?.setOverlayIgnoreMouse?.(next);
-    }
-
-    // Por defecto toda el área transparente deja pasar los clics al 100%
+    // Overlay 100% limpio y click-through (sin barra superior que estorbe en pantalla; alternar con Alt+O)
     window.epic?.setOverlayIgnoreMouse?.(true);
-
-    // Solo capturar el ratón cuando el cursor pasa exactamente sobre la píldora superior (.hud-head)
-    hudHeadEl.addEventListener('mouseenter', () => setClickThrough(false));
-    hudHeadEl.addEventListener('mouseleave', () => setClickThrough(true));
-
-    window.addEventListener('mousemove', (e) => {
-      const rect = hudHeadEl.getBoundingClientRect();
-      const insideHead = (
-        e.clientX >= rect.left - 2 &&
-        e.clientX <= rect.right + 2 &&
-        e.clientY >= rect.top - 2 &&
-        e.clientY <= rect.bottom + 2
-      );
-      setClickThrough(!insideHead);
-    });
-
-    document.getElementById('closeBtn').onclick = (e) => {
-      e.stopPropagation();
-      setClickThrough(true);
-      window.epic?.toggleOverlay(false);
-    };
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' || (e.altKey && (e.key === 'o' || e.key === 'O'))) {
-        setClickThrough(true);
+        window.epic?.setOverlayIgnoreMouse?.(true);
         window.epic?.toggleOverlay(false);
       }
     });
