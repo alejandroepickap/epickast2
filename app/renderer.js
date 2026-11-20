@@ -6916,13 +6916,13 @@ function modalProfile() {
   const accColors = makeAccordion(
     '🎨',
     'Color de Nombre, Marco y Título',
-    'Color sólido base, degradados de Bóveda, marco de avatar y título',
+    'Ajusta el color de tu nombre en chat/miembros, tu marco de avatar (también resalta al hablar) y tu título',
     false,
     h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px' },
       h('label', null, '👑 Título de jugador', titleSelect),
-      unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar', frameSelect) : h('div')
+      unlockedFrames.length > 0 ? h('label', null, '🖼️ Marco de Avatar (también define tu brillo al hablar)', frameSelect) : h('div')
     ),
-    h('label', null, 'Paleta base y color sólido personalizado', sws, colorStudioSlot),
+    h('label', null, 'Color de tu Nombre de Usuario (paleta rápida o personalizado)', sws, colorStudioSlot),
     vaultColorSwatches ? h('label', null, '✨ Degradados y Estilos de la Bóveda', vaultColorSwatches) : null
   );
 
@@ -9481,6 +9481,27 @@ function tile(key, label, user, withVol = false) {
     const badgeOverlay = h('div', { class: 'tile-badges' });
     const bannerBgEl = h('div', { class: 'tile-banner-bg' });
     const el = h('div', { class: 'tile', 'data-tile': key }, bannerBgEl, video, av, badgeOverlay, nm, stat, volWrap, tbtns);
+    const resolveSpeakColor = (usr) => {
+      const f = String((usr?.id && S.me?.id === usr.id ? (localStorage.getItem('epickast.equipped_frame') || usr.frame) : usr?.frame) || '').toLowerCase();
+      if (f) {
+        if (f.includes('solar') || f.includes('gold') || f.includes('imperial') || f.includes('eclipse')) return '#fbbf24';
+        if (f.includes('glacier') || f.includes('ice') || f.includes('frost') || f.includes('crystal')) return '#7dd3fc';
+        if (f.includes('founder') || f.includes('ocean') || f.includes('azure') || f.includes('cyan')) return '#38bdf8';
+        if (f.includes('crimson') || f.includes('fire') || f.includes('magma') || f.includes('flame') || f.includes('dragon')) return '#ef4444';
+        if (f.includes('emerald') || f.includes('jade') || f.includes('matrix') || f.includes('toxic')) return '#10b981';
+        if (f.includes('sakura') || f.includes('rose') || f.includes('pink')) return '#f472b6';
+        if (f.includes('cyber') || f.includes('neon') || f.includes('void') || f.includes('amethyst') || f.includes('purple')) return '#a855f7';
+        // Marco personalizado del Estudio de Creador: leer color si existe en catálogo
+        const customItem = (window.EKCreatorSystem?.getActiveCosmetics?.() || []).find((c) => c.type === 'frame' && (c.val === usr?.frame || c.id === usr?.frame));
+        if (customItem?.frameColor && /^#/.test(customItem.frameColor)) return customItem.frameColor;
+      }
+      const c = String((usr?.id && S.me?.id === usr.id ? (localStorage.getItem('epickast.equipped_color') || usr.color) : usr?.color) || '').trim();
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return c;
+      const hexInGrad = c.match(/#(?:[0-9a-f]{6}|[0-9a-f]{3})\b/i);
+      if (hexInGrad) return hexInGrad[0];
+      return '#22c55e';
+    };
+    el.style.setProperty('--speak-col', resolveSpeakColor(user));
     if (withVol && user?.id) {
       el.addEventListener('contextmenu', (e) => {
         openVoiceContextMenu(e, t.user || user, S.callKey, resolveServerForVoiceKey(S.callKey));

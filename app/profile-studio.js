@@ -300,9 +300,12 @@
             interaction: {
               hex: true,
               input: true,
-              save: false,
+              save: true,
               clear: false
             }
+          },
+          i18n: {
+            'btn:save': 'Listo ✓'
           }
         });
 
@@ -321,7 +324,34 @@
         };
 
         pickrInstance.on('change', handlePickrColor);
-        pickrInstance.on('swatchselect', handlePickrColor);
+        pickrInstance.on('swatchselect', (color) => {
+          handlePickrColor(color);
+          try { pickrInstance?.hide?.(); } catch (_) {}
+        });
+        pickrInstance.on('save', (color) => {
+          if (color) handlePickrColor(color);
+          try { pickrInstance?.hide?.(); } catch (_) {}
+        });
+
+        // Cerrar al hacer clic fuera del popup o presionar Escape
+        const onDocDown = (ev) => {
+          if (!pickrInstance || !pickrInstance.isOpen?.()) return;
+          const t = ev.target;
+          if (root?.app && root.app.contains(t)) return;
+          if (root?.button && root.button.contains(t)) return;
+          try { pickrInstance.hide(); } catch (_) {}
+        };
+        const onDocKey = (ev) => {
+          if (ev.key === 'Escape' && pickrInstance?.isOpen?.()) {
+            try { pickrInstance.hide(); } catch (_) {}
+          }
+        };
+        document.addEventListener('mousedown', onDocDown, true);
+        document.addEventListener('keydown', onDocKey, true);
+        pickrInstance._ekCleanup = () => {
+          document.removeEventListener('mousedown', onDocDown, true);
+          document.removeEventListener('keydown', onDocKey, true);
+        };
       } catch (_) {
         pickrInstance = null;
         mountNativeFallback();
@@ -339,6 +369,7 @@
       },
       destroy() {
         if (!pickrInstance) return;
+        try { pickrInstance._ekCleanup?.(); } catch (_) {}
         try {
           if (typeof pickrInstance.destroyAndRemove === 'function') {
             pickrInstance.destroyAndRemove();
@@ -386,7 +417,7 @@
     const solidPanel = el('div', 'ek-color-panel ek-color-panel-solid');
     const solidPicker = createColorPickerField(
       state.solidHex,
-      'Color sólido personalizado',
+      'Color de tu Nombre de Usuario (en chat y miembros)',
       (hex) => {
         if (destroyed) return;
         state.solidHex = hex;
