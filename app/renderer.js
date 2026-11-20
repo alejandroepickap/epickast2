@@ -1,4 +1,22 @@
 ﻿'use strict';
+// Reinicio único de Temporada 1 (v2.0.0): todos los jugadores inician recompensas y progreso en 0
+try {
+  if (!localStorage.getItem('epickast.season_v200_reset')) {
+    [
+      'epickast.dungeon.v1',
+      'epickast.dojo.claimedFloors.v1',
+      'epickast.dojo.cards.v2',
+      'epickast.dojo.cards.v1',
+      'epickast.dojo.ninja.v1',
+      'epickast.racer.v1',
+      'epickast.equipped_frame',
+      'epickast.equipped_title',
+      'epickast.equipped_banner',
+      'epickast.equipped_color'
+    ].forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem('epickast.season_v200_reset', '1');
+  }
+} catch {}
 const $ = (id) => document.getElementById(id);
 function h(tag, props, ...kids) {
   const e = document.createElement(tag);
@@ -7724,17 +7742,14 @@ async function modalSettings() {
   quickFixCard.classList.add('set-card-colored');
   quickFixCard.style.setProperty('--set-accent', '#a855f7');
 
-  const isMasterCreator = !!window.EKCreatorSystem?.isMasterCreator?.(S.me);
   const isMobTouch = !!(window.EKPlatform?.isWeb && window.EKPlatform?.isTouch);
 
-  // Botón discreto de cerrar sesión (sin exponer ajustes internos de servidor a usuarios normales)
+  // Tarjeta limpia de cuenta y sesión (sin exponer URLs internas del servidor)
   const logoutCard = h('div', { class: 'settings-card set-card-colored', style: '--set-accent:#ec4899;gap:10px' },
-    h('div', { class: 'settings-card-title', style: 'color:#f9a8d4' }, '👤 Sesión y Enlace para Amigos'),
-    h('label', null, shareLabel,
-      h('input', { value: shareUrl, readonly: true, onclick: (e) => { e.target.select(); navigator.clipboard?.writeText(shareUrl); toast('Enlace copiado'); } })),
+    h('div', { class: 'settings-card-title', style: 'color:#f9a8d4' }, '👤 Cuenta y Sesión'),
     h('div', { style: 'display:flex;gap:8px;margin-top:2px' },
-      h('button', { type: 'button', style: 'flex:1;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: () => { closeModal(); openOfficialGuide('notas_version'); } }, '📘 Guías Oficiales'),
-      h('button', { type: 'button', class: 'danger', style: 'padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, '🚪 Cerrar sesión')
+      h('button', { type: 'button', style: 'flex:1;padding:9px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: () => { closeModal(); openOfficialGuide('notas_version'); } }, '📘 Guías Oficiales'),
+      h('button', { type: 'button', class: 'danger', style: 'padding:9px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer', onclick: async () => { localStorage.removeItem('epickast.token'); await window.epic.saveAuth?.(null).catch(() => {}); location.reload(); } }, '🚪 Cerrar sesión')
     )
   );
 
@@ -7760,7 +7775,7 @@ async function modalSettings() {
     !isMobTouch ? modeCard : null,
     accAudio,
     !isMobTouch ? accShortcuts : null,
-    isMasterCreator ? accAccount : h('button', { style: 'padding:9px 12px;font-weight:700;font-size:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico')
+    h('button', { style: 'padding:9px 12px;font-weight:700;font-size:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;color:#cbd5e1;cursor:pointer', onclick: () => copyDiagnosticReport() }, '📋 Copiar Reporte de Diagnóstico')
   );
 
   const panes = { audio: paneAudio, video: paneVideo, visual: paneVisual, pro: panePro };

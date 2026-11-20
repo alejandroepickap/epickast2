@@ -222,37 +222,38 @@
         element: el, power: p, name: BASE_NAMES[el][p - 1],
         motif: BASE_MOTIFS[el][p - 1],
         accent: BASE_ACCENT[el], starter: true, rarity: p > 10 ? 'special' : 'base',
+        imgUrl: `assets/cards/std/${el}_${p}.jpg`,
         ...(p > 10 ? { cineTitle: BASE_CINE[el][p] } : {})
       });
     }
   });
 
-  // Desbloqueables (no 101+): estilo caricatura unificado con el Dojo y Ninjas.
+  // Desbloqueables (no 101+): con arte ilustrado real + personalizable desde Estudio de Creador.
   const UNLOCK_RAW = [
-    [1, 'fire', 2, 'Ascua Shinobi', '#ef4444', 'shuriken_fire'],
-    [2, 'fire', 4, 'Zorro de Brasas', '#f97316', 'kitsune'],
-    [3, 'fire', 6, 'Katana Carmesí', '#f59e0b', 'katana_fire'],
-    [4, 'fire', 7, 'Lámpara del Templo', '#ec4899', 'lantern'],
-    [5, 'fire', 8, 'Tigre Volcánico', '#eab308', 'tiger'],
-    [6, 'fire', 10, 'Oni de Obsidiana', '#dc2626', 'oni'],
-    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', '', '¡LLAMARADA DEL FÉNIX SOLAR!'],
-    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', '', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
-    [9, 'water', 2, 'Gota Serena', '#38bdf8', 'droplet'],
-    [10, 'water', 4, 'Koi Imperial', '#06b6d4', 'koi'],
-    [11, 'water', 5, 'Tortuga Acorazada', '#10b981', 'turtle'],
-    [12, 'water', 7, 'Abanico de Marea', '#3b82f6', 'fan_water'],
-    [13, 'water', 8, 'Tiburón Abisal', '#6366f1', 'shark'],
-    [14, 'water', 10, 'Serpiente Midgard', '#0ea5e9', 'serpent'],
-    [15, 'water', 11, 'Nutria Marejada', '#38bdf8', 'kraken', '', '¡OLA GIGANTE DE LA MAREA!'],
-    [16, 'water', 12, 'Leviatán Tsunami', '#2563eb', 'leviathan', '', '¡MAREMOTO DEL LEVIATÁN SUPREMO!'],
-    [17, 'snow', 3, 'Cristal Boreal', '#7dd3fc', 'crystal'],
-    [18, 'snow', 4, 'Puffle Glacial', '#38bdf8', 'penguin'],
-    [19, 'snow', 6, 'Búho Nival', '#a855f7', 'owl'],
-    [20, 'snow', 7, 'Shuriken Cero', '#06b6d4', 'shuriken_ice'],
-    [21, 'snow', 9, 'Lobo Ventisca', '#60a5fa', 'wolf'],
-    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti'],
-    [23, 'snow', 11, 'Pingüino Yeti Glaciar', '#7dd3fc', 'dragon_ice', '', '¡VENTISCA DEL YETI GLACIAR!'],
-    [24, 'snow', 12, 'Titán Cero Absoluto', '#e0f2fe', 'titan_ice', '', '¡ERA GLACIAL: CERO ABSOLUTO!']
+    [1, 'fire', 2, 'Ascua Shinobi', '#ef4444', 'shuriken_fire', 'assets/cards/std/fire_2.jpg'],
+    [2, 'fire', 4, 'Zorro de Brasas', '#f97316', 'kitsune', 'assets/cards/std/fire_4.jpg'],
+    [3, 'fire', 6, 'Katana Carmesí', '#f59e0b', 'katana_fire', 'assets/cards/std/fire_6.jpg'],
+    [4, 'fire', 7, 'Lámpara del Templo', '#ec4899', 'lantern', 'assets/cards/std/fire_7.jpg'],
+    [5, 'fire', 8, 'Tigre Volcánico', '#eab308', 'tiger', 'assets/cards/fire.jpg'],
+    [6, 'fire', 10, 'Oni de Obsidiana', '#dc2626', 'oni', 'assets/cards/fire.jpg'],
+    [7, 'fire', 11, 'Fénix Imperial', '#fbbf24', 'phoenix', 'assets/cartoon/card_fire_phoenix.webp', '¡LLAMARADA DEL FÉNIX SOLAR!'],
+    [8, 'fire', 12, 'Dragón de Magma', '#ef4444', 'dragon_fire', 'assets/cartoon/card_fire_dragon.webp', '¡CATACLISMO DEL DRAGÓN DE MAGMA!'],
+    [9, 'water', 2, 'Gota Serena', '#38bdf8', 'droplet', 'assets/cards/std/water_2.jpg'],
+    [10, 'water', 4, 'Koi Imperial', '#06b6d4', 'koi', 'assets/cards/std/water_4.jpg'],
+    [11, 'water', 5, 'Tortuga Acorazada', '#10b981', 'turtle', 'assets/cards/std/water_5.jpg'],
+    [12, 'water', 7, 'Abanico de Marea', '#3b82f6', 'fan_water', 'assets/cards/std/water_7.jpg'],
+    [13, 'water', 8, 'Tiburón Abisal', '#6366f1', 'shark', 'assets/cards/water.jpg'],
+    [14, 'water', 10, 'Serpiente Midgard', '#0ea5e9', 'serpent', 'assets/cards/water.jpg'],
+    [15, 'water', 11, 'Nutria Marejada', '#38bdf8', 'kraken', 'assets/cartoon/card_water_splash.webp', '¡OLA GIGANTE DE LA MAREA!'],
+    [16, 'water', 12, 'Leviatán Tsunami', '#2563eb', 'leviathan', 'assets/cards/card_water_leviathan.jpg', '¡MAREMOTO DEL LEVIATÁN SUPREMO!'],
+    [17, 'snow', 3, 'Cristal Boreal', '#7dd3fc', 'crystal', 'assets/cards/std/snow_3.jpg'],
+    [18, 'snow', 4, 'Puffle Glacial', '#38bdf8', 'penguin', 'assets/cards/std/snow_4.jpg'],
+    [19, 'snow', 6, 'Búho Nival', '#a855f7', 'owl', 'assets/cards/snow.jpg'],
+    [20, 'snow', 7, 'Shuriken Cero', '#06b6d4', 'shuriken_ice', 'assets/cards/std/snow_7.jpg'],
+    [21, 'snow', 9, 'Lobo Ventisca', '#60a5fa', 'wolf', 'assets/cards/card_snow_titan.jpg'],
+    [22, 'snow', 10, 'Yeti Rompehielos', '#38bdf8', 'yeti', 'assets/cartoon/card_snow_yeti.webp'],
+    [23, 'snow', 11, 'Pingüino Yeti Glaciar', '#7dd3fc', 'dragon_ice', 'assets/cartoon/card_snow_yeti.webp', '¡VENTISCA DEL YETI GLACIAR!'],
+    [24, 'snow', 12, 'Titán Cero Absoluto', '#e0f2fe', 'titan_ice', 'assets/cards/card_snow_titan.jpg', '¡ERA GLACIAL: CERO ABSOLUTO!']
   ];
   const UNLOCK_CARDS = UNLOCK_RAW.map(([n, element, power, name, accent, motif, imgUrl, cineTitle]) => ({
     no: 100 + n, code: 'X' + String(n).padStart(2, '0'), element, power, name, accent, starter: false, motif,
@@ -1341,13 +1342,11 @@
             </div>
           </div>
 
-          <!-- Camino de los 5 Pisos del Dojo (5 Columnas Equilibradas con Retratos HD de Guardianes) -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(158px, 1fr));gap:10px;">
+          <!-- Camino de los 9 Maestros de Cinturón de Karate (Cuadrícula 3x3 con Avatares Únicos) -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(192px, 1fr));gap:10px;">
             ${floors.map((f) => {
               const isDone = !!claimed[f.level];
-              const guardianPortrait = f.level === 5
-                ? `<div style="width:100%;height:100%;background:#f5f2ea url('${window.EKCartoonArtManifest?.ninjaEmblem || 'assets/cartoon/ninja_emblem.webp'}') center/cover no-repeat;border-radius:8px;"></div>`
-                : renderPixelNinjaSvg(f.ninjaConfig, { size: 46, pose: 'idle', frame: 0 });
+              const guardianPortrait = renderPixelNinjaSvg(f.ninjaConfig, { size: 54, pose: 'idle', frame: 0 });
               const keySprite = SPR().renderSpriteHtml ? SPR().renderSpriteHtml('key_' + f.reward.key, 0.95) : '';
               const trainCoins = Math.round(f.reward.coins * (CFG().TRAINING_REWARD_RULES?.coinMultiplier || 0.5));
               const descSafe = f.desc ?? '';

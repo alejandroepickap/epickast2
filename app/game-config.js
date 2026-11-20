@@ -417,35 +417,92 @@
     }
   ];
 
-  // --- DOJO ELEMENTAL: PISOS Y GUARDIANES ---
+  // --- DOJO ELEMENTAL: 9 MAESTROS DE CINTURÓN DE KARATE (DIFICULTAD Y DISEÑO PROGRESIVO) ---
   const DOJO_FLOORS = [
     {
       level: 1,
-      name: 'Novicio Ignis',
+      name: 'Novicio Kenji',
       belt: 'Cinturón Blanco',
       element: 'fire',
       spriteKey: 'guardian_ignis',
-      color: '#ef4444',
-      aiSkill: 0.20,
-      desc: 'Aprendiz de la llama eterna que prueba el temple de todo iniciado.',
+      color: '#e2e8f0',
+      aiSkill: 0.18,
+      desc: 'Iniciado entusiasta que apenas memoriza el triángulo elemental.',
       quotes: {
-        start: '¡Bienvenido al Dojo! Veamos si soportas el calor del primer piso.',
-        winRound: '¡Ja! El fuego consume a los indecisos.',
-        loseRound: '¡Auch! Buen golpe, tienes reflejos.',
-        winMatch: '¡Has dominado mi fuego! Mereces avanzar al segundo piso.',
-        loseMatch: 'Te falta entrenamiento. ¡Observa el triángulo elemental!'
+        start: '¡Hola! Es mi primer día en el Dojo. ¡Demos nuestro mejor esfuerzo!',
+        winRound: '¡Sí! ¡Por fin me salió el truco de la carta!',
+        loseRound: '¡Uy! Eso fue demasiado rápido para mí.',
+        winMatch: '¡Genial! Ya estás listo para el cinturón amarillo.',
+        loseMatch: '¡Gané! Aunque creo que fue un poco de suerte, jaja.'
       },
-      reward: { coins: 60, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
-      ninjaConfig: { suitColor: '#dc2626', belt: 'white', maskColor: '#7f1d1d', weapon: 'staff', aura: 'fire' }
+      reward: { coins: 40, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
+      ninjaConfig: { suitColor: '#e2e8f0', belt: 'white', maskColor: '#475569', headgear: 'none', eyes: 'classic', weapon: 'staff', aura: 'none', pet: 'none' }
     },
     {
       level: 2,
-      name: 'Centinela Escarcha',
-      belt: 'Cinturón Azul',
+      name: 'Chispa Solar',
+      belt: 'Cinturón Amarillo',
+      element: 'fire',
+      spriteKey: 'guardian_ignis',
+      color: '#facc15',
+      aiSkill: 0.28,
+      desc: 'Veloz e impulsivo; lanza cartas de fuego sin pensarlo dos veces.',
+      quotes: {
+        start: '¡Relámpago y chispa! ¿Crees poder seguir mi velocidad?',
+        winRound: '¡Boom! ¡Demasiado lento para el rayo amarillo!',
+        loseRound: '¡Ey, eso no vale! Me distraje mirando mi mascota.',
+        winMatch: '¡Uff, qué reflejos tienes! Te ganaste el respeto del piso 2.',
+        loseMatch: '¡A entrenar esos reflejos! Vuelve cuando seas más rápido.'
+      },
+      reward: { coins: 65, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
+      ninjaConfig: { suitColor: '#ca8a04', belt: 'yellow', maskColor: '#0f172a', headgear: 'spiky', eyes: 'happy', weapon: 'kunai', aura: 'none', pet: 'shiba' }
+    },
+    {
+      level: 3,
+      name: 'Furia Ámbar',
+      belt: 'Cinturón Naranja',
+      element: 'fire',
+      spriteKey: 'guardian_ignis',
+      color: '#fb923c',
+      aiSkill: 0.38,
+      desc: 'Duelista apasionado de la llama que busca combos agresivos.',
+      quotes: {
+        start: '¡Sube la temperatura del tatami! ¡Que arda este duelo!',
+        winRound: '¡Arde! ¡Nadie detiene la llamarada naranja!',
+        loseRound: '¡Auch! Buen contraataque, me gusta tu estilo.',
+        winMatch: '¡Duelo ardiente! El Monje del Cinturón Verde te espera.',
+        loseMatch: 'El fuego exige decisión. ¡No dudes al lanzar!'
+      },
+      reward: { coins: 90, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
+      ninjaConfig: { suitColor: '#ea580c', belt: 'orange', maskColor: '#7c2d12', headgear: 'visor', eyes: 'fierce', weapon: 'katana', aura: 'fire', pet: 'kitsune' }
+    },
+    {
+      level: 4,
+      name: 'Monje Bambú',
+      belt: 'Cinturón Verde',
       element: 'snow',
       spriteKey: 'guardian_frost',
-      color: '#7dd3fc',
-      aiSkill: 0.45,
+      color: '#22c55e',
+      aiSkill: 0.48,
+      desc: 'Estratega sereno del bosque; observa tus patrones antes de atacar.',
+      quotes: {
+        start: 'Respira profundo. Como el bambú, mi defensa se dobla pero no se rompe.',
+        winRound: 'La calma siempre supera a la prisa.',
+        loseRound: 'Interesante... tu mente está más clara de lo que pensaba.',
+        winMatch: 'Has hallado el equilibrio. Avanza hacia el frío Cinturón Azul.',
+        loseMatch: 'Observa el viento antes de mover tu carta, discípulo.'
+      },
+      reward: { coins: 120, key: 'silver', keyCount: 1, keyLabel: '1 Llave Plata' },
+      ninjaConfig: { suitColor: '#16a34a', belt: 'green', maskColor: '#14532d', headgear: 'kasa', eyes: 'classic', weapon: 'staff', aura: 'snow', pet: 'none' }
+    },
+    {
+      level: 5,
+      name: 'Centinela Escarcha',
+      belt: 'Cinturón Azul',
+      element: 'water',
+      spriteKey: 'guardian_frost',
+      color: '#38bdf8',
+      aiSkill: 0.58,
       desc: 'Vigilante de los picos helados; su mente es fría como el glaciar.',
       quotes: {
         start: 'Tu impetuosidad se congelará ante mi defensa glaciar.',
@@ -454,65 +511,84 @@
         winMatch: 'Impresionante. Tu espíritu arde más fuerte que la ventisca.',
         loseMatch: 'La paciencia congela la prisa. Inténtalo de nuevo.'
       },
-      reward: { coins: 100, key: 'copper', keyCount: 1, keyLabel: '1 Llave Cobre' },
-      ninjaConfig: { suitColor: '#0284c7', belt: 'blue', maskColor: '#0c4a6e', weapon: 'shuriken', aura: 'snow' }
+      reward: { coins: 150, key: 'silver', keyCount: 1, keyLabel: '1 Llave Plata' },
+      ninjaConfig: { suitColor: '#0284c7', belt: 'blue', maskColor: '#0c4a6e', headgear: 'none', eyes: 'cyber', weapon: 'shuriken', aura: 'water', pet: 'penguin' }
     },
     {
-      level: 3,
+      level: 6,
       name: 'Maestro Torrente',
       belt: 'Cinturón Rojo',
       element: 'water',
       spriteKey: 'guardian_torrent',
-      color: '#2563eb',
+      color: '#ef4444',
       aiSkill: 0.68,
-      desc: 'Señor de las mareas abisales que anticipa cada carta de tu mano.',
+      desc: 'Veterano de las mareas carmesí; castiga cualquier error táctico.',
       quotes: {
         start: 'El agua se adapta a cualquier vasija. ¿Podrás predecir mi corriente?',
-        winRound: '¡La marea arrasa con tu estrategia!',
+        winRound: '¡La marea carmesí arrasa con tu estrategia!',
         loseRound: '¡Buena lectura! Viste a través de la niebla.',
-        winMatch: 'Reconozco tu maestría táctica. El cuarto piso te aguarda.',
+        winMatch: 'Reconozco tu maestría táctica. Las sombras moradas te aguardan.',
         loseMatch: 'Intentaste golpear el océano con los ojos cerrados.'
       },
-      reward: { coins: 150, key: 'silver', keyCount: 1, keyLabel: '1 Llave Plata' },
-      ninjaConfig: { suitColor: '#1d4ed8', belt: 'red', maskColor: '#1e1b4b', weapon: 'katana', aura: 'water' }
+      reward: { coins: 190, key: 'silver', keyCount: 1, keyLabel: '1 Llave Plata' },
+      ninjaConfig: { suitColor: '#dc2626', belt: 'red', maskColor: '#450a0a', headgear: 'visor', eyes: 'fierce', weapon: 'katana', aura: 'fire', pet: 'kitsune' }
     },
     {
-      level: 4,
+      level: 7,
+      name: 'Sombra Amatista',
+      belt: 'Cinturón Morado',
+      element: 'snow',
+      spriteKey: 'guardian_colossus',
+      color: '#a855f7',
+      aiSkill: 0.78,
+      desc: 'Maestro del sigilo y el engaño; lee tu mano como un libro abierto.',
+      quotes: {
+        start: 'Las sombras ya conocen la carta que vas a elegir...',
+        winRound: 'Predecible. Caíste directo en mi ilusión.',
+        loseRound: '¡Tch! Lograste ocultar tu intención por un segundo.',
+        winMatch: 'Dominas el sigilo mental. Solo dos maestros quedan en la cima.',
+        loseMatch: 'En la oscuridad del piso 7, dudar es perder.'
+      },
+      reward: { coins: 240, key: 'gold', keyCount: 1, keyLabel: '1 Llave Oro' },
+      ninjaConfig: { suitColor: '#7c3aed', belt: 'purple', maskColor: '#2e1065', headgear: 'cat_ears', eyes: 'cyber', weapon: 'kunai', aura: 'lightning', pet: 'axolotl' }
+    },
+    {
+      level: 8,
       name: 'Coloso de Basalto',
-      belt: 'Cinturón Negro',
+      belt: 'Cinturón Café',
       element: 'fire',
       spriteKey: 'guardian_colossus',
-      color: '#f97316',
-      aiSkill: 0.84,
-      desc: 'Titán viviente forjado en magma; solo los cinturones negros pasan.',
+      color: '#b45309',
+      aiSkill: 0.86,
+      desc: 'Titán forjado en magma; el último muro antes del Cinturón Negro.',
       quotes: {
         start: 'Soy el muro inquebrantable antes del Gran Sensei. ¡En guardia!',
         winRound: '¡La roca fundida aplasta tus esperanzas!',
         loseRound: '¡Una grieta en mi armadura! Bien jugado.',
-        winMatch: 'Has superado al Coloso. El Sensei del Núcleo te espera en la cima.',
+        winMatch: 'Has superado al Coloso. El Gran Sensei del Cinturón Negro te espera.',
         loseMatch: 'Tu técnica aún se quiebra ante la presión del Núcleo.'
       },
-      reward: { coins: 220, key: 'gold', keyCount: 1, keyLabel: '1 Llave Oro' },
-      ninjaConfig: { suitColor: '#475569', belt: 'black', maskColor: '#0f172a', weapon: 'kunai', aura: 'fire' }
+      reward: { coins: 320, key: 'gold', keyCount: 1, keyLabel: '1 Llave Oro' },
+      ninjaConfig: { suitColor: '#475569', belt: 'brown', maskColor: '#0f172a', headgear: 'kasa', eyes: 'fierce', weapon: 'katana', aura: 'fire', pet: 'none' }
     },
     {
-      level: 5,
-      name: 'Sensei del Núcleo',
-      belt: 'Cinturón Dorado Supremo',
+      level: 9,
+      name: 'Gran Sensei del Núcleo',
+      belt: 'Cinturón Negro Supremo',
       element: 'legendary',
       spriteKey: 'guardian_sensei',
       color: '#fbbf24',
-      aiSkill: 0.94,
-      desc: 'Gran Maestro de los tres elementos y custodio de la Obsidiana.',
+      aiSkill: 0.95,
+      desc: 'Gran Maestro de los 9 cinturones y custodio supremo de la Obsidiana.',
       quotes: {
         start: 'Fuego, Agua y Nieve son uno en mis manos. Demuestra tu leyenda.',
         winRound: 'El equilibrio elemental aún se inclina a mi favor.',
         loseRound: '¡Sublime! Pocos discípulos logran anticipar ese movimiento.',
-        winMatch: '¡Reverencia! Eres un verdadero Gran Maestro del Dojo Elemental.',
+        winMatch: '¡Reverencia! Eres un verdadero Cinturón Negro del Dojo Elemental.',
         loseMatch: 'Un duelo honorable. Medita tu estrategia y vuelve a desafiarme.'
       },
-      reward: { coins: 500, key: 'obsidian', keyCount: 1, keyLabel: '1 Llave Obsidiana' },
-      ninjaConfig: { suitColor: '#581c87', belt: 'gold', maskColor: '#fbbf24', weapon: 'scroll', aura: 'snow' }
+      reward: { coins: 550, key: 'obsidian', keyCount: 1, keyLabel: '1 Llave Obsidiana' },
+      ninjaConfig: { suitColor: '#1e293b', belt: 'black', maskColor: '#fbbf24', headgear: 'crown', eyes: 'cyber', weapon: 'scroll', aura: 'lightning', pet: 'dragon' }
     }
   ];
 
@@ -521,14 +597,18 @@
     copperKeyChance: 0.25
   };
 
-  // --- CINTURONES Y PERSONALIZACIÓN NINJA ---
+  // --- CINTURONES OFICIALES DE KARATE Y PERSONALIZACIÓN NINJA ---
   const BELTS = [
     { id: 'white', name: 'Cinturón Blanco', color: '#f8fafc', shadow: '#cbd5e1', reqFloor: 0 },
-    { id: 'yellow', name: 'Cinturón Amarillo', color: '#facc15', shadow: '#ca8a04', reqFloor: 0 },
-    { id: 'blue', name: 'Cinturón Azul', color: '#3b82f6', shadow: '#1d4ed8', reqFloor: 2 },
-    { id: 'red', name: 'Cinturón Rojo', color: '#ef4444', shadow: '#b91c1c', reqFloor: 3 },
-    { id: 'black', name: 'Cinturón Negro', color: '#1e293b', shadow: '#090d16', reqFloor: 4 },
-    { id: 'gold', name: 'Cinturón Dorado', color: '#fbbf24', shadow: '#b45309', reqFloor: 5 }
+    { id: 'yellow', name: 'Cinturón Amarillo', color: '#facc15', shadow: '#ca8a04', reqFloor: 1 },
+    { id: 'orange', name: 'Cinturón Naranja', color: '#fb923c', shadow: '#c2410c', reqFloor: 2 },
+    { id: 'green', name: 'Cinturón Verde', color: '#22c55e', shadow: '#15803d', reqFloor: 3 },
+    { id: 'blue', name: 'Cinturón Azul', color: '#38bdf8', shadow: '#0369a1', reqFloor: 4 },
+    { id: 'red', name: 'Cinturón Rojo', color: '#ef4444', shadow: '#b91c1c', reqFloor: 5 },
+    { id: 'purple', name: 'Cinturón Morado', color: '#a855f7', shadow: '#6b21a8', reqFloor: 6 },
+    { id: 'brown', name: 'Cinturón Café', color: '#b45309', shadow: '#78350f', reqFloor: 7 },
+    { id: 'black', name: 'Cinturón Negro', color: '#1e293b', shadow: '#090d16', reqFloor: 8 },
+    { id: 'gold', name: 'Cinturón Dorado Supremo', color: '#fbbf24', shadow: '#b45309', reqFloor: 9 }
   ];
 
   const NINJA_SUITS = [

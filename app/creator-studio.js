@@ -790,48 +790,151 @@
     }
 
     // =========================================================================
-    // CANAL 4: CARTAS DEL DOJO
+    // CANAL 4: CARTAS DEL DOJO (EDITOR VISUAL DE LAS 60 CARTAS)
     // =========================================================================
     if (chKey === 'dojo') {
       const dojoCatalog = global.DojoCardCollection?.CATALOG || [];
+      const customMap = EKCreatorSystem.getCustomDojoCards() || {};
+      const customizedEntries = Object.entries(customMap);
+      const firstCard = dojoCatalog[0] || { no: 1, code: 'F01', name: 'Fogata', element: 'fire', power: 1, imgUrl: 'assets/cards/std/fire_1.jpg' };
+      const getCardImg = (c) => customMap[String(c.no)]?.imgUrl || c.imgUrl || '';
+      const getCardName = (c) => customMap[String(c.no)]?.name || c.name || '';
+
       container.innerHTML = `
-        <div style="max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
+        <div style="max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px;">
           <div style="background:linear-gradient(135deg,rgba(56,189,248,0.18),rgba(99,102,241,0.18));border:1.5px solid #38bdf8;border-radius:14px;padding:18px 22px;">
-            <div style="font-size:18px;font-weight:900;color:#fff;">🎴 Personalización de Cartas del Dojo</div>
-            <p style="margin:4px 0 0;font-size:12.5px;color:#cbd5e1;">Reemplaza el nombre o ilustración de cualquiera de las 60 cartas del Dojo Elemental.</p>
+            <div style="font-size:18px;font-weight:900;color:#fff;">🎴 Personalización de Cartas del Dojo (${dojoCatalog.length} cartas)</div>
+            <p style="margin:4px 0 0;font-size:12.5px;color:#cbd5e1;">Sube tus propias ilustraciones o renombra cualquiera de las 60 cartas del Dojo Elemental. Los cambios se sincronizan para todos los usuarios.</p>
           </div>
-          <div style="background:#111625;border:1px solid #263147;border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px;">
-            <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Carta del Dojo
-              <select id="csDojoNo" style="margin-top:4px;width:100%;background:#090d16;border:1px solid #334155;color:#fff;padding:9px;border-radius:8px;font-size:12.5px;">
-                ${dojoCatalog.map((c) => `<option value="${c.no}">${esc(c.code)} · ${esc(c.name)} (${esc(String(c.element || '').toUpperCase())} Poder ${c.power})</option>`).join('')}
-              </select>
-            </label>
-            <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Nuevo nombre (opcional)
-              <input id="csDojoName" type="text" placeholder="Ej: Dragón Carmesí Supremo" style="margin-top:4px;width:100%;box-sizing:border-box;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:8px;font-size:12.5px;">
-            </label>
-            <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Ilustración (1:1 PNG/JPG/WebP)
-              <input id="csDojoFile" type="file" accept="image/*" style="margin-top:4px;width:100%;box-sizing:border-box;background:#090d16;border:1px dashed #38bdf8;color:#cbd5e1;padding:9px;border-radius:8px;font-size:12px;">
-            </label>
-            <button type="button" id="csDojoSave" style="background:linear-gradient(135deg,#0284c7,#2563eb);border:0;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;font-weight:900;cursor:pointer;">💾 Guardar Carta Personalizada</button>
+          <div style="background:#111625;border:1px solid #263147;border-radius:14px;padding:18px;display:grid;grid-template-columns:160px 1fr;gap:18px;align-items:start;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+              <div id="csDojoPrevBox" style="width:140px;height:185px;border-radius:12px;border:2px solid #38bdf8;background:#090d16;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 20px rgba(0,0,0,0.45);">
+                <div id="csDojoPrevImg" style="flex:1;background:url('${esc(getCardImg(firstCard))}') center/cover no-repeat #0f172a;"></div>
+                <div style="padding:6px 8px;background:#0b101d;border-top:1px solid rgba(255,255,255,0.08);">
+                  <div id="csDojoPrevTitle" style="font-size:11px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(getCardName(firstCard))}</div>
+                  <div id="csDojoPrevMeta" style="font-size:9.5px;color:#38bdf8;font-weight:700;">${esc(firstCard.code)} · Poder ${firstCard.power}</div>
+                </div>
+              </div>
+              <span style="font-size:10px;color:#94a3b8;text-align:center;">Vista previa en vivo</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Seleccionar Carta del Dojo
+                <select id="csDojoNo" style="margin-top:4px;width:100%;background:#090d16;border:1px solid #334155;color:#fff;padding:9px;border-radius:8px;font-size:12.5px;">
+                  ${dojoCatalog.map((c) => `<option value="${c.no}">${customMap[String(c.no)] ? '★ ' : ''}${esc(c.code)} · ${esc(getCardName(c))} (${esc(String(c.element || '').toUpperCase())} Poder ${c.power})</option>`).join('')}
+                </select>
+              </label>
+              <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Nuevo nombre (opcional)
+                <input id="csDojoName" type="text" placeholder="Ej: Dragón Carmesí Supremo" value="${esc(customMap[String(firstCard.no)]?.name || '')}" style="margin-top:4px;width:100%;box-sizing:border-box;background:#090d16;border:1px solid #334155;color:#fff;padding:8px 10px;border-radius:8px;font-size:12.5px;">
+              </label>
+              <label style="font-size:12px;color:#cbd5e1;font-weight:700;">Subir nueva ilustración (PNG / JPG / WebP)
+                <input id="csDojoFile" type="file" accept="image/*" style="margin-top:4px;width:100%;box-sizing:border-box;background:#090d16;border:1px dashed #38bdf8;color:#cbd5e1;padding:9px;border-radius:8px;font-size:12px;">
+              </label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" id="csDojoSave" style="flex:1;background:linear-gradient(135deg,#0284c7,#2563eb);border:0;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;font-weight:900;cursor:pointer;">💾 Guardar Carta y Sincronizar</button>
+                <button type="button" id="csDojoReset" style="background:rgba(239,68,68,0.14);border:1px solid rgba(239,68,68,0.45);color:#fca5a5;padding:10px 14px;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;">↺ Restaurar original</button>
+              </div>
+            </div>
           </div>
+          ${customizedEntries.length > 0 ? `
+            <div style="background:#111625;border:1px solid #263147;border-radius:14px;padding:16px;">
+              <div style="font-size:12.5px;font-weight:800;color:#7dd3fc;margin-bottom:10px;">✨ Cartas personalizadas activas (${customizedEntries.length})</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                ${customizedEntries.map(([no, ov]) => {
+                  const base = dojoCatalog.find((x) => String(x.no) === String(no));
+                  return `<button type="button" class="csPickCustomCard" data-no="${esc(no)}" style="display:flex;align-items:center;gap:8px;background:#090d16;border:1px solid #334155;color:#e2e8f0;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:11.5px;font-weight:700;">
+                    ${ov.imgUrl ? `<span style="width:24px;height:24px;border-radius:4px;background:url('${esc(ov.imgUrl)}') center/cover no-repeat;display:inline-block;"></span>` : ''}
+                    <span>${esc(base?.code || '#' + no)} · ${esc(ov.name || base?.name || 'Carta')}</span>
+                  </button>`;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
+
       let dojoImg = '';
+      const selEl = container.querySelector('#csDojoNo');
+      const nameEl = container.querySelector('#csDojoName');
+      const prevImgEl = container.querySelector('#csDojoPrevImg');
+      const prevTitleEl = container.querySelector('#csDojoPrevTitle');
+      const prevMetaEl = container.querySelector('#csDojoPrevMeta');
+
+      const updatePreview = () => {
+        const no = Number(selEl.value || 1);
+        const c = dojoCatalog.find((x) => x.no === no) || firstCard;
+        const ov = customMap[String(no)] || {};
+        const img = dojoImg || ov.imgUrl || c.imgUrl || '';
+        prevImgEl.style.backgroundImage = img ? `url('${img}')` : 'none';
+        prevTitleEl.textContent = nameEl.value.trim() || ov.name || c.name || '';
+        prevMetaEl.textContent = `${c.code || '#' + no} · Poder ${c.power}`;
+      };
+
+      selEl.onchange = () => {
+        dojoImg = '';
+        const no = Number(selEl.value || 1);
+        nameEl.value = customMap[String(no)]?.name || '';
+        container.querySelector('#csDojoFile').value = '';
+        updatePreview();
+      };
+      nameEl.oninput = updatePreview;
+
       container.querySelector('#csDojoFile').onchange = (e) => {
         const f = e.target.files?.[0];
         if (!f) return;
         const r = new FileReader();
-        r.onload = (ev) => { dojoImg = String(ev.target?.result || ''); };
+        r.onload = (ev) => {
+          const raw = String(ev.target?.result || '');
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const cv = document.createElement('canvas');
+              cv.width = 240; cv.height = 240;
+              const ctx = cv.getContext('2d');
+              const side = Math.min(img.width, img.height);
+              const sx = (img.width - side) / 2;
+              const sy = (img.height - side) / 2;
+              ctx.drawImage(img, sx, sy, side, side, 0, 0, 240, 240);
+              dojoImg = cv.toDataURL('image/webp', 0.86);
+            } catch {
+              dojoImg = raw;
+            }
+            updatePreview();
+          };
+          img.onerror = () => { dojoImg = raw; updatePreview(); };
+          img.src = raw;
+        };
         r.readAsDataURL(f);
       };
+
       container.querySelector('#csDojoSave').onclick = () => {
-        const no = Number(container.querySelector('#csDojoNo').value || 1);
-        const nm = container.querySelector('#csDojoName').value.trim();
+        const no = Number(selEl.value || 1);
+        const nm = nameEl.value.trim();
         if (!nm && !dojoImg) return toast('Elige una imagen o escribe un nuevo nombre');
-        EKCreatorSystem.saveCustomDojoCard(no, { name: nm || undefined, imgUrl: dojoImg || undefined });
-        toast(`🎴 ¡Carta #${String(no).padStart(3, '0')} actualizada!`);
+        const prev = customMap[String(no)] || {};
+        EKCreatorSystem.saveCustomDojoCard(no, {
+          name: nm || prev.name || undefined,
+          imgUrl: dojoImg || prev.imgUrl || undefined
+        });
+        toast(`🎴 ¡Carta #${String(no).padStart(3, '0')} guardada y sincronizada!`);
         refresh();
       };
+
+      container.querySelector('#csDojoReset').onclick = () => {
+        const no = Number(selEl.value || 1);
+        const map = EKCreatorSystem.getCustomDojoCards();
+        delete map[String(no)];
+        writeJson(KEYS.dojoCards, map);
+        syncToServer();
+        toast(`↺ Carta #${String(no).padStart(3, '0')} restaurada a su arte original`);
+        refresh();
+      };
+
+      container.querySelectorAll('.csPickCustomCard').forEach((b) => {
+        b.onclick = () => {
+          selEl.value = b.dataset.no;
+          selEl.onchange();
+        };
+      });
       return container;
     }
 

@@ -116,8 +116,16 @@ try {
     console.log('[v1.8.5] Reinicio de monedas y llaves aplicado en SQLite users (250 monedas, 1 llave cobre)');
     setTimeout(saveBackup, 800);
   }
+  // Migración Temporada 1 (v2.0.0): Reinicio completo de recompensas para que todos inicien desde 0
+  const s200 = get("SELECT val FROM meta WHERE key='season_v200_reset'");
+  if (!s200) {
+    run("UPDATE users SET coins=0, dust=0, keys_copper=0, keys_silver=0, keys_gold=0, keys_obsidian=0, pity_epic=0, pity_legendary=0, unlocked_cosmetics='[]', dojo_pvp_wins=0, dojo_pvp_losses=0, frame='', title=''");
+    run("INSERT OR REPLACE INTO meta(key, val) VALUES('season_v200_reset', 'done')");
+    console.log('[v2.0.0] Reinicio de Temporada 1 aplicado en SQLite users (todos inician en 0)');
+    setTimeout(() => _performSaveBackup(true), 1200);
+  }
 } catch (e) {
-  console.log('[v1.8.5] Migration notice:', e.message);
+  console.log('[v2.0.0] Migration notice:', e.message);
 }
 
 let _localBackupTimer = null;
