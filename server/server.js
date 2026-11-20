@@ -1021,7 +1021,19 @@ const H = {
     const peers = roomUsers(d.key).filter((p) => p.id !== ws.user.id);
     r.set(ws.user.id, { ws, name: ws.user.name, state: {} });
     ws.room = d.key;
-    for (const p of peers) send(r.get(p.id).ws, { t: 'voice.joined', key: d.key, user: { id: ws.user.id, name: ws.user.name, state: {}, ...profileOf(ws.user.id) } });
+    const joinedPayload = { t: 'voice.joined', key: d.key, user: { id: ws.user.id, name: ws.user.name, state: {}, ...profileOf(ws.user.id) } };
+    const joinedUserId = ws.user.id;
+    const joinedKey = d.key;
+    // Diferir ligeramente 'voice.joined' para que el cliente entrante reciba antes la respuesta RPC 'voice.join'
+    // (con sus ICE servers y lista de peers) antes de recibir ofertas WebRTC de los demás participantes.
+    setTimeout(() => {
+      const liveRoom = rooms.get(joinedKey);
+      if (!liveRoom || liveRoom.get(joinedUserId)?.ws !== ws) return;
+      for (const p of peers) {
+        const target = liveRoom.get(p.id);
+        if (target && target.ws !== ws) send(target.ws, joinedPayload);
+      }
+    }, 60);
     const partyTrack = parties.get(d.key)?.current?.title || null;
     toUsers(a.audience, { t: 'voice.room', key: d.key, users: roomUsers(d.key), partyTrack });
     let ringing = false, offline = false;

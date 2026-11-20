@@ -3356,7 +3356,11 @@ function onMsg(ev) {
       renderSide();
       break;
     case 'voice.joined':
-      S.call?.addPeer(m.user);
+      if (S.call) {
+        S.call.addPeer(m.user);
+      } else if (S.joiningCall && m.user) {
+        (S.pendingPeers ||= []).push(m.user);
+      }
       ringer.playJoin();
       toast(`👋 ${m.user?.name || 'Alguien'} se unió a la llamada`);
       break;
@@ -3395,7 +3399,13 @@ function onMsg(ev) {
       }
       break;
     case 'voice.kicked': leaveCall(true); toast(m.reason || 'Te uniste desde otro dispositivo'); break;
-    case 'rtc.signal': S.call?.handleSignal(m.from, m.data); break;
+    case 'rtc.signal':
+      if (S.call) {
+        S.call.handleSignal(m.from, m.data);
+      } else if (S.joiningCall) {
+        (S.pendingSignals ||= []).push({ from: m.from, data: m.data });
+      }
+      break;
     case 'call.incoming': showIncoming(m); break;
     case 'call.stop': onCallStop(m); break;
     case 'profile.changed': onProfile(m.profile); break;
@@ -7152,6 +7162,9 @@ async function joinCall(key, label, opts = {}) {
     if (!t?.stat || settings.stats) return;
     t.stat.textContent = st === 'reconnecting' ? '🔄 Reconectando red…' : '';
   };
+  S.joiningCall = true;
+  S.pendingSignals = [];
+  S.pendingPeers = [];
   try {
     await call.start();
     if (settings.voiceMode === 'ptt') {
@@ -7162,15 +7175,27 @@ async function joinCall(key, label, opts = {}) {
     }
     const r = await rpc('voice.join', { key, video: !!opts?.video });
     call.ice = r.ice; S.call = call; S.callKey = key; S.callLabel = label;
+    S.joiningCall = false;
     S.party = r.party || null;
     if (S.party?.current?.title) S.partyTracks.set(key, S.party.current.title);
     r.peers.forEach((p) => call.addPeer(p));
+    if (S.pendingPeers?.length) {
+      const queuedPeers = S.pendingPeers.splice(0);
+      queuedPeers.forEach((u) => call.addPeer(u));
+    }
+    if (S.pendingSignals?.length) {
+      const queuedSigs = S.pendingSignals.splice(0);
+      queuedSigs.forEach((sig) => call.handleSignal(sig.from, sig.data));
+    }
     if (r.offline) { toast(`${label} no está conectado ahora`); S.call = call; leaveCall(false); return; }
     if (r.ringing) { S.outgoing = { key, name: label, video: !!opts?.video }; ringer.start('out'); } else ringer.playJoin?.();
     if (opts?.video) {
       await call.setCamera(true).catch(() => toast('No se pudo abrir la cámara'));
     }
-  } catch (e) { call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return; }
+  } catch (e) {
+    S.joiningCall = false; S.pendingSignals = []; S.pendingPeers = [];
+    call.close(); toast(e.name === 'NotAllowedError' || e.name === 'NotFoundError' ? 'No se pudo acceder al micrófono' : e.message); return;
+  }
   $('voiceDock').classList.remove('hidden'); $('stageWrap').classList.remove('hidden');
   try { localStorage.setItem('epickast.activeCall', JSON.stringify({ key, label, ts: Date.now() })); } catch {}
   $('reconnectCallBar')?.classList.add('hidden');

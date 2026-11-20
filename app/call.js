@@ -402,17 +402,20 @@ class Call {
 
   // ---- pares ----
   addPeer(user) {
-    if (this.peers.has(user.id)) return;
+    const uid = Number(user?.id);
+    if (!uid || this.peers.has(uid)) return;
     const iceTransportPolicy = this.settings.icePolicy === 'relay' ? 'relay' : 'all';
     const pc = new RTCPeerConnection({ iceServers: this.ice, iceTransportPolicy, bundlePolicy: 'max-bundle', iceCandidatePoolSize: 2 });
     const p = {
-      id: user.id, name: user.name, user, pc, polite: this.myId > user.id,
+      id: uid, name: user.name, user, pc, polite: Number(this.myId) > uid,
       making: false, ignore: false, senders: {}, streams: new Map(), mainId: null,
       state: user.state || {}, speaking: false,
+      pendingIce: [], _sigQueue: Promise.resolve(),
+      _createdAt: Date.now(), _stallRestarts: 0, _audioWatchdogRetries: 0,
       _iceTimer: null, _retryTimer: null, _iceRetries: 0, _retrying: false,
       _lastAudioBytes: 0, _stalledChecks: 0, _connectedAt: 0, _audioWatchdogFired: false,
     };
-    this.peers.set(user.id, p);
+    this.peers.set(uid, p);
     pc.onicecandidate = (e) => { if (e.candidate) this.send('rtc.signal', { to: p.id, data: { candidate: e.candidate } }); };
     pc.onnegotiationneeded = async () => {
       try {
@@ -449,6 +452,19 @@ class Call {
       e.track.onmute = e.track.onunmute = e.track.onended = purgeDeadStreams;
       purgeDeadStreams();
     };
+    pc.oniceconnectionstatechange = () => {
+      const iceSt = pc.iceConnectionState;
+      if (iceSt === 'failed') {
+        this.triggerIceRestart(p, { immediate: true });
+      } else if (iceSt === 'disconnected' && pc.connectionState !== 'connected') {
+        clearTimeout(p._iceTimer);
+        p._iceTimer = setTimeout(() => {
+          if (this.peers.get(p.id) === p && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+            this.triggerIceRestart(p);
+          }
+        }, 3200);
+      }
+    };
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       clearTimeout(p._iceTimer);
@@ -456,6 +472,7 @@ class Call {
         clearTimeout(p._retryTimer);
         p._retrying = false;
         p._iceRetries = 0;
+        p._stallRestarts = 0;
         p._connectedAt = p._connectedAt || Date.now();
       } else if (state === 'failed') {
         this.triggerIceRestart(p);
@@ -473,8 +490,12 @@ class Call {
     this.main?.getAudioTracks().forEach((t) => { p.senders.mic = pc.addTrack(t, this.main); this.tuneAudio(p.senders.mic); });
     if (this.camTrack) this.attachCam(p);
     if (this.screenStream) this.attachScreen(p);
-    const buf = this.pending.get(user.id);
-    if (buf) { this.pending.delete(user.id); buf.forEach((d) => this.handleSignal(user.id, d)); }
+    const buf = this.pending.get(uid) || this.pending.get(user.id);
+    if (buf) {
+      this.pending.delete(uid);
+      this.pending.delete(user.id);
+      buf.forEach((d) => this.handleSignal(uid, d));
+    }
     this.retune();
     this.onChange();
   }
@@ -485,7 +506,7 @@ class Call {
     if (!force && p._iceRetries >= 4) return;
     clearTimeout(p._retryTimer);
     clearTimeout(p._iceTimer);
-    const delays = [2000, 4000, 8000, 14000];
+    const delays = [1500, 3500, 7000, 12000];
     const attempt = p._iceRetries;
     const delay = (immediate || force) ? 150 : delays[Math.min(attempt, delays.length - 1)];
     if (!force) p._iceRetries += 1;
@@ -499,7 +520,10 @@ class Call {
       if (!force && pc.connectionState === 'connected') return;
       try {
         pc.restartIce?.();
-        if (pc.signalingState === 'stable' && (p.polite || retryNum >= 2 || force)) {
+        if (force && pc.signalingState !== 'stable') {
+          try { await pc.setLocalDescription({ type: 'rollback' }); } catch {}
+        }
+        if (pc.signalingState === 'stable' && (p.polite || retryNum >= 1 || force)) {
           p.making = true;
           try {
             const offer = await pc.createOffer({ iceRestart: true });
@@ -525,6 +549,19 @@ class Call {
     }, delay);
   }
 
+  reconnectPeer(peerId) {
+    const p = this.peers.get(Number(peerId));
+    if (!p || p.pc.connectionState === 'closed') return false;
+    p._iceRetries = 0;
+    p._stallRestarts = 0;
+    p._audioWatchdogFired = false;
+    p._audioWatchdogRetries = 0;
+    p._retrying = false;
+    this.onPeerStatus?.(p.id, 'reconnecting');
+    this.triggerIceRestart(p, { immediate: true, force: true });
+    return true;
+  }
+
   recoverAllPeers() {
     for (const p of this.peers.values()) {
       if (p.pc.connectionState !== 'connected' && p.pc.connectionState !== 'closed') {
@@ -536,36 +573,57 @@ class Call {
   }
 
   removePeer(id) {
-    const p = this.peers.get(id); if (!p) return;
+    const uid = Number(id);
+    const p = this.peers.get(uid) || this.peers.get(id); if (!p) return;
     clearTimeout(p._iceTimer);
     clearTimeout(p._retryTimer);
-    p.pc.close(); this.peers.delete(id); this.lastBytes.delete(id);
+    p.pc.close(); this.peers.delete(p.id); this.lastBytes.delete(p.id);
     this.retune(); this.onChange();
   }
 
-  async handleSignal(from, data) {
-    const p = this.peers.get(from);
-    if (!p) { const b = this.pending.get(from) || []; b.push(data); this.pending.set(from, b); return; }
-    try {
-      if (data.description) {
-        const d = data.description;
-        const collision = d.type === 'offer' && (p.making || p.pc.signalingState !== 'stable');
-        p.ignore = !p.polite && collision;
-        if (p.ignore) return;
-        if (collision && p.polite) {
-          try { await p.pc.setLocalDescription({ type: 'rollback' }); } catch {}
+  handleSignal(from, data) {
+    const uid = Number(from);
+    const p = this.peers.get(uid) || this.peers.get(from);
+    if (!p) {
+      const b = this.pending.get(uid) || [];
+      if (b.length < 200) b.push(data);
+      this.pending.set(uid, b);
+      return;
+    }
+    p._sigQueue = p._sigQueue.then(async () => {
+      if (this.peers.get(p.id) !== p || p.pc.connectionState === 'closed') return;
+      try {
+        if (data.description) {
+          const d = data.description;
+          const collision = d.type === 'offer' && (p.making || p.pc.signalingState !== 'stable');
+          p.ignore = !p.polite && collision;
+          if (p.ignore) return;
+          if (collision && p.polite) {
+            try { await p.pc.setLocalDescription({ type: 'rollback' }); } catch {}
+          }
+          await p.pc.setRemoteDescription(d);
+          p.ignore = false;
+          // Drenar candidatos ICE que llegaron antes de setRemoteDescription
+          while (p.pendingIce.length) {
+            const c = p.pendingIce.shift();
+            try { await p.pc.addIceCandidate(c); } catch (e) { if (!p.ignore) console.warn('flush ice candidate', e); }
+          }
+          if (d.type === 'offer') {
+            await p.pc.setLocalDescription();
+            const desc = p.pc.localDescription ? { type: p.pc.localDescription.type, sdp: this.tuneOpusSdp(p.pc.localDescription.sdp) } : p.pc.localDescription;
+            this.send('rtc.signal', { to: p.id, data: { description: desc } });
+          }
+        } else if (data.candidate) {
+          if (p.ignore) return;
+          if (!p.pc.remoteDescription) {
+            if (p.pendingIce.length < 150) p.pendingIce.push(data.candidate);
+            return;
+          }
+          try { await p.pc.addIceCandidate(data.candidate); } catch (e) { if (!p.ignore) console.warn('ice candidate', e); }
         }
-        await p.pc.setRemoteDescription(d);
-        p.ignore = false;
-        if (d.type === 'offer') {
-          await p.pc.setLocalDescription();
-          const desc = p.pc.localDescription ? { type: p.pc.localDescription.type, sdp: this.tuneOpusSdp(p.pc.localDescription.sdp) } : p.pc.localDescription;
-          this.send('rtc.signal', { to: from, data: { description: desc } });
-        }
-      } else if (data.candidate) {
-        try { await p.pc.addIceCandidate(data.candidate); } catch (e) { if (!p.ignore) console.warn('ice candidate', e); }
-      }
-    } catch (e) { console.warn('signal', e); }
+      } catch (e) { console.warn('signal', e); }
+    });
+    return p._sigQueue;
   }
 
   // ---- afinado de emisores ----
@@ -827,19 +885,35 @@ class Call {
         this.retune();
       }
 
+      const nowMs = Date.now();
       for (const item of peerStats) {
         const p = item.p;
+        // Watchdog #1: par atascado en 'new' o 'connecting' por >7s (nunca completó handshake ICE)
+        if (
+          (p.pc.connectionState === 'new' || p.pc.connectionState === 'connecting') &&
+          !p._connectedAt &&
+          !p._retrying &&
+          p._stallRestarts < 3 &&
+          nowMs - (p._createdAt || 0) > 7000 * (p._stallRestarts + 1)
+        ) {
+          p._stallRestarts += 1;
+          this.onPeerStatus?.(p.id, 'reconnecting');
+          this.triggerIceRestart(p, { immediate: true, force: true });
+          continue;
+        }
+        // Watchdog #2: conectado pero jamás llegó audio (hasta 2 intentos de ICE restart)
         if (
           p.pc.connectionState === 'connected' &&
           p._connectedAt > 0 &&
-          Date.now() - p._connectedAt > 8000 &&
+          nowMs - p._connectedAt > 8000 &&
           !p.state?.muted &&
-          !p._audioWatchdogFired
+          (p._audioWatchdogRetries || 0) < 2
         ) {
           const otherAudioFlowing = peerStats.some((s) => s.p !== p && s.audioGrew);
-          // Solo reiniciar ICE si jamás llegó audio de este par (evita congelar una llamada ya sana)
           if (!p._everReceivedAudio && ((p._stalledChecks >= 3 && otherAudioFlowing) || p._stalledChecks >= 4)) {
-            p._audioWatchdogFired = true;
+            p._audioWatchdogRetries = (p._audioWatchdogRetries || 0) + 1;
+            p._stalledChecks = 0;
+            this.onPeerStatus?.(p.id, 'reconnecting');
             this.triggerIceRestart(p, { immediate: true, force: true });
           }
         }
